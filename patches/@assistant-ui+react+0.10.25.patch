@@ -1,0 +1,26 @@
+diff --git a/node_modules/@assistant-ui/react/dist/runtimes/composer/DefaultEditComposerRuntimeCore.js b/node_modules/@assistant-ui/react/dist/runtimes/composer/DefaultEditComposerRuntimeCore.js
+index 44587f6..86b2274 100644
+--- a/node_modules/@assistant-ui/react/dist/runtimes/composer/DefaultEditComposerRuntimeCore.js
++++ b/node_modules/@assistant-ui/react/dist/runtimes/composer/DefaultEditComposerRuntimeCore.js
+@@ -27,14 +27,13 @@ var DefaultEditComposerRuntimeCore = class extends BaseComposerRuntimeCore {
+   _sourceId;
+   async handleSend(message) {
+     const text = getThreadMessageText(message);
+-    if (text !== this._previousText) {
+-      this.runtime.append({
+-        ...message,
+-        content: [...message.content, ...this._nonTextParts],
+-        parentId: this._parentId,
+-        sourceId: this._sourceId
+-      });
+-    }
++    this.runtime.append({
++      ...message,
++      content: [...message.content, ...this._nonTextParts],
++      parentId: this._parentId,
++      sourceId: this._sourceId,
++      startRun: true
++    });
+     this.handleCancel();
+   }
+   handleCancel() {
