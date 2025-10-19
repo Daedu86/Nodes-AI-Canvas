@@ -1,14 +1,15 @@
 "use client";
 
 import { useAssistantRuntime } from "@assistant-ui/react";
-import { Copy as CopyIcon } from "lucide-react";
+import { Copy as CopyIcon, RefreshCw, ZoomIn, ZoomOut } from "lucide-react";
 import React from "react";
+import { useThreadRepoItems, type ThreadRepoItem } from "./use-thread-repo-items";
 
-function extractText(msg: any): string {
+function extractText(msg: ThreadRepoItem["message"]): string {
   try {
     const parts = Array.isArray(msg?.content) ? msg.content : [];
     const text = parts
-      .map((p: any) => (p?.type === "text" && typeof p?.text === "string" ? p.text : ""))
+      .map((p) => (p?.type === "text" && typeof p?.text === "string" ? p.text : ""))
       .filter(Boolean)
       .join(" • ");
     return text || "";
@@ -16,8 +17,6 @@ function extractText(msg: any): string {
     return "";
   }
 }
-
-type RepoItem = { message: any; parentId: string | null };
 
 type Node = {
   id: string;
@@ -31,26 +30,23 @@ type Node = {
   branchId?: any;
 };
 
+const ZOOM_STEP = 1.2;
+const clampZoom = (value: number) => Math.min(3, Math.max(0.3, value));
+const NODE_WIDTH = 220;
+const NODE_HEIGHT = 56;
+const HALF_NODE_WIDTH = NODE_WIDTH / 2;
+const HALF_NODE_HEIGHT = NODE_HEIGHT / 2;
+
 export function ThreadGraphInline() {
   const runtime = useAssistantRuntime();
-  const [repoItems, setRepoItems] = React.useState<RepoItem[]>([]);
-
-  React.useEffect(() => {
-    try {
-      const exp = runtime?.threads?.main?.export();
-      const items = Array.isArray(exp?.messages) ? (exp!.messages as RepoItem[]) : [];
-      setRepoItems(items);
-    } catch {
-      setRepoItems([]);
-    }
-  }, [runtime]);
+  const repoItems = useThreadRepoItems(runtime);
 
   const nodes: Node[] = React.useMemo(() => {
     const arr = Array.isArray(repoItems) ? repoItems : [];
-    const map = new Map<string, RepoItem>();
+    const map = new Map<string, ThreadRepoItem>();
     arr.forEach((it) => map.set(it.message?.id, it));
     const depthCache = new Map<string, number>();
-    const getDepth = (m: any): number => {
+    const getDepth = (m: ThreadRepoItem["message"]): number => {
       const id = m?.id;
       if (!id) return 0;
       if (depthCache.has(id)) return depthCache.get(id)!;
@@ -67,7 +63,7 @@ export function ThreadGraphInline() {
       depthCache.set(id, d);
       return d;
     };
-    return arr.map((it: RepoItem, i: number) => {
+    return arr.map((it: ThreadRepoItem, i: number) => {
       const id = String(it.message?.id ?? i);
       const parentId = it.parentId ?? null;
       const node: Node = {
@@ -96,7 +92,13 @@ export function ThreadGraphInline() {
   );
   const POS_KEY = "a-ui.graph-inline-pos.v1";
   const boundsRef = React.useRef(new Map<string, { x: number; y: number; w: number; h: number }>());
-  const screenToWorld = (sx: number, sy: number) => ({ x: (sx - view.x) / view.k, y: (sy - view.y) / view.k });
+  const screenToWorld = React.useCallback(
+    (sx: number, sy: number, currentView = view) => ({
+      x: (sx - currentView.x) / currentView.k,
+      y: (sy - currentView.y) / currentView.k,
+    }),
+    [view]
+  );
 
   const render = React.useCallback(() => {
     const canvas = canvasRef.current;
@@ -129,11 +131,10 @@ export function ThreadGraphInline() {
     const marginY = 40;
     const xStep = 280;
     const levelYSteps = levels.map((l) => 80);
-    const halfNodeW = 110;
     levels.forEach((l, depth) => {
       const stepY = levelYSteps[depth] || 60;
       l.forEach((n, i) => {
-        const x = marginX + depth * xStep + halfNodeW;
+        const x = marginX + depth * xStep + HALF_NODE_WIDTH;
         const y = marginY + (i + 1) * stepY;
         (n as any).x = x;
         (n as any).y = y;
@@ -145,14 +146,14 @@ export function ThreadGraphInline() {
       });
     });
 
-  const idToNode = new Map(nodes.map((n) => [n.id, n] as const));
+    const idToNode = new Map(nodes.map((n) => [n.id, n] as const));
     nodes.forEach((n) => {
       if (!n.parentId) return;
       const p = idToNode.get(String(n.parentId));
       if (!p || p.x == null || p.y == null || n.x == null || n.y == null) return;
       ctx.beginPath();
-      ctx.moveTo(p.x + halfNodeW, p.y);
-      ctx.lineTo(n.x - halfNodeW, n.y);
+      ctx.moveTo(p.x + HALF_NODE_WIDTH, p.y);
+      ctx.lineTo(n.x - HALF_NODE_WIDTH, n.y);
       const hue = n.branchId ? (String(n.branchId).length * 67) % 360 : null;
       ctx.strokeStyle = hue == null ? "rgba(100,100,100,0.7)" : `hsla(${hue},60%,45%,0.75)`;
       ctx.lineWidth = hue == null ? 1.6 : 1.2;
@@ -175,14 +176,25 @@ export function ThreadGraphInline() {
         if (arr.length < 2) continue;
         const ordered = arr
           .filter((n) => n.x != null && n.y != null)
-          .sort((a, b) => (a.x! - b.x!));
+          .sort((a, b) => a.y! - b.y!);
         for (let i = 0; i < ordered.length - 1; i++) {
           const a = ordered[i];
           const b = ordered[i + 1];
           if (a.x == null || a.y == null || b.x == null || b.y == null) continue;
           ctx.beginPath();
-          ctx.moveTo(a.x + halfNodeW, a.y + 28);
-          ctx.lineTo(b.x - halfNodeW, b.y - 28);
+          const startX = a.x!;
+          const startY = a.y! + HALF_NODE_HEIGHT;
+          const endX = b.x!;
+          const endY = b.y! - HALF_NODE_HEIGHT;
+          ctx.moveTo(startX, startY);
+          if (Math.abs(startX - endX) < 1) {
+            ctx.lineTo(endX, endY);
+          } else {
+            const midY = (startY + endY) / 2;
+            ctx.lineTo(startX, midY);
+            ctx.lineTo(endX, midY);
+            ctx.lineTo(endX, endY);
+          }
           ctx.stroke();
         }
       }
@@ -202,8 +214,8 @@ export function ThreadGraphInline() {
       r === "user" ? "#2563eb" : r === "assistant" ? "#16a34a" : "#6b7280";
     nodes.forEach((n) => {
       if (n.x == null || n.y == null) return;
-      const w = 220;
-      const h = 56;
+      const w = NODE_WIDTH;
+      const h = NODE_HEIGHT;
       const r = 8;
       const x = n.x - w / 2;
       const y = n.y - h / 2;
@@ -236,7 +248,112 @@ export function ThreadGraphInline() {
     });
 
     ctx.restore();
-  }, [nodes, view]);
+  }, [nodes, nodePositions, view]);
+
+  const resetView = React.useCallback(() => {
+    const container = containerRef.current;
+    if (!container || nodes.length === 0) return;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const maxDepth = nodes.reduce((acc, node) => Math.max(acc, node.depth), 0);
+    const levels: Node[][] = Array.from({ length: maxDepth + 1 }, () => []);
+    nodes.forEach((node) => levels[node.depth].push(node));
+    const marginX = 80;
+    const marginY = 40;
+    const xStep = maxDepth > 0 ? (width - marginX * 2) / maxDepth : width - marginX * 2;
+    const levelYSteps = levels.map((level) => {
+      const count = level.length || 1;
+      return count > 0 ? (height - marginY * 2) / count : height;
+    });
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    levels.forEach((level, depth) => {
+      const stepY = levelYSteps[depth] || 60;
+      level.forEach((node, index) => {
+        const x = marginX + depth * xStep + HALF_NODE_WIDTH;
+        const y = marginY + (index + 1) * stepY;
+        minX = Math.min(minX, x - HALF_NODE_WIDTH);
+        maxX = Math.max(maxX, x + HALF_NODE_WIDTH);
+        minY = Math.min(minY, y - HALF_NODE_HEIGHT);
+        maxY = Math.max(maxY, y + HALF_NODE_HEIGHT);
+      });
+    });
+    const contentW = Math.max(1, maxX - minX);
+    const contentH = Math.max(1, maxY - minY);
+    const pad = 40;
+    const k = clampZoom(Math.min((width - pad * 2) / contentW, (height - pad * 2) / contentH));
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const x = width / 2 - centerX * k;
+    const y = height / 2 - centerY * k;
+    setView({ x, y, k });
+  }, [nodes]);
+
+  const zoomBy = React.useCallback((factor: number) => {
+    setView((prev) => {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        return { ...prev, k: clampZoom(prev.k * factor) };
+      }
+      const rect = canvas.getBoundingClientRect();
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      const worldX = (cx - prev.x) / prev.k;
+      const worldY = (cy - prev.y) / prev.k;
+      const k = clampZoom(prev.k * factor);
+      const x = cx - worldX * k;
+      const y = cy - worldY * k;
+      return { x, y, k };
+    });
+  }, []);
+
+  const handleZoomIn = React.useCallback(() => {
+    zoomBy(ZOOM_STEP);
+  }, [zoomBy]);
+
+  const handleZoomOut = React.useCallback(() => {
+    zoomBy(1 / ZOOM_STEP);
+  }, [zoomBy]);
+
+  const handleRefresh = React.useCallback(() => {
+    dragStartRef.current = null;
+    viewStartRef.current = null;
+    nodeDragRef.current = null;
+    setNodePositions(new Map());
+    resetView();
+  }, [resetView]);
+
+  const handleCopyJson = React.useCallback(() => {
+    try {
+      const idToParent = new Map<string, string | null>();
+      const parentToChildren = new Map<string | null, string[]>();
+      nodes.forEach((node) => {
+        idToParent.set(node.id, node.parentId ?? null);
+        const key = node.parentId ?? null;
+        const list = parentToChildren.get(key) || [];
+        list.push(node.id);
+        parentToChildren.set(key, list);
+      });
+      const payload = nodes.map((node) => {
+        const parentId = idToParent.get(node.id) ?? null;
+        const children = parentToChildren.get(node.id) ?? [];
+        const siblings = (parentToChildren.get(parentId) || []).filter((sibling) => sibling !== node.id);
+        return { id: node.id, parentId, children, siblings };
+      });
+      const text = JSON.stringify(payload, null, 2);
+      navigator.clipboard.writeText(text);
+      alert("Graph JSON copied to clipboard");
+    } catch (error) {
+      console.error(error);
+      alert("Copy failed");
+    }
+  }, [nodes]);
+
+  const controlButtonClass =
+    "inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted";
+  const iconClass = "h-3.5 w-3.5";
 
   React.useEffect(() => {
     render();
@@ -269,12 +386,13 @@ export function ThreadGraphInline() {
         }
       };
       const onMouseMove = (e: MouseEvent) => {
-        if (nodeDragRef.current) {
+        const dragInfo = nodeDragRef.current;
+        if (dragInfo) {
           const rect = canvas.getBoundingClientRect();
           const sx = e.clientX - rect.left;
           const sy = e.clientY - rect.top;
           const world = screenToWorld(sx, sy);
-          const { id, ox, oy } = nodeDragRef.current;
+          const { id, ox, oy } = dragInfo;
           const nx = world.x - ox;
           const ny = world.y - oy;
           setNodePositions((prev) => {
@@ -284,10 +402,12 @@ export function ThreadGraphInline() {
           });
           return;
         }
-        if (!dragStartRef.current || !viewStartRef.current) return;
-        const dx = e.clientX - dragStartRef.current.x;
-        const dy = e.clientY - dragStartRef.current.y;
-        setView((v) => ({ ...v, x: viewStartRef.current!.x + dx, y: viewStartRef.current!.y + dy }));
+        const dragStart = dragStartRef.current;
+        const viewStart = viewStartRef.current;
+        if (!dragStart || !viewStart) return;
+        const dx = e.clientX - dragStart.x;
+        const dy = e.clientY - dragStart.y;
+        setView((v) => ({ ...v, x: viewStart.x + dx, y: viewStart.y + dy }));
       };
       const onMouseUp = () => {
         dragStartRef.current = null;
@@ -301,9 +421,9 @@ export function ThreadGraphInline() {
         const rect = canvas.getBoundingClientRect();
         const sx = e.clientX - rect.left;
         const sy = e.clientY - rect.top;
-        const world = screenToWorld(sx, sy);
         setView((v) => {
-          const k = Math.min(3, Math.max(0.3, v.k * factor));
+          const world = screenToWorld(sx, sy, v);
+          const k = clampZoom(v.k * factor);
           const x = sx - world.x * k;
           const y = sy - world.y * k;
           return { x, y, k };
@@ -341,7 +461,7 @@ export function ThreadGraphInline() {
       if (cleanup) cleanup();
       ro.disconnect();
     };
-  }, [render, view]);
+  }, [render, screenToWorld, view]);
 
   React.useEffect(() => {
     try {
@@ -361,6 +481,10 @@ export function ThreadGraphInline() {
 
   React.useEffect(() => {
     try {
+      if (nodePositions.size === 0) {
+        localStorage.removeItem(POS_KEY);
+        return;
+      }
       const obj: Record<string, [number, number]> = {};
       nodePositions.forEach((v, k) => {
         obj[k] = [v.x, v.y];
@@ -370,86 +494,55 @@ export function ThreadGraphInline() {
   }, [nodePositions]);
 
   React.useEffect(() => {
-    const container = containerRef.current;
-    if (!container || nodes.length === 0) return;
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    const maxDepth = nodes.reduce((a, n) => Math.max(a, n.depth), 0);
-    const levels: Node[][] = Array.from({ length: maxDepth + 1 }, () => []);
-    nodes.forEach((n) => levels[n.depth].push(n));
-    const marginX = 80;
-    const marginY = 40;
-    const xStep = (width - marginX * 2) / Math.max(1, maxDepth || 1);
-    const levelYSteps = levels.map((l) => (height - marginY * 2) / Math.max(1, l.length || 1));
-    const halfNodeW = 110;
-    let minX = Number.POSITIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
-    let maxY = Number.NEGATIVE_INFINITY;
-    levels.forEach((l, depth) => {
-      const stepY = levelYSteps[depth] || 60;
-      l.forEach((n, i) => {
-        const x = marginX + depth * xStep + halfNodeW;
-        const y = marginY + (i + 1) * stepY;
-        minX = Math.min(minX, x - halfNodeW);
-        maxX = Math.max(maxX, x + halfNodeW);
-        minY = Math.min(minY, y - 28);
-        maxY = Math.max(maxY, y + 28);
-      });
-    });
-    const contentW = Math.max(1, maxX - minX);
-    const contentH = Math.max(1, maxY - minY);
-    const pad = 40;
-    const k = Math.min(
-      3,
-      Math.max(0.3, Math.min((width - pad * 2) / contentW, (height - pad * 2) / contentH))
-    );
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    const x = width / 2 - centerX * k;
-    const y = height / 2 - centerY * k;
-    setView({ x, y, k });
-  }, [nodes.length]);
+    resetView();
+  }, [resetView]);
 
   return (
     <section className="flex h-full w-full flex-col overflow-hidden">
-      <header className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-y-2 border-b border-border/60 px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold">Thread Tree (all branches)</h2>
-          <p className="text-xs text-muted-foreground">Drag to pan, wheel to zoom, click node to jump.</p>
+          <p className="text-xs text-muted-foreground">
+            Drag to pan, zoom with wheel or buttons, click a node to jump.
+          </p>
         </div>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted"
-          onClick={() => {
-            try {
-              const idToParent = new Map<string, string | null>();
-              const parentToChildren = new Map<string | null, string[]>();
-              nodes.forEach((n) => {
-                idToParent.set(n.id, n.parentId ?? null);
-                const key = n.parentId ?? null;
-                const arr = parentToChildren.get(key) || [];
-                arr.push(n.id);
-                parentToChildren.set(key, arr);
-              });
-              const out = nodes.map((n) => {
-                const id = n.id;
-                const parentId = idToParent.get(id) ?? null;
-                const children = parentToChildren.get(id) ?? [];
-                const siblings = (parentToChildren.get(parentId) || []).filter((sid) => sid !== id);
-                return { id, parentId, children, siblings };
-              });
-              const text = JSON.stringify(out, null, 2);
-              navigator.clipboard.writeText(text);
-              alert("Graph JSON copied to clipboard");
-            } catch (e) {
-              console.error(e);
-              alert("Copy failed");
-            }
-          }}
-        >
-          <CopyIcon className="h-3.5 w-3.5" /> Copy JSON
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={controlButtonClass}
+            onClick={handleZoomOut}
+            title="Zoom out"
+          >
+            <ZoomOut className={iconClass} />
+            <span>Zoom -</span>
+          </button>
+          <button
+            type="button"
+            className={controlButtonClass}
+            onClick={handleZoomIn}
+            title="Zoom in"
+          >
+            <ZoomIn className={iconClass} />
+            <span>Zoom +</span>
+          </button>
+          <button
+            type="button"
+            className={controlButtonClass}
+            onClick={handleRefresh}
+            title="Reset positions"
+          >
+            <RefreshCw className={iconClass} />
+            <span>Refresh</span>
+          </button>
+          <button
+            type="button"
+            className={controlButtonClass}
+            onClick={handleCopyJson}
+            title="Copy graph JSON"
+          >
+            <CopyIcon className={iconClass} /> Copy JSON
+          </button>
+        </div>
       </header>
       <div
         ref={(el) => {
@@ -467,4 +560,5 @@ export function ThreadGraphInline() {
     </section>
   );
 }
+
 
