@@ -39,7 +39,10 @@ export const Thread: FC = () => {
         ["--thread-max-width" as string]: "42rem",
       }}
     >
-      <ThreadPrimitive.Viewport className="flex h-full flex-col items-center overflow-y-scroll scroll-smooth bg-inherit px-4 pt-8">
+      <ThreadPrimitive.Viewport
+        autoScroll={false}
+        className="flex h-full flex-col items-center overflow-y-scroll scroll-smooth bg-inherit px-4 pt-8"
+      >
         <ThreadWelcome />
 
         <ThreadPrimitive.Messages
@@ -80,9 +83,9 @@ const ThreadScrollToBottom: FC = () => {
 const ThreadWelcome: FC = () => {
   return (
     <ThreadPrimitive.Empty>
-      <div className="flex w-full max-w-[var(--thread-max-width)] flex-grow flex-col">
-        <div className="flex w-full flex-grow flex-col items-center justify-center">
-          <p className="mt-4 font-medium">How can I help you today?</p>
+      <div className="w-full max-w-[var(--thread-max-width)] space-y-6 py-6">
+        <div>
+          <p className="text-lg font-semibold">How can I help you today?</p>
         </div>
         <ThreadWelcomeSuggestions />
       </div>
