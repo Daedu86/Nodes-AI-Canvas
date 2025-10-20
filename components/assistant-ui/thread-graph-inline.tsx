@@ -102,6 +102,7 @@ const ALL_CONNECTORS: ConnectorId[] = [
 ];
 
 const CONNECTOR_OFFSET = 12;
+const CONNECTOR_HIT_RADIUS = 14;
 
 const isConnectorId = (value: unknown): value is ConnectorId =>
   typeof value === "string" && (ALL_CONNECTORS as readonly string[]).includes(value);
@@ -221,10 +222,56 @@ export function ThreadGraphInline() {
   const connectorPositionsRef = React.useRef(new Map<string, Map<ConnectorId, Point>>());
   const edgeConnectorMapRef = React.useRef(new Map<string, EdgeConnectorInfo>());
   const nodeLayoutRef = React.useRef(new Map<string, Node>());
+  const [hoveredConnector, setHoveredConnector] = React.useState<{ nodeId: string; connectorId: ConnectorId } | null>(
+    null
+  );
+  const [draggingConnector, setDraggingConnector] = React.useState<{ nodeId: string; connectorId: ConnectorId } | null>(
+    null
+  );
+  const hoveredConnectorRef = React.useRef<typeof hoveredConnector>(null);
+  const draggingConnectorRef = React.useRef<typeof draggingConnector>(null);
+  const connectorDragRef = React.useRef<{
+    nodeId: string;
+    connectorId: ConnectorId;
+    startX: number;
+    startY: number;
+    hasMoved: boolean;
+  } | null>(null);
+  const suppressClickRef = React.useRef(false);
+
+  React.useEffect(() => {
+    hoveredConnectorRef.current = hoveredConnector;
+  }, [hoveredConnector]);
+
+  React.useEffect(() => {
+    draggingConnectorRef.current = draggingConnector;
+  }, [draggingConnector]);
 
   const POS_KEY = "a-ui.graph-inline-pos.v1";
   const CONN_KEY = "a-ui.graph-inline-conn.v1";
   const boundsRef = React.useRef(new Map<string, { x: number; y: number; w: number; h: number }>());
+  const updateHoveredConnector = React.useCallback(
+    (next: { nodeId: string; connectorId: ConnectorId } | null) => {
+      setHoveredConnector((prev) => {
+        if (prev?.nodeId === next?.nodeId && prev?.connectorId === next?.connectorId) {
+          return prev;
+        }
+        return next;
+      });
+    },
+    []
+  );
+  const updateDraggingConnector = React.useCallback(
+    (next: { nodeId: string; connectorId: ConnectorId } | null) => {
+      setDraggingConnector((prev) => {
+        if (prev?.nodeId === next?.nodeId && prev?.connectorId === next?.connectorId) {
+          return prev;
+        }
+        return next;
+      });
+    },
+    []
+  );
   const screenToWorld = React.useCallback(
     (sx: number, sy: number, currentView = view) => ({
       x: (sx - currentView.x) / currentView.k,
@@ -322,6 +369,24 @@ export function ThreadGraphInline() {
     });
     connectorDefaultsRef.current = defaults;
   }, [chooseDefaultConnectors, getEdgeKey, nodes]);
+
+  const getConnectorHit = React.useCallback(
+    (x: number, y: number, radius = CONNECTOR_HIT_RADIUS) => {
+      let closest: { nodeId: string; connectorId: ConnectorId; distance: number } | null = null;
+      connectorPositionsRef.current.forEach((connectorMap, nodeId) => {
+        connectorMap.forEach((point, connectorId) => {
+          const dx = point.x - x;
+          const dy = point.y - y;
+          const distance = Math.hypot(dx, dy);
+          if (distance <= radius && (closest == null || distance < closest.distance)) {
+            closest = { nodeId, connectorId, distance };
+          }
+        });
+      });
+      return closest;
+    },
+    []
+  );
 
   React.useEffect(() => {
     setLinkConnectors((prev) => {
@@ -496,12 +561,29 @@ export function ThreadGraphInline() {
         const point = getConnectorPoint(n, connectorId);
         connectorMap.set(connectorId, point);
         const isUsed = usedConnectors?.has(connectorId) ?? false;
-        const connectorRadius = isUsed ? 3.4 : 2.4;
+        const isHovered =
+          hoveredConnector?.nodeId === n.id && hoveredConnector.connectorId === connectorId;
+        const isDragging =
+          draggingConnector?.nodeId === n.id && draggingConnector.connectorId === connectorId;
+        const connectorRadius = isDragging ? 4.4 : isHovered ? 3.9 : isUsed ? 3.4 : 2.4;
         ctx.beginPath();
         ctx.arc(point.x, point.y, connectorRadius, 0, Math.PI * 2);
-        ctx.fillStyle = isUsed ? "#2563eb" : isDarkBg ? "rgba(148,163,184,0.55)" : "rgba(156,163,175,0.6)";
-        ctx.strokeStyle = isDarkBg ? "rgba(17,24,39,0.85)" : "#f9fafb";
-        ctx.lineWidth = isUsed ? 1.2 : 0.8;
+        let fill = isUsed ? "#2563eb" : isDarkBg ? "rgba(148,163,184,0.55)" : "rgba(156,163,175,0.6)";
+        let stroke = isDarkBg ? "rgba(17,24,39,0.85)" : "#f9fafb";
+        let lineWidth = isUsed ? 1.2 : 0.8;
+        if (isHovered) {
+          fill = "#1d4ed8";
+          stroke = isDarkBg ? "#e2e8f0" : "#bfdbfe";
+          lineWidth = Math.max(lineWidth, 1.4);
+        }
+        if (isDragging) {
+          fill = "#1e40af";
+          stroke = isDarkBg ? "#f1f5f9" : "#bfdbfe";
+          lineWidth = Math.max(lineWidth, 1.6);
+        }
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = lineWidth;
         ctx.fill();
         ctx.stroke();
       });
@@ -513,7 +595,7 @@ export function ThreadGraphInline() {
     edgeConnectorMapRef.current = edgeConnectorMap;
 
     ctx.restore();
-  }, [chooseDefaultConnectors, getEdgeKey, linkConnectors, nodePositions, nodes, view]);
+  }, [chooseDefaultConnectors, draggingConnector, getEdgeKey, hoveredConnector, linkConnectors, nodePositions, nodes, view]);
 
   const resetView = React.useCallback(() => {
     const container = containerRef.current;
@@ -628,11 +710,32 @@ export function ThreadGraphInline() {
     const raf = requestAnimationFrame(() => {});
     const canvas = canvasRef.current;
     if (canvas) {
+      const setCanvasCursor = (value: string) => {
+        if (canvas.style.cursor !== value) {
+          canvas.style.cursor = value;
+        }
+      };
       const onMouseDown = (e: MouseEvent) => {
+        suppressClickRef.current = false;
         const rect = canvas.getBoundingClientRect();
         const sx = e.clientX - rect.left;
         const sy = e.clientY - rect.top;
         const world = screenToWorld(sx, sy);
+        const connectorHit = getConnectorHit(world.x, world.y);
+        if (connectorHit) {
+          connectorDragRef.current = {
+            nodeId: connectorHit.nodeId,
+            connectorId: connectorHit.connectorId,
+            startX: world.x,
+            startY: world.y,
+            hasMoved: false,
+          };
+          updateDraggingConnector({ nodeId: connectorHit.nodeId, connectorId: connectorHit.connectorId });
+          updateHoveredConnector({ nodeId: connectorHit.nodeId, connectorId: connectorHit.connectorId });
+          setCanvasCursor("grabbing");
+          e.preventDefault();
+          return;
+        }
         let hitId: string | null = null;
         for (const [id, b] of boundsRef.current) {
           if (world.x >= b.x && world.x <= b.x + b.w && world.y >= b.y && world.y <= b.y + b.h) {
@@ -645,18 +748,37 @@ export function ThreadGraphInline() {
           const cx = b.x + b.w / 2;
           const cy = b.y + b.h / 2;
           nodeDragRef.current = { id: hitId, ox: world.x - cx, oy: world.y - cy };
-        } else {
-          dragStartRef.current = { x: e.clientX, y: e.clientY };
-          viewStartRef.current = { x: view.x, y: view.y };
+          updateHoveredConnector(null);
+          setCanvasCursor("grabbing");
+          return;
         }
+        dragStartRef.current = { x: e.clientX, y: e.clientY };
+        viewStartRef.current = { x: view.x, y: view.y };
+        updateHoveredConnector(null);
+        setCanvasCursor("grabbing");
       };
       const onMouseMove = (e: MouseEvent) => {
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const world = screenToWorld(sx, sy);
+        const connectorDrag = connectorDragRef.current;
+        if (connectorDrag) {
+          const dx = world.x - connectorDrag.startX;
+          const dy = world.y - connectorDrag.startY;
+          if (!connectorDrag.hasMoved && (Math.abs(dx) > 1 || Math.abs(dy) > 1)) {
+            connectorDrag.hasMoved = true;
+            suppressClickRef.current = true;
+          }
+          const hoverTarget = getConnectorHit(world.x, world.y);
+          updateHoveredConnector(
+            hoverTarget ? { nodeId: hoverTarget.nodeId, connectorId: hoverTarget.connectorId } : null
+          );
+          setCanvasCursor("grabbing");
+          return;
+        }
         const dragInfo = nodeDragRef.current;
         if (dragInfo) {
-          const rect = canvas.getBoundingClientRect();
-          const sx = e.clientX - rect.left;
-          const sy = e.clientY - rect.top;
-          const world = screenToWorld(sx, sy);
           const { id, ox, oy } = dragInfo;
           const nx = world.x - ox;
           const ny = world.y - oy;
@@ -665,20 +787,49 @@ export function ThreadGraphInline() {
             m.set(id, { x: nx, y: ny });
             return m;
           });
+          setCanvasCursor("grabbing");
           return;
         }
         const dragStart = dragStartRef.current;
         const viewStart = viewStartRef.current;
-        if (!dragStart || !viewStart) return;
-        const dx = e.clientX - dragStart.x;
-        const dy = e.clientY - dragStart.y;
-        setView((v) => ({ ...v, x: viewStart.x + dx, y: viewStart.y + dy }));
+        if (dragStart && viewStart) {
+          const dx = e.clientX - dragStart.x;
+          const dy = e.clientY - dragStart.y;
+          setView((v) => ({ ...v, x: viewStart.x + dx, y: viewStart.y + dy }));
+          setCanvasCursor("grabbing");
+          return;
+        }
+        const hover = getConnectorHit(world.x, world.y);
+        if (hover) {
+          updateHoveredConnector({ nodeId: hover.nodeId, connectorId: hover.connectorId });
+          setCanvasCursor("pointer");
+        } else if (hoveredConnectorRef.current) {
+          updateHoveredConnector(null);
+          setCanvasCursor("default");
+        }
       };
       const onMouseUp = () => {
+        const connectorDrag = connectorDragRef.current;
+        if (connectorDrag) {
+          updateDraggingConnector(null);
+          connectorDragRef.current = null;
+          if (connectorDrag.hasMoved) {
+            suppressClickRef.current = true;
+          }
+        }
         dragStartRef.current = null;
         viewStartRef.current = null;
         nodeDragRef.current = null;
-        canvas.style.cursor = "default";
+        setCanvasCursor(hoveredConnectorRef.current ? "pointer" : "default");
+      };
+      const onMouseLeave = () => {
+        if (connectorDragRef.current || nodeDragRef.current || dragStartRef.current) {
+          return;
+        }
+        if (hoveredConnectorRef.current) {
+          updateHoveredConnector(null);
+        }
+        setCanvasCursor("default");
       };
       const onWheel = (e: WheelEvent) => {
         e.preventDefault();
@@ -695,6 +846,10 @@ export function ThreadGraphInline() {
         });
       };
       const onClick = (e: MouseEvent) => {
+        if (suppressClickRef.current) {
+          suppressClickRef.current = false;
+          return;
+        }
         if (dragStartRef.current && viewStartRef.current) return;
         const rect = canvas.getBoundingClientRect();
         const sx = e.clientX - rect.left;
@@ -711,6 +866,7 @@ export function ThreadGraphInline() {
       canvas.addEventListener("mousedown", onMouseDown);
       window.addEventListener("mousemove", onMouseMove);
       window.addEventListener("mouseup", onMouseUp);
+      canvas.addEventListener("mouseleave", onMouseLeave);
       const wheelListenerOptions: AddEventListenerOptions = { passive: false };
       canvas.addEventListener("wheel", onWheel, wheelListenerOptions);
       canvas.addEventListener("click", onClick);
@@ -718,6 +874,7 @@ export function ThreadGraphInline() {
         canvas.removeEventListener("mousedown", onMouseDown);
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
+        canvas.removeEventListener("mouseleave", onMouseLeave);
         canvas.removeEventListener("wheel", onWheel, wheelListenerOptions);
         canvas.removeEventListener("click", onClick);
       };
@@ -727,7 +884,7 @@ export function ThreadGraphInline() {
       if (cleanup) cleanup();
       ro.disconnect();
     };
-  }, [render, screenToWorld, view]);
+  }, [getConnectorHit, render, screenToWorld, updateDraggingConnector, updateHoveredConnector, view]);
 
   React.useEffect(() => {
     try {
