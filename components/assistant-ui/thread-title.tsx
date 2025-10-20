@@ -1,8 +1,25 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAssistantRuntime, useThreadListItem } from "@assistant-ui/react";
 import { PencilIcon } from "lucide-react";
+
+const THREAD_TITLE_EVENT = "threadTitleChanged";
+
+type ThreadTitleEventDetail = {
+  threadId?: string;
+  title?: string | null;
+};
+
+type ThreadMessageLike = {
+  id?: string;
+  role?: string;
+  content?: unknown;
+};
+
+type TitleResponse = {
+  title?: string | null;
+};
 
 type Props = {
   variant?: "inline" | "header";
@@ -13,71 +30,74 @@ const storageKey = (threadId: string) => `threadTitle:${threadId}`;
 
 export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props) {
   const runtime = useAssistantRuntime();
-  const threadItem = useThreadListItem({ optional: true }) as any;
+  const threadItem = useThreadListItem({ optional: true });
   const threadId = threadItem?.id ?? "__DEFAULT_ID__";
   const [manualTitle, setManualTitle] = useState<string | null>(null);
   const [generatedTitle, setGeneratedTitle] = useState<string | null>(null);
   const loadingRef = useRef(false);
 
-  const messages = useMemo(() => {
+  const messages = useMemo<ThreadMessageLike[]>(() => {
     const main = runtime?.threads?.main;
-    if (!main) return [] as any[];
+    if (!main) return [];
     try {
-      return main.getState().messages ?? [];
+      const state = main.getState();
+      const list = Array.isArray(state?.messages) ? state.messages : [];
+      return list as ThreadMessageLike[];
     } catch {
-      return [] as any[];
+      return [];
     }
-  }, [runtime?.threads]);
+  }, [runtime]);
 
-  // Load manual title on thread change and listen for local updates
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const saved = localStorage.getItem(storageKey(threadId));
       setManualTitle(saved && saved.length ? saved : null);
-    } catch {}
+    } catch {
+      setManualTitle(null);
+    }
 
-    const onChanged = (e: Event) => {
-      const d = (e as any)?.detail as { threadId?: string; title?: string | null } | undefined;
-      if (d && d.threadId === threadId) { setManualTitle(d.title ?? null); }
+    const onChanged = (event: Event) => {
+      const detail = (event as CustomEvent<ThreadTitleEventDetail>).detail;
+      if (detail?.threadId === threadId) {
+        setManualTitle(detail.title ?? null);
+      }
     };
-    window.addEventListener("threadTitleChanged", onChanged as EventListener);
-    return () => window.removeEventListener("threadTitleChanged", onChanged as EventListener);
+
+    window.addEventListener(THREAD_TITLE_EVENT, onChanged as EventListener);
+    return () => window.removeEventListener(THREAD_TITLE_EVENT, onChanged as EventListener);
   }, [threadId]);
 
   useEffect(() => {
-    // Generate a title only when there's at least one message.
     if (!runtime || loadingRef.current) return;
-    if (!messages || messages.length === 0) return;
-    // Avoid if we already have manual or generated title
+    if (messages.length === 0) return;
     if ((manualTitle && manualTitle.length > 0) || (generatedTitle && generatedTitle.length > 0)) return;
 
-    let active = true;
+    let isActive = true;
     loadingRef.current = true;
 
     (async () => {
       try {
-        // Send only a small slice to keep it fast.
         const slice = messages.slice(-6);
-        const r = await fetch("/api/title", {
+        const response = await fetch("/api/title", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ messages: slice }),
         });
-        const data = r.ok ? await r.json() : { title: null };
-        if (!active) return;
-        const t = (data?.title as string) || null;
-        if (t) setGeneratedTitle(t);
-      } catch (e) {
-        // Ignore errors; title is best-effort
-        // console.warn("/api/title failed", e);
+        const data: TitleResponse = response.ok ? await response.json() : { title: null };
+        if (!isActive) return;
+        if (data.title) {
+          setGeneratedTitle(data.title);
+        }
+      } catch {
+        // ignore
       } finally {
         loadingRef.current = false;
       }
     })();
 
     return () => {
-      active = false;
+      isActive = false;
     };
   }, [runtime, messages, manualTitle, generatedTitle]);
 
@@ -90,32 +110,56 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
 }
 
 export function ThreadTitleEditor() {
-  const threadItem = useThreadListItem({ optional: true }) as any;
+  const threadItem = useThreadListItem({ optional: true });
   const threadId = threadItem?.id ?? "__DEFAULT_ID__";
-  const [tick, setTick] = useState(0);
+  const [currentTitle, setCurrentTitle] = useState<string | null>(null);
 
-  const current = useMemo(() => {
-    if (typeof window === "undefined") return null as string | null;
-    return localStorage.getItem(storageKey(threadId));
-  }, [threadId, tick]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const read = () => {
+      try {
+        const saved = localStorage.getItem(storageKey(threadId));
+        setCurrentTitle(saved && saved.length ? saved : null);
+      } catch {
+        setCurrentTitle(null);
+      }
+    };
+
+    read();
+    const onChanged = (event: Event) => {
+      const detail = (event as CustomEvent<ThreadTitleEventDetail>).detail;
+      if (detail?.threadId === threadId) {
+        setCurrentTitle(detail.title ?? null);
+      }
+    };
+    window.addEventListener(THREAD_TITLE_EVENT, onChanged as EventListener);
+    return () => window.removeEventListener(THREAD_TITLE_EVENT, onChanged as EventListener);
+  }, [threadId]);
 
   const handleRename = () => {
     if (typeof window === "undefined") return;
-    const currentTitle = current ?? "";
-    const next = window.prompt("Rename thread", currentTitle || "");
-    if (next === null) return; // cancelled
+    const existing = currentTitle ?? "";
+    const next = window.prompt("Rename thread", existing) ?? null;
+    if (next === null) return;
     const trimmed = next.trim();
     if (trimmed.length === 0) {
-      // Clear manual title to fall back to generated
-      localStorage.removeItem(storageKey(threadId));
+      try {
+        localStorage.removeItem(storageKey(threadId));
+      } catch {}
     } else {
-      localStorage.setItem(storageKey(threadId), trimmed);
+      try {
+        localStorage.setItem(storageKey(threadId), trimmed);
+      } catch {}
     }
-    // Notify listeners in this tab
     try {
-      window.dispatchEvent(new CustomEvent("threadTitleChanged", { detail: { threadId, title: trimmed || null } }));
+      window.dispatchEvent(
+        new CustomEvent<ThreadTitleEventDetail>(THREAD_TITLE_EVENT, {
+          detail: { threadId, title: trimmed.length === 0 ? null : trimmed },
+        }),
+      );
     } catch {}
-    setTick((x) => x + 1);
+    setCurrentTitle(trimmed.length === 0 ? null : trimmed);
   };
 
   return (
@@ -132,9 +176,3 @@ export function ThreadTitleEditor() {
     </span>
   );
 }
-
-
-
-
-
-

@@ -20,16 +20,19 @@ export function LlmToggleButton() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: next ? "start" : "stop", model: "gemma3:4b" }),
       });
-      const data = await res.json().catch(() => ({} as any));
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      const errorMessage = data?.error ?? res.statusText;
       if (!res.ok || data?.ok === false) {
-        console.error("LLM toggle failed:", data?.error || res.statusText);
-        alert(`LLM ${next ? "start" : "stop"} failed: ${data?.error || res.statusText}`);
+        console.error("LLM toggle failed:", errorMessage);
+        alert(`LLM ${next ? "start" : "stop"} failed: ${errorMessage}`);
         return;
       }
       setLlmEnabled(next);
-    } catch (e: any) {
-      console.error(e);
-      alert(`LLM ${next ? "start" : "stop"} failed: ${e?.message || e}`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
+      console.error(error);
+      alert(`LLM ${next ? "start" : "stop"} failed: ${message}`);
     } finally {
       setPending(false);
     }

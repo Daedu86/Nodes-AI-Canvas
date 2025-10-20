@@ -8,13 +8,21 @@ const DET_KEY = "a-ui.sibling-detached.v1";
 
 export type SiblingLink = { a: string; b: string };
 
+const isSiblingLink = (value: unknown): value is SiblingLink =>
+  typeof value === "object" &&
+  value !== null &&
+  typeof (value as { a?: unknown }).a === "string" &&
+  typeof (value as { b?: unknown }).b === "string";
+
+const isString = (value: unknown): value is string => typeof value === "string";
+
 function read(): SiblingLink[] {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return [];
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return [];
-    return arr.filter((x: any) => x && typeof x.a === "string" && typeof x.b === "string");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isSiblingLink);
   } catch {
     return [];
   }
@@ -54,9 +62,9 @@ export function listDetached(): string[] {
   try {
     const raw = localStorage.getItem(DET_KEY);
     if (!raw) return [];
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return [];
-    return arr.filter((x: any) => typeof x === "string");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isString);
   } catch {
     return [];
   }

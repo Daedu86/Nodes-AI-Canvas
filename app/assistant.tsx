@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { ThreadTitle, ThreadTitleEditor } from "@/components/assistant-ui/thread-title";
+import { ThreadTitleEditor } from "@/components/assistant-ui/thread-title";
 import { ThreadGraphButton } from "@/components/assistant-ui/thread-graph";
 import { ThreadGraphInline } from "@/components/assistant-ui/thread-graph-inline";
 import { HistoryModeProvider } from "@/components/context/history-mode";
@@ -188,9 +188,9 @@ export const Assistant = () => {
     <AssistantRuntimeProvider runtime={runtime}>
       <HistoryModeProvider value={historyMode} setValue={setHistoryMode}>
       <LlmEnabledProvider value={llmEnabled} setValue={setLlmEnabled}>
-      <SidebarProvider>
+      <SidebarProvider className="h-svh w-full overflow-hidden">
         <AppSidebar />
-        <SidebarInset>
+        <SidebarInset className="min-h-0 overflow-hidden">
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger />
             <Separator orientation="vertical" className="mr-2 h-4" />

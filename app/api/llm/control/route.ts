@@ -67,14 +67,18 @@ export async function POST(req: NextRequest) {
       try {
         await pexec(process.env.OLLAMA_CMD || "ollama", ["stop", model], { timeout: 30000 });
         return Response.json({ ok: true, status: "stopped", model });
-      } catch (e: any) {
-        const msg = typeof e?.message === "string" ? e.message : String(e);
-        return new Response(JSON.stringify({ ok: false, error: `ollama stop failed: ${msg}` }), { status: 500 });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
+        return new Response(
+          JSON.stringify({ ok: false, error: `ollama stop failed: ${message}` }),
+          { status: 500 }
+        );
       }
     }
-  } catch (err: any) {
-    const msg = typeof err?.message === "string" ? err.message : String(err);
-    return new Response(JSON.stringify({ ok: false, error: msg }), { status: 500 });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
+    return new Response(JSON.stringify({ ok: false, error: message }), { status: 500 });
   }
 }
-

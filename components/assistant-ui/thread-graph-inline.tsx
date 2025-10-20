@@ -27,8 +27,84 @@ type Node = {
   idx: number;
   x?: number;
   y?: number;
-  branchId?: any;
+  branchId?: unknown;
 };
+
+type ConnectorId =
+  | "left-0"
+  | "left-1"
+  | "left-2"
+  | "right-0"
+  | "right-1"
+  | "right-2"
+  | "top-0"
+  | "top-1"
+  | "bottom-0"
+  | "bottom-1";
+
+type LinkConnectorPref = {
+  from: ConnectorId;
+  to: ConnectorId;
+};
+
+type Point = { x: number; y: number };
+
+type EdgeConnectorInfo = {
+  from: ConnectorId;
+  to: ConnectorId;
+  points: { from: Point; to: Point };
+};
+
+const CONNECTOR_GROUP: Record<ConnectorId, "left" | "right" | "top" | "bottom"> = {
+  "left-0": "left",
+  "left-1": "left",
+  "left-2": "left",
+  "right-0": "right",
+  "right-1": "right",
+  "right-2": "right",
+  "top-0": "top",
+  "top-1": "top",
+  "bottom-0": "bottom",
+  "bottom-1": "bottom",
+};
+
+const CONNECTOR_POSITION_INDEX: Record<ConnectorId, number> = {
+  "left-0": 0,
+  "left-1": 1,
+  "left-2": 2,
+  "right-0": 0,
+  "right-1": 1,
+  "right-2": 2,
+  "top-0": 0,
+  "top-1": 1,
+  "bottom-0": 0,
+  "bottom-1": 1,
+};
+
+const CONNECTOR_COUNTS: Record<"left" | "right" | "top" | "bottom", number> = {
+  left: 3,
+  right: 3,
+  top: 2,
+  bottom: 2,
+};
+
+const ALL_CONNECTORS: ConnectorId[] = [
+  "left-0",
+  "left-1",
+  "left-2",
+  "right-0",
+  "right-1",
+  "right-2",
+  "top-0",
+  "top-1",
+  "bottom-0",
+  "bottom-1",
+];
+
+const CONNECTOR_OFFSET = 12;
+
+const isConnectorId = (value: unknown): value is ConnectorId =>
+  typeof value === "string" && (ALL_CONNECTORS as readonly string[]).includes(value);
 
 const ZOOM_STEP = 1.2;
 const clampZoom = (value: number) => Math.min(3, Math.max(0.3, value));
@@ -36,6 +112,51 @@ const NODE_WIDTH = 220;
 const NODE_HEIGHT = 56;
 const HALF_NODE_WIDTH = NODE_WIDTH / 2;
 const HALF_NODE_HEIGHT = NODE_HEIGHT / 2;
+
+const getConnectorPoint = (node: Node, connector: ConnectorId): Point => {
+  const group = CONNECTOR_GROUP[connector];
+  const order = CONNECTOR_POSITION_INDEX[connector];
+  const count = CONNECTOR_COUNTS[group];
+  const centerX = node.x ?? 0;
+  const centerY = node.y ?? 0;
+  const ratio = (order + 1) / (count + 1);
+  switch (group) {
+    case "left":
+      return { x: centerX - HALF_NODE_WIDTH, y: centerY - HALF_NODE_HEIGHT + ratio * NODE_HEIGHT };
+    case "right":
+      return { x: centerX + HALF_NODE_WIDTH, y: centerY - HALF_NODE_HEIGHT + ratio * NODE_HEIGHT };
+    case "top":
+      return { x: centerX - HALF_NODE_WIDTH + ratio * NODE_WIDTH, y: centerY - HALF_NODE_HEIGHT };
+    case "bottom":
+    default:
+      return { x: centerX - HALF_NODE_WIDTH + ratio * NODE_WIDTH, y: centerY + HALF_NODE_HEIGHT };
+  }
+};
+
+const offsetConnectorPoint = (point: Point, connector: ConnectorId, distance = CONNECTOR_OFFSET): Point => {
+  const group = CONNECTOR_GROUP[connector];
+  switch (group) {
+    case "left":
+      return { x: point.x - distance, y: point.y };
+    case "right":
+      return { x: point.x + distance, y: point.y };
+    case "top":
+      return { x: point.x, y: point.y - distance };
+    case "bottom":
+    default:
+      return { x: point.x, y: point.y + distance };
+  }
+};
+
+const isHorizontalConnector = (connector: ConnectorId) => {
+  const group = CONNECTOR_GROUP[connector];
+  return group === "left" || group === "right";
+};
+
+const isVerticalConnector = (connector: ConnectorId) => {
+  const group = CONNECTOR_GROUP[connector];
+  return group === "top" || group === "bottom";
+};
 
 export function ThreadGraphInline() {
   const runtime = useAssistantRuntime();
@@ -66,6 +187,11 @@ export function ThreadGraphInline() {
     return arr.map((it: ThreadRepoItem, i: number) => {
       const id = String(it.message?.id ?? i);
       const parentId = it.parentId ?? null;
+      const message = it.message;
+      const branchId =
+        message && typeof message === "object" && "branchId" in message
+          ? (message as { branchId?: unknown }).branchId
+          : undefined;
       const node: Node = {
         id,
         parentId,
@@ -73,7 +199,7 @@ export function ThreadGraphInline() {
         text: extractText(it.message).slice(0, 100),
         depth: 0,
         idx: i,
-        branchId: (it.message as any)?.branchId,
+        branchId,
       };
       node.depth = parentId === null ? 0 : getDepth(it.message);
       return node;
@@ -90,7 +216,14 @@ export function ThreadGraphInline() {
   const [nodePositions, setNodePositions] = React.useState<Map<string, { x: number; y: number }>>(
     new Map()
   );
+  const [linkConnectors, setLinkConnectors] = React.useState<Map<string, LinkConnectorPref>>(new Map());
+  const connectorDefaultsRef = React.useRef(new Map<string, LinkConnectorPref>());
+  const connectorPositionsRef = React.useRef(new Map<string, Map<ConnectorId, Point>>());
+  const edgeConnectorMapRef = React.useRef(new Map<string, EdgeConnectorInfo>());
+  const nodeLayoutRef = React.useRef(new Map<string, Node>());
+
   const POS_KEY = "a-ui.graph-inline-pos.v1";
+  const CONN_KEY = "a-ui.graph-inline-conn.v1";
   const boundsRef = React.useRef(new Map<string, { x: number; y: number; w: number; h: number }>());
   const screenToWorld = React.useCallback(
     (sx: number, sy: number, currentView = view) => ({
@@ -99,6 +232,113 @@ export function ThreadGraphInline() {
     }),
     [view]
   );
+
+  const getEdgeKey = React.useCallback(
+    (parentId: string | null, childId: string) => `${parentId ?? "null"}->${childId}`,
+    []
+  );
+
+  const chooseDefaultConnectors = React.useCallback(
+    (parent: Node | undefined, child: Node): LinkConnectorPref => {
+      if (parent && parent.x != null && parent.y != null && child.x != null && child.y != null) {
+        const dx = child.x - parent.x;
+        const dy = child.y - parent.y;
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          if (dx >= 0) {
+            return { from: "right-1", to: "left-1" };
+          }
+          return { from: "left-1", to: "right-1" };
+        }
+        if (dy >= 0) {
+          return { from: "bottom-0", to: "top-0" };
+        }
+        return { from: "top-0", to: "bottom-0" };
+      }
+      if (!parent) {
+        return { from: "right-1", to: "left-1" };
+      }
+      const depthDelta = child.depth - parent.depth;
+      if (depthDelta > 0) {
+        return { from: "right-1", to: "left-1" };
+      }
+      if (depthDelta < 0) {
+        return { from: "left-1", to: "right-1" };
+      }
+      const indexDelta = child.idx - parent.idx;
+      if (indexDelta >= 0) {
+        return { from: "bottom-0", to: "top-0" };
+      }
+      return { from: "top-0", to: "bottom-0" };
+    },
+    []
+  );
+
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CONN_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, { from?: string; to?: string }>;
+      const map = new Map<string, LinkConnectorPref>();
+      (Object.entries(parsed) as Array<[string, { from?: string; to?: string }]>)
+        .forEach(([key, value]) => {
+          const from = value?.from;
+          const to = value?.to;
+          if (isConnectorId(from) && isConnectorId(to)) {
+            map.set(key, { from, to });
+          }
+        });
+      if (map.size > 0) setLinkConnectors(map);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  React.useEffect(() => {
+    try {
+      if (linkConnectors.size === 0) {
+        localStorage.removeItem(CONN_KEY);
+        return;
+      }
+      const obj: Record<string, LinkConnectorPref> = {};
+      linkConnectors.forEach((value, key) => {
+        obj[key] = value;
+      });
+      localStorage.setItem(CONN_KEY, JSON.stringify(obj));
+    } catch {
+      /* ignore */
+    }
+  }, [linkConnectors]);
+
+  React.useEffect(() => {
+    const defaults = new Map<string, LinkConnectorPref>();
+    const idToNode = new Map<string, Node>();
+    nodes.forEach((node) => {
+      idToNode.set(node.id, node);
+    });
+    nodes.forEach((node) => {
+      if (!node.parentId) return;
+      const parent = idToNode.get(node.parentId);
+      defaults.set(getEdgeKey(node.parentId, node.id), chooseDefaultConnectors(parent, node));
+    });
+    connectorDefaultsRef.current = defaults;
+  }, [chooseDefaultConnectors, getEdgeKey, nodes]);
+
+  React.useEffect(() => {
+    setLinkConnectors((prev) => {
+      if (prev.size === 0) return prev;
+      const defaults = connectorDefaultsRef.current;
+      let changed = false;
+      const next = new Map<string, LinkConnectorPref>();
+      prev.forEach((value, key) => {
+        if (defaults.has(key)) {
+          next.set(key, value);
+        } else {
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [nodes]);
 
   const render = React.useCallback(() => {
     const canvas = canvasRef.current;
@@ -119,6 +359,18 @@ export function ThreadGraphInline() {
     ctx.fillRect(0, 0, width, height);
     ctx.strokeStyle = "rgba(0,0,0,0.05)";
 
+    const isDarkBg = (() => {
+      const numeric = bgColor.match(/\d+/g);
+      if (!numeric || numeric.length < 3) return false;
+      const [r, g, b] = numeric.slice(0, 3).map(Number);
+      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      return luminance < 140;
+    })();
+    const nodeFill = isDarkBg ? "rgba(30,41,59,0.92)" : "rgba(255,255,255,0.94)";
+    const nodeStroke = isDarkBg ? "rgba(148,163,184,0.35)" : "rgba(15,23,42,0.08)";
+    const textColor = isDarkBg ? "rgba(226,232,240,0.95)" : "#111827";
+    const labelColor = isDarkBg ? "rgba(148,163,184,0.85)" : "rgba(100,116,139,0.95)";
+
     ctx.save();
     ctx.translate(view.x, view.y);
     ctx.scale(view.k, view.k);
@@ -130,125 +382,138 @@ export function ThreadGraphInline() {
     const marginX = 80;
     const marginY = 40;
     const xStep = 280;
-    const levelYSteps = levels.map((l) => 80);
-    levels.forEach((l, depth) => {
+    const levelYSteps = levels.map(() => 80);
+    levels.forEach((level, depth) => {
       const stepY = levelYSteps[depth] || 60;
-      l.forEach((n, i) => {
+      level.forEach((n, index) => {
         const x = marginX + depth * xStep + HALF_NODE_WIDTH;
-        const y = marginY + (i + 1) * stepY;
-        (n as any).x = x;
-        (n as any).y = y;
+        const y = marginY + (index + 1) * stepY;
+        n.x = x;
+        n.y = y;
         const pos = nodePositions.get(n.id);
         if (pos) {
-          (n as any).x = pos.x;
-          (n as any).y = pos.y;
+          n.x = pos.x;
+          n.y = pos.y;
         }
       });
     });
 
     const idToNode = new Map(nodes.map((n) => [n.id, n] as const));
+    nodeLayoutRef.current = new Map(idToNode);
+    const connectorUsage = new Map<string, Set<ConnectorId>>();
+    const connectorPositions = new Map<string, Map<ConnectorId, Point>>();
+    const edgeConnectorMap = new Map<string, EdgeConnectorInfo>();
+
     nodes.forEach((n) => {
       if (!n.parentId) return;
-      const p = idToNode.get(String(n.parentId));
-      if (!p || p.x == null || p.y == null || n.x == null || n.y == null) return;
+      const parent = idToNode.get(String(n.parentId));
+      if (!parent || parent.x == null || parent.y == null || n.x == null || n.y == null) return;
+      const edgeKey = getEdgeKey(n.parentId, n.id);
+      const pref = linkConnectors.get(edgeKey) ?? chooseDefaultConnectors(parent, n);
+      const parentConnectorPoint = getConnectorPoint(parent, pref.from);
+      const childConnectorPoint = getConnectorPoint(n, pref.to);
+      edgeConnectorMap.set(edgeKey, {
+        from: pref.from,
+        to: pref.to,
+        points: { from: parentConnectorPoint, to: childConnectorPoint },
+      });
+
+      const start = offsetConnectorPoint(parentConnectorPoint, pref.from);
+      const end = offsetConnectorPoint(childConnectorPoint, pref.to);
       ctx.beginPath();
-      ctx.moveTo(p.x + HALF_NODE_WIDTH, p.y);
-      ctx.lineTo(n.x - HALF_NODE_WIDTH, n.y);
+      ctx.moveTo(start.x, start.y);
+      if (isHorizontalConnector(pref.from) && isHorizontalConnector(pref.to)) {
+        const midX = (start.x + end.x) / 2;
+        ctx.lineTo(midX, start.y);
+        ctx.lineTo(midX, end.y);
+      } else if (isVerticalConnector(pref.from) && isVerticalConnector(pref.to)) {
+        const midY = (start.y + end.y) / 2;
+        ctx.lineTo(start.x, midY);
+        ctx.lineTo(end.x, midY);
+      } else if (isHorizontalConnector(pref.from) && isVerticalConnector(pref.to)) {
+        ctx.lineTo(end.x, start.y);
+      } else if (isVerticalConnector(pref.from) && isHorizontalConnector(pref.to)) {
+        ctx.lineTo(start.x, end.y);
+      }
+      ctx.lineTo(end.x, end.y);
       const hue = n.branchId ? (String(n.branchId).length * 67) % 360 : null;
       ctx.strokeStyle = hue == null ? "rgba(100,100,100,0.7)" : `hsla(${hue},60%,45%,0.75)`;
       ctx.lineWidth = hue == null ? 1.6 : 1.2;
       ctx.stroke();
+
+      const parentUsed = connectorUsage.get(parent.id) ?? new Set<ConnectorId>();
+      parentUsed.add(pref.from);
+      connectorUsage.set(parent.id, parentUsed);
+      const childUsed = connectorUsage.get(n.id) ?? new Set<ConnectorId>();
+      childUsed.add(pref.to);
+      connectorUsage.set(n.id, childUsed);
     });
 
-    try {
-      const groups = new Map<string, Node[]>();
-      nodes.forEach((n) => {
-        const key = `${n.parentId ?? "root"}::${n.depth}`;
-        const arr = groups.get(key) || [];
-        arr.push(n);
-        groups.set(key, arr);
-      });
-      ctx.save();
-      ctx.setLineDash?.([5, 4]);
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = "rgba(59,130,246,0.6)";
-      for (const arr of groups.values()) {
-        if (arr.length < 2) continue;
-        const ordered = arr
-          .filter((n) => n.x != null && n.y != null)
-          .sort((a, b) => a.y! - b.y!);
-        for (let i = 0; i < ordered.length - 1; i++) {
-          const a = ordered[i];
-          const b = ordered[i + 1];
-          if (a.x == null || a.y == null || b.x == null || b.y == null) continue;
-          ctx.beginPath();
-          const startX = a.x!;
-          const startY = a.y! + HALF_NODE_HEIGHT;
-          const endX = b.x!;
-          const endY = b.y! - HALF_NODE_HEIGHT;
-          ctx.moveTo(startX, startY);
-          if (Math.abs(startX - endX) < 1) {
-            ctx.lineTo(endX, endY);
-          } else {
-            const midY = (startY + endY) / 2;
-            ctx.lineTo(startX, midY);
-            ctx.lineTo(endX, midY);
-            ctx.lineTo(endX, endY);
-          }
-          ctx.stroke();
-        }
-      }
-      ctx.restore();
-    } catch {}
-
-    const m = bgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-    const isDarkBg = (() => {
-      if (!m) return false;
-      const r = +m[1];
-      const g = +m[2];
-      const b = +m[3];
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b < 128;
-    })();
-    const textColor = isDarkBg ? "#e5e7eb" : "#111827";
-    const roleColor = (r: string) =>
-      r === "user" ? "#2563eb" : r === "assistant" ? "#16a34a" : "#6b7280";
     nodes.forEach((n) => {
       if (n.x == null || n.y == null) return;
       const w = NODE_WIDTH;
       const h = NODE_HEIGHT;
-      const r = 8;
-      const x = n.x - w / 2;
-      const y = n.y - h / 2;
+      const x = n.x - HALF_NODE_WIDTH;
+      const y = n.y - HALF_NODE_HEIGHT;
+      const radius = 10;
+
       ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.arcTo(x + w, y, x + w, y + h, r);
-      ctx.arcTo(x + w, y + h, x, y + h, r);
-      ctx.arcTo(x, y + h, x, y, r);
-      ctx.arcTo(x, y, x + w, y, r);
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + w - radius, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+      ctx.lineTo(x + w, y + h - radius);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      ctx.lineTo(x + radius, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
       ctx.closePath();
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = nodeFill;
       ctx.fill();
-      ctx.strokeStyle = isDarkBg ? "#9CA3AF" : "rgba(0,0,0,0.15)";
+      ctx.strokeStyle = nodeStroke;
+      ctx.lineWidth = 1;
       ctx.stroke();
 
-      const badge = (n.role || "").toUpperCase();
-      ctx.fillStyle = roleColor(n.role);
-      ctx.fillRect(x + 8, y + 8, ctx.measureText(badge).width + 12, 16);
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = labelColor;
       ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
-      ctx.fillText(badge, x + 14, y + 20);
+      const role = (n.role || "").toUpperCase();
+      if (role) {
+        ctx.fillText(role, x + 8, y + 16);
+      }
 
       ctx.fillStyle = textColor;
       ctx.font = "12px ui-sans-serif, system-ui, sans-serif";
-      const preview = (n.text || "").slice(0, 80);
+      const preview = (n.text || "").replace(/\s+/g, " ").trim().slice(0, 80);
       const textY = y + 36;
-      ctx.fillText(preview, x + 8, textY, w - 16);
+      if (preview) {
+        ctx.fillText(preview, x + 8, textY, w - 16);
+      }
+
+      const connectorMap = new Map<ConnectorId, Point>();
+      connectorPositions.set(n.id, connectorMap);
+      const usedConnectors = connectorUsage.get(n.id);
+      ALL_CONNECTORS.forEach((connectorId) => {
+        const point = getConnectorPoint(n, connectorId);
+        connectorMap.set(connectorId, point);
+        const isUsed = usedConnectors?.has(connectorId) ?? false;
+        const connectorRadius = isUsed ? 3.4 : 2.4;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, connectorRadius, 0, Math.PI * 2);
+        ctx.fillStyle = isUsed ? "#2563eb" : isDarkBg ? "rgba(148,163,184,0.55)" : "rgba(156,163,175,0.6)";
+        ctx.strokeStyle = isDarkBg ? "rgba(17,24,39,0.85)" : "#f9fafb";
+        ctx.lineWidth = isUsed ? 1.2 : 0.8;
+        ctx.fill();
+        ctx.stroke();
+      });
 
       boundsRef.current.set(n.id, { x, y, w, h });
     });
 
+    connectorPositionsRef.current = connectorPositions;
+    edgeConnectorMapRef.current = edgeConnectorMap;
+
     ctx.restore();
-  }, [nodes, nodePositions, view]);
+  }, [chooseDefaultConnectors, getEdgeKey, linkConnectors, nodePositions, nodes, view]);
 
   const resetView = React.useCallback(() => {
     const container = containerRef.current;
@@ -360,7 +625,7 @@ export function ThreadGraphInline() {
     const ro = new ResizeObserver(() => render());
     if (containerRef.current) ro.observe(containerRef.current);
     let cleanup: (() => void) | undefined;
-    let raf = requestAnimationFrame(() => {});
+    const raf = requestAnimationFrame(() => {});
     const canvas = canvasRef.current;
     if (canvas) {
       const onMouseDown = (e: MouseEvent) => {
@@ -446,13 +711,14 @@ export function ThreadGraphInline() {
       canvas.addEventListener("mousedown", onMouseDown);
       window.addEventListener("mousemove", onMouseMove);
       window.addEventListener("mouseup", onMouseUp);
-      canvas.addEventListener("wheel", onWheel, { passive: false } as any);
+      const wheelListenerOptions: AddEventListenerOptions = { passive: false };
+      canvas.addEventListener("wheel", onWheel, wheelListenerOptions);
       canvas.addEventListener("click", onClick);
       cleanup = () => {
         canvas.removeEventListener("mousedown", onMouseDown);
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
-        canvas.removeEventListener("wheel", onWheel as any);
+        canvas.removeEventListener("wheel", onWheel, wheelListenerOptions);
         canvas.removeEventListener("click", onClick);
       };
     }
@@ -469,7 +735,7 @@ export function ThreadGraphInline() {
       if (raw) {
         const obj = JSON.parse(raw) as Record<string, [number, number]>;
         const map = new Map<string, { x: number; y: number }>();
-        Object.entries(obj).forEach(([id, arr]) => {
+        (Object.entries(obj) as Array<[string, [number, number]]>).forEach(([id, arr]) => {
           if (Array.isArray(arr) && arr.length === 2 && typeof arr[0] === "number" && typeof arr[1] === "number") {
             map.set(id, { x: arr[0], y: arr[1] });
           }

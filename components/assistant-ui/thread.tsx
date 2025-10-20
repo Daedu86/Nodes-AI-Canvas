@@ -19,18 +19,78 @@ import {
   SendHorizontalIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { ToolFallback } from "./tool-fallback";
 import { useAssistantRuntime } from "@assistant-ui/react";
+import type { AssistantRuntime } from "@assistant-ui/react";
+import type { ExportedMessageRepository } from "@assistant-ui/react/runtimes/utils/MessageRepository";
+import type { ThreadRepoItem } from "./use-thread-repo-items";
 import { useHistoryMode } from "@/components/context/history-mode";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import React from "react";
 import { computeSiblingGroupId } from "@/lib/sibling-group";
 
+
+type MessageLike = {
+  id?: string;
+  parentId?: string | null;
+  branchId?: unknown;
+  role?: string;
+};
+
+type SiblingInfo = {
+  siblingIdStr: string;
+  parentIdDisplay: string | null;
+};
+
+const DEFAULT_SIBLING_INFO: SiblingInfo = { siblingIdStr: "", parentIdDisplay: null };
+
+const resolveSiblingInfo = (
+  message: MessageLike | null | undefined,
+  runtime: AssistantRuntime | null | undefined,
+): SiblingInfo => {
+  if (!message) return DEFAULT_SIBLING_INFO;
+  const id = message.id ?? "";
+  const parentId = message.parentId ?? null;
+  if (!id) {
+    return { siblingIdStr: "", parentIdDisplay: parentId };
+  }
+  const mainThread = runtime?.threads?.main;
+  if (!mainThread?.export) {
+    return { siblingIdStr: "", parentIdDisplay: parentId };
+  }
+  try {
+    const exportValue = mainThread.export() as ExportedMessageRepository | undefined;
+    const items = Array.isArray(exportValue?.messages)
+      ? (exportValue.messages as ThreadRepoItem[])
+      : [];
+    const hasSibling = items.some((item) => {
+      const childId = String(item.message?.id ?? "");
+      const itemParentId = item.parentId ?? null;
+      return childId && childId !== id && itemParentId === parentId;
+    });
+    if (hasSibling && typeof parentId === "string" && parentId.length > 0) {
+      return {
+        siblingIdStr: computeSiblingGroupId(parentId),
+        parentIdDisplay: parentId,
+      };
+    }
+  } catch {
+    // ignore export errors
+  }
+  return { siblingIdStr: "", parentIdDisplay: parentId };
+};
+
+const getBranchIdValue = (message: MessageLike | null | undefined): string | null => {
+  if (!message) return null;
+  if (!Object.prototype.hasOwnProperty.call(message, "branchId")) return null;
+  const value = message.branchId;
+  if (value === null || value === undefined) return "-";
+  return String(value);
+};
 export const Thread: FC = () => {
   return (
     <ThreadPrimitive.Root
@@ -41,7 +101,7 @@ export const Thread: FC = () => {
     >
       <ThreadPrimitive.Viewport
         autoScroll={false}
-        className="flex h-full flex-col items-center overflow-y-scroll scroll-smooth bg-inherit px-4 pt-8"
+        className="flex h-full flex-col items-stretch overflow-y-auto bg-inherit px-4 py-6"
       >
         <ThreadWelcome />
 
@@ -53,14 +113,18 @@ export const Thread: FC = () => {
           }}
         />
 
-        <ThreadPrimitive.If empty={false}>
-          <div className="min-h-8 flex-grow" />
+        <ThreadPrimitive.If empty>
+          <div className="mt-6 flex w-full max-w-[var(--thread-max-width)] flex-col items-center gap-3 pb-6">
+            <Composer />
+          </div>
         </ThreadPrimitive.If>
 
-        <div className="sticky bottom-0 mt-3 flex w-full max-w-[var(--thread-max-width)] flex-col items-center justify-end rounded-t-lg bg-inherit pb-4">
-          <ThreadScrollToBottom />
-          <Composer />
-        </div>
+        <ThreadPrimitive.If empty={false}>
+          <div className="sticky bottom-0 mt-auto flex w-full max-w-[var(--thread-max-width)] flex-col items-center justify-end gap-2 bg-inherit pb-4">
+            <ThreadScrollToBottom />
+            <Composer />
+          </div>
+        </ThreadPrimitive.If>
       </ThreadPrimitive.Viewport>
     </ThreadPrimitive.Root>
   );
@@ -200,40 +264,29 @@ const ComposerAction: FC = () => {
 const UserMessage: FC = () => {
   const message = useMessage();
   const runtime = useAssistantRuntime();
-  const { siblingIdStr, parentIdDisplay } = React.useMemo(() => {
-    try {
-      const id = String((message as any)?.id ?? "");
-      const parentId = (message as any)?.parentId ?? null;
-      if (!id) return { siblingIdStr: "", parentIdDisplay: (message as any)?.parentId ?? null };
-      // Implicit siblings: messages that share the same parent
-      const exp = (runtime as any)?.threads?.main?.export?.();
-      const items: any[] = Array.isArray(exp?.messages) ? (exp!.messages as any[]) : [];
-      let hasSibling = false;
-      for (const it of items) {
-        const mid = String(it?.message?.id ?? "");
-        const p = it?.parentId ?? null;
-        if (mid && mid !== id && p === parentId) { hasSibling = true; break; }
-      }
-      if (hasSibling && typeof parentId === "string" && parentId.length > 0) {
-        return { siblingIdStr: computeSiblingGroupId(parentId), parentIdDisplay: parentId };
-      }
-      return { siblingIdStr: "", parentIdDisplay: parentId };
-    } catch { return { siblingIdStr: "", parentIdDisplay: (message as any)?.parentId ?? null }; }
-  }, [runtime, message?.id]);
+  const messageLike = React.useMemo<MessageLike>(() => (message ?? {}) as MessageLike, [message]);
+  const { siblingIdStr, parentIdDisplay } = React.useMemo(
+    () => resolveSiblingInfo(messageLike, runtime),
+    [messageLike, runtime],
+  );
+  const branchIdValue = React.useMemo(() => getBranchIdValue(messageLike), [messageLike]);
+
   return (
-    <MessagePrimitive.Root data-message-id={message?.id} className="grid auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] gap-y-2 [&:where(>*)]:col-start-2 w-full max-w-[var(--thread-max-width)] py-4">
+    <MessagePrimitive.Root
+      data-message-id={message?.id}
+      className="grid auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] gap-y-2 [&:where(>*)]:col-start-2 w-full max-w-[var(--thread-max-width)] py-4"
+    >
       <UserActionBar />
 
       <div className="bg-muted text-foreground max-w-[calc(var(--thread-max-width)*0.8)] break-words rounded-3xl px-5 py-2.5 col-start-2 row-start-2">
-        {/* Datos del mensaje */}
         <div className="text-xs text-muted-foreground mb-1">
-          <div><b>id:</b> {message?.id ?? '-'}</div>
-          <div><b>parentId:</b> {parentIdDisplay ?? '-'}</div>
-          <div><b>siblingId:</b> {siblingIdStr || '-'}</div>
-          {"branchId" in (message ?? {}) && (
-            <div><b>branchId:</b> {(message as any)?.branchId ?? '-'}</div>
+          <div><b>id:</b> {message?.id ?? "-"}</div>
+          <div><b>parentId:</b> {parentIdDisplay ?? "-"}</div>
+          <div><b>siblingId:</b> {siblingIdStr || "-"}</div>
+          {branchIdValue !== null && (
+            <div><b>branchId:</b> {branchIdValue}</div>
           )}
-          <div><b>type:</b> {message?.role ?? '-'}</div>
+          <div><b>type:</b> {message?.role ?? "-"}</div>
         </div>
         <MessagePrimitive.Content />
       </div>
@@ -242,7 +295,6 @@ const UserMessage: FC = () => {
     </MessagePrimitive.Root>
   );
 };
-
 const UserActionBar: FC = () => {
   return (
     <ActionBarPrimitive.Root
@@ -261,10 +313,8 @@ const UserActionBar: FC = () => {
 
 const EditComposer: FC = () => {
   const composer = useComposerRuntime();
-  const message = useMessage();
   const { historyMode, setHistoryMode } = useHistoryMode();
   const { llmEnabled } = useLlmEnabled();
-  const runtime = useAssistantRuntime();
 
   const handleSend = () => {
     if (!llmEnabled) return;
@@ -319,38 +369,27 @@ const EditComposer: FC = () => {
 const AssistantMessage: FC = () => {
   const message = useMessage();
   const runtime = useAssistantRuntime();
-  const { siblingIdStr, parentIdDisplay } = React.useMemo(() => {
-    try {
-      const id = String((message as any)?.id ?? "");
-      const parentId = (message as any)?.parentId ?? null;
-      if (!id) return { siblingIdStr: "", parentIdDisplay: (message as any)?.parentId ?? null };
-      // Implicit siblings: messages that share the same parent
-      const exp = (runtime as any)?.threads?.main?.export?.();
-      const items: any[] = Array.isArray(exp?.messages) ? (exp!.messages as any[]) : [];
-      let hasSibling = false;
-      for (const it of items) {
-        const mid = String(it?.message?.id ?? "");
-        const p = it?.parentId ?? null;
-        if (mid && mid !== id && p === parentId) { hasSibling = true; break; }
-      }
-      if (hasSibling && typeof parentId === "string" && parentId.length > 0) {
-        return { siblingIdStr: computeSiblingGroupId(parentId), parentIdDisplay: parentId };
-      }
-      return { siblingIdStr: "", parentIdDisplay: parentId };
-    } catch { return { siblingIdStr: "", parentIdDisplay: (message as any)?.parentId ?? null }; }
-  }, [runtime, message?.id]);
+  const messageLike = React.useMemo<MessageLike>(() => (message ?? {}) as MessageLike, [message]);
+  const { siblingIdStr, parentIdDisplay } = React.useMemo(
+    () => resolveSiblingInfo(messageLike, runtime),
+    [messageLike, runtime],
+  );
+  const branchIdValue = React.useMemo(() => getBranchIdValue(messageLike), [messageLike]);
+
   return (
-    <MessagePrimitive.Root data-message-id={message?.id} className="grid grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] relative w-full max-w-[var(--thread-max-width)] py-4">
+    <MessagePrimitive.Root
+      data-message-id={message?.id}
+      className="grid grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] relative w-full max-w-[var(--thread-max-width)] py-4"
+    >
       <div className="text-foreground max-w-[calc(var(--thread-max-width)*0.8)] break-words leading-7 col-span-2 col-start-2 row-start-1 my-1.5">
-        {/* Datos del mensaje */}
         <div className="text-xs text-muted-foreground mb-1">
-          <div><b>id:</b> {message?.id ?? '-'}</div>
-          <div><b>parentId:</b> {parentIdDisplay ?? '-'}</div>
-          <div><b>siblingId:</b> {siblingIdStr || '-'}</div>
-          {"branchId" in (message ?? {}) && (
-            <div><b>branchId:</b> {(message as any)?.branchId ?? '-'}</div>
+          <div><b>id:</b> {message?.id ?? "-"}</div>
+          <div><b>parentId:</b> {parentIdDisplay ?? "-"}</div>
+          <div><b>siblingId:</b> {siblingIdStr || "-"}</div>
+          {branchIdValue !== null && (
+            <div><b>branchId:</b> {branchIdValue}</div>
           )}
-          <div><b>type:</b> {message?.role ?? '-'}</div>
+          <div><b>type:</b> {message?.role ?? "-"}</div>
         </div>
         <MessagePrimitive.Content
           components={{ Text: MarkdownText, tools: { Fallback: ToolFallback } }}
@@ -363,7 +402,6 @@ const AssistantMessage: FC = () => {
     </MessagePrimitive.Root>
   );
 };
-
 const AssistantActionBar: FC = () => {
   return (
     <ActionBarPrimitive.Root

@@ -1,26 +1,63 @@
-﻿import { ollama } from "ollama-ai-provider";
+"use strict";
+
 import { frontendTools } from "@assistant-ui/react-ai-sdk";
 import { streamText } from "ai";
+import { ollama } from "ollama-ai-provider";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export async function POST(req: Request) {
-  const body = await req.json();
-  const { messages, system, tools } = body;
-  const historyMode = (body?.runConfig?.custom?.historyMode ?? body?.runConfig?.historyMode ?? body?.historyMode);
+type ChatMessage = {
+  role: string;
+  content?: unknown;
+  [key: string]: unknown;
+};
 
-  // History mode: "full" sends the whole thread; default sends only the last user question.
+type ChatRunConfig = {
+  historyMode?: string;
+  custom?: {
+    historyMode?: string;
+  };
+};
+
+type ChatRequestBody = {
+  messages?: unknown;
+  system?: string;
+  tools?: Parameters<typeof frontendTools>[0];
+  runConfig?: ChatRunConfig;
+  historyMode?: string;
+};
+
+const isChatMessage = (value: unknown): value is ChatMessage =>
+  typeof value === "object" &&
+  value !== null &&
+  typeof (value as { role?: unknown }).role === "string";
+
+export async function POST(req: Request) {
+  const body = (await req.json()) as ChatRequestBody;
+  const rawMessages = Array.isArray(body.messages) ? body.messages : [];
+  const messages: ChatMessage[] = rawMessages.filter(isChatMessage);
+  const system = body.system;
+  const tools = body.tools;
+
+  const historyMode =
+    body.runConfig?.custom?.historyMode ?? body.runConfig?.historyMode ?? body.historyMode;
+
   const isFullHistory = historyMode === "full";
-  const lastUserMessage = [...(messages ?? [])].reverse().find((m: any) => m?.role === "user");
-  const messagesToSend = isFullHistory
+  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
+  const messagesToSend: ChatMessage[] = isFullHistory
     ? messages
     : lastUserMessage
       ? [lastUserMessage]
-      : (Array.isArray(messages) && messages.length > 0 ? [messages[messages.length - 1]] : []);
+      : messages.length > 0
+        ? [messages[messages.length - 1]]
+        : [];
 
   console.log("Mensajes originales recibidos:", messages);
-  console.log("Mensajes enviados al modelo (" + (isFullHistory ? "historial completo" : "solo ultima pregunta") + "):", messagesToSend);
+  console.log(
+    `Mensajes enviados al modelo (${isFullHistory ? "historial completo" : "solo ultima pregunta"}):`,
+    messagesToSend
+  );
 
   try {
     const result = streamText({
@@ -34,9 +71,8 @@ export async function POST(req: Request) {
       onError: console.error,
     });
     return result.toDataStreamResponse();
-  } catch (err) {
-    console.error("/api/chat error:", err);
+  } catch (error) {
+    console.error("/api/chat error:", error);
     return new Response("LLM backend unavailable", { status: 503 });
   }
 }
-
