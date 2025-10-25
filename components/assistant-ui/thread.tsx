@@ -282,10 +282,7 @@ const UserMessage: FC = () => {
         <div className="text-xs text-muted-foreground mb-1">
           <div><b>id:</b> {message?.id ?? "-"}</div>
           <div><b>parentId:</b> {parentIdDisplay ?? "-"}</div>
-          <div><b>siblingId:</b> {siblingIdStr || "-"}</div>
-          {branchIdValue !== null && (
-            <div><b>branchId:</b> {branchIdValue}</div>
-          )}
+          <div><b>branchId:</b> {branchIdValue ?? "-"}</div>
           <div><b>type:</b> {message?.role ?? "-"}</div>
         </div>
         <MessagePrimitive.Content />
@@ -385,10 +382,7 @@ const AssistantMessage: FC = () => {
         <div className="text-xs text-muted-foreground mb-1">
           <div><b>id:</b> {message?.id ?? "-"}</div>
           <div><b>parentId:</b> {parentIdDisplay ?? "-"}</div>
-          <div><b>siblingId:</b> {siblingIdStr || "-"}</div>
-          {branchIdValue !== null && (
-            <div><b>branchId:</b> {branchIdValue}</div>
-          )}
+          <div><b>branchId:</b> {branchIdValue ?? "-"}</div>
           <div><b>type:</b> {message?.role ?? "-"}</div>
         </div>
         <MessagePrimitive.Content

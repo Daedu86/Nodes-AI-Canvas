@@ -30,6 +30,17 @@ type Node = {
   branchId?: unknown;
 };
 
+const ROOT_NODE_ID = "__ROOT__";
+const ROOT_NODE_LABEL = "Conversation Root";
+
+const nodesShareBranch = (parentNode: Node | null, childNode: Node | null) => {
+  if (!parentNode || !childNode) return false;
+  const parentBranch = parentNode.branchId;
+  const childBranch = childNode.branchId;
+  if (parentBranch == null || childBranch == null) return true;
+  return parentBranch === childBranch;
+};
+
 type ConnectorId =
   | "left-0"
   | "left-1"
@@ -47,12 +58,16 @@ type LinkConnectorPref = {
   to: ConnectorId;
 };
 
+type ConnectorRole = "from" | "to";
+
 type Point = { x: number; y: number };
 
 type EdgeConnectorInfo = {
   from: ConnectorId;
   to: ConnectorId;
   points: { from: Point; to: Point };
+  parentId: string | null;
+  childId: string;
 };
 
 const CONNECTOR_GROUP: Record<ConnectorId, "left" | "right" | "top" | "bottom"> = {
@@ -185,7 +200,7 @@ export function ThreadGraphInline() {
       depthCache.set(id, d);
       return d;
     };
-    return arr.map((it: ThreadRepoItem, i: number) => {
+    const baseNodes = arr.map((it: ThreadRepoItem, i: number) => {
       const id = String(it.message?.id ?? i);
       const parentId = it.parentId ?? null;
       const message = it.message;
@@ -205,6 +220,23 @@ export function ThreadGraphInline() {
       node.depth = parentId === null ? 0 : getDepth(it.message);
       return node;
     });
+    if (baseNodes.length === 0) return baseNodes;
+    const rootChildren = baseNodes.filter((node) => node.parentId === null);
+    if (rootChildren.length === 0) return baseNodes;
+    rootChildren.forEach((node) => {
+      node.parentId = ROOT_NODE_ID;
+      node.depth += 1;
+    });
+    const rootNode: Node = {
+      id: ROOT_NODE_ID,
+      parentId: null,
+      role: "ROOT",
+      text: ROOT_NODE_LABEL,
+      depth: 0,
+      idx: -1,
+      branchId: null,
+    };
+    return [rootNode, ...baseNodes];
   }, [repoItems]);
 
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
@@ -233,6 +265,10 @@ export function ThreadGraphInline() {
   const connectorDragRef = React.useRef<{
     nodeId: string;
     connectorId: ConnectorId;
+    edgeKey: string;
+    role: ConnectorRole;
+    parentId: string | null;
+    childId: string;
     startX: number;
     startY: number;
     hasMoved: boolean;
@@ -285,8 +321,32 @@ export function ThreadGraphInline() {
     []
   );
 
+  const getNodesForEdge = React.useCallback(
+    (parentId: string | null, childId: string) => {
+      if (!childId) {
+        return { parentNode: null, childNode: null };
+      }
+      const parentNode = parentId ? nodeLayoutRef.current.get(parentId) ?? null : null;
+      const childNode = nodeLayoutRef.current.get(childId) ?? null;
+      return { parentNode, childNode };
+    },
+    []
+  );
+
+  const isConfigurableEdge = React.useCallback(
+    (parentId: string | null, childId: string) => {
+      const { parentNode, childNode } = getNodesForEdge(parentId, childId);
+      if (!parentNode || !childNode) return false;
+      return nodesShareBranch(parentNode, childNode);
+    },
+    [getNodesForEdge]
+  );
+
   const chooseDefaultConnectors = React.useCallback(
     (parent: Node | undefined, child: Node): LinkConnectorPref => {
+      if (parent?.id === ROOT_NODE_ID) {
+        return { from: "bottom-0", to: "top-0" };
+      }
       if (parent && parent.x != null && parent.y != null && child.x != null && child.y != null) {
         const dx = child.x - parent.x;
         const dy = child.y - parent.y;
@@ -388,18 +448,128 @@ export function ThreadGraphInline() {
     []
   );
 
+  const findEdgeForConnector = React.useCallback(
+    (nodeId: string, connectorId: ConnectorId, point?: Point) => {
+      let best:
+        | {
+            edgeKey: string;
+            role: ConnectorRole;
+            parentId: string | null;
+            childId: string;
+            distance: number;
+          }
+        | null = null;
+      edgeConnectorMapRef.current.forEach((info, edgeKey) => {
+        if (!isConfigurableEdge(info.parentId, info.childId)) {
+          return;
+        }
+        if (info.parentId === nodeId && info.from === connectorId) {
+          const targetPoint = info.points.to;
+          const distance = point ? Math.hypot(targetPoint.x - point.x, targetPoint.y - point.y) : 0;
+          if (best == null || distance < best.distance) {
+            best = { edgeKey, role: "from", parentId: info.parentId, childId: info.childId, distance };
+          }
+        }
+        if (info.childId === nodeId && info.to === connectorId) {
+          const targetPoint = info.points.from;
+          const distance = point ? Math.hypot(targetPoint.x - point.x, targetPoint.y - point.y) : 0;
+          if (best == null || distance < best.distance) {
+            best = { edgeKey, role: "to", parentId: info.parentId, childId: info.childId, distance };
+          }
+        }
+      });
+      return best;
+    },
+    [isConfigurableEdge]
+  );
+
+  const isValidConnectorTarget = React.useCallback(
+    (
+      dragContext:
+        | { parentId: string | null; childId: string; role: ConnectorRole }
+        | null,
+      candidate: { nodeId: string; connectorId: ConnectorId } | null
+    ) => {
+      if (!dragContext || !candidate) return false;
+      if (!dragContext.childId) return false;
+      if (dragContext.role === "from") {
+        if (!dragContext.parentId || candidate.nodeId !== dragContext.parentId) return false;
+      } else if (candidate.nodeId !== dragContext.childId) {
+        return false;
+      }
+      if (!isConfigurableEdge(dragContext.parentId ?? null, dragContext.childId)) {
+        return false;
+      }
+      return true;
+    },
+    [isConfigurableEdge]
+  );
+
+  const applyConnectorSelection = React.useCallback(
+    (
+      edgeKey: string,
+      role: ConnectorRole,
+      connectorId: ConnectorId,
+      parentId: string | null,
+      childId: string
+    ) => {
+      if (!childId) return;
+      setLinkConnectors((prev) => {
+        if (!isConfigurableEdge(parentId, childId)) {
+          if (!prev.has(edgeKey)) return prev;
+          const next = new Map(prev);
+          next.delete(edgeKey);
+          return next;
+        }
+        const defaults = connectorDefaultsRef.current;
+        const defaultPref = defaults.get(edgeKey);
+        const stored = prev.get(edgeKey);
+        const fallback = edgeConnectorMapRef.current.get(edgeKey);
+        const base = stored ?? defaultPref ?? (fallback ? { from: fallback.from, to: fallback.to } : null);
+        if (!base) return prev;
+        const updated: LinkConnectorPref =
+          role === "from" ? { from: connectorId, to: base.to } : { from: base.from, to: connectorId };
+        if (stored && stored.from === updated.from && stored.to === updated.to) {
+          return prev;
+        }
+        const matchesDefault =
+          !!defaultPref && defaultPref.from === updated.from && defaultPref.to === updated.to;
+        if (matchesDefault) {
+          if (!stored) return prev;
+          const next = new Map(prev);
+          next.delete(edgeKey);
+          return next;
+        }
+        const next = new Map(prev);
+        next.set(edgeKey, updated);
+        return next;
+      });
+    },
+    [isConfigurableEdge]
+  );
+
   React.useEffect(() => {
     setLinkConnectors((prev) => {
       if (prev.size === 0) return prev;
       const defaults = connectorDefaultsRef.current;
       let changed = false;
       const next = new Map<string, LinkConnectorPref>();
+      const idToNode = new Map(nodes.map((node) => [node.id, node] as const));
       prev.forEach((value, key) => {
-        if (defaults.has(key)) {
-          next.set(key, value);
-        } else {
+        if (!defaults.has(key)) {
           changed = true;
+          return;
         }
+        const [rawParent, rawChild] = key.split("->");
+        const parentId = rawParent === "null" ? null : rawParent ?? null;
+        const childId = rawChild ?? "";
+        const parentNode = parentId ? idToNode.get(parentId) ?? null : null;
+        const childNode = idToNode.get(childId) ?? null;
+        if (!parentNode || !childNode || !nodesShareBranch(parentNode, childNode)) {
+          changed = true;
+          return;
+        }
+        next.set(key, value);
       });
       return changed ? next : prev;
     });
@@ -481,6 +651,8 @@ export function ThreadGraphInline() {
         from: pref.from,
         to: pref.to,
         points: { from: parentConnectorPoint, to: childConnectorPoint },
+        parentId: parent.id,
+        childId: n.id,
       });
 
       const start = offsetConnectorPoint(parentConnectorPoint, pref.from);
@@ -521,6 +693,17 @@ export function ThreadGraphInline() {
       const x = n.x - HALF_NODE_WIDTH;
       const y = n.y - HALF_NODE_HEIGHT;
       const radius = 10;
+      const isRootNode = n.id === ROOT_NODE_ID;
+      const currentFill = isRootNode
+        ? isDarkBg
+          ? "rgba(30,64,175,0.85)"
+          : "rgba(219,234,254,0.95)"
+        : nodeFill;
+      const currentStroke = isRootNode
+        ? isDarkBg
+          ? "rgba(191,219,254,0.7)"
+          : "rgba(37,99,235,0.45)"
+        : nodeStroke;
 
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
@@ -533,22 +716,24 @@ export function ThreadGraphInline() {
       ctx.lineTo(x, y + radius);
       ctx.quadraticCurveTo(x, y, x + radius, y);
       ctx.closePath();
-      ctx.fillStyle = nodeFill;
+      ctx.fillStyle = currentFill;
       ctx.fill();
-      ctx.strokeStyle = nodeStroke;
+      ctx.strokeStyle = currentStroke;
       ctx.lineWidth = 1;
       ctx.stroke();
 
       ctx.fillStyle = labelColor;
       ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
-      const role = (n.role || "").toUpperCase();
+      const role = isRootNode ? "ROOT" : (n.role || "").toUpperCase();
       if (role) {
         ctx.fillText(role, x + 8, y + 16);
       }
 
       ctx.fillStyle = textColor;
       ctx.font = "12px ui-sans-serif, system-ui, sans-serif";
-      const preview = (n.text || "").replace(/\s+/g, " ").trim().slice(0, 80);
+      const preview = isRootNode
+        ? ROOT_NODE_LABEL
+        : (n.text || "").replace(/\s+/g, " ").trim().slice(0, 80);
       const textY = y + 36;
       if (preview) {
         ctx.fillText(preview, x + 8, textY, w - 16);
@@ -677,26 +862,60 @@ export function ThreadGraphInline() {
       const idToParent = new Map<string, string | null>();
       const parentToChildren = new Map<string | null, string[]>();
       nodes.forEach((node) => {
-        idToParent.set(node.id, node.parentId ?? null);
-        const key = node.parentId ?? null;
-        const list = parentToChildren.get(key) || [];
+        if (node.id === ROOT_NODE_ID) return;
+        const rawParentId = node.parentId ?? null;
+        const normalizedParentId = rawParentId === ROOT_NODE_ID ? null : rawParentId;
+        idToParent.set(node.id, normalizedParentId);
+        const list = parentToChildren.get(normalizedParentId) || [];
         list.push(node.id);
-        parentToChildren.set(key, list);
+        parentToChildren.set(normalizedParentId, list);
       });
-      const payload = nodes.map((node) => {
-        const parentId = idToParent.get(node.id) ?? null;
-        const children = parentToChildren.get(node.id) ?? [];
-        const siblings = (parentToChildren.get(parentId) || []).filter((sibling) => sibling !== node.id);
-        return { id: node.id, parentId, children, siblings };
+      const combinedConnectors = new Map<string, LinkConnectorPref>();
+      connectorDefaultsRef.current.forEach((value, key) => {
+        combinedConnectors.set(key, { ...value });
       });
-      const text = JSON.stringify(payload, null, 2);
+      linkConnectors.forEach((value, key) => {
+        combinedConnectors.set(key, { ...value });
+      });
+      const connectorEntries = Array.from(combinedConnectors.entries()).map(([edgeKey, pref]) => {
+        const info = edgeConnectorMapRef.current.get(edgeKey);
+        const [rawParent, rawChild] = edgeKey.split("->");
+        const parentIdRaw = info?.parentId ?? (rawParent === "null" ? null : rawParent ?? null);
+        const parentId = parentIdRaw === ROOT_NODE_ID ? null : parentIdRaw;
+        const childId = info?.childId ?? rawChild ?? "";
+        return {
+          edgeKey,
+          parentId,
+          childId,
+          connector: pref,
+          custom: linkConnectors.has(edgeKey),
+        };
+      });
+      const payload = nodes
+        .filter((node) => node.id !== ROOT_NODE_ID)
+        .map((node) => {
+          const parentId = idToParent.get(node.id) ?? null;
+          const children = parentToChildren.get(node.id) ?? [];
+          const siblings = (parentToChildren.get(parentId) || []).filter((sibling) => sibling !== node.id);
+          const edgeKey = parentId ? getEdgeKey(parentId, node.id) : null;
+          const connectorPref = edgeKey ? combinedConnectors.get(edgeKey) ?? null : null;
+          return {
+            id: node.id,
+            parentId,
+            branchId: node.branchId ?? null,
+            children,
+            siblings,
+            connectorPref,
+          };
+        });
+      const text = JSON.stringify({ nodes: payload, connectors: connectorEntries }, null, 2);
       navigator.clipboard.writeText(text);
       alert("Graph JSON copied to clipboard");
     } catch (error) {
       console.error(error);
       alert("Copy failed");
     }
-  }, [nodes]);
+  }, [getEdgeKey, linkConnectors, nodes]);
 
   const controlButtonClass =
     "inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted";
@@ -723,18 +942,25 @@ export function ThreadGraphInline() {
         const world = screenToWorld(sx, sy);
         const connectorHit = getConnectorHit(world.x, world.y);
         if (connectorHit) {
-          connectorDragRef.current = {
-            nodeId: connectorHit.nodeId,
-            connectorId: connectorHit.connectorId,
-            startX: world.x,
-            startY: world.y,
-            hasMoved: false,
-          };
-          updateDraggingConnector({ nodeId: connectorHit.nodeId, connectorId: connectorHit.connectorId });
-          updateHoveredConnector({ nodeId: connectorHit.nodeId, connectorId: connectorHit.connectorId });
-          setCanvasCursor("grabbing");
-          e.preventDefault();
-          return;
+          const edgeInfo = findEdgeForConnector(connectorHit.nodeId, connectorHit.connectorId, world);
+          if (edgeInfo) {
+            connectorDragRef.current = {
+              nodeId: connectorHit.nodeId,
+              connectorId: connectorHit.connectorId,
+              edgeKey: edgeInfo.edgeKey,
+              role: edgeInfo.role,
+              parentId: edgeInfo.parentId,
+              childId: edgeInfo.childId,
+              startX: world.x,
+              startY: world.y,
+              hasMoved: false,
+            };
+            updateDraggingConnector({ nodeId: connectorHit.nodeId, connectorId: connectorHit.connectorId });
+            updateHoveredConnector({ nodeId: connectorHit.nodeId, connectorId: connectorHit.connectorId });
+            setCanvasCursor("grabbing");
+            e.preventDefault();
+            return;
+          }
         }
         let hitId: string | null = null;
         for (const [id, b] of boundsRef.current) {
@@ -744,6 +970,11 @@ export function ThreadGraphInline() {
           }
         }
         if (hitId) {
+          if (hitId === ROOT_NODE_ID) {
+            updateHoveredConnector(null);
+            setCanvasCursor("default");
+            return;
+          }
           const b = boundsRef.current.get(hitId)!;
           const cx = b.x + b.w / 2;
           const cy = b.y + b.h / 2;
@@ -771,8 +1002,11 @@ export function ThreadGraphInline() {
             suppressClickRef.current = true;
           }
           const hoverTarget = getConnectorHit(world.x, world.y);
+          const isValid = isValidConnectorTarget(connectorDrag, hoverTarget);
           updateHoveredConnector(
-            hoverTarget ? { nodeId: hoverTarget.nodeId, connectorId: hoverTarget.connectorId } : null
+            isValid && hoverTarget
+              ? { nodeId: hoverTarget.nodeId, connectorId: hoverTarget.connectorId }
+              : null
           );
           setCanvasCursor("grabbing");
           return;
@@ -811,11 +1045,21 @@ export function ThreadGraphInline() {
       const onMouseUp = () => {
         const connectorDrag = connectorDragRef.current;
         if (connectorDrag) {
-          updateDraggingConnector(null);
-          connectorDragRef.current = null;
+          const target = hoveredConnectorRef.current;
           if (connectorDrag.hasMoved) {
             suppressClickRef.current = true;
+            if (isValidConnectorTarget(connectorDrag, target) && target) {
+              applyConnectorSelection(
+                connectorDrag.edgeKey,
+                connectorDrag.role,
+                target.connectorId,
+                connectorDrag.parentId,
+                connectorDrag.childId
+              );
+            }
           }
+          updateDraggingConnector(null);
+          connectorDragRef.current = null;
         }
         dragStartRef.current = null;
         viewStartRef.current = null;
@@ -857,6 +1101,9 @@ export function ThreadGraphInline() {
         const world = screenToWorld(sx, sy);
         for (const [id, b] of boundsRef.current) {
           if (world.x >= b.x && world.x <= b.x + b.w && world.y >= b.y && world.y <= b.y + b.h) {
+            if (id === ROOT_NODE_ID) {
+              continue;
+            }
             const el = document.querySelector(`[data-message-id="${id}"]`) as HTMLElement | null;
             if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
             break;
@@ -884,7 +1131,17 @@ export function ThreadGraphInline() {
       if (cleanup) cleanup();
       ro.disconnect();
     };
-  }, [getConnectorHit, render, screenToWorld, updateDraggingConnector, updateHoveredConnector, view]);
+  }, [
+    applyConnectorSelection,
+    findEdgeForConnector,
+    getConnectorHit,
+    isValidConnectorTarget,
+    render,
+    screenToWorld,
+    updateDraggingConnector,
+    updateHoveredConnector,
+    view,
+  ]);
 
   React.useEffect(() => {
     try {
