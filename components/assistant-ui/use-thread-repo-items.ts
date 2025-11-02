@@ -6,6 +6,7 @@ import {
   EDIT_PARENT_KEY,
   EDIT_SOURCE_KEY,
   ASSISTANT_EDIT_METADATA_KEY,
+  ASSISTANT_EDIT_BRIDGE_KEY,
 } from "@/lib/assistant-edit-branching";
 
 export type ThreadRepoItem = ExportedMessageRepository["messages"][number];
@@ -70,19 +71,22 @@ const reparentAssistantChild = (
       bridgeParentId: bridge.parentId ?? null,
     });
   }
-  const message =
-    sourceId
-      ? {
-          ...item.message,
-          metadata: {
-            ...(item.message.metadata ?? {}),
-            custom: {
-              ...((item.message.metadata?.custom as Record<string, unknown> | undefined) ?? {}),
-              [ASSISTANT_EDIT_METADATA_KEY]: sourceId,
-            },
-          },
-        }
-      : item.message;
+  const nextMetadataCustom: Record<string, unknown> = {
+    ...((item.message.metadata?.custom as Record<string, unknown> | undefined) ?? {}),
+  };
+  if (bridgeId) {
+    nextMetadataCustom[ASSISTANT_EDIT_BRIDGE_KEY] = bridgeId;
+  }
+  if (sourceId) {
+    nextMetadataCustom[ASSISTANT_EDIT_METADATA_KEY] = sourceId;
+  }
+  const message = {
+    ...item.message,
+    metadata: {
+      ...(item.message.metadata ?? {}),
+      custom: nextMetadataCustom,
+    },
+  };
   if (process.env.NODE_ENV !== "production" && sourceId) {
     console.log("[thread-repo] tagged assistant edit metadata", {
       childId: message?.id,
@@ -138,30 +142,42 @@ const normalizeAssistantBranches = (
   const order = new Map<string, number>();
   const bridges = new Set<string>();
   const visible = items.reduce<ThreadRepoItem[]>((acc, item, idx) => {
-    const id = item.message?.id;
+    const originalCustom =
+      (item.message.metadata as { custom?: Record<string, unknown> } | undefined)?.custom ?? {};
+    const forcedBridgeIdValue = originalCustom[ASSISTANT_EDIT_BRIDGE_KEY];
+    const forcedBridgeId = typeof forcedBridgeIdValue === "string" ? forcedBridgeIdValue : null;
+    const currentItem =
+      forcedBridgeId && forcedBridgeId !== item.parentId
+        ? {
+            ...item,
+            parentId: forcedBridgeId,
+          }
+        : item;
+    const id = currentItem.message?.id;
     if (id) {
       order.set(id, idx);
     }
     if (process.env.NODE_ENV !== "production") {
       console.log("[thread-repo] normalized candidate", {
         id,
-        parentId: item.parentId ?? null,
-        custom: (item.message.metadata as { custom?: Record<string, unknown> } | undefined)?.custom,
-        sourceId: getSourceId(item.message),
+        parentId: currentItem.parentId ?? null,
+        custom:
+          (currentItem.message.metadata as { custom?: Record<string, unknown> } | undefined)?.custom ?? {},
+        sourceId: getSourceId(currentItem.message),
       });
     }
     if (id && bridgeIds.has(id)) {
       bridges.add(id);
-      acc.push(item);
+      acc.push(currentItem);
       return acc;
     }
-    const currentParentId = item.parentId ?? null;
+    const currentParentId = currentItem.parentId ?? null;
     if (currentParentId && bridgeIds.has(currentParentId)) {
       const bridge = byId.get(currentParentId);
-      acc.push(reparentAssistantChild(item, bridge, byId));
+      acc.push(reparentAssistantChild(currentItem, bridge, byId));
       return acc;
     }
-    const itemSourceId = getSourceId(item.message);
+    const itemSourceId = getSourceId(currentItem.message);
     if (itemSourceId) {
       const candidates = bridgeBySource.get(itemSourceId);
       const matchedBridgeId = candidates?.[candidates.length - 1];
@@ -169,12 +185,12 @@ const normalizeAssistantBranches = (
         const matchedBridge = byId.get(matchedBridgeId);
         if (matchedBridge) {
           bridges.add(matchedBridgeId);
-          acc.push(reparentAssistantChild(item, matchedBridge, byId));
+          acc.push(reparentAssistantChild(currentItem, matchedBridge, byId));
           return acc;
         }
       }
     }
-    acc.push(item);
+    acc.push(currentItem);
     return acc;
   }, []);
   return { items: visible, order, bridges };
