@@ -52,7 +52,6 @@ describe("normalizeThreadRepoItems", () => {
       id: "assistant-edit",
       role: "assistant",
       parentId: "root-user",
-      sourceId: "assistant-1",
       custom: {
         [ASSISTANT_EDIT_METADATA_KEY]: "assistant-1",
       },

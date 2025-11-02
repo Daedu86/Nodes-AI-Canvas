@@ -28,7 +28,9 @@ const getSourceId = (message: ThreadRepoItem["message"]): string | null => {
   if (typeof directSource === "string") return directSource;
   const custom = (message.metadata as { custom?: Record<string, unknown> } | undefined)?.custom;
   const metaSource = custom?.[EDIT_SOURCE_KEY];
-  return typeof metaSource === "string" ? metaSource : null;
+  if (typeof metaSource === "string") return metaSource;
+  const editedFrom = custom?.[ASSISTANT_EDIT_METADATA_KEY];
+  return typeof editedFrom === "string" ? editedFrom : null;
 };
 
 const shouldHideUserBridge = (item: ThreadRepoItem, byId: Map<string, ThreadRepoItem>) => {
