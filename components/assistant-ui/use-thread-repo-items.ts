@@ -99,9 +99,15 @@ const reparentAssistantChild = (
   };
 };
 
-const normalizeAssistantBranches = (
+export type NormalizedThreadRepo = {
+  items: ThreadRepoItem[];
+  order: Map<string, number>;
+  bridges: Set<string>;
+};
+
+export const normalizeThreadRepoItems = (
   items: ThreadRepoItem[],
-): { items: ThreadRepoItem[]; order: Map<string, number>; bridges: Set<string> } => {
+): NormalizedThreadRepo => {
   if (items.length === 0) {
     return { items, order: new Map(), bridges: new Set() };
   }
@@ -199,7 +205,7 @@ const normalizeAssistantBranches = (
 export function useThreadRepoItems(
   runtime: AssistantRuntime | null | undefined,
   options: Options = {},
-): { items: ThreadRepoItem[]; order: Map<string, number>; bridges: Set<string> } {
+): NormalizedThreadRepo {
   const { enabled = true } = options;
   const [items, setItems] = useState<ThreadRepoItem[]>([]);
 
@@ -249,6 +255,6 @@ export function useThreadRepoItems(
     if (process.env.NODE_ENV !== "production") {
       console.log("[thread-repo] raw export", items);
     }
-    return normalizeAssistantBranches(items);
+    return normalizeThreadRepoItems(items);
   }, [items]);
 }
