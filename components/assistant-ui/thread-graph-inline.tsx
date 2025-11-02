@@ -673,6 +673,7 @@ export function ThreadGraphInline() {
     nodes.forEach((n) => {
       if (!n.parentId) return;
       if (n.parentId === ROOT_NODE_ID) return;
+      if (n.isBridge) return;
       if (n.editedFromId) {
         if (
           process.env.NODE_ENV !== "production" &&
@@ -1117,6 +1118,9 @@ export function ThreadGraphInline() {
         if (!visibleIds.has(childId)) {
           return [];
         }
+        if (bridgeNodeIds.has(childId)) {
+          return [];
+        }
         return [
           {
             edgeKey,
@@ -1170,7 +1174,9 @@ export function ThreadGraphInline() {
         const siblings = (parentToChildren.get(parentId) || []).filter((siblingId) => siblingId !== id);
         const edgeKey = parentId ? getEdgeKey(parentId, id) : null;
         const connectorPref =
-          edgeKey && visibleIds.has(id) ? combinedConnectors.get(edgeKey) ?? null : null;
+          edgeKey && visibleIds.has(id) && !bridgeNodeIds.has(id)
+            ? combinedConnectors.get(edgeKey) ?? null
+            : null;
         const base = {
           id,
           parentId,
