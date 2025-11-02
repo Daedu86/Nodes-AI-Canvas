@@ -125,6 +125,16 @@ const normalizeAssistantBranches = (
       bridgeIds.add(id);
     }
   });
+  const bridgeBySource = new Map<string, string[]>();
+  bridgeIds.forEach((bridgeId) => {
+    const bridge = byId.get(bridgeId);
+    if (!bridge) return;
+    const source = getSourceId(bridge.message);
+    if (!source) return;
+    const list = bridgeBySource.get(source) ?? [];
+    list.push(bridgeId);
+    bridgeBySource.set(source, list);
+  });
   const order = new Map<string, number>();
   const bridges = new Set<string>();
   const visible = items.reduce<ThreadRepoItem[]>((acc, item, idx) => {
@@ -150,6 +160,19 @@ const normalizeAssistantBranches = (
       const bridge = byId.get(currentParentId);
       acc.push(reparentAssistantChild(item, bridge, byId));
       return acc;
+    }
+    const itemSourceId = getSourceId(item.message);
+    if (itemSourceId) {
+      const candidates = bridgeBySource.get(itemSourceId);
+      const matchedBridgeId = candidates?.[candidates.length - 1];
+      if (matchedBridgeId && matchedBridgeId !== id) {
+        const matchedBridge = byId.get(matchedBridgeId);
+        if (matchedBridge) {
+          bridges.add(matchedBridgeId);
+          acc.push(reparentAssistantChild(item, matchedBridge, byId));
+          return acc;
+        }
+      }
     }
     acc.push(item);
     return acc;
