@@ -54,14 +54,16 @@ const reparentAssistantChild = (
   const normalizedParentId = explicitParent ?? bridge.parentId ?? sourceParentId ?? null;
   const sourceId = detectedSourceId;
   const itemCustom = (item.message.metadata as { custom?: Record<string, unknown> } | undefined)?.custom ?? {};
-  if (normalizedParentId === item.parentId && (!sourceId || itemCustom[ASSISTANT_EDIT_METADATA_KEY] === sourceId)) {
+  const bridgeId = bridge.message?.id;
+  const desiredParentId = explicitParent ?? bridgeId ?? item.parentId ?? normalizedParentId ?? null;
+  if (desiredParentId === item.parentId && (!sourceId || itemCustom[ASSISTANT_EDIT_METADATA_KEY] === sourceId)) {
     return item;
   }
   if (process.env.NODE_ENV !== "production") {
     console.log("[thread-repo] reparent assistant", {
       childId: item.message?.id,
       originalParentId: item.parentId ?? null,
-      normalizedParentId,
+      normalizedParentId: desiredParentId,
       sourceId,
       bridgeCustom,
       bridgeSourceId: getSourceId(bridge.message),
@@ -88,7 +90,7 @@ const reparentAssistantChild = (
     });
   }
   return {
-    parentId: normalizedParentId,
+    parentId: desiredParentId,
     message,
   };
 };
