@@ -674,11 +674,11 @@ export function ThreadGraphInline() {
       if (!n.parentId) return;
       if (n.parentId === ROOT_NODE_ID) return;
       if (n.isBridge) return;
-      if (n.editedFromId) {
-        if (
-          process.env.NODE_ENV !== "production" &&
-          !variantLogRef.current.has(n.id)
-        ) {
+      const parent = idToNode.get(String(n.parentId));
+      if (!parent) return;
+      const parentIsBridge = parent.isBridge ?? false;
+      if (n.editedFromId && !parentIsBridge) {
+        if (process.env.NODE_ENV !== "production" && !variantLogRef.current.has(n.id)) {
           console.log("[thread-graph-inline] suppressing variant edge", {
             childId: n.id,
             parentId: n.parentId,
@@ -688,8 +688,7 @@ export function ThreadGraphInline() {
         }
         return;
       }
-      const parent = idToNode.get(String(n.parentId));
-      if (!parent || parent.x == null || parent.y == null || n.x == null || n.y == null) return;
+      if (parent.x == null || parent.y == null || n.x == null || n.y == null) return;
       const edgeKey = getEdgeKey(n.parentId, n.id);
       const pref = linkConnectors.get(edgeKey) ?? chooseDefaultConnectors(parent, n);
       const parentConnectorPoint = getConnectorPoint(parent, pref.from);
