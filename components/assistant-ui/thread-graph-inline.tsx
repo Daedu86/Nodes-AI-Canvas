@@ -664,6 +664,7 @@ export function ThreadGraphInline() {
 
     nodes.forEach((n) => {
       if (!n.parentId) return;
+      if (n.parentId === ROOT_NODE_ID) return;
       if (n.editedFromId) {
         if (
           process.env.NODE_ENV !== "production" &&
@@ -791,6 +792,56 @@ export function ThreadGraphInline() {
         ctx.lineTo(nodeB.x, nodeB.y);
         ctx.stroke();
         ctx.restore();
+
+        const labelSource = nodeB.branchId ?? nodeB.id;
+        if (labelSource != null) {
+          const rawLabel =
+            typeof labelSource === "string" || typeof labelSource === "number"
+              ? String(labelSource)
+              : typeof (labelSource as { id?: unknown })?.id === "string"
+                ? String((labelSource as { id?: string }).id)
+                : "";
+          if (rawLabel) {
+            const midX = (nodeA.x + nodeB.x) / 2;
+            const midY = (nodeA.y + nodeB.y) / 2;
+            const labelText =
+              rawLabel.length > 18 ? `${rawLabel.slice(0, 8)}...${rawLabel.slice(-4)}` : rawLabel;
+            ctx.save();
+            ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
+            const metrics = ctx.measureText(labelText);
+            const paddingX = 6;
+            const paddingY = 3;
+            const textHeight =
+              (metrics.actualBoundingBoxAscent ?? 7) + (metrics.actualBoundingBoxDescent ?? 3);
+            const boxWidth = metrics.width + paddingX * 2;
+            const boxHeight = textHeight + paddingY * 2;
+            const boxX = midX - boxWidth / 2;
+            const boxY = midY - boxHeight / 2;
+            const radius = 6;
+            ctx.beginPath();
+            ctx.moveTo(boxX + radius, boxY);
+            ctx.lineTo(boxX + boxWidth - radius, boxY);
+            ctx.quadraticCurveTo(boxX + boxWidth, boxY, boxX + boxWidth, boxY + radius);
+            ctx.lineTo(boxX + boxWidth, boxY + boxHeight - radius);
+            ctx.quadraticCurveTo(boxX + boxWidth, boxY + boxHeight, boxX + boxWidth - radius, boxY + boxHeight);
+            ctx.lineTo(boxX + radius, boxY + boxHeight);
+            ctx.quadraticCurveTo(boxX, boxY + boxHeight, boxX, boxY + boxHeight - radius);
+            ctx.lineTo(boxX, boxY + radius);
+            ctx.quadraticCurveTo(boxX, boxY, boxX + radius, boxY);
+            ctx.closePath();
+            ctx.fillStyle = isDarkBg ? "rgba(254,226,226,0.92)" : "rgba(254,242,242,0.95)";
+            ctx.strokeStyle = "rgba(220,38,38,0.85)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([]);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = isDarkBg ? "#7f1d1d" : "#991b1b";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(labelText, midX, midY + 0.4);
+            ctx.restore();
+          }
+        }
       });
     });
 
@@ -986,6 +1037,7 @@ export function ThreadGraphInline() {
     try {
       const idToParent = new Map<string, string | null>();
       const parentToChildren = new Map<string | null, string[]>();
+      const nodeById = new Map<string, Node>();
       nodes.forEach((node) => {
         if (node.id === ROOT_NODE_ID) return;
         const rawParentId = node.parentId ?? null;
@@ -994,6 +1046,7 @@ export function ThreadGraphInline() {
         const list = parentToChildren.get(normalizedParentId) || [];
         list.push(node.id);
         parentToChildren.set(normalizedParentId, list);
+        nodeById.set(node.id, node);
       });
       const combinedConnectors = new Map<string, LinkConnectorPref>();
       connectorDefaultsRef.current.forEach((value, key) => {
@@ -1002,19 +1055,59 @@ export function ThreadGraphInline() {
       linkConnectors.forEach((value, key) => {
         combinedConnectors.set(key, { ...value });
       });
-      const connectorEntries = Array.from(combinedConnectors.entries()).map(([edgeKey, pref]) => {
+      const connectorEntries = Array.from(combinedConnectors.entries()).flatMap(([edgeKey, pref]) => {
         const info = edgeConnectorMapRef.current.get(edgeKey);
         const [rawParent, rawChild] = edgeKey.split("->");
         const parentIdRaw = info?.parentId ?? (rawParent === "null" ? null : rawParent ?? null);
         const parentId = parentIdRaw === ROOT_NODE_ID ? null : parentIdRaw;
+        if (parentId === null) {
+          return [];
+        }
         const childId = info?.childId ?? rawChild ?? "";
-        return {
-          edgeKey,
-          parentId,
-          childId,
-          connector: pref,
-          custom: linkConnectors.has(edgeKey),
-        };
+        return [
+          {
+            edgeKey,
+            description: "parent-child",
+            colorLine: "grey",
+            parentId,
+            childId,
+            connector: pref,
+            custom: linkConnectors.has(edgeKey),
+          },
+        ];
+      });
+      const siblingConnectors: Array<{
+        edgeKey: string;
+        parentId: string | null;
+        childId: string;
+        siblingId: string;
+        description: string;
+        colorLine: string;
+        connector: null;
+        custom: false;
+      }> = [];
+      parentToChildren.forEach((children, parentId) => {
+        if (children.length <= 1) return;
+        const sorted = [...children].sort((a, b) => {
+          const aIdx = nodeById.get(a)?.idx ?? 0;
+          const bIdx = nodeById.get(b)?.idx ?? 0;
+          return aIdx - bIdx;
+        });
+        sorted.forEach((childId, index) => {
+          const nextId = sorted[index + 1];
+          if (!nextId) return;
+          const edgeKey = `siblings:${parentId ?? "null"}:${childId}<->${nextId}`;
+          siblingConnectors.push({
+            edgeKey,
+            parentId,
+            childId: nextId,
+            siblingId: childId,
+            description: "siblings",
+            colorLine: "red-dashed",
+            connector: null,
+            custom: false,
+          });
+        });
       });
       const payload = nodes
         .filter((node) => node.id !== ROOT_NODE_ID)
@@ -1034,7 +1127,11 @@ export function ThreadGraphInline() {
             connectorPref,
           };
         });
-      const text = JSON.stringify({ nodes: payload, connectors: connectorEntries }, null, 2);
+      const text = JSON.stringify(
+        { nodes: payload, connectors: [...connectorEntries, ...siblingConnectors] },
+        null,
+        2,
+      );
       navigator.clipboard.writeText(text);
       alert("Graph JSON copied to clipboard");
     } catch (error) {
