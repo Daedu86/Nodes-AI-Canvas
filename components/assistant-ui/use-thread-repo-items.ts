@@ -93,13 +93,12 @@ const reparentAssistantChild = (
   };
 };
 
-/**
- * Converts the default assistant-ui edit flow (user bridge node -> assistant child)
- * into the desired structure where assistant edits become sibling variants.
- * Bridge user messages are identified via metadata injected by our runtime patch.
- */
-const normalizeAssistantBranches = (items: ThreadRepoItem[]): ThreadRepoItem[] => {
-  if (items.length === 0) return items;
+const normalizeAssistantBranches = (
+  items: ThreadRepoItem[],
+): { items: ThreadRepoItem[]; order: Map<string, number>; bridges: Set<string> } => {
+  if (items.length === 0) {
+    return { items, order: new Map(), bridges: new Set() };
+  }
   const byId = new Map<string, ThreadRepoItem>();
   items.forEach((item) => {
     const id = item.message?.id;
@@ -124,11 +123,12 @@ const normalizeAssistantBranches = (items: ThreadRepoItem[]): ThreadRepoItem[] =
       bridgeIds.add(id);
     }
   });
-  if (bridgeIds.size === 0) return items;
-  return items.reduce<ThreadRepoItem[]>((acc, item) => {
+  const order = new Map<string, number>();
+  const bridges = new Set<string>();
+  const visible = items.reduce<ThreadRepoItem[]>((acc, item, idx) => {
     const id = item.message?.id;
-    if (id && bridgeIds.has(id)) {
-      return acc;
+    if (id) {
+      order.set(id, idx);
     }
     if (process.env.NODE_ENV !== "production") {
       console.log("[thread-repo] normalized candidate", {
@@ -137,6 +137,11 @@ const normalizeAssistantBranches = (items: ThreadRepoItem[]): ThreadRepoItem[] =
         custom: (item.message.metadata as { custom?: Record<string, unknown> } | undefined)?.custom,
         sourceId: getSourceId(item.message),
       });
+    }
+    if (id && bridgeIds.has(id)) {
+      bridges.add(id);
+      acc.push(item);
+      return acc;
     }
     const currentParentId = item.parentId ?? null;
     if (currentParentId && bridgeIds.has(currentParentId)) {
@@ -147,12 +152,13 @@ const normalizeAssistantBranches = (items: ThreadRepoItem[]): ThreadRepoItem[] =
     acc.push(item);
     return acc;
   }, []);
+  return { items: visible, order, bridges };
 };
 
 export function useThreadRepoItems(
   runtime: AssistantRuntime | null | undefined,
   options: Options = {},
-): ThreadRepoItem[] {
+): { items: ThreadRepoItem[]; order: Map<string, number>; bridges: Set<string> } {
   const { enabled = true } = options;
   const [items, setItems] = useState<ThreadRepoItem[]>([]);
 

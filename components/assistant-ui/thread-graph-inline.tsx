@@ -31,6 +31,7 @@ type Node = {
   y?: number;
   branchId?: unknown;
   editedFromId?: string | null;
+  isBridge?: boolean;
 };
 
 const ROOT_NODE_ID = "__ROOT__";
@@ -179,7 +180,11 @@ const isVerticalConnector = (connector: ConnectorId) => {
 
 export function ThreadGraphInline() {
   const runtime = useAssistantRuntime();
-  const repoItems = useThreadRepoItems(runtime);
+  const {
+    items: repoItems,
+    order: itemOrderMap,
+    bridges: bridgeNodeIds,
+  } = useThreadRepoItems(runtime);
   const { getParentId, cutLink, restoreLink, resetLinks, overrides } = useLinkEditor();
   const [linkEditMode, setLinkEditMode] = React.useState(false);
 
@@ -219,6 +224,7 @@ export function ThreadGraphInline() {
           : {}) as Record<string, unknown>;
       const editedFromValue = metadataCustom[ASSISTANT_EDIT_METADATA_KEY];
       const editedFromId = typeof editedFromValue === "string" ? editedFromValue : null;
+      const isBridge = bridgeNodeIds.has(id);
       const node: Node = {
         id,
         parentId,
@@ -228,6 +234,7 @@ export function ThreadGraphInline() {
         idx: i,
         branchId,
         editedFromId,
+        isBridge,
       };
       const effectiveParent = getParentId(id, parentId);
       node.parentId = effectiveParent;
@@ -249,9 +256,10 @@ export function ThreadGraphInline() {
       depth: 0,
       idx: -1,
       branchId: null,
+      isBridge: false,
     };
     return [rootNode, ...baseNodes];
-  }, [repoItems, getParentId]);
+  }, [repoItems, bridgeNodeIds, getParentId]);
 
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -853,16 +861,23 @@ export function ThreadGraphInline() {
       const y = n.y - HALF_NODE_HEIGHT;
       const radius = 10;
       const isRootNode = n.id === ROOT_NODE_ID;
+      const isBridgeNode = Boolean(n.isBridge);
+      const bridgeFill = isDarkBg ? "rgba(120,53,15,0.72)" : "rgba(253,246,178,0.95)";
+      const bridgeStroke = isDarkBg ? "rgba(248,189,96,0.6)" : "rgba(217,119,6,0.55)";
       const currentFill = isRootNode
         ? isDarkBg
           ? "rgba(30,64,175,0.85)"
           : "rgba(219,234,254,0.95)"
-        : nodeFill;
+        : isBridgeNode
+          ? bridgeFill
+          : nodeFill;
       const currentStroke = isRootNode
         ? isDarkBg
           ? "rgba(191,219,254,0.7)"
           : "rgba(37,99,235,0.45)"
-        : nodeStroke;
+        : isBridgeNode
+          ? bridgeStroke
+          : nodeStroke;
 
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
@@ -883,9 +898,13 @@ export function ThreadGraphInline() {
 
       ctx.fillStyle = labelColor;
       ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
-      const role = isRootNode ? "ROOT" : (n.role || "").toUpperCase();
-      if (role) {
-        ctx.fillText(role, x + 8, y + 16);
+      const baseRole = isRootNode ? "ROOT" : (n.role || "").toUpperCase();
+      const roleLabel =
+        n.isBridge && !isRootNode
+          ? `${baseRole ? `${baseRole} · ` : ""}BRIDGE`
+          : baseRole;
+      if (roleLabel) {
+        ctx.fillText(roleLabel, x + 8, y + 16);
       }
 
       ctx.fillStyle = textColor;
@@ -1035,19 +1054,49 @@ export function ThreadGraphInline() {
 
   const handleCopyJson = React.useCallback(() => {
     try {
+      type ExportRecord = {
+        id: string;
+        parentId: string | null;
+        role: string;
+        branchId: unknown;
+        order: number;
+        isBridge: boolean;
+      };
       const idToParent = new Map<string, string | null>();
       const parentToChildren = new Map<string | null, string[]>();
-      const nodeById = new Map<string, Node>();
-      nodes.forEach((node) => {
-        if (node.id === ROOT_NODE_ID) return;
-        const rawParentId = node.parentId ?? null;
-        const normalizedParentId = rawParentId === ROOT_NODE_ID ? null : rawParentId;
-        idToParent.set(node.id, normalizedParentId);
-        const list = parentToChildren.get(normalizedParentId) || [];
-        list.push(node.id);
-        parentToChildren.set(normalizedParentId, list);
-        nodeById.set(node.id, node);
-      });
+      const idToRecord = new Map<string, ExportRecord>();
+      const visibleIds = new Set<string>();
+
+      const registerItem = (item: ThreadRepoItem, idx: number) => {
+        const id = item.message?.id;
+        if (!id) return;
+        const rawParent = item.parentId ?? null;
+        const fallbackParent = rawParent === ROOT_NODE_ID ? null : rawParent;
+        const effectiveParent = getParentId(id, fallbackParent);
+        idToParent.set(id, effectiveParent);
+        const list = parentToChildren.get(effectiveParent) ?? [];
+        list.push(id);
+        parentToChildren.set(effectiveParent, list);
+        const branchId =
+          item.message && typeof item.message === "object" && "branchId" in item.message
+            ? (item.message as { branchId?: unknown }).branchId ?? null
+            : null;
+        const role = String(item.message?.role ?? "");
+        const orderIndex = itemOrderMap.get(id) ?? idx;
+        const isBridge = bridgeNodeIds.has(id);
+        idToRecord.set(id, {
+          id,
+          parentId: effectiveParent,
+          role,
+          branchId,
+          order: orderIndex,
+          isBridge,
+        });
+        visibleIds.add(id);
+      };
+
+      repoItems.forEach((item, idx) => registerItem(item, idx));
+
       const combinedConnectors = new Map<string, LinkConnectorPref>();
       connectorDefaultsRef.current.forEach((value, key) => {
         combinedConnectors.set(key, { ...value });
@@ -1055,6 +1104,7 @@ export function ThreadGraphInline() {
       linkConnectors.forEach((value, key) => {
         combinedConnectors.set(key, { ...value });
       });
+
       const connectorEntries = Array.from(combinedConnectors.entries()).flatMap(([edgeKey, pref]) => {
         const info = edgeConnectorMapRef.current.get(edgeKey);
         const [rawParent, rawChild] = edgeKey.split("->");
@@ -1064,6 +1114,9 @@ export function ThreadGraphInline() {
           return [];
         }
         const childId = info?.childId ?? rawChild ?? "";
+        if (!visibleIds.has(childId)) {
+          return [];
+        }
         return [
           {
             edgeKey,
@@ -1076,6 +1129,7 @@ export function ThreadGraphInline() {
           },
         ];
       });
+
       const siblingConnectors: Array<{
         edgeKey: string;
         parentId: string | null;
@@ -1089,9 +1143,9 @@ export function ThreadGraphInline() {
       parentToChildren.forEach((children, parentId) => {
         if (children.length <= 1) return;
         const sorted = [...children].sort((a, b) => {
-          const aIdx = nodeById.get(a)?.idx ?? 0;
-          const bIdx = nodeById.get(b)?.idx ?? 0;
-          return aIdx - bIdx;
+          const aOrder = idToRecord.get(a)?.order ?? 0;
+          const bOrder = idToRecord.get(b)?.order ?? 0;
+          return aOrder - bOrder;
         });
         sorted.forEach((childId, index) => {
           const nextId = sorted[index + 1];
@@ -1109,26 +1163,33 @@ export function ThreadGraphInline() {
           });
         });
       });
-      const payload = nodes
-        .filter((node) => node.id !== ROOT_NODE_ID)
-        .map((node) => {
-          const parentId = idToParent.get(node.id) ?? null;
-          const children = parentToChildren.get(node.id) ?? [];
-          const siblings = (parentToChildren.get(parentId) || []).filter((sibling) => sibling !== node.id);
-          const edgeKey = parentId ? getEdgeKey(parentId, node.id) : null;
-          const connectorPref = edgeKey ? combinedConnectors.get(edgeKey) ?? null : null;
-          return {
-            id: node.id,
-            parentId,
-            role: node.role,
-            branchId: node.branchId ?? null,
-            children,
-            siblings,
-            connectorPref,
-          };
-        });
+
+      const payload = Array.from(idToRecord.values()).map((record) => {
+        const { id, parentId, role, branchId, isBridge, order } = record;
+        const children = parentToChildren.get(id) ?? [];
+        const siblings = (parentToChildren.get(parentId) || []).filter((siblingId) => siblingId !== id);
+        const edgeKey = parentId ? getEdgeKey(parentId, id) : null;
+        const connectorPref =
+          edgeKey && visibleIds.has(id) ? combinedConnectors.get(edgeKey) ?? null : null;
+        const base = {
+          id,
+          parentId,
+          role,
+          branchId,
+          children,
+          siblings,
+          connectorPref,
+          orderIndex: order,
+          isBridge: isBridge || undefined,
+        };
+        return base;
+      });
+
+      payload.sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+      const output = payload.map(({ orderIndex, ...rest }) => rest);
+
       const text = JSON.stringify(
-        { nodes: payload, connectors: [...connectorEntries, ...siblingConnectors] },
+        { nodes: output, connectors: [...connectorEntries, ...siblingConnectors] },
         null,
         2,
       );
@@ -1138,7 +1199,7 @@ export function ThreadGraphInline() {
       console.error(error);
       alert("Copy failed");
     }
-  }, [getEdgeKey, linkConnectors, nodes]);
+  }, [bridgeNodeIds, getEdgeKey, getParentId, itemOrderMap, linkConnectors, repoItems]);
 
   const handleCanvasClick = React.useCallback(
     (event: React.MouseEvent<HTMLCanvasElement>) => {
