@@ -670,14 +670,22 @@ export function ThreadGraphInline() {
     cutTargetsRef.current.clear();
     restoreTargetsRef.current.clear();
 
+    const rootChildCandidates = nodes.filter((node) => node.parentId === ROOT_NODE_ID);
+    const primaryRootChildId =
+      rootChildCandidates
+        .filter((node) => !node.isBridge)
+        .sort((a, b) => a.idx - b.idx)[0]?.id ?? rootChildCandidates[0]?.id ?? null;
+
     nodes.forEach((n) => {
       if (!n.parentId) return;
-      if (n.parentId === ROOT_NODE_ID) return;
       if (n.isBridge) return;
       const parent = idToNode.get(String(n.parentId));
       if (!parent) return;
+      if (n.parentId === ROOT_NODE_ID && primaryRootChildId && n.id !== primaryRootChildId) {
+        return;
+      }
       const parentIsBridge = parent.isBridge ?? false;
-      if (n.editedFromId && !parentIsBridge) {
+      if (n.parentId !== ROOT_NODE_ID && n.editedFromId && !parentIsBridge) {
         if (process.env.NODE_ENV !== "production" && !variantLogRef.current.has(n.id)) {
           console.log("[thread-graph-inline] suppressing variant edge", {
             childId: n.id,
