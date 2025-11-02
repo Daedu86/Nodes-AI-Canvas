@@ -1,9 +1,11 @@
 "use client";
 
 import { useAssistantRuntime } from "@assistant-ui/react";
-import { Copy as CopyIcon, RefreshCw, ZoomIn, ZoomOut } from "lucide-react";
+import { Copy as CopyIcon, RefreshCw, RotateCcw, Scissors, ZoomIn, ZoomOut } from "lucide-react";
 import React from "react";
 import { useThreadRepoItems, type ThreadRepoItem } from "./use-thread-repo-items";
+import { ASSISTANT_EDIT_METADATA_KEY } from "@/lib/assistant-edit-branching";
+import { useLinkEditor } from "@/components/context/link-editor";
 
 function extractText(msg: ThreadRepoItem["message"]): string {
   try {
@@ -28,6 +30,7 @@ type Node = {
   x?: number;
   y?: number;
   branchId?: unknown;
+  editedFromId?: string | null;
 };
 
 const ROOT_NODE_ID = "__ROOT__";
@@ -177,6 +180,8 @@ const isVerticalConnector = (connector: ConnectorId) => {
 export function ThreadGraphInline() {
   const runtime = useAssistantRuntime();
   const repoItems = useThreadRepoItems(runtime);
+  const { getParentId, cutLink, restoreLink, resetLinks, overrides } = useLinkEditor();
+  const [linkEditMode, setLinkEditMode] = React.useState(false);
 
   const nodes: Node[] = React.useMemo(() => {
     const arr = Array.isArray(repoItems) ? repoItems : [];
@@ -208,6 +213,12 @@ export function ThreadGraphInline() {
         message && typeof message === "object" && "branchId" in message
           ? (message as { branchId?: unknown }).branchId
           : undefined;
+      const metadataCustom =
+        (message && typeof message === "object" && "metadata" in message
+          ? ((message as { metadata?: { custom?: Record<string, unknown> } }).metadata?.custom ?? {})
+          : {}) as Record<string, unknown>;
+      const editedFromValue = metadataCustom[ASSISTANT_EDIT_METADATA_KEY];
+      const editedFromId = typeof editedFromValue === "string" ? editedFromValue : null;
       const node: Node = {
         id,
         parentId,
@@ -216,8 +227,11 @@ export function ThreadGraphInline() {
         depth: 0,
         idx: i,
         branchId,
+        editedFromId,
       };
-      node.depth = parentId === null ? 0 : getDepth(it.message);
+      const effectiveParent = getParentId(id, parentId);
+      node.parentId = effectiveParent;
+      node.depth = effectiveParent === null ? 0 : getDepth(it.message);
       return node;
     });
     if (baseNodes.length === 0) return baseNodes;
@@ -237,7 +251,7 @@ export function ThreadGraphInline() {
       branchId: null,
     };
     return [rootNode, ...baseNodes];
-  }, [repoItems]);
+  }, [repoItems, getParentId]);
 
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -254,6 +268,13 @@ export function ThreadGraphInline() {
   const connectorPositionsRef = React.useRef(new Map<string, Map<ConnectorId, Point>>());
   const edgeConnectorMapRef = React.useRef(new Map<string, EdgeConnectorInfo>());
   const nodeLayoutRef = React.useRef(new Map<string, Node>());
+  const variantLogRef = React.useRef(new Set<string>());
+  const cutTargetsRef = React.useRef(
+    new Map<string, { x: number; y: number; parentId: string | null; childId: string }>(),
+  );
+  const restoreTargetsRef = React.useRef(
+    new Map<string, { x: number; y: number; radius: number; childId: string }>(),
+  );
   const [hoveredConnector, setHoveredConnector] = React.useState<{ nodeId: string; connectorId: ConnectorId } | null>(
     null
   );
@@ -638,9 +659,25 @@ export function ThreadGraphInline() {
     const connectorUsage = new Map<string, Set<ConnectorId>>();
     const connectorPositions = new Map<string, Map<ConnectorId, Point>>();
     const edgeConnectorMap = new Map<string, EdgeConnectorInfo>();
+    cutTargetsRef.current.clear();
+    restoreTargetsRef.current.clear();
 
     nodes.forEach((n) => {
       if (!n.parentId) return;
+      if (n.editedFromId) {
+        if (
+          process.env.NODE_ENV !== "production" &&
+          !variantLogRef.current.has(n.id)
+        ) {
+          console.log("[thread-graph-inline] suppressing variant edge", {
+            childId: n.id,
+            parentId: n.parentId,
+            editedFromId: n.editedFromId,
+          });
+          variantLogRef.current.add(n.id);
+        }
+        return;
+      }
       const parent = idToNode.get(String(n.parentId));
       if (!parent || parent.x == null || parent.y == null || n.x == null || n.y == null) return;
       const edgeKey = getEdgeKey(n.parentId, n.id);
@@ -677,6 +714,51 @@ export function ThreadGraphInline() {
       ctx.strokeStyle = hue == null ? "rgba(100,100,100,0.7)" : `hsla(${hue},60%,45%,0.75)`;
       ctx.lineWidth = hue == null ? 1.6 : 1.2;
       ctx.stroke();
+      const midX = (start.x + end.x) / 2;
+      const midY = (start.y + end.y) / 2;
+      const label = n.id;
+      if (label) {
+        ctx.font = "9px ui-monospace, monospace";
+        const metrics = ctx.measureText(label);
+        const textWidth = metrics.width;
+        const textHeight = 9;
+        const paddingX = 4;
+        const paddingY = 2;
+        const boxWidth = textWidth + paddingX * 2;
+        const boxHeight = textHeight + paddingY * 2;
+        const boxX = midX - boxWidth / 2;
+        const boxY = midY - boxHeight / 2;
+        ctx.beginPath();
+        const boxRadius = 4;
+        ctx.moveTo(boxX + boxRadius, boxY);
+        ctx.lineTo(boxX + boxWidth - boxRadius, boxY);
+        ctx.quadraticCurveTo(boxX + boxWidth, boxY, boxX + boxWidth, boxY + boxRadius);
+        ctx.lineTo(boxX + boxWidth, boxY + boxHeight - boxRadius);
+        ctx.quadraticCurveTo(boxX + boxWidth, boxY + boxHeight, boxX + boxWidth - boxRadius, boxY + boxHeight);
+        ctx.lineTo(boxX + boxRadius, boxY + boxHeight);
+        ctx.quadraticCurveTo(boxX, boxY + boxHeight, boxX, boxY + boxHeight - boxRadius);
+        ctx.lineTo(boxX, boxY + boxRadius);
+        ctx.quadraticCurveTo(boxX, boxY, boxX + boxRadius, boxY);
+        ctx.closePath();
+        ctx.fillStyle = isDarkBg ? "rgba(15,23,42,0.9)" : "rgba(241,245,249,0.95)";
+        ctx.strokeStyle = isDarkBg ? "rgba(148,163,184,0.5)" : "rgba(15,23,42,0.2)";
+        ctx.lineWidth = 0.8;
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = isDarkBg ? "rgba(226,232,240,0.95)" : "#0f172a";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, midX - textWidth / 2, midY + 0.5);
+      }
+      cutTargetsRef.current.set(edgeKey, { x: midX, y: midY, parentId: parent.id, childId: n.id });
+      if (linkEditMode) {
+        ctx.save();
+        ctx.font = "16px ui-sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgba(220,38,38,0.95)";
+        ctx.fillText("✂", midX, midY);
+        ctx.restore();
+      }
 
       const parentUsed = connectorUsage.get(parent.id) ?? new Set<ConnectorId>();
       parentUsed.add(pref.from);
@@ -684,6 +766,32 @@ export function ThreadGraphInline() {
       const childUsed = connectorUsage.get(n.id) ?? new Set<ConnectorId>();
       childUsed.add(pref.to);
       connectorUsage.set(n.id, childUsed);
+    });
+
+    const siblingsByParent = new Map<string | null, Node[]>();
+    nodes.forEach((node) => {
+      const key = node.parentId ?? null;
+      const collection = siblingsByParent.get(key) ?? [];
+      collection.push(node);
+      siblingsByParent.set(key, collection);
+    });
+    siblingsByParent.forEach((siblings) => {
+      if (siblings.length <= 1) return;
+      const sorted = [...siblings].sort((a, b) => a.idx - b.idx);
+      sorted.forEach((nodeA, idx) => {
+        const nodeB = sorted[idx + 1];
+        if (!nodeB) return;
+        if (nodeA.x == null || nodeA.y == null || nodeB.x == null || nodeB.y == null) return;
+        ctx.save();
+        ctx.setLineDash([8, 4]);
+        ctx.strokeStyle = "rgba(239,68,68,0.8)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(nodeA.x, nodeA.y);
+        ctx.lineTo(nodeB.x, nodeB.y);
+        ctx.stroke();
+        ctx.restore();
+      });
     });
 
     nodes.forEach((n) => {
@@ -738,6 +846,23 @@ export function ThreadGraphInline() {
       if (preview) {
         ctx.fillText(preview, x + 8, textY, w - 16);
       }
+      if (linkEditMode && !isRootNode && overrides.has(n.id)) {
+        const iconX = (n.x ?? 0) + HALF_NODE_WIDTH - 18;
+        const iconY = (n.y ?? 0) - HALF_NODE_HEIGHT + 18;
+        const radius = 12;
+        restoreTargetsRef.current.set(n.id, { x: iconX, y: iconY, radius, childId: n.id });
+        ctx.save();
+        ctx.fillStyle = "rgba(37,99,235,0.9)";
+        ctx.beginPath();
+        ctx.arc(iconX, iconY, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "12px ui-sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("↺", iconX, iconY + 1);
+        ctx.restore();
+      }
 
       const connectorMap = new Map<ConnectorId, Point>();
       connectorPositions.set(n.id, connectorMap);
@@ -780,7 +905,7 @@ export function ThreadGraphInline() {
     edgeConnectorMapRef.current = edgeConnectorMap;
 
     ctx.restore();
-  }, [chooseDefaultConnectors, draggingConnector, getEdgeKey, hoveredConnector, linkConnectors, nodePositions, nodes, view]);
+  }, [chooseDefaultConnectors, draggingConnector, getEdgeKey, hoveredConnector, linkConnectors, nodePositions, nodes, view, linkEditMode, overrides]);
 
   const resetView = React.useCallback(() => {
     const container = containerRef.current;
@@ -902,6 +1027,7 @@ export function ThreadGraphInline() {
           return {
             id: node.id,
             parentId,
+            role: node.role,
             branchId: node.branchId ?? null,
             children,
             siblings,
@@ -917,9 +1043,51 @@ export function ThreadGraphInline() {
     }
   }, [getEdgeKey, linkConnectors, nodes]);
 
+  const handleCanvasClick = React.useCallback(
+    (event: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!linkEditMode) return;
+      event.preventDefault();
+      const rect = event.currentTarget.getBoundingClientRect();
+      const sx = event.clientX - rect.left;
+      const sy = event.clientY - rect.top;
+      const world = screenToWorld(sx, sy);
+      let restoreCandidate: { childId: string; dist: number } | null = null;
+      restoreTargetsRef.current.forEach((target) => {
+        const dx = target.x - world.x;
+        const dy = target.y - world.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= target.radius && (!restoreCandidate || dist < restoreCandidate.dist)) {
+          restoreCandidate = { childId: target.childId, dist };
+        }
+      });
+      if (restoreCandidate) {
+        restoreLink(restoreCandidate.childId);
+        return;
+      }
+      let best: { childId: string; parentId: string | null; dist: number } | null = null;
+      cutTargetsRef.current.forEach((target) => {
+        if (!target.parentId) return;
+        const dx = target.x - world.x;
+        const dy = target.y - world.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= 24 && (!best || dist < best.dist)) {
+          best = { childId: target.childId, parentId: target.parentId, dist };
+        }
+      });
+      if (!best) return;
+      if (overrides.has(best.childId)) {
+        restoreLink(best.childId);
+        return;
+      }
+      cutLink(best.childId, best.parentId);
+    },
+    [linkEditMode, overrides, screenToWorld, cutLink, restoreLink],
+  );
+
   const controlButtonClass =
     "inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted";
   const iconClass = "h-3.5 w-3.5";
+  const cutCount = overrides.size;
 
   React.useEffect(() => {
     render();
@@ -934,7 +1102,14 @@ export function ThreadGraphInline() {
           canvas.style.cursor = value;
         }
       };
+      if (linkEditMode) {
+        setCanvasCursor("crosshair");
+      }
       const onMouseDown = (e: MouseEvent) => {
+        if (linkEditMode) {
+          setCanvasCursor("crosshair");
+          return;
+        }
         suppressClickRef.current = false;
         const rect = canvas.getBoundingClientRect();
         const sx = e.clientX - rect.left;
@@ -989,6 +1164,10 @@ export function ThreadGraphInline() {
         setCanvasCursor("grabbing");
       };
       const onMouseMove = (e: MouseEvent) => {
+        if (linkEditMode) {
+          setCanvasCursor("crosshair");
+          return;
+        }
         const rect = canvas.getBoundingClientRect();
         const sx = e.clientX - rect.left;
         const sy = e.clientY - rect.top;
@@ -1043,6 +1222,10 @@ export function ThreadGraphInline() {
         }
       };
       const onMouseUp = () => {
+        if (linkEditMode) {
+          setCanvasCursor("crosshair");
+          return;
+        }
         const connectorDrag = connectorDragRef.current;
         if (connectorDrag) {
           const target = hoveredConnectorRef.current;
@@ -1067,6 +1250,10 @@ export function ThreadGraphInline() {
         setCanvasCursor(hoveredConnectorRef.current ? "pointer" : "default");
       };
       const onMouseLeave = () => {
+        if (linkEditMode) {
+          setCanvasCursor("crosshair");
+          return;
+        }
         if (connectorDragRef.current || nodeDragRef.current || dragStartRef.current) {
           return;
         }
@@ -1116,14 +1303,18 @@ export function ThreadGraphInline() {
       canvas.addEventListener("mouseleave", onMouseLeave);
       const wheelListenerOptions: AddEventListenerOptions = { passive: false };
       canvas.addEventListener("wheel", onWheel, wheelListenerOptions);
-      canvas.addEventListener("click", onClick);
+      if (!linkEditMode) {
+        canvas.addEventListener("click", onClick);
+      }
       cleanup = () => {
         canvas.removeEventListener("mousedown", onMouseDown);
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
         canvas.removeEventListener("mouseleave", onMouseLeave);
         canvas.removeEventListener("wheel", onWheel, wheelListenerOptions);
-        canvas.removeEventListener("click", onClick);
+        if (!linkEditMode) {
+          canvas.removeEventListener("click", onClick);
+        }
       };
     }
     return () => {
@@ -1141,6 +1332,7 @@ export function ThreadGraphInline() {
     updateDraggingConnector,
     updateHoveredConnector,
     view,
+    linkEditMode,
   ]);
 
   React.useEffect(() => {
@@ -1185,8 +1377,35 @@ export function ThreadGraphInline() {
           <p className="text-xs text-muted-foreground">
             Drag to pan, zoom with wheel or buttons, click a node to jump.
           </p>
+          {linkEditMode && (
+            <p className="text-[11px] text-amber-600">
+              Click a ✂ label to cut a link. Click the blue ↺ badge on a node to restore it.
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={`${controlButtonClass} ${
+              linkEditMode ? "border-primary bg-primary text-primary-foreground" : ""
+            }`}
+            onClick={() => setLinkEditMode((prev) => !prev)}
+            title="Toggle link editing mode"
+          >
+            <Scissors className={iconClass} />
+            <span>{linkEditMode ? "Finish Editing" : "Edit Links"}</span>
+          </button>
+          {cutCount > 0 && (
+            <button
+              type="button"
+              className={controlButtonClass}
+              onClick={resetLinks}
+              title="Restore all link cuts"
+            >
+              <RotateCcw className={iconClass} />
+              <span>Reset Cuts ({cutCount})</span>
+            </button>
+          )}
           <button
             type="button"
             className={controlButtonClass}
@@ -1235,10 +1454,13 @@ export function ThreadGraphInline() {
             canvasRef.current = el as HTMLCanvasElement;
           }}
           className="h-full w-full"
+          onClick={handleCanvasClick}
         />
       </div>
     </section>
   );
 }
+
+
 
 

@@ -1,5 +1,6 @@
-﻿"use client";
+"use client";
 
+import { useAssistantEditBranching } from "@/lib/assistant-edit-branching";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { useChatRuntime } from "@assistant-ui/react-ai-sdk";
 import { Thread } from "@/components/assistant-ui/thread";
@@ -22,6 +23,7 @@ import { ThreadGraphInline } from "@/components/assistant-ui/thread-graph-inline
 import { HistoryModeProvider } from "@/components/context/history-mode";
 import { LlmEnabledProvider } from "@/components/context/llm-enabled";
 import { LlmToggleButton } from "@/components/assistant-ui/llm-toggle";
+import { LinkEditorProvider } from "@/components/context/link-editor";
 
 export const Assistant = () => {
   const [historyMode, setHistoryMode] = useState<"last" | "full">("last");
@@ -55,10 +57,11 @@ export const Assistant = () => {
     } catch {}
   }, [llmEnabled]);
 
-  const runtime = useChatRuntime({
+  const rawRuntime = useChatRuntime({
     api: "/api/chat",
     body: { historyMode },
   });
+  const runtime = useAssistantEditBranching(rawRuntime);
 
   useEffect(() => {
     if (!runtime) return;
@@ -186,69 +189,71 @@ export const Assistant = () => {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <HistoryModeProvider value={historyMode} setValue={setHistoryMode}>
-      <LlmEnabledProvider value={llmEnabled} setValue={setLlmEnabled}>
-      <SidebarProvider className="h-svh w-full overflow-hidden">
-        <AppSidebar />
-        <SidebarInset className="min-h-0 overflow-hidden">
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">Build Your Own ChatGPT UX</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>
-                    <ThreadTitleEditor />
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            <div className="ml-auto flex items-center gap-2">
-              <ThreadGraphButton />
-              <LlmToggleButton />
-              <ThemeToggle />
-            </div>
-          </header>
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <div ref={splitRef} className="flex flex-1 min-h-0 gap-3 px-4 py-4">
-              <div
-                className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border/60 bg-background"
-                style={leftStyle}
-              >
-                <Thread />
-              </div>
-              <div
-                role="separator"
-                tabIndex={0}
-                aria-orientation="vertical"
-                aria-label="Resize panels"
-                className="group relative flex h-full w-2 cursor-col-resize items-center justify-center rounded bg-border/40 outline-none transition-colors focus-visible:bg-primary/30"
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={stopResizing}
-                onPointerCancel={stopResizing}
-                onLostPointerCapture={stopResizing}
-                onDoubleClick={handleSeparatorDoubleClick}
-                onKeyDown={handleSeparatorKeyDown}
-              >
-                <span className="pointer-events-none h-16 w-px rounded-full bg-border/80 transition-colors group-hover:bg-primary" />
-              </div>
-              <div
-                className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border/60 bg-background"
-                style={rightStyle}
-              >
-                <ThreadGraphInline />
-              </div>
-            </div>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
-      </LlmEnabledProvider>
-      </HistoryModeProvider>
+      <LinkEditorProvider>
+        <HistoryModeProvider value={historyMode} setValue={setHistoryMode}>
+          <LlmEnabledProvider value={llmEnabled} setValue={setLlmEnabled}>
+            <SidebarProvider className="h-svh w-full overflow-hidden">
+              <AppSidebar />
+              <SidebarInset className="min-h-0 overflow-hidden">
+                <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+                  <SidebarTrigger />
+                  <Separator orientation="vertical" className="mr-2 h-4" />
+                  <Breadcrumb>
+                    <BreadcrumbList>
+                      <BreadcrumbItem className="hidden md:block">
+                        <BreadcrumbLink href="#">Build Your Own ChatGPT UX</BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator className="hidden md:block" />
+                      <BreadcrumbItem>
+                        <BreadcrumbPage>
+                          <ThreadTitleEditor />
+                        </BreadcrumbPage>
+                      </BreadcrumbItem>
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                  <div className="ml-auto flex items-center gap-2">
+                    <ThreadGraphButton />
+                    <LlmToggleButton />
+                    <ThemeToggle />
+                  </div>
+                </header>
+                <div className="flex flex-1 flex-col overflow-hidden">
+                  <div ref={splitRef} className="flex flex-1 min-h-0 gap-3 px-4 py-4">
+                    <div
+                      className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border/60 bg-background"
+                      style={leftStyle}
+                    >
+                      <Thread />
+                    </div>
+                    <div
+                      role="separator"
+                      tabIndex={0}
+                      aria-orientation="vertical"
+                      aria-label="Resize panels"
+                      className="group relative flex h-full w-2 cursor-col-resize items-center justify-center rounded bg-border/40 outline-none transition-colors focus-visible:bg-primary/30"
+                      onPointerDown={handlePointerDown}
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={stopResizing}
+                      onPointerCancel={stopResizing}
+                      onLostPointerCapture={stopResizing}
+                      onDoubleClick={handleSeparatorDoubleClick}
+                      onKeyDown={handleSeparatorKeyDown}
+                    >
+                      <span className="pointer-events-none h-16 w-px rounded-full bg-border/80 transition-colors group-hover:bg-primary" />
+                    </div>
+                    <div
+                      className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border/60 bg-background"
+                      style={rightStyle}
+                    >
+                      <ThreadGraphInline />
+                    </div>
+                  </div>
+                </div>
+              </SidebarInset>
+            </SidebarProvider>
+          </LlmEnabledProvider>
+        </HistoryModeProvider>
+      </LinkEditorProvider>
     </AssistantRuntimeProvider>
   );
 };

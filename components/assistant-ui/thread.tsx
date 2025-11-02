@@ -32,6 +32,7 @@ import { useHistoryMode } from "@/components/context/history-mode";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import React from "react";
 import { computeSiblingGroupId } from "@/lib/sibling-group";
+import { useLinkEditor } from "@/components/context/link-editor";
 
 
 type MessageLike = {
@@ -51,10 +52,11 @@ const DEFAULT_SIBLING_INFO: SiblingInfo = { siblingIdStr: "", parentIdDisplay: n
 const resolveSiblingInfo = (
   message: MessageLike | null | undefined,
   runtime: AssistantRuntime | null | undefined,
+  getParentOverride: (childId?: string | null, fallback?: string | null) => string | null,
 ): SiblingInfo => {
   if (!message) return DEFAULT_SIBLING_INFO;
   const id = message.id ?? "";
-  const parentId = message.parentId ?? null;
+  const parentId = getParentOverride(id, message.parentId ?? null);
   if (!id) {
     return { siblingIdStr: "", parentIdDisplay: parentId };
   }
@@ -69,7 +71,7 @@ const resolveSiblingInfo = (
       : [];
     const hasSibling = items.some((item) => {
       const childId = String(item.message?.id ?? "");
-      const itemParentId = item.parentId ?? null;
+      const itemParentId = getParentOverride(childId, item.parentId ?? null);
       return childId && childId !== id && itemParentId === parentId;
     });
     if (hasSibling && typeof parentId === "string" && parentId.length > 0) {
@@ -265,9 +267,10 @@ const UserMessage: FC = () => {
   const message = useMessage();
   const runtime = useAssistantRuntime();
   const messageLike = React.useMemo<MessageLike>(() => (message ?? {}) as MessageLike, [message]);
-  const { siblingIdStr, parentIdDisplay } = React.useMemo(
-    () => resolveSiblingInfo(messageLike, runtime),
-    [messageLike, runtime],
+  const { getParentId } = useLinkEditor();
+  const { parentIdDisplay } = React.useMemo(
+    () => resolveSiblingInfo(messageLike, runtime, getParentId),
+    [messageLike, runtime, getParentId],
   );
   const branchIdValue = React.useMemo(() => getBranchIdValue(messageLike), [messageLike]);
 
@@ -367,9 +370,10 @@ const AssistantMessage: FC = () => {
   const message = useMessage();
   const runtime = useAssistantRuntime();
   const messageLike = React.useMemo<MessageLike>(() => (message ?? {}) as MessageLike, [message]);
-  const { siblingIdStr, parentIdDisplay } = React.useMemo(
-    () => resolveSiblingInfo(messageLike, runtime),
-    [messageLike, runtime],
+  const { getParentId } = useLinkEditor();
+  const { parentIdDisplay } = React.useMemo(
+    () => resolveSiblingInfo(messageLike, runtime, getParentId),
+    [messageLike, runtime, getParentId],
   );
   const branchIdValue = React.useMemo(() => getBranchIdValue(messageLike), [messageLike]);
 

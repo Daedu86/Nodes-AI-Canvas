@@ -1,8 +1,8 @@
 diff --git a/node_modules/@assistant-ui/react/dist/runtimes/composer/DefaultEditComposerRuntimeCore.js b/node_modules/@assistant-ui/react/dist/runtimes/composer/DefaultEditComposerRuntimeCore.js
-index 44587f6..86b2274 100644
+index 44587f6..9d2dacf 100644
 --- a/node_modules/@assistant-ui/react/dist/runtimes/composer/DefaultEditComposerRuntimeCore.js
 +++ b/node_modules/@assistant-ui/react/dist/runtimes/composer/DefaultEditComposerRuntimeCore.js
-@@ -27,14 +27,13 @@ var DefaultEditComposerRuntimeCore = class extends BaseComposerRuntimeCore {
+@@ -27,14 +27,31 @@ var DefaultEditComposerRuntimeCore = class extends BaseComposerRuntimeCore {
    _sourceId;
    async handleSend(message) {
      const text = getThreadMessageText(message);
@@ -14,13 +14,41 @@ index 44587f6..86b2274 100644
 -        sourceId: this._sourceId
 -      });
 -    }
-+    this.runtime.append({
++    console.log("Mensaje enviado desde composer:", message);
++    const metadata = message.metadata ?? {};
++    const custom = metadata.custom ?? {};
++    const bridgeMetadata = {
++      ...metadata,
++      custom: {
++        ...custom,
++        __assistantEditParentId: this._parentId ?? null,
++        __assistantEditSourceId: this._sourceId ?? null
++      }
++    };
++    const bridgedMessage = {
 +      ...message,
++      metadata: bridgeMetadata
++    };
++    if (process.env.NODE_ENV !== "production") {
++      console.log("[edit-composer] bridge payload", {
++        parentId: this._parentId,
++        sourceId: this._sourceId,
++        metadata: bridgeMetadata
++      });
++    }
++    this.runtime.append({
++      ...bridgedMessage,
 +      content: [...message.content, ...this._nonTextParts],
 +      parentId: this._parentId,
 +      sourceId: this._sourceId,
 +      startRun: true
 +    });
-     this.handleCancel();
-   }
++    return this.handleCancel();
++  }
    handleCancel() {
+-    this.endEditCallback();
+-    this._notifySubscribers();
+-  }
++    this.endEditCallback();
++    this._notifySubscribers();
++  }
