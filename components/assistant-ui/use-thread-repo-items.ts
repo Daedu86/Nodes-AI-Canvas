@@ -58,8 +58,12 @@ const reparentAssistantChild = (
   const sourceId = detectedSourceId;
   const itemCustom = (item.message.metadata as { custom?: Record<string, unknown> } | undefined)?.custom ?? {};
   const bridgeId = bridge.message?.id;
-  const desiredParentId = explicitParent ?? bridgeId ?? item.parentId ?? normalizedParentId ?? null;
-  if (desiredParentId === item.parentId && (!sourceId || itemCustom[ASSISTANT_EDIT_METADATA_KEY] === sourceId)) {
+  const desiredParentId = bridgeId ?? explicitParent ?? item.parentId ?? normalizedParentId ?? null;
+  if (
+    desiredParentId === item.parentId &&
+    (!sourceId || itemCustom[ASSISTANT_EDIT_METADATA_KEY] === sourceId) &&
+    itemCustom[ASSISTANT_EDIT_BRIDGE_KEY] === bridgeId
+  ) {
     return item;
   }
   if (process.env.NODE_ENV !== "production") {

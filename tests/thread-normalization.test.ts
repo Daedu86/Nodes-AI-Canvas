@@ -7,6 +7,7 @@ import {
   ASSISTANT_EDIT_METADATA_KEY,
   ASSISTANT_EDIT_BRIDGE_KEY,
   EDIT_SOURCE_KEY,
+  EDIT_PARENT_KEY,
 } from "../lib/assistant-edit-branching";
 
 const makeItem = ({
@@ -54,6 +55,7 @@ describe("normalizeThreadRepoItems", () => {
       parentId: "root-user",
       custom: {
         [ASSISTANT_EDIT_METADATA_KEY]: "assistant-1",
+        [EDIT_PARENT_KEY]: "root-user",
       },
     });
 
