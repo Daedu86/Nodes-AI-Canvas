@@ -670,6 +670,16 @@ export function ThreadGraphInline() {
     cutTargetsRef.current.clear();
     restoreTargetsRef.current.clear();
 
+
+    const primaryUserChildByParent = new Map<string, string>();
+    nodes.forEach((node) => {
+      if (!node.parentId) return;
+      if (node.isBridge) return;
+      if (node.role !== "user") return;
+      if (!primaryUserChildByParent.has(node.parentId)) {
+        primaryUserChildByParent.set(node.parentId, node.id);
+      }
+    });
     const rootChildCandidates = nodes.filter((node) => node.parentId === ROOT_NODE_ID);
     const primaryRootChildId =
       rootChildCandidates
@@ -694,6 +704,10 @@ export function ThreadGraphInline() {
           });
           variantLogRef.current.add(n.id);
         }
+        return;
+      }
+      const primaryUserChildId = primaryUserChildByParent.get(n.parentId);
+      if (n.role === "user" && primaryUserChildId && primaryUserChildId !== n.id) {
         return;
       }
       if (parent.x == null || parent.y == null || n.x == null || n.y == null) return;
@@ -1631,6 +1645,7 @@ export function ThreadGraphInline() {
     </section>
   );
 }
+
 
 
 
