@@ -1,26 +1,45 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AssistantRuntime } from "@assistant-ui/react";
-import type { ThreadRuntimeEventType } from "@assistant-ui/react/runtimes/core/ThreadRuntimeCore";
-import type { ExportedMessageRepository } from "@assistant-ui/react/runtimes/utils/MessageRepository";
 import {
   EDIT_PARENT_KEY,
   EDIT_SOURCE_KEY,
   ASSISTANT_EDIT_METADATA_KEY,
   ASSISTANT_EDIT_BRIDGE_KEY,
 } from "@/lib/assistant-edit-branching";
+import { getModelEntry, rememberModelEntry, type ModelEntry } from "@/lib/message-model-registry";
 
-export type ThreadRepoItem = ExportedMessageRepository["messages"][number];
+type ThreadRuntimeEventType = "initialize" | "runStart" | "runEnd" | "modelContextUpdate";
+type ThreadExport = ReturnType<AssistantRuntime["threads"]["main"]["export"]>;
+
+export type ThreadRepoItem = ThreadExport["messages"][number];
 
 type Options = {
   enabled?: boolean;
+  defaultModel?: { modelId: string; provider: string };
 };
 
 const THREAD_EVENTS: ThreadRuntimeEventType[] = [
   "initialize",
-  "run-start",
-  "run-end",
-  "model-context-update",
+  "runStart",
+  "runEnd",
+  "modelContextUpdate",
 ];
+
+const providerFromValue = (value: unknown): ModelEntry["provider"] => {
+  if (value === "ollama" || value === "openrouter") return value;
+  return typeof value === "string" && value.length ? value : "openrouter";
+};
+
+const coalesceModelEntry = (
+  item: ThreadRepoItem,
+  fallback?: { modelId: string; provider: string },
+): ModelEntry | undefined => {
+  const custom = (item.message.metadata?.custom as Record<string, unknown> | undefined) ?? {};
+  const model = typeof custom.model === "string" ? custom.model : fallback?.modelId;
+  const provider = providerFromValue(custom.provider ?? fallback?.provider);
+  if (!model) return undefined;
+  return { model, provider };
+};
 
 const getSourceId = (message: ThreadRepoItem["message"]): string | null => {
   if (!message) return null;
@@ -66,17 +85,6 @@ const reparentAssistantChild = (
   ) {
     return item;
   }
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[thread-repo] reparent assistant", {
-      childId: item.message?.id,
-      originalParentId: item.parentId ?? null,
-      normalizedParentId: desiredParentId,
-      sourceId,
-      bridgeCustom,
-      bridgeSourceId: getSourceId(bridge.message),
-      bridgeParentId: bridge.parentId ?? null,
-    });
-  }
   const nextMetadataCustom: Record<string, unknown> = {
     ...((item.message.metadata?.custom as Record<string, unknown> | undefined) ?? {}),
   };
@@ -92,13 +100,7 @@ const reparentAssistantChild = (
       ...(item.message.metadata ?? {}),
       custom: nextMetadataCustom,
     },
-  };
-  if (process.env.NODE_ENV !== "production" && sourceId) {
-    console.log("[thread-repo] tagged assistant edit metadata", {
-      childId: message?.id,
-      editedFromId: sourceId,
-    });
-  }
+  } as ThreadRepoItem["message"];
   return {
     parentId: desiredParentId,
     message,
@@ -121,16 +123,6 @@ export const normalizeThreadRepoItems = (
   items.forEach((item) => {
     const id = item.message?.id;
     if (id) {
-      if (process.env.NODE_ENV !== "production" && item.message?.role === "user") {
-        const custom = (item.message.metadata as { custom?: Record<string, unknown> } | undefined)?.custom;
-        console.log("[thread-repo] user metadata", {
-          id,
-          parentId: item.parentId ?? null,
-          hasEditSource: typeof custom?.[EDIT_SOURCE_KEY] === "string",
-          sourceId: getSourceId(item.message),
-          custom,
-        });
-      }
       byId.set(id, item);
     }
   });
@@ -169,15 +161,6 @@ export const normalizeThreadRepoItems = (
     if (id) {
       order.set(id, idx);
     }
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[thread-repo] normalized candidate", {
-        id,
-        parentId: currentItem.parentId ?? null,
-        custom:
-          (currentItem.message.metadata as { custom?: Record<string, unknown> } | undefined)?.custom ?? {},
-        sourceId: getSourceId(currentItem.message),
-      });
-    }
     if (id && bridgeIds.has(id)) {
       bridges.add(id);
       acc.push(currentItem);
@@ -212,8 +195,11 @@ export function useThreadRepoItems(
   runtime: AssistantRuntime | null | undefined,
   options: Options = {},
 ): NormalizedThreadRepo {
-  const { enabled = true } = options;
+  const { enabled = true, defaultModel } = options;
+  const defaultModelId = defaultModel?.modelId;
+  const defaultProvider = defaultModel?.provider;
   const [items, setItems] = useState<ThreadRepoItem[]>([]);
+  const seenIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!enabled) {
@@ -232,7 +218,28 @@ export function useThreadRepoItems(
       if (!isMounted) return;
       try {
         const exportValue = thread.export();
-        setItems(Array.isArray(exportValue?.messages) ? exportValue.messages : []);
+        const rawItems = Array.isArray(exportValue?.messages) ? exportValue.messages : [];
+
+        // Record model/provider once per message (without mutating message data).
+        rawItems.forEach((item) => {
+          const id = item.message?.id;
+          if (!id) return;
+          if (seenIdsRef.current.has(id)) return;
+          seenIdsRef.current.add(id);
+          const existing = getModelEntry(id);
+          if (existing) return;
+          const derived = coalesceModelEntry(
+            item,
+            defaultModelId && defaultProvider
+              ? { modelId: defaultModelId, provider: defaultProvider }
+              : undefined,
+          );
+          if (derived) {
+            rememberModelEntry(id, derived);
+          }
+        });
+
+        setItems(rawItems);
       } catch {
         if (isMounted) setItems([]);
       }
@@ -255,12 +262,6 @@ export function useThreadRepoItems(
         }
       });
     };
-  }, [enabled, runtime]);
-
-  return useMemo(() => {
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[thread-repo] raw export", items);
-    }
-    return normalizeThreadRepoItems(items);
-  }, [items]);
+  }, [enabled, runtime, defaultModelId, defaultProvider]);
+  return useMemo(() => normalizeThreadRepoItems(items), [items]);
 }

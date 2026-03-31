@@ -1,15 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useAssistantRuntime, useThreadListItem } from "@assistant-ui/react";
+import { useEffect, useMemo, useRef } from "react";
+import { useAssistantRuntime } from "@assistant-ui/react";
 import { PencilIcon } from "lucide-react";
-
-const THREAD_TITLE_EVENT = "threadTitleChanged";
-
-type ThreadTitleEventDetail = {
-  threadId?: string;
-  title?: string | null;
-};
+import { useModelConfig } from "@/components/context/model-config";
+import { usePersistedSessions } from "@/components/context/persisted-sessions";
 
 type ThreadMessageLike = {
   id?: string;
@@ -26,14 +21,13 @@ type Props = {
   fallback?: string;
 };
 
-const storageKey = (threadId: string) => `threadTitle:${threadId}`;
+const formatTitle = (title: string | null | undefined, fallback: string) =>
+  typeof title === "string" && title.trim().length ? title.trim() : fallback;
 
 export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props) {
   const runtime = useAssistantRuntime();
-  const threadItem = useThreadListItem({ optional: true });
-  const threadId = threadItem?.id ?? "__DEFAULT_ID__";
-  const [manualTitle, setManualTitle] = useState<string | null>(null);
-  const [generatedTitle, setGeneratedTitle] = useState<string | null>(null);
+  const { activeSession, renameSession } = usePersistedSessions();
+  const { modelId, provider } = useModelConfig();
   const loadingRef = useRef(false);
 
   const messages = useMemo<ThreadMessageLike[]>(() => {
@@ -49,29 +43,9 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
   }, [runtime]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const saved = localStorage.getItem(storageKey(threadId));
-      setManualTitle(saved && saved.length ? saved : null);
-    } catch {
-      setManualTitle(null);
-    }
-
-    const onChanged = (event: Event) => {
-      const detail = (event as CustomEvent<ThreadTitleEventDetail>).detail;
-      if (detail?.threadId === threadId) {
-        setManualTitle(detail.title ?? null);
-      }
-    };
-
-    window.addEventListener(THREAD_TITLE_EVENT, onChanged as EventListener);
-    return () => window.removeEventListener(THREAD_TITLE_EVENT, onChanged as EventListener);
-  }, [threadId]);
-
-  useEffect(() => {
-    if (!runtime || loadingRef.current) return;
+    if (!activeSession || loadingRef.current) return;
+    if (activeSession.title && activeSession.title.trim().length > 0) return;
     if (messages.length === 0) return;
-    if ((manualTitle && manualTitle.length > 0) || (generatedTitle && generatedTitle.length > 0)) return;
 
     let isActive = true;
     loadingRef.current = true;
@@ -82,13 +56,11 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
         const response = await fetch("/api/title", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: slice }),
+          body: JSON.stringify({ messages: slice, model: modelId, provider }),
         });
         const data: TitleResponse = response.ok ? await response.json() : { title: null };
-        if (!isActive) return;
-        if (data.title) {
-          setGeneratedTitle(data.title);
-        }
+        if (!isActive || !data.title) return;
+        await renameSession(activeSession.id, data.title);
       } catch {
         // ignore
       } finally {
@@ -99,9 +71,9 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
     return () => {
       isActive = false;
     };
-  }, [runtime, messages, manualTitle, generatedTitle]);
+  }, [activeSession, messages, modelId, provider, renameSession]);
 
-  const text = manualTitle ?? generatedTitle ?? threadItem?.title ?? fallback;
+  const text = formatTitle(activeSession?.title, fallback);
 
   if (variant === "header") {
     return <span className="font-medium">{text}</span>;
@@ -110,64 +82,22 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
 }
 
 export function ThreadTitleEditor() {
-  const threadItem = useThreadListItem({ optional: true });
-  const threadId = threadItem?.id ?? "__DEFAULT_ID__";
-  const [currentTitle, setCurrentTitle] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const read = () => {
-      try {
-        const saved = localStorage.getItem(storageKey(threadId));
-        setCurrentTitle(saved && saved.length ? saved : null);
-      } catch {
-        setCurrentTitle(null);
-      }
-    };
-
-    read();
-    const onChanged = (event: Event) => {
-      const detail = (event as CustomEvent<ThreadTitleEventDetail>).detail;
-      if (detail?.threadId === threadId) {
-        setCurrentTitle(detail.title ?? null);
-      }
-    };
-    window.addEventListener(THREAD_TITLE_EVENT, onChanged as EventListener);
-    return () => window.removeEventListener(THREAD_TITLE_EVENT, onChanged as EventListener);
-  }, [threadId]);
+  const { activeSession, renameSession } = usePersistedSessions();
+  const title = formatTitle(activeSession?.title, "New Chat");
 
   const handleRename = () => {
-    if (typeof window === "undefined") return;
-    const existing = currentTitle ?? "";
-    const next = window.prompt("Rename thread", existing) ?? null;
+    if (typeof window === "undefined" || !activeSession) return;
+    const next = window.prompt("Rename session", activeSession.title ?? "") ?? null;
     if (next === null) return;
-    const trimmed = next.trim();
-    if (trimmed.length === 0) {
-      try {
-        localStorage.removeItem(storageKey(threadId));
-      } catch {}
-    } else {
-      try {
-        localStorage.setItem(storageKey(threadId), trimmed);
-      } catch {}
-    }
-    try {
-      window.dispatchEvent(
-        new CustomEvent<ThreadTitleEventDetail>(THREAD_TITLE_EVENT, {
-          detail: { threadId, title: trimmed.length === 0 ? null : trimmed },
-        }),
-      );
-    } catch {}
-    setCurrentTitle(trimmed.length === 0 ? null : trimmed);
+    void renameSession(activeSession.id, next.trim().length ? next.trim() : null);
   };
 
   return (
     <span className="inline-flex items-center gap-2">
-      <ThreadTitle variant="header" />
+      <span className="font-medium">{title}</span>
       <button
         type="button"
-        title="Rename thread"
+        title="Rename session"
         onClick={handleRename}
         className="text-muted-foreground hover:text-foreground inline-flex items-center rounded p-0.5"
       >
@@ -176,3 +106,4 @@ export function ThreadTitleEditor() {
     </span>
   );
 }
+

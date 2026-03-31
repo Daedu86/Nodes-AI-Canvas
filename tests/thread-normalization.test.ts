@@ -95,4 +95,84 @@ describe("normalizeThreadRepoItems", () => {
 
     expect(bridges.has("bridge-user")).toBe(true);
   });
+
+  it("reparents assistant edits when the bridge uses sourceId instead of custom metadata", () => {
+    const rootUser = makeItem({ id: "root-user", role: "user", parentId: null });
+    const originalAssistant = makeItem({
+      id: "assistant-1",
+      role: "assistant",
+      parentId: "root-user",
+    });
+    const bridgeUser = makeItem({
+      id: "bridge-user",
+      role: "user",
+      parentId: "root-user",
+      sourceId: "assistant-1",
+    });
+    const assistantEdit = makeItem({
+      id: "assistant-edit",
+      role: "assistant",
+      parentId: "root-user",
+      custom: {
+        [ASSISTANT_EDIT_METADATA_KEY]: "assistant-1",
+      },
+    });
+
+    const { items, bridges } = normalizeThreadRepoItems([
+      rootUser,
+      originalAssistant,
+      bridgeUser,
+      assistantEdit,
+    ]);
+
+    const byId = new Map(items.map((item) => [item.message?.id, item]));
+    expect(byId.get("assistant-edit")?.parentId).toBe("bridge-user");
+    expect(bridges.has("bridge-user")).toBe(true);
+  });
+
+  it("honors persisted bridge metadata when a normalized export is reloaded", () => {
+    const rootUser = makeItem({ id: "root-user", role: "user", parentId: null });
+    const originalAssistant = makeItem({
+      id: "assistant-1",
+      role: "assistant",
+      parentId: "root-user",
+    });
+    const bridgeUser = makeItem({
+      id: "bridge-user",
+      role: "user",
+      parentId: "root-user",
+      custom: {
+        [EDIT_SOURCE_KEY]: "assistant-1",
+      },
+    });
+    const assistantEdit = makeItem({
+      id: "assistant-edit",
+      role: "assistant",
+      parentId: "root-user",
+      custom: {
+        [ASSISTANT_EDIT_METADATA_KEY]: "assistant-1",
+        [ASSISTANT_EDIT_BRIDGE_KEY]: "bridge-user",
+        [EDIT_PARENT_KEY]: "root-user",
+      },
+    });
+
+    const { items } = normalizeThreadRepoItems([
+      rootUser,
+      originalAssistant,
+      bridgeUser,
+      assistantEdit,
+    ]);
+
+    const byId = new Map(items.map((item) => [item.message?.id, item]));
+    const normalizedEdit = byId.get("assistant-edit");
+    expect(normalizedEdit?.parentId).toBe("bridge-user");
+    expect(
+      (normalizedEdit?.message.metadata as { custom?: Record<string, unknown> } | undefined)
+        ?.custom?.[ASSISTANT_EDIT_BRIDGE_KEY],
+    ).toBe("bridge-user");
+    expect(
+      (normalizedEdit?.message.metadata as { custom?: Record<string, unknown> } | undefined)
+        ?.custom?.[ASSISTANT_EDIT_METADATA_KEY],
+    ).toBe("assistant-1");
+  });
 });

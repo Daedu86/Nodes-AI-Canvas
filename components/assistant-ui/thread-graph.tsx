@@ -4,7 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { GitBranch, X } from "lucide-react";
 import React from "react";
 
-import { ThreadGraphInline } from "./thread-graph-inline";
+import { ThreadGraphFlow } from "./thread-graph-flow/thread-graph-flow";
 
 export function ThreadGraphButton() {
   const [open, setOpen] = React.useState(false);
@@ -23,7 +23,7 @@ export function ThreadGraphButton() {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/30" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 h-[85vh] w-[min(96vw,1200px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-md border bg-background shadow-lg">
-          <Dialog.Title className="sr-only">Thread Tree Viewer</Dialog.Title>
+          <Dialog.Title className="sr-only">Thread Flow Viewer</Dialog.Title>
           <div className="flex items-center justify-end border-b p-3">
             <Dialog.Close asChild>
               <button type="button" className="rounded p-1 hover:bg-muted" aria-label="Close">
@@ -32,7 +32,7 @@ export function ThreadGraphButton() {
             </Dialog.Close>
           </div>
           <div className="h-[calc(85vh-44px)] w-full overflow-hidden">
-            <ThreadGraphInline />
+            <ThreadGraphFlow />
           </div>
         </Dialog.Content>
       </Dialog.Portal>

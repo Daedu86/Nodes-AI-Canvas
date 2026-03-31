@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/playwright-report
+/test-results
 
 # next.js
 /.next/
@@ -19,6 +21,7 @@
 
 # production
 /build
+/data
 
 # misc
 .DS_Store
@@ -29,6 +32,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+.dev*.log
+.start*.log
+.flow-*.log
+.visual-smoke*.log
+*.stderr.log
+*.stdout.log
 
 # env files (can opt-in for committing if needed)
 .env*

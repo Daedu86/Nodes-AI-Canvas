@@ -1,11 +1,11 @@
 "use client"; // Esto marca el archivo como un componente cliente
 
-import { ToolCallContentPartComponent } from "@assistant-ui/react";
+import { ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
 
-export const ToolFallback: ToolCallContentPartComponent = ({
+export const ToolFallback: ToolCallMessagePartComponent = ({
   toolName,
   argsText,
   result,

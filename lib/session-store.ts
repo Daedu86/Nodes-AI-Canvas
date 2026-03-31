@@ -1,0 +1,207 @@
+import { randomUUID } from "node:crypto";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import {
+  EMPTY_SESSION_THREAD_EXPORT,
+  getSessionMessageCount,
+  normalizeSessionArtifactsDocument,
+  normalizeSessionContextLinksDocument,
+  normalizeSessionThreadExport,
+  type SessionDocument,
+  type SessionSummary,
+  type SessionThreadExport,
+} from "@/lib/session-documents";
+import type { SessionArtifact, SessionContextLink } from "@/lib/session-artifacts";
+import {
+  cleanupOrphanedSessionBlobs,
+  deleteSessionBlobDir,
+  getSessionBlobMaintenance,
+  reconcileSessionArtifactBlobs,
+} from "@/lib/session-blob-store";
+
+type StoredSession = Omit<SessionDocument, "messageCount">;
+
+type SessionPatch = {
+  archived?: boolean;
+  artifacts?: SessionArtifact[];
+  contextLinks?: SessionContextLink[];
+  snapshot?: SessionThreadExport;
+  title?: string | null;
+};
+
+const SESSION_FILE_EXTENSION = ".json";
+
+const ensureSafeSessionId = (sessionId: string) => {
+  if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
+    throw new Error(`Invalid session id: ${sessionId}`);
+  }
+};
+
+const getSessionStoreDir = () =>
+  process.env.SESSION_STORE_DIR
+    ? path.resolve(process.env.SESSION_STORE_DIR)
+    : path.join(process.cwd(), "data", "sessions");
+
+const getSessionFilePath = (sessionId: string) => {
+  ensureSafeSessionId(sessionId);
+  return path.join(getSessionStoreDir(), `${sessionId}${SESSION_FILE_EXTENSION}`);
+};
+
+const toSessionDocument = (session: StoredSession): SessionDocument => ({
+  ...session,
+  snapshot: normalizeSessionThreadExport(session.snapshot),
+  artifacts: normalizeSessionArtifactsDocument(session.artifacts),
+  contextLinks: normalizeSessionContextLinksDocument(session.contextLinks),
+  messageCount: getSessionMessageCount(normalizeSessionThreadExport(session.snapshot)),
+});
+
+const sortSessions = (sessions: SessionSummary[]) =>
+  [...sessions].sort((a, b) => {
+    const timeDelta = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    if (timeDelta !== 0) return timeDelta;
+    return a.createdAt.localeCompare(b.createdAt);
+  });
+
+async function ensureStoreDir() {
+  await fs.mkdir(getSessionStoreDir(), { recursive: true });
+}
+
+async function writeSessionDocument(session: StoredSession) {
+  await ensureStoreDir();
+  const filePath = getSessionFilePath(session.id);
+  const tempPath = `${filePath}.tmp`;
+  await fs.writeFile(tempPath, JSON.stringify(session, null, 2), "utf8");
+  await fs.rename(tempPath, filePath);
+}
+
+async function readSessionDocumentFromPath(filePath: string): Promise<SessionDocument> {
+  const raw = await fs.readFile(filePath, "utf8");
+  const parsed = JSON.parse(raw) as Partial<StoredSession>;
+  const snapshot = normalizeSessionThreadExport(parsed.snapshot);
+  return toSessionDocument({
+    id: typeof parsed.id === "string" ? parsed.id : path.basename(filePath, SESSION_FILE_EXTENSION),
+    title: typeof parsed.title === "string" && parsed.title.trim().length ? parsed.title.trim() : null,
+    archived: parsed.archived === true,
+    createdAt:
+      typeof parsed.createdAt === "string" && parsed.createdAt.length
+        ? parsed.createdAt
+        : new Date().toISOString(),
+    updatedAt:
+      typeof parsed.updatedAt === "string" && parsed.updatedAt.length
+        ? parsed.updatedAt
+        : new Date().toISOString(),
+    snapshot,
+    artifacts: normalizeSessionArtifactsDocument(parsed.artifacts),
+    contextLinks: normalizeSessionContextLinksDocument(parsed.contextLinks),
+  });
+}
+
+async function readAllSessionDocuments() {
+  await ensureStoreDir();
+  const entries = await fs.readdir(getSessionStoreDir(), { withFileTypes: true });
+  return Promise.all(
+    entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith(SESSION_FILE_EXTENSION))
+      .map((entry) => readSessionDocumentFromPath(path.join(getSessionStoreDir(), entry.name))),
+  );
+}
+
+async function getReferencedBlobRefs() {
+  const sessions = await readAllSessionDocuments();
+  return sessions.flatMap((session) =>
+    session.artifacts
+      .map((artifact) => artifact.blobRef)
+      .filter((blobRef): blobRef is string => Boolean(blobRef)),
+  );
+}
+
+export async function listSessions(options: { includeArchived?: boolean } = {}) {
+  const includeArchived = options.includeArchived === true;
+  const sessions = await readAllSessionDocuments();
+
+  const summaries = sessions
+    .filter((session) => includeArchived || !session.archived)
+    .map<SessionSummary>(({ snapshot, ...session }) => ({
+      ...session,
+      messageCount: getSessionMessageCount(snapshot),
+    }));
+
+  return sortSessions(summaries);
+}
+
+export async function getSession(sessionId: string) {
+  const filePath = getSessionFilePath(sessionId);
+  const session = await readSessionDocumentFromPath(filePath);
+  return session;
+}
+
+export async function createSession(input: {
+  artifacts?: SessionArtifact[];
+  contextLinks?: SessionContextLink[];
+  snapshot?: SessionThreadExport;
+  title?: string | null;
+} = {}) {
+  const now = new Date().toISOString();
+  const session: StoredSession = {
+    id: randomUUID(),
+    title: typeof input.title === "string" && input.title.trim().length ? input.title.trim() : null,
+    archived: false,
+    createdAt: now,
+    updatedAt: now,
+    snapshot: normalizeSessionThreadExport(input.snapshot ?? EMPTY_SESSION_THREAD_EXPORT),
+    artifacts: normalizeSessionArtifactsDocument(input.artifacts),
+    contextLinks: normalizeSessionContextLinksDocument(input.contextLinks),
+  };
+  await writeSessionDocument(session);
+  return toSessionDocument(session);
+}
+
+export async function patchSession(sessionId: string, patch: SessionPatch) {
+  const current = await getSession(sessionId);
+  const next: StoredSession = {
+    id: current.id,
+    title:
+      patch.title === undefined
+        ? current.title
+        : typeof patch.title === "string" && patch.title.trim().length
+          ? patch.title.trim()
+          : null,
+    archived: patch.archived ?? current.archived,
+    createdAt: current.createdAt,
+    updatedAt: new Date().toISOString(),
+    snapshot:
+      patch.snapshot === undefined
+        ? current.snapshot
+        : normalizeSessionThreadExport(patch.snapshot),
+    artifacts:
+      patch.artifacts === undefined
+        ? current.artifacts
+        : normalizeSessionArtifactsDocument(patch.artifacts),
+    contextLinks:
+      patch.contextLinks === undefined
+        ? current.contextLinks
+        : normalizeSessionContextLinksDocument(patch.contextLinks),
+  };
+  await reconcileSessionArtifactBlobs(current.artifacts, next.artifacts);
+  await writeSessionDocument(next);
+  return toSessionDocument(next);
+}
+
+export async function deleteSession(sessionId: string) {
+  const filePath = getSessionFilePath(sessionId);
+  await fs.rm(filePath, { force: true });
+  await deleteSessionBlobDir(sessionId);
+}
+
+export async function deleteSessions(sessionIds: string[]) {
+  const uniqueSessionIds = [...new Set(sessionIds)];
+  await Promise.all(uniqueSessionIds.map((sessionId) => deleteSession(sessionId)));
+}
+
+export async function getSessionBlobMaintenanceSummary() {
+  return getSessionBlobMaintenance(await getReferencedBlobRefs());
+}
+
+export async function cleanupSessionBlobStore() {
+  return cleanupOrphanedSessionBlobs(await getReferencedBlobRefs());
+}

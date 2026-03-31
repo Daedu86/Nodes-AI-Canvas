@@ -1,32 +1,64 @@
 import { NextRequest } from "next/server";
 import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const pexec = promisify(execFile);
-
 type Payload = { action: "start" | "stop"; model?: string };
+type JsonBody = { ok: boolean; error?: string; model?: string; status?: string };
+
+function json(body: JsonBody, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function isOllamaControlEnabled() {
+  return process.env.ENABLE_OLLAMA_CONTROL_ROUTE === "1";
+}
 
 function getOllamaBase() {
   const base = process.env.OLLAMA_API_URL || "http://127.0.0.1:11434/api";
   return base.replace(/\/$/, "");
 }
 
+function execFileAsync(file: string, args: string[], timeout = 30_000) {
+  return new Promise<void>((resolve, reject) => {
+    execFile(file, args, { timeout }, (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 export async function POST(req: NextRequest) {
+  if (!isOllamaControlEnabled()) {
+    return json(
+      {
+        ok: false,
+        error:
+          "Ollama control route is disabled. Set ENABLE_OLLAMA_CONTROL_ROUTE=1 to enable local model lifecycle controls.",
+      },
+      404,
+    );
+  }
+
   let body: Payload;
   try {
     body = (await req.json()) as Payload;
   } catch {
-    return new Response(JSON.stringify({ ok: false, error: "Invalid JSON" }), { status: 400 });
+    return json({ ok: false, error: "Invalid JSON" }, 400);
   }
 
   const action = body?.action;
   const model = body?.model || "gemma3:4b";
 
   if (action !== "start" && action !== "stop") {
-    return new Response(JSON.stringify({ ok: false, error: "Invalid action" }), { status: 400 });
+    return json({ ok: false, error: "Invalid action" }, 400);
   }
 
   try {
@@ -60,25 +92,22 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      return Response.json({ ok: true, status: "started", model });
+      return json({ ok: true, status: "started", model });
     } else {
       // Try to stop the model via CLI (simplest and broadly supported)
       // Requires 'ollama' on PATH. If unavailable, surface a clear error.
       try {
-        await pexec(process.env.OLLAMA_CMD || "ollama", ["stop", model], { timeout: 30000 });
-        return Response.json({ ok: true, status: "stopped", model });
+        await execFileAsync(process.env.OLLAMA_CMD || "ollama", ["stop", model]);
+        return json({ ok: true, status: "stopped", model });
       } catch (error) {
         const message =
           error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
-        return new Response(
-          JSON.stringify({ ok: false, error: `ollama stop failed: ${message}` }),
-          { status: 500 }
-        );
+        return json({ ok: false, error: `ollama stop failed: ${message}` }, 500);
       }
     }
   } catch (error) {
     const message =
       error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
-    return new Response(JSON.stringify({ ok: false, error: message }), { status: 500 });
+    return json({ ok: false, error: message }, 500);
   }
 }
