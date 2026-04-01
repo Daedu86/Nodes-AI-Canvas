@@ -130,6 +130,6 @@ export function getOpenRouterApiKey(): string | undefined {
 export function getOpenRouterMetadataHeaders(): Record<string, string> {
   return {
     "HTTP-Referer": process.env.OPENROUTER_REFERER || "http://localhost:3000",
-    "X-Title": process.env.OPENROUTER_TITLE || "assistant-ui-starter",
+    "X-Title": process.env.OPENROUTER_TITLE || "Nodes",
   };
 }

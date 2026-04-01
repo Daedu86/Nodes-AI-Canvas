@@ -1,8 +1,8 @@
-# AI Canvas
+# Nodes
 
-AI Canvas is a visual workspace for thinking with AI.
+Nodes is a visual workspace for thinking with AI.
 
-Instead of keeping everything inside one long chat, AI Canvas lets you:
+Instead of keeping everything inside one long chat, Nodes lets you:
 
 - branch conversations
 - compare different directions
@@ -22,7 +22,7 @@ See [LICENSE](LICENSE) for the project license and [THIRD_PARTY_NOTICES.md](THIR
 
 Most AI tools are great at generating one answer.
 
-AI Canvas is built for a different job:
+Nodes is built for a different job:
 
 - exploring multiple answers
 - keeping the reasoning visible
@@ -37,25 +37,25 @@ The product behaves more like a workspace than a chat window.
 
 Chat and canvas stay side by side, so you can branch ideas without losing the thread.
 
-![AI Canvas main workspace](docs/screenshots/workspace-hero.png)
+![Nodes main workspace](docs/screenshots/workspace-hero.png)
 
 ### Project canvas
 
 Projects pull multiple sessions and typed nodes into one larger canvas, so the most important conclusions stay visible in one place.
 
-![AI Canvas project canvas](docs/screenshots/project-canvas.png)
+![Nodes project canvas](docs/screenshots/project-canvas.png)
 
 ### Project Arena
 
 Projects let you compare multiple sessions or branches and promote the best direction into shared context.
 
-![AI Canvas Project Arena](docs/screenshots/project-arena.png)
+![Nodes Project Arena](docs/screenshots/project-arena.png)
 
 ### Project context builder
 
 Global context can be assembled from structured sources like arena synthesis, winners, typed nodes, and session summaries.
 
-![AI Canvas project context builder](docs/screenshots/project-context-builder.png)
+![Nodes project context builder](docs/screenshots/project-context-builder.png)
 
 ## Main Concepts
 
@@ -158,7 +158,7 @@ One practical workflow looks like this:
 7. Apply that result to the project context.
 8. Keep iterating from there.
 
-This is where AI Canvas is strongest: when you need to compare, synthesize, and decide.
+This is where Nodes is strongest: when you need to compare, synthesize, and decide.
 
 ## Quick Start
 
@@ -215,7 +215,7 @@ Then open [http://localhost:3000](http://localhost:3000).
 
 ## Where Your Data Lives
 
-AI Canvas stores workspace data locally on disk.
+Nodes stores workspace data locally on disk.
 
 Typical folders:
 
@@ -233,7 +233,7 @@ Your `.env.local` file is ignored by git and is not meant to be committed.
 
 ## Notes About Context
 
-AI Canvas lets you inspect what the model is actually seeing.
+Nodes lets you inspect what the model is actually seeing.
 
 - `Last` means the model mainly sees the latest prompt
 - `Full` means the model sees the full conversation history for that path
@@ -264,7 +264,7 @@ npm run build
 
 ## In Short
 
-AI Canvas is for people who want more than one answer from AI.
+Nodes is for people who want more than one answer from AI.
 
 It gives you a place to:
 
