@@ -5,10 +5,8 @@ import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
-  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { ThreadTitleEditor } from "@/components/assistant-ui/thread-title";
 import { ModelSelector } from "@/components/assistant-ui/model-selector";
@@ -17,6 +15,7 @@ import { LlmToggleButton } from "@/components/assistant-ui/llm-toggle";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { SessionContextSheet } from "@/components/workspace/session-context-sheet";
+import { ProductBrand } from "@/components/workspace/product-brand";
 
 export const AppHeader = () => {
   const { llmEnabled } = useLlmEnabled();
@@ -25,12 +24,9 @@ export const AppHeader = () => {
     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger />
       <Separator orientation="vertical" className="mr-2 h-4" />
+      <ProductBrand className="min-w-0" modeLabel="Sessions" />
       <Breadcrumb>
         <BreadcrumbList>
-          <BreadcrumbItem className="hidden md:block">
-            <BreadcrumbLink href="#">Build Your Own ChatGPT UX</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator className="hidden md:block" />
           <BreadcrumbItem>
             <BreadcrumbPage>
               <ThreadTitleEditor />
