@@ -1,50 +1,162 @@
 # AI Canvas
 
-AI Canvas is a Next.js chat workspace built on top of `@assistant-ui/react`.
-It combines a ChatGPT-style conversation surface with message branching, a visual thread graph, per-message model tracking, and support for both local Ollama models and remote OpenRouter models.
+AI Canvas is a visual workspace for thinking with AI.
 
-The current codebase is no longer just an Ollama starter. The app can run fully against OpenRouter, and the UI includes model selection and graph tooling that go beyond the original template.
+Instead of keeping everything inside one long chat, AI Canvas lets you:
 
-## What it does
+- branch conversations
+- compare different directions
+- attach extra context like notes, code, files, and images
+- group related sessions into projects
+- keep working context visible while you iterate
 
-- Chat UI built with `@assistant-ui/react` and the AI SDK.
-- Provider-aware model routing for `ollama` and `openrouter`.
-- Model selector in the header for switching between local and hosted models.
-- History mode toggle:
-  - `Last` sends only the latest user message.
-  - `Full` sends the full conversation history.
-- Thread list with new-thread and archive actions.
-- Auto-generated thread titles plus manual rename support.
-- Message edit / reload / copy actions.
-- Branch-aware conversation flow with branch picker controls.
-- Interactive thread graph:
-  - inline graph panel
-  - modal graph viewer
-  - pan / zoom
-  - link cut / restore tools
-  - graph JSON export
-- Per-message model provenance stored in localStorage so the UI can show which model/provider produced a response.
+It is best for people who want to explore options before committing to one path.
 
-## Tech stack
+## License
 
-- Next.js 15
-- React 19
-- TypeScript
-- Tailwind CSS 4
-- `@assistant-ui/react`
-- `@assistant-ui/react-ai-sdk`
-- `ai`
-- `ollama-ai-provider`
-- `@ai-sdk/openai` for OpenRouter access
+This project is licensed under the MIT License.
 
-## Local setup
+See [LICENSE](LICENSE) for the project license and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream notice details related to `assistant-ui`.
 
-### Prerequisites
+## What Makes It Different
+
+Most AI tools are great at generating one answer.
+
+AI Canvas is built for a different job:
+
+- exploring multiple answers
+- keeping the reasoning visible
+- comparing branches and sessions
+- turning exploration into a reusable decision
+
+The product behaves more like a workspace than a chat window.
+
+## Screenshots
+
+### Main workspace
+
+Chat and canvas stay side by side, so you can branch ideas without losing the thread.
+
+![AI Canvas main workspace](docs/screenshots/workspace-hero.png)
+
+### Project Arena
+
+Projects let you compare multiple sessions or branches and promote the best direction into shared context.
+
+![AI Canvas Project Arena](docs/screenshots/project-arena.png)
+
+## Main Concepts
+
+### Session
+
+A session is a single working conversation.
+
+You can:
+
+- start a new session
+- branch from messages
+- reopen saved sessions later
+- inspect what context is being sent to the model
+
+### Branch
+
+Branches let you try different directions without losing the original path.
+
+Examples:
+
+- rewrite the same prompt a different way
+- ask a follow-up from a specific reply
+- compare multiple answers to the same idea
+
+### Artifact
+
+Artifacts are extra pieces of context you can add to the canvas.
+
+Supported artifact types include:
+
+- text
+- code
+- image
+- file
+
+You can attach an artifact to a node and create a new branch that uses that context.
+
+### Project
+
+A project groups multiple sessions into one larger workspace.
+
+Inside a project you can:
+
+- add more than one session
+- see them together on a larger canvas
+- keep a global project context
+- compare sessions or branches in Arena
+
+### Arena
+
+Arena helps you compare options.
+
+You can compare:
+
+- sessions
+- branches
+
+Then you can:
+
+- pick a winner
+- create a merge node
+- promote the result into the project context
+- save it as reusable memory
+
+### Beacon
+
+Beacon is the guide inside the canvas.
+
+It helps you understand:
+
+- the node it is standing on
+- the branch it is inspecting
+- the current focus of the workspace
+
+Beacon is there to guide exploration, not replace your main chat thread.
+
+## What You Can Do Today
+
+- chat with local or hosted models
+- switch models from the UI
+- choose `Last` or `Full` history mode
+- branch from user or assistant messages
+- manage saved sessions from the sidebar
+- attach artifacts as context
+- create projects from multiple sessions
+- compare options inside Project Arena
+- use merge nodes and reusable memory
+- inspect the context that will actually be sent to the LLM
+
+## A Good Way To Use It
+
+One practical workflow looks like this:
+
+1. Create one session for product ideas.
+2. Create another for technical architecture.
+3. Create another for risks, tradeoffs, or critiques.
+4. Add those sessions into a project.
+5. Compare them in Arena.
+6. Create a merge node from the best thinking.
+7. Apply that result to the project context.
+8. Keep iterating from there.
+
+This is where AI Canvas is strongest: when you need to compare, synthesize, and decide.
+
+## Quick Start
+
+### Requirements
 
 - Node.js 18+
 - npm
-- Optional: Ollama if you want local models
-- OpenRouter API key if you want hosted models
+- one model provider:
+  - OpenRouter for hosted models
+  - Ollama for local models
 
 ### Install
 
@@ -52,32 +164,13 @@ The current codebase is no longer just an Ollama starter. The app can run fully 
 npm ci
 ```
 
-### Environment
+### Create `.env.local`
 
-Create `.env.local` from `.env.example` and configure the provider you want to use.
+Use one of these setups.
 
-Relevant variables:
+#### Option A: OpenRouter
 
-- `OPENROUTER_API_KEY`
-  Required for OpenRouter models.
-- `OPENROUTER_API_URL`
-  Defaults to `https://openrouter.ai/api/v1`.
-- `OPENROUTER_REFERER`
-  Optional but recommended for OpenRouter attribution and limits.
-- `OPENROUTER_TITLE`
-  Optional OpenRouter app title metadata.
-- `OLLAMA_API_URL`
-  Defaults to `http://localhost:11434/api`.
-- `ENABLE_OLLAMA_CONTROL_ROUTE`
-  Optional. Set to `1` only if you want the advanced local-only `/api/llm/control` route enabled.
-- `DEFAULT_MODEL`
-  Server-side default used by `/api/chat` and `/api/title`.
-- `NEXT_PUBLIC_DEFAULT_MODEL`
-  Client-side default model shown when no prior model is saved in localStorage.
-- `NEXT_PUBLIC_DEFAULT_PROVIDER`
-  Client-side default provider (`ollama` or `openrouter`).
-
-Example OpenRouter-oriented setup:
+Recommended if you want the easiest hosted setup.
 
 ```env
 OPENROUTER_API_KEY=your-key
@@ -89,7 +182,9 @@ NEXT_PUBLIC_DEFAULT_MODEL=nvidia/nemotron-3-super-120b-a12b:free
 NEXT_PUBLIC_DEFAULT_PROVIDER=openrouter
 ```
 
-Example Ollama-oriented setup:
+#### Option B: Ollama
+
+Use this if you want to run local models on your own machine.
 
 ```env
 OLLAMA_API_URL=http://localhost:11434/api
@@ -98,7 +193,7 @@ NEXT_PUBLIC_DEFAULT_MODEL=gemma3:4b
 NEXT_PUBLIC_DEFAULT_PROVIDER=ollama
 ```
 
-### Run the app
+### Run
 
 ```bash
 npm run dev
@@ -106,131 +201,63 @@ npm run dev
 
 Then open [http://localhost:3000](http://localhost:3000).
 
-## How the app is structured
+## Where Your Data Lives
 
-### App shell
+AI Canvas stores workspace data locally on disk.
 
-- [app/page.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/app/page.tsx)
-  Minimal entrypoint that renders the assistant.
-- [app/assistant.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/app/assistant.tsx)
-  Main orchestrator. It creates the chat runtime, mounts context providers, persists UI state, and renders the 3-panel layout:
-  - sidebar
-  - chat thread
-  - inline thread graph
+Typical folders:
 
-### Main UI components
+- `data/sessions`
+- `data/projects`
+- `data/session-blobs`
 
-- [components/assistant-ui/thread.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/assistant-ui/thread.tsx)
-  Main chat surface. Renders user and assistant messages, composer, action bars, branch picker, history mode controls, and message metadata.
-- [components/assistant-ui/thread-list.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/assistant-ui/thread-list.tsx)
-  Sidebar thread list with new-thread and archive actions.
-- [components/assistant-ui/thread-title.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/assistant-ui/thread-title.tsx)
-  Handles auto title generation and manual renaming. Manual titles are stored in localStorage.
-- [components/assistant-ui/model-selector.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/assistant-ui/model-selector.tsx)
-  Header dropdown for switching model/provider combinations.
-- [components/assistant-ui/markdown-text.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/assistant-ui/markdown-text.tsx)
-  Markdown renderer with GFM and copyable code blocks.
-- [components/assistant-ui/tool-fallback.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/assistant-ui/tool-fallback.tsx)
-  Fallback renderer for tool calls and tool results inside assistant messages.
+That means:
 
-### Thread graph
+- your saved sessions persist across restarts
+- your projects persist across restarts
+- uploaded files and images are stored locally
 
-- [components/assistant-ui/thread-graph-inline.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/assistant-ui/thread-graph-inline.tsx)
-  Canvas-based graph viewer for all conversation branches. Supports:
-  - pan and zoom
-  - click-to-jump to a message
-  - connector editing
-  - cut / restore link overrides
-  - JSON export
-- [components/assistant-ui/thread-graph.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/assistant-ui/thread-graph.tsx)
-  Dialog wrapper that reuses the inline graph viewer in a modal.
-- [components/assistant-ui/use-thread-repo-items.ts](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/assistant-ui/use-thread-repo-items.ts)
-  Extracts and normalizes exported thread data from the runtime. This is the key adapter between the assistant runtime and the graph.
+Your `.env.local` file is ignored by git and is not meant to be committed.
 
-### Context providers
+## Notes About Context
 
-- [components/context/history-mode.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/context/history-mode.tsx)
-  Global `Last` vs `Full` history mode.
-- [components/context/llm-enabled.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/context/llm-enabled.tsx)
-  UI-level enabled/disabled state for LLM usage.
-- [components/context/model-config.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/context/model-config.tsx)
-  Current active model and provider.
-- [components/context/link-editor.tsx](/C:/Users/daedu/Documents/Playground/AI%20Canvas/components/context/link-editor.tsx)
-  Persistent graph link overrides used by the thread graph.
+AI Canvas lets you inspect what the model is actually seeing.
 
-### API routes
+- `Last` means the model mainly sees the latest prompt
+- `Full` means the model sees the full conversation history for that path
 
-- [app/api/chat/route.ts](/C:/Users/daedu/Documents/Playground/AI%20Canvas/app/api/chat/route.ts)
-  Main chat endpoint. Resolves `provider` and `model`, then streams the reply using either OpenRouter or Ollama.
-- [app/api/title/route.ts](/C:/Users/daedu/Documents/Playground/AI%20Canvas/app/api/title/route.ts)
-  Title generation endpoint. Uses the same provider-aware model resolution pattern.
-- [app/api/llm/control/route.ts](/C:/Users/daedu/Documents/Playground/AI%20Canvas/app/api/llm/control/route.ts)
-  Advanced local-only Ollama utility route for pulling, warming, and stopping local models. It is disabled by default and only available when `ENABLE_OLLAMA_CONTROL_ROUTE=1` is set. The main cloud-first UI flow does not depend on it.
+Artifacts and project context can also affect what gets sent.
 
-### Supporting libraries
+The app includes context budgeting so large artifacts do not overwhelm the prompt.
 
-- [lib/message-model-registry.ts](/C:/Users/daedu/Documents/Playground/AI%20Canvas/lib/message-model-registry.ts)
-  Persists per-message model/provider metadata in localStorage.
-- [lib/assistant-edit-branching.ts](/C:/Users/daedu/Documents/Playground/AI%20Canvas/lib/assistant-edit-branching.ts)
-  Defines metadata keys used when modeling edited assistant branches.
+## Notes About Images And Files
 
-## Runtime behavior
+Images and files can be attached as context artifacts.
 
-### Model routing
+Whether the model truly understands the original media depends on the model you choose.
 
-The app can resolve the active model from:
+In practice:
 
-1. explicit request body
-2. runtime config
-3. environment defaults
+- some models mainly use metadata or extracted text
+- multimodal understanding depends on provider and model support
 
-If a model name contains `/`, the code treats it as an OpenRouter model unless a provider is explicitly set.
-
-### Persistence
-
-The app stores several UI concerns in localStorage:
-
-- selected model/provider
-- history mode
-- LLM enabled state
-- thread title overrides
-- graph node positions
-- graph link overrides
-- per-message model registry
-
-There is no server-side conversation persistence layer in this repo today.
-
-## Current caveats
-
-- The README used to describe the project as primarily Ollama-based. The code now supports OpenRouter directly and the model selector is part of the current UX.
-- The header toggle is now provider-agnostic and only enables or disables outgoing AI requests in the client. It is no longer meant to represent local model lifecycle management.
-- Local Ollama models are still selectable, but the dedicated Ollama lifecycle route is now treated as an advanced opt-in path instead of part of the default product surface.
-- The thread graph and normalization logic are more advanced than the rest of the docs originally suggested. If you are changing message branching behavior, start with `use-thread-repo-items.ts`.
-
-## Testing
-
-Run the test suite with:
+## Useful Commands
 
 ```bash
+npm run dev
 npm test
+npm run test:e2e
+npm run build
 ```
 
-The current test coverage includes normalization logic for edited / bridged thread structures:
+## In Short
 
-- [tests/thread-normalization.test.ts](/C:/Users/daedu/Documents/Playground/AI%20Canvas/tests/thread-normalization.test.ts)
+AI Canvas is for people who want more than one answer from AI.
 
-## Codex Workflow
+It gives you a place to:
 
-If you want to work on this repo with parallel Codex subagents, see [AGENTS.md](AGENTS.md).
-
-The repo is organized for agent ownership by bounded areas such as:
-
-- `ui-chat`
-- `graph-branching`
-- `provider-backend`
-- `state-runtime`
-
-## Suggested next documentation updates
-
-- Document the graph JSON export format.
-- Document whether the optional Ollama utility route should remain exposed in the main product.
+- branch ideas
+- compare options
+- carry context forward
+- merge what matters
+- and turn messy exploration into clearer decisions
