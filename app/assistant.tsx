@@ -1,8 +1,8 @@
 "use client";
 
-import { useAssistantEditBranching } from "@/lib/assistant-edit-branching";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { useChatRuntime } from "@assistant-ui/react-ai-sdk";
+import dynamic from "next/dynamic";
 import { LinkEditorProvider } from "@/components/context/link-editor";
 import { MessageLatencyProvider } from "@/components/context/message-latency";
 import { RequestErrorProvider } from "@/components/context/request-error";
@@ -20,12 +20,40 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/workspace/app-header";
 import { ChatPanel } from "@/components/workspace/chat-panel";
-import { GraphPanel } from "@/components/workspace/graph-panel";
-import { ProjectHeader } from "@/components/workspace/project-header";
-import { ProjectWorkspace } from "@/components/workspace/project-workspace";
 import { WorkspaceSplitLayout } from "@/components/workspace/workspace-split-layout";
 import { rememberMessageLatencyEntry } from "@/lib/message-latency-registry";
 import { GraphBranchIntentProvider } from "@/components/context/graph-branch-intent";
+
+const GraphPanel = dynamic(
+  () => import("@/components/workspace/graph-panel").then((mod) => mod.GraphPanel),
+  {
+    loading: () => (
+      <div className="flex h-full min-h-0 items-center justify-center rounded-lg border border-border/60 bg-background p-4 text-sm text-muted-foreground">
+        Loading graph…
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
+const ProjectHeader = dynamic(
+  () => import("@/components/workspace/project-header").then((mod) => mod.ProjectHeader),
+  {
+    loading: () => null,
+  },
+);
+
+const ProjectWorkspace = dynamic(
+  () => import("@/components/workspace/project-workspace").then((mod) => mod.ProjectWorkspace),
+  {
+    loading: () => (
+      <div className="flex h-full min-h-0 items-center justify-center p-6 text-sm text-muted-foreground">
+        Loading project workspace…
+      </div>
+    ),
+    ssr: false,
+  },
+);
 
 function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
   const { historyMode, modelConfig } = useSessionUiState();
@@ -100,9 +128,6 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
   );
 
   const rawRuntime = useChatRuntime(chatRuntimeOptions);
-  const isRuntimeHydrated = useAssistantEditBranching(rawRuntime, {
-    storageKey: `assistant-ui.main-thread-export.v1:${sessionId}`,
-  });
 
   React.useEffect(() => {
     if (!rawRuntime) return;
@@ -145,36 +170,34 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
   return (
     <AssistantRuntimeProvider runtime={rawRuntime}>
       <PersistedSessionRuntimeBridge />
-      {isRuntimeHydrated ? (
-        <RequestErrorProvider
+      <RequestErrorProvider
+        value={{
+          clearRequestError: () => setRequestError(null),
+          requestError,
+          setRequestError,
+        }}
+      >
+        <MessageLatencyProvider
           value={{
-            clearRequestError: () => setRequestError(null),
-            requestError,
-            setRequestError,
+            bumpLatencyVersion: () => setLatencyVersion((value) => value + 1),
+            latencyVersion,
           }}
         >
-          <MessageLatencyProvider
-            value={{
-              bumpLatencyVersion: () => setLatencyVersion((value) => value + 1),
-              latencyVersion,
-            }}
-          >
-            <SessionArtifactsProvider>
-              <GraphBranchIntentProvider>
-                <LinkEditorProvider>
-                  <>
-                    <AppHeader />
-                    <WorkspaceSplitLayout
-                      leftPanel={<ChatPanel />}
-                      rightPanel={<GraphPanel />}
-                    />
-                  </>
-                </LinkEditorProvider>
-              </GraphBranchIntentProvider>
-            </SessionArtifactsProvider>
-          </MessageLatencyProvider>
-        </RequestErrorProvider>
-      ) : null}
+          <SessionArtifactsProvider>
+            <GraphBranchIntentProvider>
+              <LinkEditorProvider>
+                <>
+                  <AppHeader />
+                  <WorkspaceSplitLayout
+                    leftPanel={<ChatPanel />}
+                    rightPanel={<GraphPanel />}
+                  />
+                </>
+              </LinkEditorProvider>
+            </GraphBranchIntentProvider>
+          </SessionArtifactsProvider>
+        </MessageLatencyProvider>
+      </RequestErrorProvider>
     </AssistantRuntimeProvider>
   );
 }

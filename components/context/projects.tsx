@@ -39,6 +39,7 @@ type ProjectResponse = {
 };
 
 const ACTIVE_PROJECT_KEY = "assistant-ui.active-project-id.v1";
+const AUTO_OPEN_PROJECT_SESSION_THRESHOLD = 10;
 
 const ProjectsContext = React.createContext<ProjectsContextValue | null>(null);
 
@@ -110,7 +111,19 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       try {
         const loadedProjects = await refreshProjects();
         const preferredId = readStoredActiveProjectId();
-        if (preferredId && loadedProjects.some((project) => project.id === preferredId)) {
+        const preferredProject = preferredId
+          ? loadedProjects.find((project) => project.id === preferredId) ?? null
+          : null;
+
+        if (
+          preferredProject &&
+          preferredProject.sessionCount >= AUTO_OPEN_PROJECT_SESSION_THRESHOLD
+        ) {
+          if (mounted) {
+            setActiveProject(null);
+            writeStoredActiveProjectId(null);
+          }
+        } else if (preferredId && loadedProjects.some((project) => project.id === preferredId)) {
           try {
             await loadProject(preferredId);
           } catch {

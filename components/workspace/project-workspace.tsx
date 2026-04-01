@@ -29,6 +29,7 @@ type SessionResponse = {
 type ArenaCompareMode = "sessions" | "branches";
 
 const encoder = new TextEncoder();
+const PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD = 10;
 
 const formatProjectTitle = (title: string | null) => title?.trim() || "Untitled Project";
 const formatSessionTitle = (title: string | null) => title?.trim() || "Untitled Session";
@@ -105,13 +106,22 @@ export function ProjectWorkspace() {
   const [titleDraft, setTitleDraft] = React.useState(activeProject?.title ?? "");
   const [globalContextDraft, setGlobalContextDraft] = React.useState(activeProject?.globalContext ?? "");
   const [contextSaveState, setContextSaveState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [workspaceMode, setWorkspaceMode] = React.useState<"canvas" | "arena">("canvas");
+  const [workspaceMode, setWorkspaceMode] = React.useState<"canvas" | "arena">(() =>
+    (activeProject?.sessionIds.length ?? 0) >= PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD
+      ? "arena"
+      : "canvas",
+  );
   const [arenaCompareMode, setArenaCompareMode] = React.useState<ArenaCompareMode>("sessions");
   const [arenaSessionIds, setArenaSessionIds] = React.useState<string[]>([]);
   const [arenaBranchKeys, setArenaBranchKeys] = React.useState<string[]>([]);
   const [memoryTitleDraft, setMemoryTitleDraft] = React.useState("Arena synthesis");
   const [memoryTypeDraft, setMemoryTypeDraft] = React.useState<ProjectMemoryType>("summary");
   const [memoryActionState, setMemoryActionState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  const shouldPreferArenaOnLoad = React.useMemo(
+    () => (activeProject?.sessionIds.length ?? 0) >= PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD,
+    [activeProject?.sessionIds.length],
+  );
 
   React.useEffect(() => {
     setTitleDraft(activeProject?.title ?? "");
@@ -121,11 +131,15 @@ export function ProjectWorkspace() {
     setMemoryActionState("idle");
     setMemoryTitleDraft("Arena synthesis");
     setMemoryTypeDraft("summary");
-    setWorkspaceMode("canvas");
+    setWorkspaceMode(
+      (activeProject?.sessionIds.length ?? 0) >= PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD
+        ? "arena"
+        : "canvas",
+    );
     setArenaCompareMode("sessions");
     setArenaSessionIds([]);
     setArenaBranchKeys([]);
-  }, [activeProject?.globalContext, activeProject?.id, activeProject?.title]);
+  }, [activeProject?.globalContext, activeProject?.id, activeProject?.sessionIds.length, activeProject?.title]);
 
   const activeProjectId = activeProject?.id ?? null;
   const memberSessionIdsKey = activeProject?.sessionIds.join("|") ?? "";
@@ -1086,6 +1100,13 @@ export function ProjectWorkspace() {
               </Button>
             </div>
           </div>
+          {shouldPreferArenaOnLoad && workspaceMode !== "canvas" ? (
+            <div className="border-b border-border/60 bg-amber-500/5 px-4 py-2">
+              <p className="text-xs text-amber-700">
+                Large project detected. Arena opens first so the workspace stays responsive; load the full canvas when you need it.
+              </p>
+            </div>
+          ) : null}
           <div className="min-h-0 flex-1">
             {workspaceMode === "canvas" ? (
               <ProjectCanvas

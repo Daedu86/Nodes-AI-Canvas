@@ -109,33 +109,47 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
 
   const bootstrap = React.useCallback(async () => {
     setIsReady(false);
-    let nextSessions = await refreshSessions();
+    try {
+      let nextSessions = await refreshSessions();
 
-    if (nextSessions.length === 0) {
-      const created = await fetchJson<SessionResponse>("/api/sessions", {
-        method: "POST",
-        body: JSON.stringify({}),
-      });
-      nextSessions = [created.session];
+      if (nextSessions.length === 0) {
+        const created = await fetchJson<SessionResponse>("/api/sessions", {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+        nextSessions = [created.session];
+        setSessions(nextSessions);
+        setActiveSession(created.session);
+        writeStoredActiveSessionId(created.session.id);
+        return;
+      }
+
       setSessions(nextSessions);
-      setActiveSession(created.session);
-      writeStoredActiveSessionId(created.session.id);
+      const preferredId = pickSessionId(nextSessions, {
+        preferredId: readStoredActiveSessionId(),
+      });
+
+      if (preferredId) {
+        try {
+          await loadSession(preferredId);
+        } catch {
+          const fallbackSessionId = pickSessionId(nextSessions, {
+            excludeIds: [preferredId],
+          });
+          if (fallbackSessionId) {
+            await loadSession(fallbackSessionId);
+          } else {
+            setActiveSession(null);
+            writeStoredActiveSessionId(null);
+          }
+        }
+      } else {
+        setActiveSession(null);
+        writeStoredActiveSessionId(null);
+      }
+    } finally {
       setIsReady(true);
-      return;
     }
-
-    setSessions(nextSessions);
-    const preferredId = pickSessionId(nextSessions, {
-      preferredId: readStoredActiveSessionId(),
-    });
-
-    if (preferredId) {
-      await loadSession(preferredId);
-    } else {
-      setActiveSession(null);
-      writeStoredActiveSessionId(null);
-    }
-    setIsReady(true);
   }, [loadSession, refreshSessions]);
 
   React.useEffect(() => {

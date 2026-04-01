@@ -381,6 +381,12 @@ function getOverlappingNodePairs(boxes: FlowNodeBox[], inset = 12) {
   return pairs;
 }
 
+test("loads the workspace without getting stuck on session bootstrap", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.getByPlaceholder("Write a message...")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Loading sessions...")).toHaveCount(0);
+});
+
 test("sends a prompt and renders the mocked assistant reply", async ({ page }) => {
   await gotoChat(page);
   const reply = await sendPrompt(page, "Browser smoke prompt");
