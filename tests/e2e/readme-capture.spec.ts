@@ -181,14 +181,42 @@ async function applyReadmePolish(page: Page) {
     content: `
       .react-flow {
         background:
-          radial-gradient(circle at 16% 18%, rgba(56, 189, 248, 0.16), transparent 25%),
-          radial-gradient(circle at 84% 12%, rgba(59, 130, 246, 0.1), transparent 24%),
-          linear-gradient(180deg, #f5f7fb 0%, #e9eef6 100%) !important;
+          radial-gradient(circle at 18% 18%, rgba(56, 189, 248, 0.16), transparent 24%),
+          radial-gradient(circle at 82% 14%, rgba(14, 165, 233, 0.12), transparent 22%),
+          radial-gradient(circle at 50% 82%, rgba(168, 85, 247, 0.1), transparent 26%),
+          linear-gradient(180deg, #0b1220 0%, #0f172a 52%, #111827 100%) !important;
       }
       .react-flow__pane,
       .react-flow__viewport,
       .react-flow__renderer {
         background: transparent !important;
+      }
+      .react-flow__background {
+        opacity: 0.45 !important;
+      }
+      .react-flow__background path {
+        stroke: rgba(148, 163, 184, 0.18) !important;
+      }
+      .react-flow__node > div {
+        background: linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(15, 23, 42, 0.94)) !important;
+        border-color: rgba(148, 163, 184, 0.2) !important;
+        box-shadow: 0 24px 54px -30px rgba(2, 6, 23, 0.7) !important;
+      }
+      .react-flow__node > div > div {
+        background: linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.92)) !important;
+        border-color: rgba(148, 163, 184, 0.16) !important;
+      }
+      .react-flow__node p {
+        color: rgba(241, 245, 249, 0.95) !important;
+      }
+      .react-flow__node [class*="text-muted-foreground"] {
+        color: rgba(148, 163, 184, 0.95) !important;
+      }
+      .react-flow__node [class*="bg-muted"] {
+        background: rgba(148, 163, 184, 0.16) !important;
+      }
+      .react-flow__edge path {
+        filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.15));
       }
       .react-flow__controls,
       .react-flow__minimap {
@@ -201,8 +229,24 @@ async function applyReadmePolish(page: Page) {
         border-color: rgba(148, 163, 184, 0.32) !important;
       }
       .react-flow__attribution,
+      [data-sonner-toaster],
+      [data-sonner-toast],
+      [role="alert"],
+      [role="status"],
       a[href*="github.com"] {
         display: none !important;
+      }
+      body::after {
+        content: "";
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 172px;
+        height: 72px;
+        background: #0a0d14;
+        border-top-right-radius: 14px;
+        z-index: 2147483647;
+        pointer-events: none;
       }
     `,
   });
@@ -212,6 +256,21 @@ async function applyReadmePolish(page: Page) {
       const text = anchor.textContent?.replace(/\s+/g, " ").trim() ?? "";
       if (text.includes("GitHub") || text.includes("View Source")) {
         (anchor as HTMLElement).style.display = "none";
+      }
+    }
+
+    for (const element of Array.from(document.querySelectorAll("body *"))) {
+      const htmlElement = element as HTMLElement;
+      const text = htmlElement.innerText?.replace(/\s+/g, " ").trim() ?? "";
+      const style = window.getComputedStyle(htmlElement);
+      const rect = htmlElement.getBoundingClientRect();
+      const isToastZone =
+        rect.left < 220 &&
+        rect.bottom > window.innerHeight - 220 &&
+        rect.width < 260 &&
+        rect.height < 120;
+      if ((style.position === "fixed" || style.position === "sticky" || isToastZone) && /\bIssue\b/i.test(text)) {
+        htmlElement.style.display = "none";
       }
     }
   });
