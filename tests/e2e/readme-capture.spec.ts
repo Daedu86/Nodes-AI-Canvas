@@ -206,14 +206,29 @@ async function applyReadmePolish(page: Page) {
         background: linear-gradient(180deg, rgba(30, 41, 59, 0.94), rgba(15, 23, 42, 0.92)) !important;
         border-color: rgba(148, 163, 184, 0.16) !important;
       }
+      .react-flow__node > div > div {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.96)) !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
+      }
+      .react-flow__node p,
+      .react-flow__node span,
+      .react-flow__node div {
+        text-shadow: none !important;
+      }
       .react-flow__node p {
-        color: rgba(241, 245, 249, 0.95) !important;
+        color: rgba(15, 23, 42, 0.92) !important;
+      }
+      .react-flow__node [class*="text-foreground"] {
+        color: rgba(15, 23, 42, 0.94) !important;
       }
       .react-flow__node [class*="text-muted-foreground"] {
-        color: rgba(148, 163, 184, 0.95) !important;
+        color: rgba(71, 85, 105, 0.88) !important;
       }
       .react-flow__node [class*="bg-muted"] {
-        background: rgba(148, 163, 184, 0.16) !important;
+        background: rgba(226, 232, 240, 0.78) !important;
+      }
+      .react-flow__node [class*="border-border"] {
+        border-color: rgba(148, 163, 184, 0.24) !important;
       }
       .react-flow__edge path {
         filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.15));
