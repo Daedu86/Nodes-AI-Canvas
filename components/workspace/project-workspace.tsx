@@ -27,6 +27,13 @@ import {
   buildProjectArenaSessionEntry,
   buildProjectArenaSummary,
 } from "@/lib/project-arena";
+import {
+  buildProjectContextDraft,
+  buildProjectContextSources,
+  getDefaultProjectContextSourceIds,
+  getProjectContextSourceCategoryLabel,
+  getProjectContextSourcePreview,
+} from "@/lib/project-context-builder";
 
 type SessionResponse = {
   session: SessionDocument;
@@ -130,6 +137,7 @@ export function ProjectWorkspace() {
   const [memoryContentDraft, setMemoryContentDraft] = React.useState("");
   const [memoryActionState, setMemoryActionState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
   const [memoryActionMessage, setMemoryActionMessage] = React.useState("Create a typed node and attach it to this project.");
+  const [selectedContextSourceIds, setSelectedContextSourceIds] = React.useState<string[]>([]);
 
   const shouldPreferArenaOnLoad = React.useMemo(
     () => (activeProject?.sessionIds.length ?? 0) >= PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD,
@@ -154,6 +162,7 @@ export function ProjectWorkspace() {
     setArenaCompareMode("sessions");
     setArenaSessionIds([]);
     setArenaBranchKeys([]);
+    setSelectedContextSourceIds([]);
   }, [activeProject?.globalContext, activeProject?.id, activeProject?.sessionIds.length, activeProject?.title]);
 
   const activeProjectId = activeProject?.id ?? null;
@@ -406,6 +415,31 @@ export function ProjectWorkspace() {
     return selectedMemoryItem?.type === "merge" ? selectedMemoryItem : null;
   }, [selectedCanvasItem, selectedMemoryItem]);
 
+  const projectContextSources = React.useMemo(
+    () =>
+      activeProject
+        ? buildProjectContextSources({
+            arenaSummary,
+            attachedMemoryItems,
+            branchCatalog: arenaBranchCatalog,
+            project: activeProject,
+            selectedFocus: selectedCanvasItem,
+            sessions: memberSessions,
+          })
+        : [],
+    [activeProject, arenaBranchCatalog, arenaSummary, attachedMemoryItems, memberSessions, selectedCanvasItem],
+  );
+
+  const selectedProjectContextSources = React.useMemo(
+    () => projectContextSources.filter((source) => selectedContextSourceIds.includes(source.id)),
+    [projectContextSources, selectedContextSourceIds],
+  );
+
+  const projectContextBuilderDraft = React.useMemo(
+    () => buildProjectContextDraft(selectedProjectContextSources),
+    [selectedProjectContextSources],
+  );
+
   React.useEffect(() => {
     if (!arenaSummary) return;
     const leadEntry = arenaEntries.find((entry) => entry.key === arenaSummary.leadKey);
@@ -647,6 +681,43 @@ export function ProjectWorkspace() {
     });
   }, [selectedMemoryItem]);
 
+  const toggleProjectContextSource = React.useCallback((sourceId: string) => {
+    setSelectedContextSourceIds((prev) =>
+      prev.includes(sourceId)
+        ? prev.filter((entry) => entry !== sourceId)
+        : [...prev, sourceId],
+    );
+  }, []);
+
+  const handleSelectDefaultContextSources = React.useCallback(() => {
+    setSelectedContextSourceIds(getDefaultProjectContextSourceIds(projectContextSources));
+  }, [projectContextSources]);
+
+  const handleSelectAllContextSources = React.useCallback(() => {
+    setSelectedContextSourceIds(projectContextSources.map((source) => source.id));
+  }, [projectContextSources]);
+
+  const handleClearContextSources = React.useCallback(() => {
+    setSelectedContextSourceIds([]);
+  }, []);
+
+  const handleReplaceGlobalContextWithBuilder = React.useCallback(() => {
+    const nextText = projectContextBuilderDraft.text.trim();
+    if (!nextText) return;
+    setGlobalContextDraft(nextText);
+  }, [projectContextBuilderDraft.text]);
+
+  const handleAppendBuilderToGlobalContext = React.useCallback(() => {
+    const nextText = projectContextBuilderDraft.text.trim();
+    if (!nextText) return;
+    setGlobalContextDraft((prev) => {
+      const trimmed = prev.trim();
+      if (trimmed.length === 0) return nextText;
+      if (trimmed.includes(nextText)) return trimmed;
+      return `${trimmed}\n\n${nextText}`;
+    });
+  }, [projectContextBuilderDraft.text]);
+
   if (!activeProject || !projectView) {
     return null;
   }
@@ -725,7 +796,7 @@ export function ProjectWorkspace() {
           title="Global Context"
           description="Shared guidance that applies across every session inside this project."
         >
-          <div className="space-y-2">
+          <div className="space-y-4">
             <textarea
               value={globalContextDraft}
               onChange={(event) => setGlobalContextDraft(event.currentTarget.value)}
@@ -743,6 +814,130 @@ export function ProjectWorkspace() {
                       : "Autosaves after edits"}
               </span>
               <span>{formatBytes(encoder.encode(globalContextDraft).length)}</span>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    Context Builder
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    Compose project-wide guidance from Arena synthesis, winners, typed nodes, canvas focus, and member session summaries.
+                  </p>
+                </div>
+                <div className="shrink-0 text-right text-xs text-muted-foreground">
+                  <div>{selectedProjectContextSources.length} selected</div>
+                  <div>{projectContextBuilderDraft.estimatedTokens} tokens</div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3"
+                  onClick={handleSelectDefaultContextSources}
+                  disabled={projectContextSources.length === 0}
+                >
+                  Select defaults
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3"
+                  onClick={handleSelectAllContextSources}
+                  disabled={projectContextSources.length === 0}
+                >
+                  Select all
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3"
+                  onClick={handleClearContextSources}
+                  disabled={selectedContextSourceIds.length === 0}
+                >
+                  Clear
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3"
+                  onClick={handleReplaceGlobalContextWithBuilder}
+                  disabled={projectContextBuilderDraft.text.trim().length === 0}
+                >
+                  Replace with builder
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3"
+                  onClick={handleAppendBuilderToGlobalContext}
+                  disabled={projectContextBuilderDraft.text.trim().length === 0}
+                >
+                  Append builder
+                </Button>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {projectContextSources.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Add sessions, select canvas context, or attach typed nodes to unlock builder blocks.
+                  </p>
+                ) : (
+                  projectContextSources.map((source) => {
+                    const selected = selectedContextSourceIds.includes(source.id);
+                    return (
+                      <button
+                        key={source.id}
+                        type="button"
+                        onClick={() => toggleProjectContextSource(source.id)}
+                        className={`flex w-full items-start justify-between gap-3 rounded-xl border px-3 py-3 text-left transition ${
+                          selected
+                            ? "border-sky-500/35 bg-sky-500/10"
+                            : "border-border/60 bg-background/80 hover:bg-muted/40"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                              {getProjectContextSourceCategoryLabel(source.category)}
+                            </span>
+                            <p className="truncate text-sm font-medium text-foreground">{source.title}</p>
+                          </div>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {getProjectContextSourcePreview(source)}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right text-[11px] text-muted-foreground">
+                          <div>{source.estimatedTokens} tok</div>
+                          <div>{formatBytes(source.bytes)}</div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="mt-3 rounded-xl border border-border/60 bg-muted/25 px-3 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                    Builder preview
+                  </p>
+                  <span className="text-[11px] text-muted-foreground">
+                    {formatBytes(projectContextBuilderDraft.bytes)}
+                  </span>
+                </div>
+                <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap text-xs leading-6 text-foreground/85">
+                  {projectContextBuilderDraft.text.trim() || "Select one or more sources to preview the composed project context."}
+                </pre>
+              </div>
             </div>
           </div>
         </SectionCard>
