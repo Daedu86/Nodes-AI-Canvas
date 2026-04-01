@@ -8,10 +8,21 @@ vi.mock("@/lib/session-blob-store", () => ({
   saveSessionArtifactBlob: saveSessionArtifactBlobMock,
 }));
 
+const { getSessionMock } = vi.hoisted(() => ({
+  getSessionMock: vi.fn(),
+}));
+
+vi.mock("@/lib/session-store", () => ({
+  getSession: getSessionMock,
+}));
+
 import { POST } from "../app/api/sessions/[sessionId]/artifacts/route";
 
 describe("/api/sessions/[sessionId]/artifacts", () => {
   beforeEach(() => {
+    getSessionMock.mockResolvedValue({
+      id: "session-123",
+    });
     saveSessionArtifactBlobMock.mockResolvedValue({
       absolutePath: "C:\\temp\\blob",
       blobRef: "session-123/diagram.png",
@@ -20,6 +31,23 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("returns 404 when the session does not exist", async () => {
+    getSessionMock.mockRejectedValueOnce(new Error("missing"));
+    const formData = new FormData();
+    formData.append("file", new File([new Uint8Array([1])], "diagram.png", { type: "image/png" }));
+
+    const response = await POST(
+      new Request("http://localhost/api/sessions/session-123/artifacts", {
+        body: formData,
+        method: "POST",
+      }),
+      { params: Promise.resolve({ sessionId: "session-123" }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect(saveSessionArtifactBlobMock).not.toHaveBeenCalled();
   });
 
   it("returns 400 when no file is provided", async () => {
@@ -68,6 +96,7 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(getSessionMock).toHaveBeenCalledWith("session-123");
     expect(saveSessionArtifactBlobMock).toHaveBeenCalledWith(
       expect.objectContaining({
         fileName: "diagram.png",

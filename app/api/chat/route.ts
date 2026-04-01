@@ -10,10 +10,11 @@ import {
   type ModelResolutionRunConfig,
   type Provider,
 } from "@/lib/llm/config";
-import { mergeSystemWithContextArtifacts } from "@/lib/llm/context-builder";
+import { buildContextArtifactsUserMessage } from "@/lib/llm/context-builder";
 import { createE2eMockChatResponse, isE2eMockLlmEnabled } from "@/lib/llm/e2e-mock";
 import { normalizeMessages, selectMessagesForHistoryMode } from "@/lib/llm/messages";
 import { openrouterClient } from "@/lib/llm/openrouter";
+import { enforceLocalApiAccess } from "@/lib/server/api-access";
 import { normalizeLlmContextArtifacts } from "@/lib/session-artifacts";
 
 export const runtime = "nodejs";
@@ -31,6 +32,9 @@ type ChatRequestBody = {
 };
 
 export async function POST(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const body = (await req.json()) as ChatRequestBody;
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
   const messages = normalizeMessages(rawMessages);
@@ -76,6 +80,10 @@ export async function POST(req: Request) {
     }
 
     const toolset = tools ? { ...frontendTools(tools) } : undefined;
+    const artifactContextMessage = buildContextArtifactsUserMessage(contextArtifacts, {
+      modelId,
+      provider,
+    });
     const modelMessages = messagesToSend.map(
       ({ role, content }) =>
         ({
@@ -83,22 +91,20 @@ export async function POST(req: Request) {
           content,
         }) satisfies ModelMessage,
     );
+    const resolvedMessages = artifactContextMessage
+      ? [artifactContextMessage satisfies ModelMessage, ...modelMessages]
+      : modelMessages;
 
     const result = streamText({
       model,
-      messages: modelMessages,
-      system: mergeSystemWithContextArtifacts(system, contextArtifacts, { modelId, provider }),
+      messages: resolvedMessages,
+      system,
       tools: toolset,
       onError: console.error,
     });
     return result.toUIMessageStreamResponse({
       originalMessages: rawMessages as never[],
-      onError: (error) => {
-        if (error == null) {
-          return "unknown error";
-        }
-        return error instanceof Error ? error.message : String(error);
-      },
+      onError: () => "The assistant request could not be completed.",
     });
   } catch (error) {
     console.error("/api/chat error:", error);

@@ -177,13 +177,37 @@ describe("/api/chat", () => {
     expect(response.status).toBe(200);
     expect(streamTextMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        system: expect.stringContaining("Attached context artifacts:"),
+        system: undefined,
       }),
     );
     expect(streamTextMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        system: expect.stringContaining("Spec Note"),
+        messages: [
+          { role: "user", content: expect.stringContaining("Attached context artifacts:") },
+          { role: "user", content: "Follow-up with artifact context" },
+        ],
       }),
     );
+  });
+
+  it("returns a generic client-safe error message from the stream layer", async () => {
+    streamTextMock.mockReturnValueOnce({
+      toUIMessageStreamResponse: ({ onError }: { onError: (error: unknown) => string }) =>
+        new Response(onError(new Error("upstream provider trace")), { status: 500 }),
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          model: "nvidia/nemotron-3-super-120b-a12b:free",
+          messages: [{ id: "u1", role: "user", content: "hello" }],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.text()).resolves.toBe("The assistant request could not be completed.");
   });
 });

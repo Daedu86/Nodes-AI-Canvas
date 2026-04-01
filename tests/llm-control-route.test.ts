@@ -42,6 +42,21 @@ describe("/api/llm/control", () => {
     expect(execFileMock).not.toHaveBeenCalled();
   });
 
+  it("blocks remote callers even when enabled", async () => {
+    process.env.ENABLE_OLLAMA_CONTROL_ROUTE = "1";
+
+    const response = await POST(
+      new Request("https://example.com/api/llm/control", {
+        method: "POST",
+        body: JSON.stringify({ action: "start", model: "gemma3:4b" }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(execFileMock).not.toHaveBeenCalled();
+  });
+
   it("can warm a model when explicitly enabled", async () => {
     process.env.ENABLE_OLLAMA_CONTROL_ROUTE = "1";
     fetchMock
@@ -97,5 +112,32 @@ describe("/api/llm/control", () => {
       { timeout: 30000 },
       expect.any(Function),
     );
+  });
+
+  it("returns a generic stop error instead of raw command output", async () => {
+    process.env.ENABLE_OLLAMA_CONTROL_ROUTE = "1";
+    execFileMock.mockImplementation(
+      (
+        _file: string,
+        _args: string[],
+        _options: { timeout: number },
+        callback: (error: Error | null) => void,
+      ) => {
+        callback(new Error("spawn ENOENT ollama"));
+      },
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/llm/control", {
+        method: "POST",
+        body: JSON.stringify({ action: "stop", model: "gemma3:4b" }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: "Unable to stop the Ollama model.",
+    });
   });
 });

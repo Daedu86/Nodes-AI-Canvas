@@ -43,6 +43,11 @@ export type ContextArtifactsBuildResult = {
   >;
 };
 
+export type ContextArtifactMessage = {
+  role: "user";
+  content: string;
+};
+
 const getArtifactHeader = (artifact: LlmContextArtifact) => {
   const sizeLabel = formatBytes(artifact.byteSize ?? 0);
   const fileLabel = artifact.fileName ? ` file=${artifact.fileName}` : "";
@@ -232,15 +237,14 @@ export const buildContextArtifactsBlock = (
   };
 };
 
-export const mergeSystemWithContextArtifacts = (
-  system: string | undefined,
+export const buildContextArtifactsUserMessage = (
   artifacts: LlmContextArtifact[],
   modelConfig?: ModelConfig,
-) => {
+): ContextArtifactMessage | null => {
   const artifactBlock = buildContextArtifactsBlock(artifacts, modelConfig).block;
-  if (!artifactBlock) return system;
-  if (!system || system.trim().length === 0) {
-    return artifactBlock;
-  }
-  return `${system.trim()}\n\n${artifactBlock}`;
+  if (!artifactBlock) return null;
+  return {
+    role: "user",
+    content: artifactBlock,
+  };
 };

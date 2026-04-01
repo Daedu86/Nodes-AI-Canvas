@@ -4,6 +4,7 @@ import {
   normalizeSessionContextLinksDocument,
   normalizeSessionThreadExport,
 } from "@/lib/session-documents";
+import { enforceLocalApiAccess } from "@/lib/server/api-access";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,9 @@ type RouteParams = {
 };
 
 export async function GET(_req: Request, context: RouteParams) {
+  const accessError = enforceLocalApiAccess(_req);
+  if (accessError) return accessError;
+
   const { sessionId } = await context.params;
   try {
     const session = await getSession(sessionId);
@@ -32,6 +36,9 @@ export async function GET(_req: Request, context: RouteParams) {
 }
 
 export async function PATCH(req: Request, context: RouteParams) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const { sessionId } = await context.params;
   const body = (await req.json().catch(() => ({}))) as PatchSessionBody;
 
@@ -53,6 +60,9 @@ export async function PATCH(req: Request, context: RouteParams) {
 }
 
 export async function DELETE(_req: Request, context: RouteParams) {
+  const accessError = enforceLocalApiAccess(_req);
+  if (accessError) return accessError;
+
   const { sessionId } = await context.params;
 
   try {

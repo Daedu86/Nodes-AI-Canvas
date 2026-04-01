@@ -9,6 +9,7 @@ import {
   normalizeSessionContextLinksDocument,
   normalizeSessionThreadExport,
 } from "@/lib/session-documents";
+import { enforceLocalApiAccess } from "@/lib/server/api-access";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,9 @@ type DeleteSessionsBody = {
 };
 
 export async function GET(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const url = new URL(req.url);
   const includeArchived = url.searchParams.get("includeArchived") === "1";
   const sessions = await listSessions({ includeArchived });
@@ -32,6 +36,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const body = (await req.json().catch(() => ({}))) as CreateSessionBody;
   const session = await createSession({
     title: body.title ?? null,
@@ -43,6 +50,9 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const body = (await req.json().catch(() => ({}))) as DeleteSessionsBody;
   const deleteAll = body.all === true;
   const requestedIds = Array.isArray(body.sessionIds)

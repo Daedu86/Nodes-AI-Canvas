@@ -11,6 +11,7 @@ import {
 } from "@/lib/llm/config";
 import { buildE2eMockTitle, isE2eMockLlmEnabled } from "@/lib/llm/e2e-mock";
 import { normalizeMessages, toPlainTextTranscript } from "@/lib/llm/messages";
+import { enforceLocalApiAccess } from "@/lib/server/api-access";
 
 export const runtime = "edge";
 export const maxDuration = 15;
@@ -32,6 +33,9 @@ function sanitizeTitle(value: string): string {
 }
 
 export async function POST(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   try {
     const { messages: maybeMessages, model, provider: maybeProvider }: TitleRequestBody = await req.json();
     const messages = normalizeMessages(Array.isArray(maybeMessages) ? maybeMessages : []);
@@ -96,8 +100,7 @@ export async function POST(req: Request) {
     const title = sanitizeTitle(raw);
     return NextResponse.json({ title });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("/api/title error:", error);
+    return NextResponse.json({ error: "Unable to generate a title right now." }, { status: 500 });
   }
 }

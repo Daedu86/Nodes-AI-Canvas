@@ -3,6 +3,7 @@ import {
   deleteProjects as deleteProjectBatch,
   listProjects,
 } from "@/lib/project-store";
+import { enforceLocalApiAccess } from "@/lib/server/api-access";
 
 type CreateProjectBody = {
   memoryIds?: unknown;
@@ -18,12 +19,18 @@ type DeleteProjectsBody = {
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const projects = await listProjects();
   return Response.json({ projects });
 }
 
 export async function POST(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const body = (await req.json().catch(() => ({}))) as CreateProjectBody;
   const sessionIds = Array.isArray(body.sessionIds)
     ? body.sessionIds.filter((value): value is string => typeof value === "string" && value.length > 0)
@@ -41,6 +48,9 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const body = (await req.json().catch(() => ({}))) as DeleteProjectsBody;
   const deleteAll = body.all === true;
   const requestedIds = Array.isArray(body.projectIds)

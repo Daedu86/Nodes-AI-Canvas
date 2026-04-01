@@ -4,6 +4,7 @@ import {
   type ProjectMemorySourceKind,
   type ProjectMemoryType,
 } from "@/lib/memory-documents";
+import { enforceLocalApiAccess } from "@/lib/server/api-access";
 
 type RouteParams = {
   params: Promise<{
@@ -24,6 +25,9 @@ type PatchMemoryBody = {
 export const runtime = "nodejs";
 
 export async function GET(_: Request, context: RouteParams) {
+  const accessError = enforceLocalApiAccess(_);
+  if (accessError) return accessError;
+
   const { memoryId } = await context.params;
   try {
     const item = await getMemoryItem(memoryId);
@@ -34,6 +38,9 @@ export async function GET(_: Request, context: RouteParams) {
 }
 
 export async function PATCH(req: Request, context: RouteParams) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const { memoryId } = await context.params;
   const body = (await req.json().catch(() => ({}))) as PatchMemoryBody;
   try {
@@ -80,6 +87,9 @@ export async function PATCH(req: Request, context: RouteParams) {
 }
 
 export async function DELETE(_: Request, context: RouteParams) {
+  const accessError = enforceLocalApiAccess(_);
+  if (accessError) return accessError;
+
   const { memoryId } = await context.params;
   try {
     await deleteMemoryItem(memoryId);

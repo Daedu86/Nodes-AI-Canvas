@@ -50,7 +50,7 @@ describe("/api/sessions/blob-maintenance", () => {
   });
 
   it("returns blob maintenance summary", async () => {
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/sessions/blob-maintenance"));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -62,7 +62,9 @@ describe("/api/sessions/blob-maintenance", () => {
   });
 
   it("runs orphan cleanup", async () => {
-    const response = await POST();
+    const response = await POST(
+      new Request("http://localhost/api/sessions/blob-maintenance", { method: "POST" }),
+    );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -73,5 +75,14 @@ describe("/api/sessions/blob-maintenance", () => {
         },
       },
     });
+  });
+
+  it("blocks remote cleanup requests", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/sessions/blob-maintenance", { method: "POST" }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(cleanupSessionBlobStoreMock).not.toHaveBeenCalled();
   });
 });

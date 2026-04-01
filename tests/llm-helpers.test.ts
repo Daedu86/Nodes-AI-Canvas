@@ -136,4 +136,16 @@ describe("llm helpers", () => {
       provider: "openrouter",
     });
   });
+
+  it("falls back to the safe allowlisted model when the client requests an unsupported model", () => {
+    expect(
+      resolveModelConfig({
+        provider: "openrouter",
+        model: "openai/gpt-4.1",
+      }),
+    ).toEqual({
+      modelId: "nvidia/nemotron-3-super-120b-a12b:free",
+      provider: "openrouter",
+    });
+  });
 });

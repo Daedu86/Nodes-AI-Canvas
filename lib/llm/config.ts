@@ -38,6 +38,57 @@ export const OPENROUTER_BASE_URL =
   process.env.OPENROUTER_API_URL || "https://openrouter.ai/api/v1";
 export const OLLAMA_API_URL = process.env.OLLAMA_API_URL || "http://localhost:11434/api";
 
+const DEFAULT_ALLOWED_MODELS: Record<Provider, string[]> = {
+  openrouter: [
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "stepfun/step-3.5-flash:free",
+  ],
+  ollama: ["gemma3:4b", "llama3.1:8b"],
+};
+
+const parseAllowedModels = (value: string | undefined) =>
+  value
+    ?.split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0) ?? [];
+
+const inferProviderFromModel = (modelId: string): Provider =>
+  modelId.includes("/") ? "openrouter" : "ollama";
+
+export function getAllowedModels(provider: Provider) {
+  const configured = parseAllowedModels(
+    provider === "openrouter"
+      ? process.env.ALLOWED_OPENROUTER_MODELS
+      : process.env.ALLOWED_OLLAMA_MODELS,
+  );
+  return configured.length > 0 ? configured : DEFAULT_ALLOWED_MODELS[provider];
+}
+
+export function isAllowedModelConfig(config: { modelId: string; provider: Provider }) {
+  return getAllowedModels(config.provider).includes(config.modelId);
+}
+
+export function getSafeDefaultModelConfig(): {
+  modelId: string;
+  provider: Provider;
+} {
+  const defaultProvider = inferProviderFromModel(DEFAULT_MODEL);
+  if (isAllowedModelConfig({ modelId: DEFAULT_MODEL, provider: defaultProvider })) {
+    return { modelId: DEFAULT_MODEL, provider: defaultProvider };
+  }
+
+  const [fallbackOpenRouter] = getAllowedModels("openrouter");
+  if (fallbackOpenRouter) {
+    return { modelId: fallbackOpenRouter, provider: "openrouter" };
+  }
+
+  const [fallbackOllama] = getAllowedModels("ollama");
+  return {
+    modelId: fallbackOllama ?? DEFAULT_MODEL,
+    provider: fallbackOllama ? "ollama" : defaultProvider,
+  };
+}
+
 export function resolveModelConfig(input: ModelResolutionInput): {
   modelId: string;
   provider: Provider;
@@ -57,10 +108,19 @@ export function resolveModelConfig(input: ModelResolutionInput): {
     input.runConfig?.custom?.provider ??
     (model.includes("/") ? "openrouter" : "ollama");
 
-  return {
+  const candidate: {
+    modelId: string;
+    provider: Provider;
+  } = {
     modelId: model,
     provider: provider === "openrouter" ? "openrouter" : "ollama",
   };
+
+  if (isAllowedModelConfig(candidate)) {
+    return candidate;
+  }
+
+  return getSafeDefaultModelConfig();
 }
 
 export function getOpenRouterApiKey(): string | undefined {

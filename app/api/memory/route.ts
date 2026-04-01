@@ -8,6 +8,7 @@ import {
   type ProjectMemorySourceKind,
   type ProjectMemoryType,
 } from "@/lib/memory-documents";
+import { enforceLocalApiAccess } from "@/lib/server/api-access";
 
 type CreateMemoryBody = {
   content?: string;
@@ -26,12 +27,18 @@ type DeleteMemoryBody = {
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const items = await listMemoryItems();
   return Response.json({ items });
 }
 
 export async function POST(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const body = (await req.json().catch(() => ({}))) as CreateMemoryBody;
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const content = typeof body.content === "string" ? body.content : "";
@@ -67,6 +74,9 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const body = (await req.json().catch(() => ({}))) as DeleteMemoryBody;
   const deleteAll = body.all === true;
   const requestedIds = Array.isArray(body.memoryIds)

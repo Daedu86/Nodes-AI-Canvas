@@ -1,9 +1,11 @@
+import { getSession } from "@/lib/session-store";
 import { saveSessionArtifactBlob } from "@/lib/session-blob-store";
 import {
   DEFAULT_MAX_UPLOAD_FILE_BYTES,
   DEFAULT_MAX_UPLOAD_IMAGE_BYTES,
   formatBytes,
 } from "@/lib/context-budget";
+import { enforceLocalApiAccess } from "@/lib/server/api-access";
 
 export const runtime = "nodejs";
 
@@ -14,9 +16,18 @@ type RouteParams = {
 };
 
 export async function POST(req: Request, context: RouteParams) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const { sessionId } = await context.params;
 
   try {
+    try {
+      await getSession(sessionId);
+    } catch {
+      return new Response("Session not found", { status: 404 });
+    }
+
     const formData = await req.formData();
     const file = formData.get("file");
     if (!(file instanceof File)) {

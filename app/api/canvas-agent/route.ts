@@ -15,6 +15,7 @@ import {
 } from "@/lib/llm/config";
 import { isE2eMockLlmEnabled } from "@/lib/llm/e2e-mock";
 import { openrouterClient } from "@/lib/llm/openrouter";
+import { enforceLocalApiAccess } from "@/lib/server/api-access";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -32,6 +33,9 @@ const buildE2eMockCanvasGuideText = (action: CanvasGuideAction, payload: CanvasG
 };
 
 export async function POST(req: Request) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   try {
     const body = (await req.json()) as CanvasAgentRequestBody;
     const action = body.action;
@@ -67,8 +71,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ text: result.text });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("/api/canvas-agent error:", error);
+    return NextResponse.json({ error: "Unable to reach the canvas guide right now." }, { status: 500 });
   }
 }

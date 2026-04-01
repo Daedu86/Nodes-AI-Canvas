@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { execFile } from "node:child_process";
+import { enforceLocalApiAccess } from "@/lib/server/api-access";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -36,6 +37,11 @@ function execFileAsync(file: string, args: string[], timeout = 30_000) {
 }
 
 export async function POST(req: NextRequest) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) {
+    return accessError;
+  }
+
   if (!isOllamaControlEnabled()) {
     return json(
       {
@@ -100,14 +106,12 @@ export async function POST(req: NextRequest) {
         await execFileAsync(process.env.OLLAMA_CMD || "ollama", ["stop", model]);
         return json({ ok: true, status: "stopped", model });
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
-        return json({ ok: false, error: `ollama stop failed: ${message}` }, 500);
+        console.error("ollama stop failed", error);
+        return json({ ok: false, error: "Unable to stop the Ollama model." }, 500);
       }
     }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
-    return json({ ok: false, error: message }, 500);
+    console.error("ollama control failed", error);
+    return json({ ok: false, error: "Unable to control the Ollama model." }, 500);
   }
 }

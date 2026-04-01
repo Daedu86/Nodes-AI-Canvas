@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildContextArtifactsBlock,
-  mergeSystemWithContextArtifacts,
+  buildContextArtifactsUserMessage,
 } from "../lib/llm/context-builder";
 
 describe("context builder", () => {
@@ -53,8 +53,8 @@ describe("context builder", () => {
     expect(result.excludedArtifacts).toHaveLength(0);
   });
 
-  it("merges context artifacts into an existing system prompt", () => {
-    const merged = mergeSystemWithContextArtifacts("Be concise.", [
+  it("builds a user-scoped context message for attached artifacts", () => {
+    const artifactMessage = buildContextArtifactsUserMessage([
       {
         id: "artifact-1",
         artifactType: "text",
@@ -64,8 +64,10 @@ describe("context builder", () => {
       },
     ]);
 
-    expect(merged).toContain("Be concise.");
-    expect(merged).toContain("Only use free models.");
+    expect(artifactMessage).toEqual({
+      role: "user",
+      content: expect.stringContaining("Only use free models."),
+    });
   });
 
   it("enforces artifact count and truncates oversized artifact text", () => {

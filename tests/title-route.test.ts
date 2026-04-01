@@ -66,4 +66,24 @@ describe("/api/title", () => {
 
     expect(await response.json()).toEqual({ title: "Mock Browser Title" });
   });
+
+  it("returns a generic title error instead of raw upstream details", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("provider trace here"));
+
+    const response = await POST(
+      new Request("http://localhost/api/title", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          model: "nvidia/nemotron-3-super-120b-a12b:free",
+          messages: [{ role: "user", content: "Name this chat" }],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "Unable to generate a title right now.",
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import { getProject, patchProject } from "@/lib/project-store";
+import { enforceLocalApiAccess } from "@/lib/server/api-access";
 
 type RouteParams = {
   params: Promise<{
@@ -18,6 +19,9 @@ type PatchProjectBody = {
 export const runtime = "nodejs";
 
 export async function GET(_: Request, context: RouteParams) {
+  const accessError = enforceLocalApiAccess(_);
+  if (accessError) return accessError;
+
   const { projectId } = await context.params;
   try {
     const project = await getProject(projectId);
@@ -28,6 +32,9 @@ export async function GET(_: Request, context: RouteParams) {
 }
 
 export async function PATCH(req: Request, context: RouteParams) {
+  const accessError = enforceLocalApiAccess(req);
+  if (accessError) return accessError;
+
   const { projectId } = await context.params;
   const body = (await req.json().catch(() => ({}))) as PatchProjectBody;
   try {
