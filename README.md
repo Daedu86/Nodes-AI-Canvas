@@ -39,11 +39,23 @@ Chat and canvas stay side by side, so you can branch ideas without losing the th
 
 ![AI Canvas main workspace](docs/screenshots/workspace-hero.png)
 
+### Project canvas
+
+Projects pull multiple sessions and typed nodes into one larger canvas, so the most important conclusions stay visible in one place.
+
+![AI Canvas project canvas](docs/screenshots/project-canvas.png)
+
 ### Project Arena
 
 Projects let you compare multiple sessions or branches and promote the best direction into shared context.
 
 ![AI Canvas Project Arena](docs/screenshots/project-arena.png)
+
+### Project context builder
+
+Global context can be assembled from structured sources like arena synthesis, winners, typed nodes, and session summaries.
+
+![AI Canvas project context builder](docs/screenshots/project-context-builder.png)
 
 ## Main Concepts
 
