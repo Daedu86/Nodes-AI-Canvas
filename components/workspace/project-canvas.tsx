@@ -34,6 +34,7 @@ export type ProjectCanvasSelection =
   | {
       kind: "node";
       label: string;
+      messageId?: string | null;
       memoryId?: string | null;
       memoryType?: string | null;
       preview: string;
@@ -77,6 +78,7 @@ function ProjectCanvasInner({
     onSelectionChange?.({
       kind: "node",
       label: node.data.title ?? node.data.sessionTitle ?? node.data.role,
+      messageId: node.data.messageId ?? null,
       memoryId: node.data.memoryId ?? null,
       memoryType: node.data.memoryType ?? null,
       preview: node.data.preview,

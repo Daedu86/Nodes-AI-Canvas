@@ -9,7 +9,13 @@ import { useProjects } from "@/components/context/projects";
 import { useReusableMemory } from "@/components/context/reusable-memory";
 import { estimateTokenCount, formatBytes } from "@/lib/context-budget";
 import { normalizeMessages, toPlainTextTranscript } from "@/lib/llm/messages";
-import { PROJECT_MEMORY_TYPES, type ProjectMemoryType } from "@/lib/memory-documents";
+import type { ProjectMemorySourceKind, ProjectMemoryType } from "@/lib/memory-documents";
+import {
+  PROJECT_EDITABLE_MEMORY_TYPES,
+  PROJECT_MEMORY_META,
+  PROJECT_MEMORY_TYPE_ORDER,
+  formatProjectMemoryTypeLabel,
+} from "@/lib/project-memory-meta";
 import type { ProjectDocument } from "@/lib/project-documents";
 import type { SessionDocument, SessionSummary } from "@/lib/session-documents";
 import { ProjectCanvas, type ProjectCanvasSelection } from "@/components/workspace/project-canvas";
@@ -34,7 +40,6 @@ const PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD = 10;
 const formatProjectTitle = (title: string | null) => title?.trim() || "Untitled Project";
 const formatSessionTitle = (title: string | null) => title?.trim() || "Untitled Session";
 const formatMemoryTitle = (title: string) => title.trim() || "Untitled Memory";
-const formatMemoryTypeLabel = (type: ProjectMemoryType) => `${type.slice(0, 1).toUpperCase()}${type.slice(1)}`;
 const formatProjectWinnerLabel = ({
   branchCatalog,
   memberSessions,
@@ -62,6 +67,12 @@ const formatUpdatedAt = (value: string) => {
   } catch {
     return value;
   }
+};
+
+const summarizeSelectionForTypedNode = (selection: ProjectCanvasSelection) => {
+  if (!selection) return "";
+  const prefix = selection.kind === "edge" ? `Canvas branch: ${selection.label}` : `Canvas focus: ${selection.label}`;
+  return `${prefix}\n\n${selection.preview}`.trim();
 };
 
 const SectionCard = ({
@@ -116,7 +127,9 @@ export function ProjectWorkspace() {
   const [arenaBranchKeys, setArenaBranchKeys] = React.useState<string[]>([]);
   const [memoryTitleDraft, setMemoryTitleDraft] = React.useState("Arena synthesis");
   const [memoryTypeDraft, setMemoryTypeDraft] = React.useState<ProjectMemoryType>("summary");
+  const [memoryContentDraft, setMemoryContentDraft] = React.useState("");
   const [memoryActionState, setMemoryActionState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [memoryActionMessage, setMemoryActionMessage] = React.useState("Create a typed node and attach it to this project.");
 
   const shouldPreferArenaOnLoad = React.useMemo(
     () => (activeProject?.sessionIds.length ?? 0) >= PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD,
@@ -131,6 +144,8 @@ export function ProjectWorkspace() {
     setMemoryActionState("idle");
     setMemoryTitleDraft("Arena synthesis");
     setMemoryTypeDraft("summary");
+    setMemoryContentDraft("");
+    setMemoryActionMessage("Create a typed node and attach it to this project.");
     setWorkspaceMode(
       (activeProject?.sessionIds.length ?? 0) >= PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD
         ? "arena"
@@ -250,6 +265,24 @@ export function ProjectWorkspace() {
     return memoryItems.filter((item) => !attached.has(item.id));
   }, [activeProject, memoryItems]);
 
+  const attachedMemoryGroups = React.useMemo(
+    () =>
+      PROJECT_MEMORY_TYPE_ORDER.map((type) => ({
+        items: attachedMemoryItems.filter((item) => item.type === type),
+        type,
+      })).filter((group) => group.items.length > 0),
+    [attachedMemoryItems],
+  );
+
+  const availableMemoryGroups = React.useMemo(
+    () =>
+      PROJECT_MEMORY_TYPE_ORDER.map((type) => ({
+        items: availableMemoryItems.filter((item) => item.type === type),
+        type,
+      })).filter((group) => group.items.length > 0),
+    [availableMemoryItems],
+  );
+
   const arenaBranchCatalog = React.useMemo(
     () => memberSessions.flatMap((session) => buildProjectArenaBranchEntries(session)),
     [memberSessions],
@@ -360,11 +393,18 @@ export function ProjectWorkspace() {
     [arenaEntries, attachedMemoryItems, globalContextDraft],
   );
 
+  const selectedMemoryItem = React.useMemo(() => {
+    if (!selectedCanvasItem || selectedCanvasItem.kind !== "node" || !selectedCanvasItem.memoryId) {
+      return null;
+    }
+    return attachedMemoryItems.find((item) => item.id === selectedCanvasItem.memoryId) ?? null;
+  }, [attachedMemoryItems, selectedCanvasItem]);
+
   const selectedMergeMemory = React.useMemo(() => {
     if (!selectedCanvasItem || selectedCanvasItem.kind !== "node") return null;
     if (selectedCanvasItem.memoryType !== "merge" || !selectedCanvasItem.memoryId) return null;
-    return attachedMemoryItems.find((item) => item.id === selectedCanvasItem.memoryId) ?? null;
-  }, [attachedMemoryItems, selectedCanvasItem]);
+    return selectedMemoryItem?.type === "merge" ? selectedMemoryItem : null;
+  }, [selectedCanvasItem, selectedMemoryItem]);
 
   React.useEffect(() => {
     if (!arenaSummary) return;
@@ -410,6 +450,7 @@ export function ProjectWorkspace() {
     const leadEntry = arenaEntries.find((entry) => entry.key === arenaSummary.leadKey);
     if (!leadEntry) return;
     setMemoryActionState("saving");
+    setMemoryActionMessage("Saving arena synthesis as a typed node...");
     try {
       const item = await createMemoryItem({
         content: arenaSummary.note,
@@ -424,8 +465,11 @@ export function ProjectWorkspace() {
         memoryIds: [...new Set([...activeProject.memoryIds, item.id])],
       });
       setMemoryActionState("saved");
+      setMemoryContentDraft(arenaSummary.note);
+      setMemoryActionMessage("Typed node saved from Arena synthesis.");
     } catch {
       setMemoryActionState("error");
+      setMemoryActionMessage("Could not save the Arena synthesis as a typed node.");
     }
   }, [
     activeProject,
@@ -442,6 +486,7 @@ export function ProjectWorkspace() {
     const leadEntry = arenaEntries.find((entry) => entry.key === arenaSummary.leadKey);
     if (!leadEntry) return;
     setMemoryActionState("saving");
+    setMemoryActionMessage("Creating merge node from Arena synthesis...");
     try {
       const mergeTitle = `${leadEntry.title} merge node`;
       const item = await createMemoryItem({
@@ -458,11 +503,99 @@ export function ProjectWorkspace() {
       });
       setMemoryTitleDraft(mergeTitle);
       setMemoryActionState("saved");
+      setMemoryActionMessage("Merge node created and attached to the project.");
       setWorkspaceMode("canvas");
     } catch {
       setMemoryActionState("error");
+      setMemoryActionMessage("Could not create the merge node.");
     }
   }, [activeProject, arenaEntries, arenaSummary, createMemoryItem, saveActiveProjectPatch]);
+
+  const handleSeedTypedNodeFromArena = React.useCallback(() => {
+    if (!arenaSummary) return;
+    const leadEntry = arenaEntries.find((entry) => entry.key === arenaSummary.leadKey);
+    setMemoryContentDraft(arenaSummary.note);
+    setMemoryTitleDraft((current) => {
+      const trimmed = current.trim();
+      if (trimmed.length > 0 && trimmed !== "Arena synthesis") return current;
+      return leadEntry ? `${leadEntry.title} ${formatProjectMemoryTypeLabel(memoryTypeDraft).toLowerCase()}` : current;
+    });
+    setMemoryActionState("idle");
+    setMemoryActionMessage("Arena synthesis copied into the typed node composer.");
+  }, [arenaEntries, arenaSummary, memoryTypeDraft]);
+
+  const handleSeedTypedNodeFromCanvasFocus = React.useCallback(() => {
+    if (!selectedCanvasItem) return;
+    const summary = summarizeSelectionForTypedNode(selectedCanvasItem);
+    if (!summary) return;
+    setMemoryContentDraft(summary);
+    setMemoryTitleDraft((current) => {
+      const trimmed = current.trim();
+      if (trimmed.length > 0 && trimmed !== "Arena synthesis") return current;
+      return `${selectedCanvasItem.label} ${formatProjectMemoryTypeLabel(memoryTypeDraft).toLowerCase()}`;
+    });
+    setMemoryActionState("idle");
+    setMemoryActionMessage("Canvas focus copied into the typed node composer.");
+  }, [memoryTypeDraft, selectedCanvasItem]);
+
+  const handleCreateTypedNode = React.useCallback(async () => {
+    if (!activeProject) return;
+    const title = formatMemoryTitle(memoryTitleDraft);
+    const content = memoryContentDraft.trim();
+    if (!title || !content) {
+      setMemoryActionState("error");
+      setMemoryActionMessage("Typed nodes need both a title and content.");
+      return;
+    }
+
+    let sourceKind: ProjectMemorySourceKind = null;
+    let sourceKeys: string[] = [];
+    let sourceSessionId: string | null = null;
+
+    if (selectedCanvasItem?.kind === "node" && selectedCanvasItem.sessionId) {
+      sourceSessionId = selectedCanvasItem.sessionId;
+      if (selectedCanvasItem.role === "session") {
+        sourceKind = "session";
+        sourceKeys = [selectedCanvasItem.sessionId];
+      } else if (selectedCanvasItem.messageId) {
+        sourceKind = "branch";
+        sourceKeys = [`${selectedCanvasItem.sessionId}:${selectedCanvasItem.messageId}`];
+      }
+    }
+
+    setMemoryActionState("saving");
+    setMemoryActionMessage("Creating typed node...");
+    try {
+      const item = await createMemoryItem({
+        content,
+        sourceProjectId: activeProject.id,
+        sourceKeys,
+        sourceKind,
+        sourceSessionId,
+        title,
+        type: memoryTypeDraft,
+      });
+      await saveActiveProjectPatch({
+        memoryIds: [...new Set([...activeProject.memoryIds, item.id])],
+      });
+      setMemoryActionState("saved");
+      setMemoryActionMessage(`${formatProjectMemoryTypeLabel(memoryTypeDraft)} node created and attached.`);
+      setMemoryTitleDraft(`${formatProjectMemoryTypeLabel(memoryTypeDraft)} note`);
+      setMemoryContentDraft("");
+      setWorkspaceMode("canvas");
+    } catch {
+      setMemoryActionState("error");
+      setMemoryActionMessage("Could not create the typed node.");
+    }
+  }, [
+    activeProject,
+    createMemoryItem,
+    memoryContentDraft,
+    memoryTitleDraft,
+    memoryTypeDraft,
+    saveActiveProjectPatch,
+    selectedCanvasItem,
+  ]);
 
   const handleAttachMemory = React.useCallback(async (memoryId: string) => {
     if (!activeProject) return;
@@ -502,6 +635,17 @@ export function ProjectWorkspace() {
       return `${trimmed}\n\n${mergeContent}`;
     });
   }, [selectedCanvasItem?.preview, selectedMergeMemory]);
+
+  const handleAppendSelectedMemoryToGlobalContext = React.useCallback(() => {
+    const content = selectedMemoryItem?.content.trim() ?? "";
+    if (!content) return;
+    setGlobalContextDraft((prev) => {
+      const trimmed = prev.trim();
+      if (trimmed.length === 0) return content;
+      if (trimmed.includes(content)) return trimmed;
+      return `${trimmed}\n\n${content}`;
+    });
+  }, [selectedMemoryItem]);
 
   if (!activeProject || !projectView) {
     return null;
@@ -796,40 +940,91 @@ export function ProjectWorkspace() {
         </SectionCard>
 
         <SectionCard
-          title="Reusable Memory"
-          description="Promote winning syntheses into reusable typed notes and attach library items back into this project."
+          title="Typed Nodes"
+          description="Create question, draft, critique, decision, summary, and evidence nodes that live on the project canvas."
         >
           <div className="space-y-4">
             <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3">
               <div className="space-y-2">
                 <label className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                  Memory title
+                  Node title
                 </label>
                 <Input
-                  aria-label="Memory title"
+                  aria-label="Typed node title"
                   value={memoryTitleDraft}
                   onChange={(event) => setMemoryTitleDraft(event.currentTarget.value)}
-                  placeholder="Name this reusable memory"
+                  placeholder="Name this typed node"
                 />
               </div>
               <div className="mt-3 space-y-2">
                 <label className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                  Memory type
+                  Node type
                 </label>
                 <select
-                  aria-label="Memory type"
+                  aria-label="Typed node type"
                   value={memoryTypeDraft}
                   onChange={(event) => setMemoryTypeDraft(event.currentTarget.value as ProjectMemoryType)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
                 >
-                  {PROJECT_MEMORY_TYPES.map((type) => (
+                  {PROJECT_EDITABLE_MEMORY_TYPES.map((type) => (
                     <option key={type} value={type}>
-                      {formatMemoryTypeLabel(type)}
+                      {formatProjectMemoryTypeLabel(type)}
                     </option>
                   ))}
                 </select>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  {PROJECT_MEMORY_META[memoryTypeDraft].description}
+                </p>
+              </div>
+              <div className="mt-3 space-y-2">
+                <label className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  Node content
+                </label>
+                <textarea
+                  aria-label="Typed node content"
+                  value={memoryContentDraft}
+                  onChange={(event) => setMemoryContentDraft(event.currentTarget.value)}
+                  placeholder="Write the structured note you want to keep on the project canvas..."
+                  className="min-h-[140px] w-full rounded-xl border border-border/70 bg-background px-3 py-3 text-sm leading-6 text-foreground shadow-sm outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{estimateTokenCount(memoryContentDraft)} estimated tokens</span>
+                  <span>{formatBytes(encoder.encode(memoryContentDraft).length)}</span>
+                </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    void handleCreateTypedNode();
+                  }}
+                  disabled={memoryTitleDraft.trim().length === 0 || memoryContentDraft.trim().length === 0}
+                >
+                  <PlusIcon className="h-3.5 w-3.5" />
+                  Create typed node
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSeedTypedNodeFromArena}
+                  disabled={!arenaSummary}
+                >
+                  <GitBranchPlus className="h-3.5 w-3.5" />
+                  Use arena synthesis
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSeedTypedNodeFromCanvasFocus}
+                  disabled={!selectedCanvasItem}
+                >
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                  Use canvas focus
+                </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -843,68 +1038,98 @@ export function ProjectWorkspace() {
                   Save arena synthesis
                 </Button>
                 <span className="text-xs text-muted-foreground">
-                  {memoryActionState === "saving"
-                    ? "Saving memory..."
-                    : memoryActionState === "saved"
-                      ? "Memory saved"
-                      : memoryActionState === "error"
-                        ? "Memory save failed"
-                        : "Creates a typed memory item and attaches it to this project"}
+                  <span
+                    className={
+                      memoryActionState === "error"
+                        ? "text-rose-700"
+                        : memoryActionState === "saved"
+                          ? "text-emerald-700"
+                          : memoryActionState === "saving"
+                            ? "text-sky-700"
+                            : "text-muted-foreground"
+                    }
+                  >
+                    {memoryActionMessage}
+                  </span>
                 </span>
               </div>
             </div>
 
             <div className="space-y-2">
               <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                Attached Memory
+                Attached Typed Nodes
               </p>
               {!isMemoryReady ? (
                 <p className="text-sm text-muted-foreground">Loading memory library...</p>
               ) : attachedMemoryItems.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No reusable memory attached to this project yet.</p>
+                <p className="text-sm text-muted-foreground">No typed nodes attached to this project yet.</p>
               ) : (
-                attachedMemoryItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-border/60 bg-background/80 px-3 py-3"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
-                          <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-violet-700">
-                            {formatMemoryTypeLabel(item.type)}
-                          </span>
-                        </div>
-                        <p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">
-                          {item.content}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2"
-                          onClick={() => {
-                            void handleDetachMemory(item.id);
-                          }}
-                        >
-                          Detach
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2 text-rose-700"
-                          onClick={() => {
-                            void handleDeleteMemory(item.id);
-                          }}
-                        >
-                          <Trash2Icon className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                attachedMemoryGroups.map((group) => (
+                  <div key={group.type} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.16em]"
+                        style={{
+                          borderColor: `${PROJECT_MEMORY_META[group.type].accent}55`,
+                          color: PROJECT_MEMORY_META[group.type].accent,
+                        }}
+                      >
+                        {formatProjectMemoryTypeLabel(group.type)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {group.items.length} node{group.items.length === 1 ? "" : "s"}
+                      </span>
                     </div>
+                    {group.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-xl border border-border/60 bg-background/80 px-3 py-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+                              <span
+                                className="rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.16em]"
+                                style={{
+                                  borderColor: `${PROJECT_MEMORY_META[item.type].accent}55`,
+                                  color: PROJECT_MEMORY_META[item.type].accent,
+                                }}
+                              >
+                                {formatProjectMemoryTypeLabel(item.type)}
+                              </span>
+                            </div>
+                            <p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">
+                              {item.content}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2"
+                              onClick={() => {
+                                void handleDetachMemory(item.id);
+                              }}
+                            >
+                              Detach
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2 text-rose-700"
+                              onClick={() => {
+                                void handleDeleteMemory(item.id);
+                              }}
+                            >
+                              <Trash2Icon className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))
               )}
@@ -917,32 +1142,50 @@ export function ProjectWorkspace() {
               {availableMemoryItems.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Every reusable memory item is already attached.</p>
               ) : (
-                availableMemoryItems.slice(0, 8).map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-background/80 px-3 py-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
-                        <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-                          {formatMemoryTypeLabel(item.type)}
-                        </span>
-                      </div>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.content}</p>
+                availableMemoryGroups.slice(0, 6).map((group) => (
+                  <div key={group.type} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.16em]"
+                        style={{
+                          borderColor: `${PROJECT_MEMORY_META[group.type].accent}55`,
+                          color: PROJECT_MEMORY_META[group.type].accent,
+                        }}
+                      >
+                        {formatProjectMemoryTypeLabel(group.type)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {group.items.length} available
+                      </span>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-2"
-                      onClick={() => {
-                        void handleAttachMemory(item.id);
-                      }}
-                    >
-                      <PlusIcon className="h-3.5 w-3.5" />
-                      Attach
-                    </Button>
+                    {group.items.slice(0, 4).map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-background/80 px-3 py-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+                            <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                              {formatProjectMemoryTypeLabel(item.type)}
+                            </span>
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.content}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2"
+                          onClick={() => {
+                            void handleAttachMemory(item.id);
+                          }}
+                        >
+                          <PlusIcon className="h-3.5 w-3.5" />
+                          Attach
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 ))
               )}
@@ -1018,6 +1261,43 @@ export function ProjectWorkspace() {
                 </p>
               ) : null}
               <p className="text-sm leading-6 text-foreground/85">{selectedCanvasItem.preview}</p>
+              {!selectedMemoryItem ? (
+                <div className="space-y-2 rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-sky-700">
+                    Typed node action
+                  </p>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Seed the typed node composer with this canvas focus so you can turn it into a reusable question, draft, critique, decision, summary, or evidence node.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSeedTypedNodeFromCanvasFocus}
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" />
+                    Create typed node from focus
+                  </Button>
+                </div>
+              ) : null}
+              {selectedMemoryItem && !selectedMergeMemory ? (
+                <div className="space-y-2 rounded-xl border border-violet-500/20 bg-violet-500/5 px-3 py-3">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-violet-700">
+                    Typed node actions
+                  </p>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Append this typed node to the project&apos;s global context when it should influence the whole workspace.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAppendSelectedMemoryToGlobalContext}
+                  >
+                    Append to global context
+                  </Button>
+                </div>
+              ) : null}
               {selectedMergeMemory ? (
                 <div className="space-y-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-3">
                   <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-amber-700">

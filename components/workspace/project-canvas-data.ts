@@ -2,6 +2,10 @@
 
 import { normalizeMessageContent } from "@/lib/llm/messages";
 import type { ProjectMemoryItem } from "@/lib/memory-documents";
+import {
+  PROJECT_MEMORY_META,
+  PROJECT_MEMORY_TYPE_ORDER,
+} from "@/lib/project-memory-meta";
 import type { ProjectDocument } from "@/lib/project-documents";
 import type { SessionDocument } from "@/lib/session-documents";
 import { getSessionTreeStats } from "@/lib/session-context";
@@ -78,6 +82,8 @@ export function buildProjectCanvasFlow(
     .filter((session): session is SessionDocument => Boolean(session));
 
   const globalContextNodeId = makeContextNodeId(project.id);
+  const memoryLaneCounts = new Map<string, number>();
+  const mergeLaneIndexRef = { value: 0 };
   nodes.push({
     id: globalContextNodeId,
     type: "artifactNode",
@@ -94,20 +100,34 @@ export function buildProjectCanvasFlow(
     },
   });
 
-  memoryItems.forEach((memoryItem, memoryIndex) => {
+  memoryItems.forEach((memoryItem) => {
     const memoryNodeId = makeMemoryNodeId(project.id, memoryItem.id);
     const sourceSession = memoryItem.sourceSessionId
       ? orderedSessions.find((session) => session.id === memoryItem.sourceSessionId) ?? null
       : null;
+    const memoryMeta = PROJECT_MEMORY_META[memoryItem.type];
+    const laneIndex = PROJECT_MEMORY_TYPE_ORDER.indexOf(memoryItem.type);
+    const laneCount = memoryLaneCounts.get(memoryItem.type) ?? 0;
+    memoryLaneCounts.set(memoryItem.type, laneCount + 1);
+    const position =
+      memoryItem.type === "merge"
+        ? { x: -560, y: 72 + mergeLaneIndexRef.value++ * 240 }
+        : {
+            x: -900,
+            y: 56 + Math.max(0, laneIndex) * 176 + laneCount * 44,
+          };
 
     nodes.push({
       id: memoryNodeId,
       type: "artifactNode",
-      position: memoryItem.type === "merge"
-        ? { x: -560, y: 72 + memoryIndex * 240 }
-        : { x: -860, y: 56 + memoryIndex * 220 },
+      position,
       data: {
-        accent: sourceSession ? SESSION_SWATCHES[orderedSessions.findIndex((session) => session.id === sourceSession.id) % SESSION_SWATCHES.length] : undefined,
+        accent:
+          memoryItem.type === "merge"
+            ? memoryMeta.accent
+            : sourceSession
+              ? SESSION_SWATCHES[orderedSessions.findIndex((session) => session.id === sourceSession.id) % SESSION_SWATCHES.length]
+              : memoryMeta.accent,
         artifactType: "text",
         kind: "artifact",
         memoryId: memoryItem.id,
@@ -120,8 +140,8 @@ export function buildProjectCanvasFlow(
           memoryItem.type === "merge"
             ? "merge node"
             : sourceSession
-              ? "linked session"
-              : "library",
+              ? `${memoryMeta.label.toLowerCase()} · linked session`
+              : `${memoryMeta.label.toLowerCase()} · library`,
         title: memoryItem.title,
       },
     });
@@ -131,12 +151,12 @@ export function buildProjectCanvasFlow(
       source: memoryNodeId,
       target: globalContextNodeId,
       type: "threadEdge",
-      data: {
-        accent: "#a855f7",
-        label: memoryItem.type,
-        tone: "context",
-      },
-    });
+        data: {
+          accent: memoryMeta.accent,
+          label: memoryMeta.label.toLowerCase(),
+          tone: "context",
+        },
+      });
 
     if (memoryItem.type === "merge") {
       resolveMemorySourceNodeIds(project.id, memoryItem).forEach((sourceNodeId) => {

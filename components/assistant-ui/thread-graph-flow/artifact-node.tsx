@@ -4,7 +4,7 @@ import { memo } from "react";
 import { Code2, File, FileImage, FileText, ImageIcon, Link2, Move } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { ThreadGraphFlowNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-flow-types";
-import type { ProjectMemoryType } from "@/lib/memory-documents";
+import { PROJECT_MEMORY_META } from "@/lib/project-memory-meta";
 
 const previewText = (value: string) => {
   const compact = value.replace(/\s+/g, " ").trim();
@@ -19,19 +19,9 @@ const formatByteSize = (byteSize?: number | null) => {
   return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const MEMORY_TYPE_META: Record<ProjectMemoryType, { accent: string; label: string }> = {
-  question: { accent: "#2563eb", label: "Question memory" },
-  draft: { accent: "#7c3aed", label: "Draft memory" },
-  critique: { accent: "#dc2626", label: "Critique memory" },
-  decision: { accent: "#ca8a04", label: "Decision memory" },
-  summary: { accent: "#0f766e", label: "Summary memory" },
-  evidence: { accent: "#0891b2", label: "Evidence memory" },
-  merge: { accent: "#d97706", label: "Merge node" },
-};
-
 export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<ThreadGraphFlowNode>) => {
   const artifactType = data.artifactType ?? "text";
-  const memoryMeta = data.memoryType ? MEMORY_TYPE_META[data.memoryType] : null;
+  const memoryMeta = data.memoryType ? PROJECT_MEMORY_META[data.memoryType] : null;
   const isCode = artifactType === "code";
   const isImage = artifactType === "image";
   const isFile = artifactType === "file";
@@ -82,7 +72,7 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
                   <Icon className="h-3 w-3" />
                   <span>
                     {memoryMeta
-                      ? memoryMeta.label
+                      ? memoryMeta.shortLabel
                       : isCode
                       ? "Code context"
                       : isImage
@@ -107,7 +97,7 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
               <div>
                 <p className="text-sm font-semibold text-foreground/90">{data.title ?? "Untitled artifact"}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {memoryMeta ? "Reusable typed memory attached to the project canvas." : "Context node reusable across branches."}
+                  {memoryMeta ? memoryMeta.description : "Context node reusable across branches."}
                 </p>
               </div>
             </div>

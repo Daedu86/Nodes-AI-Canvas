@@ -798,10 +798,10 @@ test("creates a project from multiple saved sessions and opens the aggregated ca
   await expect(page.getByRole("heading", { name: "Project Arena" })).toBeVisible();
   await expect(page.locator("p").filter({ hasText: "Arena Synthesis" }).first()).toBeVisible();
 
-  await page.getByLabel("Memory title").fill("Arena memo");
+  await page.getByLabel("Typed node title").fill("Arena memo");
   await page.getByRole("button", { name: "Pick winner" }).click();
   await page.getByRole("button", { name: "Save arena synthesis" }).click();
-  await expect(page.getByText("Memory saved", { exact: true })).toBeVisible();
+  await expect(page.getByText("Typed node saved from Arena synthesis.")).toBeVisible();
   await page.getByRole("button", { name: "Branches" }).click();
   await expect(page.getByText("Arena comparison across 2 selected branches.")).toBeVisible();
   await expect(page.getByText("Compare 2 branches side by side and promote a lead direction into global context.")).toBeVisible();
@@ -816,6 +816,29 @@ test("creates a project from multiple saved sessions and opens the aggregated ca
   await expect(page.getByPlaceholder(/Describe the cross-session goal/i)).toHaveValue(
     /Project Arena branch synthesis/i,
   );
+});
+
+test("creates a typed node from canvas focus inside a project", async ({ page }) => {
+  await gotoChat(page, { title: "Typed node session one" });
+  await sendPrompt(page, "Typed node session one");
+
+  await createAndOpenNamedSession(page, "Typed node session two");
+  await sendPrompt(page, "Typed node session two");
+  await page.getByRole("checkbox", { name: "Select session Typed node session one" }).check();
+  await page.getByRole("checkbox", { name: "Select session Typed node session two" }).check();
+  await page.getByRole("button", { name: /From selected/ }).click();
+
+  await expect(page.getByText("Unified canvas for 2 sessions and one shared project context node.")).toBeVisible();
+  await page.locator(".react-flow__node").filter({ hasText: "Typed node session one" }).first().click();
+
+  await page.getByLabel("Typed node type").selectOption("decision");
+  await page.getByRole("button", { name: "Use canvas focus" }).click();
+  await page.getByRole("button", { name: "Create typed node", exact: true }).click();
+
+  await expect(page.getByText("Decision node created and attached.")).toBeVisible();
+  await expect(page.locator('.react-flow__node [data-memory-type="decision"]').first()).toBeVisible();
+  await page.locator('.react-flow__node [data-memory-type="decision"]').first().click();
+  await expect(page.getByRole("button", { name: "Append to global context" })).toBeVisible();
 });
 
 test("deletes a project durably across reload", async ({ page }) => {
