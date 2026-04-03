@@ -9,10 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { AuthStatusButton } from "@/components/auth/auth-status-button";
 import { useProjects } from "@/components/context/projects";
-import { ProductBrand } from "@/components/workspace/product-brand";
 
 const formatProjectTitle = (title: string | null) => title?.trim() || "Untitled Project";
 
@@ -23,7 +20,6 @@ export function ProjectHeader() {
     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger />
       <Separator orientation="vertical" className="mr-2 h-4" />
-      <ProductBrand className="min-w-0" compact modeLabel="Project" />
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -38,8 +34,6 @@ export function ProjectHeader() {
         <Button type="button" variant="outline" size="sm" onClick={clearActiveProject}>
           Back to sessions
         </Button>
-        <AuthStatusButton />
-        <ThemeToggle />
       </div>
     </header>
   );

@@ -12,11 +12,8 @@ import { ThreadTitleEditor } from "@/components/assistant-ui/thread-title";
 import { ModelSelector } from "@/components/assistant-ui/model-selector";
 import { ThreadGraphButton } from "@/components/assistant-ui/thread-graph";
 import { LlmToggleButton } from "@/components/assistant-ui/llm-toggle";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { SessionContextSheet } from "@/components/workspace/session-context-sheet";
-import { AuthStatusButton } from "@/components/auth/auth-status-button";
-import { ProductBrand } from "@/components/workspace/product-brand";
 
 export const AppHeader = () => {
   const { llmEnabled } = useLlmEnabled();
@@ -25,7 +22,6 @@ export const AppHeader = () => {
     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger />
       <Separator orientation="vertical" className="mr-2 h-4" />
-      <ProductBrand className="min-w-0" modeLabel="Sessions" />
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -49,8 +45,6 @@ export const AppHeader = () => {
           {llmEnabled ? "AI on" : "AI off"}
         </span>
         <LlmToggleButton />
-        <AuthStatusButton />
-        <ThemeToggle />
       </div>
     </header>
   );

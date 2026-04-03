@@ -10,7 +10,6 @@ type ProductBrandProps = {
 
 export function ProductBrand({
   className,
-  compact = false,
   modeLabel,
   ...props
 }: ProductBrandProps) {
@@ -47,11 +46,6 @@ export function ProductBrand({
             </span>
           ) : null}
         </div>
-        {!compact ? (
-          <p className="hidden truncate text-xs text-muted-foreground lg:block">
-            AI decision workspace for branching, comparison, and synthesis.
-          </p>
-        ) : null}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Moon, Sun } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "theme";
 
@@ -14,7 +15,15 @@ function getInitialTheme(): Theme {
   return stored === "light" || stored === "dark" ? (stored as Theme) : "dark";
 }
 
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({
+  className,
+  size = "sm",
+  variant = "ghost",
+}: {
+  className?: string;
+  size?: React.ComponentProps<typeof Button>["size"];
+  variant?: React.ComponentProps<typeof Button>["variant"];
+}) {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
   useEffect(() => {
@@ -28,11 +37,11 @@ export function ThemeToggle({ className }: { className?: string }) {
 
   return (
     <Button
-      variant="ghost"
-      size="sm"
+      variant={variant}
+      size={size}
       onClick={toggle}
       aria-label="Toggle dark mode"
-      className={className}
+      className={cn(className)}
     >
       {theme === "dark" ? (
         <>

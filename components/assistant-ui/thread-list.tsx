@@ -137,18 +137,6 @@ export const ThreadList: FC = () => {
 
   return (
     <div className="flex flex-col items-stretch gap-3 px-1 py-2">
-      <Button
-        className="flex items-center justify-start gap-2 rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-2.5 text-start text-sky-50 shadow-[0_12px_30px_-24px_rgba(56,189,248,0.85)] hover:bg-sky-500/15"
-        variant="outline"
-        onClick={() => {
-          clearActiveProject();
-          void createSession();
-        }}
-      >
-        <PlusIcon className="h-4 w-4" />
-        New Session
-      </Button>
-
       <div className="overflow-hidden rounded-xl border border-border/60 bg-background/60 shadow-sm">
         <button
           type="button"
@@ -270,7 +258,7 @@ export const ThreadList: FC = () => {
         >
           <span className="flex items-center gap-2 text-sm font-medium">
             <FolderOpenIcon className="h-4 w-4" />
-            Saved Sessions
+            Sessions
           </span>
           <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>{sessions.length}</span>
@@ -285,6 +273,19 @@ export const ThreadList: FC = () => {
         {savedSessionsOpen ? (
           <div className="border-t border-border/60">
             <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 rounded-lg border-sky-500/20 bg-sky-500/10 px-3 text-xs text-sky-700 hover:bg-sky-500/15 hover:text-sky-800"
+                onClick={() => {
+                  clearActiveProject();
+                  void createSession();
+                }}
+              >
+                <PlusIcon className="h-3.5 w-3.5" />
+                New session
+              </Button>
               {!manageSessions ? (
                 <>
                   <Button
