@@ -63,6 +63,7 @@ import { useModelConfig } from "@/components/context/model-config";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
 import { useRequestError } from "@/components/context/request-error";
 import { useSessionArtifacts } from "@/components/context/session-artifacts";
+import { useSessionUiState } from "@/components/context/session-ui-state";
 import {
   buildBranchSpec,
   getAllowedBranchOperations,
@@ -358,6 +359,7 @@ export function ThreadGraphFlow() {
   const { modelId, provider } = useModelConfig();
   const { clearRequestError, setRequestError } = useRequestError();
   const { activeSession, activeSessionId } = usePersistedSessions();
+  const { focusedMessageId, setFocusedMessageId, setViewMode } = useSessionUiState();
   const {
     artifacts,
     contextLinks,
@@ -591,6 +593,34 @@ export function ThreadGraphFlow() {
     return lineage;
   }, [nodeIndex, nodes, selectedArtifact, selectedNodeId]);
 
+  const applyCanvasSelection = React.useCallback(
+    (nodeId: string | null) => {
+      setSelectedNodeId(nodeId);
+      if (!nodeId || nodeId === "__ROOT__") {
+        setFocusedMessageId(null);
+        return;
+      }
+      if (artifactIndex.has(nodeId)) {
+        setFocusedMessageId(null);
+        return;
+      }
+      if (nodeIndex.has(nodeId)) {
+        setFocusedMessageId(nodeId);
+      }
+    },
+    [artifactIndex, nodeIndex, setFocusedMessageId],
+  );
+
+  React.useEffect(() => {
+    if (!focusedMessageId || focusedMessageId === selectedNodeId) {
+      return;
+    }
+    if (!nodeIndex.has(focusedMessageId)) {
+      return;
+    }
+    setSelectedNodeId(focusedMessageId);
+  }, [focusedMessageId, nodeIndex, selectedNodeId]);
+
   const relatedContextIds = React.useMemo(() => {
     const related = new Set<string>();
     selectedContextArtifactIds.forEach((id) => related.add(id));
@@ -673,9 +703,9 @@ export function ThreadGraphFlow() {
   const handleCutEdge = React.useCallback(
     (childId: string, parentId: string | null) => {
       cutLink(childId, parentId);
-      setSelectedNodeId(childId);
+      applyCanvasSelection(childId);
     },
-    [cutLink],
+    [applyCanvasSelection, cutLink],
   );
 
   const baseConversationEdges = React.useMemo<ThreadGraphFlowEdge[]>(() => {
@@ -857,6 +887,26 @@ export function ThreadGraphFlow() {
     };
   }, [decoratedFlowNodes.length, reactFlowInstance, treeStructureSignature]);
 
+  React.useEffect(() => {
+    if (!reactFlowInstance || !focusedMessageId || !nodeIndex.has(focusedMessageId)) {
+      return;
+    }
+    const animationFrame = window.requestAnimationFrame(() => {
+      void reactFlowInstance
+        .fitView({
+          duration: 260,
+          padding: 0.34,
+          nodes: [{ id: focusedMessageId }],
+        })
+        .then(() => {
+          setStoredViewport(reactFlowInstance.getViewport());
+        });
+    });
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+    };
+  }, [focusedMessageId, nodeIndex, reactFlowInstance]);
+
   const selectedFlowNode = React.useMemo(
     () => decoratedFlowNodes.find((node) => node.id === selectedNodeId) ?? null,
     [decoratedFlowNodes, selectedNodeId],
@@ -942,6 +992,13 @@ export function ThreadGraphFlow() {
     setStoredViewport(reactFlowInstance.getViewport());
   }, [reactFlowInstance, selectedNodeId]);
 
+  const handleOpenSelectedInChat = React.useCallback(() => {
+    if (!selectedMessageNode || selectedMessageNode.id === "__ROOT__") return;
+    setViewMode("split");
+    setFocusedMessageId(selectedMessageNode.id);
+    scrollMessageIntoView(selectedMessageNode.id);
+  }, [selectedMessageNode, setFocusedMessageId, setViewMode]);
+
   const handleResetView = React.useCallback(async () => {
     if (!reactFlowInstance) return;
     await reactFlowInstance.fitView({ duration: 450, padding: 0.18 });
@@ -1018,8 +1075,9 @@ export function ThreadGraphFlow() {
         language: artifactType === "code" ? "ts" : null,
       });
       setSelectedNodeId(created.id);
+      setFocusedMessageId(null);
     },
-    [artifacts, createArtifact],
+    [artifacts, createArtifact, setFocusedMessageId],
   );
 
   const handleCreateArtifactFromFile = React.useCallback(
@@ -1078,6 +1136,7 @@ export function ThreadGraphFlow() {
           title,
         });
         setSelectedNodeId(created.id);
+        setFocusedMessageId(null);
       } catch (error) {
         console.error(`Failed to create ${artifactType} artifact`, error);
         const message =
@@ -1093,6 +1152,7 @@ export function ThreadGraphFlow() {
       clearRequestError,
       contextBudgetPolicy,
       createArtifact,
+      setFocusedMessageId,
       setRequestError,
     ],
   );
@@ -1813,7 +1873,7 @@ export function ThreadGraphFlow() {
                               type="button"
                               aria-label={`Open target ${target.id}`}
                               className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs hover:bg-muted"
-                              onClick={() => setSelectedNodeId(target.id)}
+                              onClick={() => applyCanvasSelection(target.id)}
                             >
                               <span>Open target</span>
                             </button>
@@ -1832,7 +1892,7 @@ export function ThreadGraphFlow() {
                     className="inline-flex items-center gap-1 rounded-md border border-rose-500/35 bg-rose-500/10 px-2.5 py-1.5 text-xs text-rose-700 hover:bg-rose-500/15"
                     onClick={() => {
                       deleteArtifact(selectedArtifact.id);
-                      setSelectedNodeId(null);
+                      applyCanvasSelection(null);
                     }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -1881,12 +1941,10 @@ export function ThreadGraphFlow() {
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs hover:bg-muted"
-                      onClick={() => {
-                        scrollMessageIntoView(selectedMessageNode.id);
-                      }}
+                      onClick={handleOpenSelectedInChat}
                     >
                       <Focus className="h-3.5 w-3.5" />
-                      <span>Jump to message</span>
+                      <span>Open in chat</span>
                     </button>
                   ) : null}
                   <button
@@ -1927,7 +1985,7 @@ export function ThreadGraphFlow() {
                   <button
                     type="button"
                     className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs hover:bg-muted"
-                    onClick={() => setSelectedNodeId(null)}
+                    onClick={() => applyCanvasSelection(null)}
                   >
                     <span>Clear focus</span>
                   </button>
@@ -2068,16 +2126,19 @@ export function ThreadGraphFlow() {
             }}
             onSelectionChange={({ nodes: selectedNodes }) => {
               if (selectedNodes[0]?.id) {
-                setSelectedNodeId(selectedNodes[0].id);
+                applyCanvasSelection(selectedNodes[0].id);
               }
             }}
             onNodeClick={(_, node) => {
-              setSelectedNodeId(node.id);
-              if (node.data.kind !== "artifact" && node.id !== "__ROOT__") {
-                scrollMessageIntoView(node.id);
-              }
+              applyCanvasSelection(node.id);
             }}
-            onPaneClick={() => setSelectedNodeId(null)}
+            onNodeDoubleClick={(_, node) => {
+              if (node.data.kind === "artifact" || node.id === "__ROOT__") return;
+              applyCanvasSelection(node.id);
+              setViewMode("split");
+              scrollMessageIntoView(node.id);
+            }}
+            onPaneClick={() => applyCanvasSelection(null)}
             className="bg-transparent"
             defaultEdgeOptions={{
               animated: false,

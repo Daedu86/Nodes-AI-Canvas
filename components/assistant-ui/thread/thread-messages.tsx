@@ -36,6 +36,7 @@ import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { useMessageLatencyVersion } from "@/components/context/message-latency";
 import { useModelConfig } from "@/components/context/model-config";
 import { useRequestError } from "@/components/context/request-error";
+import { useSessionUiState } from "@/components/context/session-ui-state";
 import { useThreadBranchDraft } from "@/components/context/thread-branch-draft";
 import {
   getBranchOperationDetail,
@@ -291,6 +292,10 @@ const getMessageText = (message: MessageLike | null | undefined) => {
     .trim();
 };
 
+const eventTargetsInteractiveControl = (target: EventTarget | null) =>
+  target instanceof HTMLElement &&
+  Boolean(target.closest("button,a,input,textarea,select,[role='button'],[data-ignore-message-focus='true']"));
+
 const SyntheticAssistantEditBranchBadge: FC<{
   activeBranchCount: number;
   activeBranchNumber: number;
@@ -321,6 +326,7 @@ export const UserMessage: FC = () => {
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
   const { clearRequestError, setRequestError } = useRequestError();
+  const { focusedMessageId, setFocusedMessageId, setViewMode } = useSessionUiState();
   const [isSubmittingBranch, setIsSubmittingBranch] = React.useState(false);
   const isThreadRunning = runtime.threads.main.getState().isRunning;
   const isRootUser = resolvedParentId === null;
@@ -400,7 +406,19 @@ export const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root
       data-message-id={message?.id}
-      className="grid auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] gap-y-2 [&:where(>*)]:col-start-2 w-full max-w-[var(--thread-max-width)] py-4"
+      className={cn(
+        "grid auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] gap-y-2 [&:where(>*)]:col-start-2 w-full max-w-[var(--thread-max-width)] rounded-3xl py-4 transition-colors",
+        focusedMessageId === message?.id ? "bg-sky-500/5" : undefined,
+      )}
+      onClick={(event) => {
+        if (!message?.id || eventTargetsInteractiveControl(event.target)) return;
+        setFocusedMessageId(message.id);
+      }}
+      onDoubleClick={(event) => {
+        if (!message?.id || eventTargetsInteractiveControl(event.target)) return;
+        setFocusedMessageId(message.id);
+        setViewMode("split");
+      }}
     >
       <UserActionBar
         branchTooltip={branchDetail.title}
@@ -447,6 +465,7 @@ export const AssistantMessage: FC = () => {
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
   const { clearRequestError, setRequestError } = useRequestError();
+  const { focusedMessageId, setFocusedMessageId, setViewMode } = useSessionUiState();
   const [isSubmittingBranch, setIsSubmittingBranch] = React.useState(false);
   const [assistantEditText, setAssistantEditText] = React.useState("");
   const [isEditingAssistant, setIsEditingAssistant] = React.useState(false);
@@ -621,7 +640,19 @@ export const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root
       data-message-id={message?.id}
-      className="grid grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] relative w-full max-w-[var(--thread-max-width)] py-4"
+      className={cn(
+        "relative grid w-full max-w-[var(--thread-max-width)] grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] rounded-3xl py-4 transition-colors",
+        focusedMessageId === message?.id ? "bg-sky-500/5" : undefined,
+      )}
+      onClick={(event) => {
+        if (!message?.id || eventTargetsInteractiveControl(event.target)) return;
+        setFocusedMessageId(message.id);
+      }}
+      onDoubleClick={(event) => {
+        if (!message?.id || eventTargetsInteractiveControl(event.target)) return;
+        setFocusedMessageId(message.id);
+        setViewMode("split");
+      }}
     >
       <div className="text-foreground max-w-[calc(var(--thread-max-width)*0.8)] break-words leading-7 col-span-2 col-start-2 row-start-1 my-1.5">
         <MessageMetadata

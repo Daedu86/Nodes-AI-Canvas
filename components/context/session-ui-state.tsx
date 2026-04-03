@@ -20,6 +20,8 @@ export type LinkOverrideEntry = {
 type SessionUiStateContextValue = {
   historyMode: HistoryMode;
   setHistoryMode: (value: HistoryMode) => void;
+  focusedMessageId: string | null;
+  setFocusedMessageId: (value: string | null) => void;
   llmEnabled: boolean;
   setLlmEnabled: (value: boolean) => void;
   modelConfig: ModelConfig;
@@ -161,6 +163,7 @@ export function SessionUiStateProvider({
   sessionId: string;
 }) {
   const [historyMode, setHistoryMode] = React.useState<HistoryMode>(() => readHistoryMode(sessionId));
+  const [focusedMessageId, setFocusedMessageId] = React.useState<string | null>(null);
   const [llmEnabled, setLlmEnabled] = React.useState<boolean>(() => readLlmEnabled(sessionId));
   const [modelConfig, setModelConfig] = React.useState<ModelConfig>(() => readModelConfig(sessionId));
   const [viewMode, setViewMode] = React.useState<SessionViewMode>(() => readViewMode(sessionId));
@@ -233,6 +236,8 @@ export function SessionUiStateProvider({
     () => ({
       historyMode,
       setHistoryMode,
+      focusedMessageId,
+      setFocusedMessageId,
       llmEnabled,
       setLlmEnabled,
       modelConfig,
@@ -245,7 +250,16 @@ export function SessionUiStateProvider({
       setLinkOverrides,
       sessionId,
     }),
-    [historyMode, llmEnabled, modelConfig, viewMode, splitRatio, linkOverrides, sessionId],
+    [
+      historyMode,
+      focusedMessageId,
+      llmEnabled,
+      modelConfig,
+      viewMode,
+      splitRatio,
+      linkOverrides,
+      sessionId,
+    ],
   );
 
   return (
