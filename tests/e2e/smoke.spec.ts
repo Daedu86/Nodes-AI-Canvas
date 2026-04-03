@@ -911,10 +911,12 @@ test("creates a project from multiple saved sessions and opens the aggregated ca
   await expect(page.getByRole("heading", { name: "Project Arena" })).toBeVisible();
   await expect(page.locator("p").filter({ hasText: "Arena Synthesis" }).first()).toBeVisible();
 
+  await page.getByRole("button", { name: "Open Nodes" }).click();
   await page.getByLabel("Typed node title").fill("Arena memo");
   await page.getByRole("button", { name: "Pick winner" }).click();
   await page.getByRole("button", { name: "Save arena synthesis" }).click();
   await expect(page.getByText("Typed node saved from Arena synthesis.")).toBeVisible();
+  await page.getByRole("button", { name: "Open Arena" }).click();
   await page.getByRole("button", { name: "Branches" }).click();
   await expect(page.getByText("Arena comparison across 2 selected branches.")).toBeVisible();
   await expect(page.getByText("Compare 2 branches side by side and promote a lead direction into global context.")).toBeVisible();
@@ -947,6 +949,7 @@ test("creates a typed node from canvas focus inside a project", async ({ page })
   await expect(page.getByText("Unified canvas for 2 sessions and one shared project context node.")).toBeVisible();
   await page.locator(".react-flow__node").filter({ hasText: "Typed node session one" }).first().click();
 
+  await page.getByRole("button", { name: "Open Nodes" }).click();
   await page.getByLabel("Typed node type").selectOption("decision");
   await page.getByRole("button", { name: "Use canvas focus" }).click();
   await page.getByRole("button", { name: "Create typed node", exact: true }).click();

@@ -40,6 +40,7 @@ type SessionResponse = {
 };
 
 type ArenaCompareMode = "sessions" | "branches";
+type ProjectInspectorTab = "context" | "arena" | "nodes" | "sessions" | "focus";
 
 const encoder = new TextEncoder();
 const PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD = 10;
@@ -138,6 +139,7 @@ export function ProjectWorkspace() {
   const [memoryActionState, setMemoryActionState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
   const [memoryActionMessage, setMemoryActionMessage] = React.useState("Create a typed node and attach it to this project.");
   const [selectedContextSourceIds, setSelectedContextSourceIds] = React.useState<string[]>([]);
+  const [inspectorTab, setInspectorTab] = React.useState<ProjectInspectorTab>("context");
 
   const shouldPreferArenaOnLoad = React.useMemo(
     () => (activeProject?.sessionIds.length ?? 0) >= PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD,
@@ -163,6 +165,7 @@ export function ProjectWorkspace() {
     setArenaSessionIds([]);
     setArenaBranchKeys([]);
     setSelectedContextSourceIds([]);
+    setInspectorTab("context");
   }, [activeProject?.globalContext, activeProject?.id, activeProject?.sessionIds.length, activeProject?.title]);
 
   const activeProjectId = activeProject?.id ?? null;
@@ -222,6 +225,11 @@ export function ProjectWorkspace() {
 
     return () => window.clearTimeout(timeout);
   }, [activeProject, globalContextDraft, saveActiveProjectPatch]);
+
+  React.useEffect(() => {
+    if (!selectedCanvasItem) return;
+    setInspectorTab("focus");
+  }, [selectedCanvasItem]);
 
   const handleCommitTitle = React.useCallback(async () => {
     if (!activeProject) return;
@@ -439,6 +447,34 @@ export function ProjectWorkspace() {
     () => buildProjectContextDraft(selectedProjectContextSources),
     [selectedProjectContextSources],
   );
+  const selectedArenaCount = arenaCompareMode === "sessions" ? arenaSessionIds.length : arenaBranchKeys.length;
+  const inspectorTabMeta: Record<ProjectInspectorTab, { badge: string; description: string; label: string }> = {
+    context: {
+      badge: String(selectedProjectContextSources.length),
+      description: "Shape the project-wide guidance and compose a cleaner global context from reusable sources.",
+      label: "Context",
+    },
+    arena: {
+      badge: `${selectedArenaCount}/4`,
+      description: "Pick the sessions or branches that matter, then drive Arena comparisons from one place.",
+      label: "Arena",
+    },
+    nodes: {
+      badge: String(attachedMemoryItems.length),
+      description: "Create and attach typed nodes that turn conclusions into reusable project structure.",
+      label: "Nodes",
+    },
+    sessions: {
+      badge: String(memberSessions.length),
+      description: "Curate which saved sessions belong to the project and keep the canvas source set clean.",
+      label: "Sessions",
+    },
+    focus: {
+      badge: selectedCanvasItem ? "1" : "0",
+      description: "Inspect the last selected canvas node or branch and turn it into context or a typed node.",
+      label: "Focus",
+    },
+  };
 
   React.useEffect(() => {
     if (!arenaSummary) return;
@@ -556,6 +592,7 @@ export function ProjectWorkspace() {
     });
     setMemoryActionState("idle");
     setMemoryActionMessage("Arena synthesis copied into the typed node composer.");
+    setInspectorTab("nodes");
   }, [arenaEntries, arenaSummary, memoryTypeDraft]);
 
   const handleSeedTypedNodeFromCanvasFocus = React.useCallback(() => {
@@ -570,6 +607,7 @@ export function ProjectWorkspace() {
     });
     setMemoryActionState("idle");
     setMemoryActionMessage("Canvas focus copied into the typed node composer.");
+    setInspectorTab("nodes");
   }, [memoryTypeDraft, selectedCanvasItem]);
 
   const handleCreateTypedNode = React.useCallback(async () => {
@@ -657,6 +695,7 @@ export function ProjectWorkspace() {
     const mergeContent = selectedMergeMemory?.content.trim() ?? selectedCanvasItem?.preview.trim() ?? "";
     if (!mergeContent) return;
     setGlobalContextDraft(mergeContent);
+    setInspectorTab("context");
   }, [selectedCanvasItem?.preview, selectedMergeMemory]);
 
   const handleAppendMergeToGlobalContext = React.useCallback(() => {
@@ -668,6 +707,7 @@ export function ProjectWorkspace() {
       if (trimmed.includes(mergeContent)) return trimmed;
       return `${trimmed}\n\n${mergeContent}`;
     });
+    setInspectorTab("context");
   }, [selectedCanvasItem?.preview, selectedMergeMemory]);
 
   const handleAppendSelectedMemoryToGlobalContext = React.useCallback(() => {
@@ -679,6 +719,7 @@ export function ProjectWorkspace() {
       if (trimmed.includes(content)) return trimmed;
       return `${trimmed}\n\n${content}`;
     });
+    setInspectorTab("context");
   }, [selectedMemoryItem]);
 
   const toggleProjectContextSource = React.useCallback((sourceId: string) => {
@@ -705,6 +746,7 @@ export function ProjectWorkspace() {
     const nextText = projectContextBuilderDraft.text.trim();
     if (!nextText) return;
     setGlobalContextDraft(nextText);
+    setInspectorTab("context");
   }, [projectContextBuilderDraft.text]);
 
   const handleAppendBuilderToGlobalContext = React.useCallback(() => {
@@ -716,6 +758,7 @@ export function ProjectWorkspace() {
       if (trimmed.includes(nextText)) return trimmed;
       return `${trimmed}\n\n${nextText}`;
     });
+    setInspectorTab("context");
   }, [projectContextBuilderDraft.text]);
 
   if (!activeProject || !projectView) {
@@ -724,7 +767,7 @@ export function ProjectWorkspace() {
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
-      <div className="flex w-[360px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-border/60 bg-muted/20 px-4 py-4">
+      <div className="flex w-[380px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-border/60 bg-muted/20 px-4 py-4">
         <SectionCard
           title="Project Overview"
           description="Projects aggregate multiple saved sessions into one persistent canvas."
@@ -792,6 +835,54 @@ export function ProjectWorkspace() {
           </div>
         </SectionCard>
 
+        <section className="rounded-2xl border border-border/60 bg-background/80 px-3 py-3 shadow-sm">
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              ["context", BookCopy],
+              ["arena", BarChart3],
+              ["nodes", GitBranchPlus],
+              ["sessions", Network],
+              ["focus", ArrowUpRight],
+            ] as const).map(([tab, Icon]) => {
+              const meta = inspectorTabMeta[tab];
+              const active = inspectorTab === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  aria-label={`Open ${meta.label}`}
+                  onClick={() => setInspectorTab(tab)}
+                  className={`rounded-xl border px-3 py-3 text-left transition ${
+                    active
+                      ? "border-sky-500/35 bg-sky-500/10 shadow-sm"
+                      : "border-border/60 bg-background/90 hover:bg-muted/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Icon className={`h-3.5 w-3.5 ${active ? "text-sky-700" : "text-muted-foreground"}`} />
+                      <span className={`text-sm font-medium ${active ? "text-sky-900" : "text-foreground"}`}>
+                        {meta.label}
+                      </span>
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        active ? "bg-sky-500/15 text-sky-700" : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {meta.badge}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 px-1 text-xs leading-5 text-muted-foreground">
+            {inspectorTabMeta[inspectorTab].description}
+          </p>
+        </section>
+
+        {inspectorTab === "context" ? (
         <SectionCard
           title="Global Context"
           description="Shared guidance that applies across every session inside this project."
@@ -941,7 +1032,9 @@ export function ProjectWorkspace() {
             </div>
           </div>
         </SectionCard>
+        ) : null}
 
+        {inspectorTab === "sessions" ? (
         <SectionCard
           title="Project Sessions"
           description="These saved sessions feed the combined project canvas."
@@ -996,34 +1089,29 @@ export function ProjectWorkspace() {
             ))}
           </div>
         </SectionCard>
+        ) : null}
 
+        {inspectorTab === "arena" ? (
         <SectionCard
           title="Project Arena"
           description="Compare whole sessions or concrete root branches side by side and synthesize a lead direction."
         >
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant={workspaceMode === "canvas" ? "default" : "outline"}
-                size="sm"
-                className="h-8 px-3"
-                onClick={() => setWorkspaceMode("canvas")}
-              >
-                <Network className="h-3.5 w-3.5" />
-                Canvas
-              </Button>
-              <Button
-                type="button"
-                variant={workspaceMode === "arena" ? "default" : "outline"}
-                size="sm"
-                className="h-8 px-3"
-                onClick={() => setWorkspaceMode("arena")}
-                disabled={(arenaCompareMode === "sessions" ? arenaSessionIds.length : arenaBranchKeys.length) < 2}
-              >
-                <BarChart3 className="h-3.5 w-3.5" />
-                Arena
-              </Button>
+            <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Workspace mode</div>
+                  <div className="mt-1 font-semibold text-foreground">
+                    {workspaceMode === "canvas" ? "Canvas active" : "Arena active"}
+                  </div>
+                </div>
+                <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Switch in header
+                </span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                Use the main workspace header to move between Canvas and Arena. This panel only controls what enters the comparison.
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -1051,7 +1139,7 @@ export function ProjectWorkspace() {
             <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-2 text-sm">
               <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Selection</div>
               <div className="mt-1 font-semibold text-foreground">
-                {arenaCompareMode === "sessions" ? arenaSessionIds.length : arenaBranchKeys.length} / 4 {arenaCompareMode} selected
+                {selectedArenaCount} / 4 {arenaCompareMode} selected
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 Arena becomes available once you select at least two {arenaCompareMode === "sessions" ? "project sessions" : "root branches"}.
@@ -1133,7 +1221,9 @@ export function ProjectWorkspace() {
             ) : null}
           </div>
         </SectionCard>
+        ) : null}
 
+        {inspectorTab === "nodes" ? (
         <SectionCard
           title="Typed Nodes"
           description="Create question, draft, critique, decision, summary, and evidence nodes that live on the project canvas."
@@ -1387,7 +1477,9 @@ export function ProjectWorkspace() {
             </div>
           </div>
         </SectionCard>
+        ) : null}
 
+        {inspectorTab === "sessions" ? (
         <SectionCard
           title="Add More Sessions"
           description="Pull more saved sessions into the same global project canvas."
@@ -1427,7 +1519,9 @@ export function ProjectWorkspace() {
             ))}
           </div>
         </SectionCard>
+        ) : null}
 
+        {inspectorTab === "focus" ? (
         <SectionCard
           title="Canvas Focus"
           description="Inspect what you last selected on the aggregated project canvas."
@@ -1539,6 +1633,7 @@ export function ProjectWorkspace() {
             </p>
           )}
         </SectionCard>
+        ) : null}
       </div>
 
       <div className="min-w-0 flex-1 p-4">
@@ -1565,7 +1660,10 @@ export function ProjectWorkspace() {
                 type="button"
                 variant={workspaceMode === "arena" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setWorkspaceMode("arena")}
+                onClick={() => {
+                  setWorkspaceMode("arena");
+                  setInspectorTab("arena");
+                }}
                 disabled={(arenaCompareMode === "sessions" ? arenaSessionIds.length : arenaBranchKeys.length) < 2}
               >
                 Arena

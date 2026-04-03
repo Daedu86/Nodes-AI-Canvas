@@ -51,6 +51,7 @@ export const ThreadList: FC = () => {
   } = useProjects();
   const [projectsOpen, setProjectsOpen] = React.useState(true);
   const [savedSessionsOpen, setSavedSessionsOpen] = React.useState(true);
+  const [manageSessions, setManageSessions] = React.useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
@@ -130,26 +131,28 @@ export const ThreadList: FC = () => {
       sessionIds,
       title: buildProjectTitle(sessionIds),
     });
+    setManageSessions(false);
+    setSelectedSessionIds(new Set());
   }, [buildProjectTitle, createProject, selectedSessionIds]);
 
   return (
-    <div className="flex flex-col items-stretch gap-2">
+    <div className="flex flex-col items-stretch gap-3 px-1 py-2">
       <Button
-        className="data-[active]:bg-muted hover:bg-muted flex items-center justify-start gap-1 rounded-lg px-2.5 py-2 text-start"
-        variant="ghost"
+        className="flex items-center justify-start gap-2 rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-2.5 text-start text-sky-50 shadow-[0_12px_30px_-24px_rgba(56,189,248,0.85)] hover:bg-sky-500/15"
+        variant="outline"
         onClick={() => {
           clearActiveProject();
           void createSession();
         }}
       >
-        <PlusIcon />
+        <PlusIcon className="h-4 w-4" />
         New Session
       </Button>
 
-      <div className="overflow-hidden rounded-lg border border-border/60 bg-background/60">
+      <div className="overflow-hidden rounded-xl border border-border/60 bg-background/60 shadow-sm">
         <button
           type="button"
-          className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-muted/60"
+          className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-muted/60"
           onClick={() => setProjectsOpen((prev) => !prev)}
         >
           <span className="flex items-center gap-2 text-sm font-medium">
@@ -173,7 +176,7 @@ export const ThreadList: FC = () => {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-7 px-2.5 text-xs"
+                className="h-8 rounded-lg px-3 text-xs"
                 onClick={() => {
                   void handleCreateEmptyProject();
                 }}
@@ -185,15 +188,26 @@ export const ThreadList: FC = () => {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-7 px-2.5 text-xs"
+                className="h-8 rounded-lg px-3 text-xs"
                 onClick={() => {
+                  if (!manageSessions) {
+                    setManageSessions(true);
+                    return;
+                  }
                   void handleCreateProjectFromSelected();
                 }}
-                disabled={selectedCount === 0}
+                disabled={manageSessions && selectedCount === 0}
               >
                 <Network className="h-3.5 w-3.5" />
-                From selected{selectedCount > 0 ? ` (${selectedCount})` : ""}
+                {manageSessions
+                  ? `From selected${selectedCount > 0 ? ` (${selectedCount})` : ""}`
+                  : "Select sessions"}
               </Button>
+              {!manageSessions ? (
+                <span className="text-[11px] text-muted-foreground">
+                  Use selection mode to turn multiple sessions into one project.
+                </span>
+              ) : null}
             </div>
 
             {projects.length === 0 ? (
@@ -208,7 +222,7 @@ export const ThreadList: FC = () => {
                 return (
                   <div
                     key={project.id}
-                    className="data-[active]:bg-muted hover:bg-muted mx-1 mb-1 flex items-center gap-2 rounded-lg"
+                    className="group data-[active]:bg-muted hover:bg-muted mx-1 mb-1 flex items-center gap-2 rounded-xl border border-transparent px-1 transition data-[active]:border-sky-500/15"
                     data-active={isActive ? "true" : "false"}
                   >
                     <button
@@ -231,7 +245,7 @@ export const ThreadList: FC = () => {
                       </span>
                     </button>
                     <TooltipIconButton
-                      className="text-foreground hover:text-destructive mr-3 size-4 p-0"
+                      className="text-foreground hover:text-destructive mr-3 size-4 p-0 opacity-40 transition group-hover:opacity-100"
                       variant="ghost"
                       tooltip="Delete project"
                       onClick={() => {
@@ -248,10 +262,10 @@ export const ThreadList: FC = () => {
         ) : null}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-border/60 bg-background/60">
+      <div className="overflow-hidden rounded-xl border border-border/60 bg-background/60 shadow-sm">
         <button
           type="button"
-          className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-muted/60"
+          className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-muted/60"
           onClick={() => setSavedSessionsOpen((prev) => !prev)}
         >
           <span className="flex items-center gap-2 text-sm font-medium">
@@ -271,39 +285,72 @@ export const ThreadList: FC = () => {
         {savedSessionsOpen ? (
           <div className="border-t border-border/60">
             <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-7 px-2.5 text-xs"
-                onClick={handleSelectAll}
-                disabled={sessions.length === 0}
-              >
-                <CheckSquare2Icon className="h-3.5 w-3.5" />
-                {allSelected ? "Clear all" : "Select all"}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-7 px-2.5 text-xs"
-                onClick={handleDeleteSelected}
-                disabled={selectedCount === 0}
-              >
-                <Trash2Icon className="h-3.5 w-3.5" />
-                Delete selected{selectedCount > 0 ? ` (${selectedCount})` : ""}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-7 px-2.5 text-xs"
-                onClick={handleDeleteAll}
-                disabled={sessions.length === 0}
-              >
-                <Trash2Icon className="h-3.5 w-3.5" />
-                Delete all
-              </Button>
+              {!manageSessions ? (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 rounded-lg px-3 text-xs"
+                    onClick={() => setManageSessions(true)}
+                    disabled={sessions.length === 0}
+                  >
+                    <CheckSquare2Icon className="h-3.5 w-3.5" />
+                    Manage
+                  </Button>
+                  <span className="text-[11px] text-muted-foreground">
+                    Select, delete, and batch-manage sessions only when you need to.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 rounded-lg px-3 text-xs"
+                    onClick={() => {
+                      setManageSessions(false);
+                      setSelectedSessionIds(new Set());
+                    }}
+                  >
+                    Done
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 rounded-lg px-3 text-xs"
+                    onClick={handleSelectAll}
+                    disabled={sessions.length === 0}
+                  >
+                    <CheckSquare2Icon className="h-3.5 w-3.5" />
+                    {allSelected ? "Clear all" : "Select all"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 rounded-lg px-3 text-xs"
+                    onClick={handleDeleteSelected}
+                    disabled={selectedCount === 0}
+                  >
+                    <Trash2Icon className="h-3.5 w-3.5" />
+                    Delete selected{selectedCount > 0 ? ` (${selectedCount})` : ""}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 rounded-lg px-3 text-xs"
+                    onClick={handleDeleteAll}
+                    disabled={sessions.length === 0}
+                  >
+                    <Trash2Icon className="h-3.5 w-3.5" />
+                    Delete all
+                  </Button>
+                </>
+              )}
             </div>
 
             {!isReady ? (
@@ -323,20 +370,24 @@ export const ThreadList: FC = () => {
                 return (
                   <div
                     key={session.id}
-                    className="data-[active]:bg-muted hover:bg-muted focus-visible:bg-muted focus-visible:ring-ring mx-1 mb-1 flex items-center gap-2 rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2"
+                    className="group data-[active]:bg-muted hover:bg-muted focus-visible:bg-muted focus-visible:ring-ring mx-1 mb-1 flex items-center gap-2 rounded-xl border border-transparent px-1 transition-all focus-visible:outline-none focus-visible:ring-2 data-[active]:border-emerald-500/15"
                     data-active={isActive ? "true" : "false"}
                   >
-                    <label className="flex items-center pl-3">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select session ${formatTitle(session.title)}`}
-                        checked={isSelected}
-                        onChange={(event) => {
-                          toggleSessionSelection(session.id, event.currentTarget.checked);
-                        }}
-                        className="h-4 w-4 rounded border-border/70"
-                      />
-                    </label>
+                    {manageSessions ? (
+                      <label className="flex items-center pl-3">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select session ${formatTitle(session.title)}`}
+                          checked={isSelected}
+                          onChange={(event) => {
+                            toggleSessionSelection(session.id, event.currentTarget.checked);
+                          }}
+                          className="h-4 w-4 rounded border-border/70"
+                        />
+                      </label>
+                    ) : (
+                      <div className="w-3" aria-hidden="true" />
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -362,30 +413,34 @@ export const ThreadList: FC = () => {
                         {session.messageCount} messages · {formatUpdatedAt(session.updatedAt)}
                       </span>
                     </button>
-                    {!session.archived ? (
+                    <div className="ml-auto mr-3 flex items-center gap-2">
+                      {!session.archived ? (
+                        <TooltipIconButton
+                          className={`hover:text-primary text-foreground size-4 p-0 transition ${
+                            manageSessions ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                          }`}
+                          variant="ghost"
+                          tooltip="Archive session"
+                          onClick={() => {
+                            void archiveSession(session.id);
+                          }}
+                        >
+                          <ArchiveIcon />
+                        </TooltipIconButton>
+                      ) : null}
                       <TooltipIconButton
-                        className="hover:text-primary text-foreground ml-auto size-4 p-0"
+                        className={`text-foreground hover:text-destructive size-4 p-0 transition ${
+                          manageSessions ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                        }`}
                         variant="ghost"
-                        tooltip="Archive session"
+                        tooltip="Delete session"
                         onClick={() => {
-                          void archiveSession(session.id);
+                          void deleteSession(session.id);
                         }}
                       >
-                        <ArchiveIcon />
+                        <Trash2Icon />
                       </TooltipIconButton>
-                    ) : (
-                      <span className="ml-auto w-4" aria-hidden="true" />
-                    )}
-                    <TooltipIconButton
-                      className="text-foreground hover:text-destructive mr-3 size-4 p-0"
-                      variant="ghost"
-                      tooltip="Delete session"
-                      onClick={() => {
-                        void deleteSession(session.id);
-                      }}
-                    >
-                      <Trash2Icon />
-                    </TooltipIconButton>
+                    </div>
                   </div>
                 );
               })}
