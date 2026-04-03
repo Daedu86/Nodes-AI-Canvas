@@ -20,6 +20,56 @@ const getPreview = (value: string) => {
   return compact.length > 150 ? `${compact.slice(0, 147)}...` : compact;
 };
 
+const getNodeTone = (data: ThreadGraphFlowNode["data"]) => {
+  if (data.kind === "root" || data.isRoot) {
+    return {
+      background:
+        "radial-gradient(circle at top right, rgba(96,165,250,0.2), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.98), rgba(239,246,255,0.96))",
+      glow: "shadow-[0_20px_50px_-30px_rgba(37,99,235,0.42)]",
+      roleLabel: "Entry",
+      toneLabel: "Conversation root",
+    };
+  }
+
+  if (data.kind === "bridge" || data.isBridge) {
+    return {
+      background:
+        "radial-gradient(circle at top right, rgba(251,191,36,0.16), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,251,235,0.96))",
+      glow: "shadow-[0_18px_42px_-28px_rgba(245,158,11,0.3)]",
+      roleLabel: "Bridge",
+      toneLabel: "Shared branch",
+    };
+  }
+
+  if (data.role === "assistant") {
+    return {
+      background:
+        "radial-gradient(circle at top right, rgba(125,211,252,0.18), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.98), rgba(240,249,255,0.95))",
+      glow: "shadow-[0_18px_42px_-28px_rgba(14,165,233,0.28)]",
+      roleLabel: "Assistant",
+      toneLabel: "AI reply",
+    };
+  }
+
+  if (data.role === "user") {
+    return {
+      background:
+        "radial-gradient(circle at top right, rgba(226,232,240,0.9), transparent 32%), linear-gradient(180deg, rgba(255,255,255,0.99), rgba(248,250,252,0.96))",
+      glow: "shadow-[0_18px_42px_-28px_rgba(15,23,42,0.22)]",
+      roleLabel: "Prompt",
+      toneLabel: "User input",
+    };
+  }
+
+  return {
+    background:
+      "radial-gradient(circle at top right, rgba(255,255,255,0.88), transparent 32%), linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.9))",
+    glow: "shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)]",
+    roleLabel: data.role || "Node",
+    toneLabel: "Conversation node",
+  };
+};
+
 export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<ThreadGraphFlowNode>) => {
   const isRoot = Boolean(data.isRoot || data.kind === "root");
   const isBridge = Boolean(data.isBridge || data.kind === "bridge");
@@ -36,8 +86,7 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
   const accent = data.accent ?? palette.swatch;
   const branchLabel = formatBranchLabel(data.branchId);
   const preview = getPreview(data.preview);
-  const roleLabel = isRoot ? "Root" : data.role || "Node";
-  const rootGlow = isRoot ? "shadow-[0_20px_50px_-30px_rgba(37,99,235,0.4)]" : "shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)]";
+  const tone = getNodeTone(data);
   const selectedRing = selected ? "ring-2 ring-sky-400/70" : "ring-1 ring-border/50";
   const draggingLift = dragging ? "scale-[1.015]" : "scale-100";
   const emphasis = data.emphasis ?? "normal";
@@ -50,9 +99,9 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
       className={[
         "group relative min-w-[280px] max-w-[340px] rounded-[28px] border bg-background/95 p-[1px] transition-all duration-200",
         selectedRing,
-        rootGlow,
+        tone.glow,
         draggingLift,
-        isMuted ? "opacity-35 saturate-75" : "",
+        isMuted ? "scale-[0.985] opacity-20 saturate-50" : "",
         isLineage ? "opacity-95" : "",
         isSelected ? "scale-[1.01]" : "",
       ].join(" ")}
@@ -64,8 +113,7 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
         <div
           className="pointer-events-none absolute inset-0 opacity-90"
           style={{
-            backgroundImage:
-              "radial-gradient(circle at top right, rgba(255,255,255,0.88), transparent 32%), linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.9))",
+            backgroundImage: tone.background,
           }}
         />
         <div
@@ -94,7 +142,7 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className={pillClass} style={{ borderColor: `${accent}55`, color: accent }}>
-                {roleLabel}
+                {tone.roleLabel}
               </span>
               {isBridge ? (
                 <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-700">
@@ -148,10 +196,11 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            {typeof data.idx === "number" ? <span>#{String(data.idx).padStart(2, "0")}</span> : null}
-            {isSelected ? (
-              <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-sky-700">
+            <div className="flex flex-col items-end gap-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              <span>{tone.toneLabel}</span>
+              {typeof data.idx === "number" ? <span>#{String(data.idx).padStart(2, "0")}</span> : null}
+              {isSelected ? (
+                <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-sky-700">
                 Focus
               </span>
             ) : null}

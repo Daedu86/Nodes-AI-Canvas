@@ -109,10 +109,10 @@ export const ThreadGraphEdge = memo(
           markerEnd={markerEnd}
           style={{
             stroke: accent,
-            strokeOpacity: isMuted ? 0.2 : isSelected ? 0.98 : isLineage ? 0.85 : 0.72,
+            strokeOpacity: isMuted ? 0.08 : isSelected ? 0.98 : isLineage ? 0.85 : 0.72,
             strokeWidth: outerWidth,
             strokeDasharray: isEditMode ? "10 8" : data?.tone === "context" ? "10 8" : undefined,
-            filter: `drop-shadow(0 0 8px ${accent}33)`,
+            filter: isMuted ? "none" : `drop-shadow(0 0 8px ${accent}33)`,
           }}
         />
         <BaseEdge
@@ -121,7 +121,7 @@ export const ThreadGraphEdge = memo(
           markerEnd={markerEnd}
           style={{
             stroke: "rgba(255,255,255,0.78)",
-            strokeOpacity: isMuted ? 0.12 : isSelected ? 0.92 : isLineage ? 0.7 : 0.55,
+            strokeOpacity: isMuted ? 0.04 : isSelected ? 0.92 : isLineage ? 0.7 : 0.55,
             strokeWidth: innerWidth,
             strokeDasharray: isEditMode
               ? "4 8"

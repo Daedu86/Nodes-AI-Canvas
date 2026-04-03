@@ -336,6 +336,7 @@ const LegendItem = ({ color, label }: { color: string; label: string }) => (
 );
 
 type FlowSpotlightMode = "all" | "assistant" | "user" | "bridge" | "edited";
+type FlowDensityMode = "overview" | "focus";
 type CanvasGuidePhase = "idle" | "walking" | "observing" | "thinking" | "speaking";
 
 const flowFilterLabel: Record<FlowSpotlightMode, string> = {
@@ -380,6 +381,7 @@ export function ThreadGraphFlow() {
   const { beginDraft, cancelDraft, draft, setDraftText } = useGraphBranchIntent();
   const [linkEditMode, setLinkEditMode] = React.useState(false);
   const [spotlight, setSpotlight] = React.useState<FlowSpotlightMode>("all");
+  const [densityMode, setDensityMode] = React.useState<FlowDensityMode>("overview");
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
   const [isSubmittingBranch, setIsSubmittingBranch] = React.useState(false);
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
@@ -473,6 +475,7 @@ export function ThreadGraphFlow() {
     setSelectedNodeId(null);
     setLinkEditMode(false);
     setSpotlight("all");
+    setDensityMode("overview");
     setIsGuideOpen(false);
     setIsGuideBusy(false);
     setGuidePhase("idle");
@@ -593,6 +596,57 @@ export function ThreadGraphFlow() {
     return lineage;
   }, [nodeIndex, nodes, selectedArtifact, selectedNodeId]);
 
+  const focusPathNodeIds = React.useMemo(() => {
+    if (!selectedNodeId) return new Set<string>();
+
+    const focusIds = new Set<string>([selectedNodeId]);
+
+    const addAncestors = (startId: string | null) => {
+      let currentId = startId;
+      while (currentId) {
+        if (focusIds.has(currentId)) {
+          const parentId = nodeIndex.get(currentId)?.parentId ?? null;
+          if (!parentId || focusIds.has(parentId)) {
+            break;
+          }
+        }
+        focusIds.add(currentId);
+        const parentId = nodeIndex.get(currentId)?.parentId ?? null;
+        if (!parentId) break;
+        currentId = parentId;
+      }
+    };
+
+    if (selectedArtifact) {
+      selectedContextLinkedMessageIds.forEach((messageId) => {
+        focusIds.add(messageId);
+        addAncestors(messageId);
+      });
+      return focusIds;
+    }
+
+    addAncestors(selectedNodeId);
+
+    nodes.forEach((node) => {
+      if (node.parentId === selectedNodeId) {
+        focusIds.add(node.id);
+      }
+    });
+
+    selectedContextArtifactIds.forEach((artifactId) => {
+      focusIds.add(artifactId);
+    });
+
+    return focusIds;
+  }, [
+    nodeIndex,
+    nodes,
+    selectedArtifact,
+    selectedContextArtifactIds,
+    selectedContextLinkedMessageIds,
+    selectedNodeId,
+  ]);
+
   const applyCanvasSelection = React.useCallback(
     (nodeId: string | null) => {
       setSelectedNodeId(nodeId);
@@ -620,6 +674,12 @@ export function ThreadGraphFlow() {
     }
     setSelectedNodeId(focusedMessageId);
   }, [focusedMessageId, nodeIndex, selectedNodeId]);
+
+  React.useEffect(() => {
+    if (densityMode === "focus" && !selectedNodeId) {
+      setDensityMode("overview");
+    }
+  }, [densityMode, selectedNodeId]);
 
   const relatedContextIds = React.useMemo(() => {
     const related = new Set<string>();
@@ -787,8 +847,31 @@ export function ThreadGraphFlow() {
     [baseArtifactNodes, baseContextEdges, baseConversationEdges, baseConversationNodes],
   );
 
+  const visibleNodeIds = React.useMemo(() => {
+    if (densityMode !== "focus" || !selectedNodeId) {
+      return null;
+    }
+    return focusPathNodeIds;
+  }, [densityMode, focusPathNodeIds, selectedNodeId]);
+
+  const visibleFlowNodes = React.useMemo(
+    () =>
+      visibleNodeIds
+        ? flowNodes.filter((node) => visibleNodeIds.has(node.id))
+        : flowNodes,
+    [flowNodes, visibleNodeIds],
+  );
+
+  const visibleFlowEdges = React.useMemo(
+    () =>
+      visibleNodeIds
+        ? flowEdges.filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target))
+        : flowEdges,
+    [flowEdges, visibleNodeIds],
+  );
+
   const decoratedFlowNodes = React.useMemo<ThreadGraphFlowNode[]>(() => {
-    return flowNodes.map((node) => {
+    return visibleFlowNodes.map((node) => {
       const originalNode = nodeIndex.get(node.id);
       const filterMatched = originalNode ? matchesSpotlight(originalNode) : true;
       const emphasis: NonNullable<ThreadGraphFlowNode["data"]["emphasis"]> =
@@ -811,10 +894,18 @@ export function ThreadGraphFlow() {
         },
       };
     });
-  }, [flowNodes, matchesSpotlight, nodeIndex, relatedContextIds, selectedLineage, selectedNodeId, spotlight]);
+  }, [
+    matchesSpotlight,
+    nodeIndex,
+    relatedContextIds,
+    selectedLineage,
+    selectedNodeId,
+    spotlight,
+    visibleFlowNodes,
+  ]);
 
   const decoratedFlowEdges = React.useMemo<ThreadGraphFlowEdge[]>(() => {
-    return flowEdges.map((edge) => {
+    return visibleFlowEdges.map((edge) => {
       const sourceInLineage = selectedLineage.has(edge.source) || relatedContextIds.has(edge.source);
       const targetInLineage = selectedLineage.has(edge.target) || relatedContextIds.has(edge.target);
       const sourceMatched = decoratedFlowNodes.find((node) => node.id === edge.source)?.data.filterMatched ?? true;
@@ -839,7 +930,7 @@ export function ThreadGraphFlow() {
         },
       };
     });
-  }, [decoratedFlowNodes, flowEdges, relatedContextIds, selectedLineage, selectedNodeId, spotlight]);
+  }, [decoratedFlowNodes, relatedContextIds, selectedLineage, selectedNodeId, spotlight, visibleFlowEdges]);
 
   const graphStructureSignature = React.useMemo(
     () =>
@@ -906,6 +997,25 @@ export function ThreadGraphFlow() {
       window.cancelAnimationFrame(animationFrame);
     };
   }, [focusedMessageId, nodeIndex, reactFlowInstance]);
+
+  React.useEffect(() => {
+    if (!reactFlowInstance || densityMode !== "focus" || !selectedNodeId) {
+      return;
+    }
+    const animationFrame = window.requestAnimationFrame(() => {
+      void reactFlowInstance
+        .fitView({
+          duration: 280,
+          padding: 0.28,
+        })
+        .then(() => {
+          setStoredViewport(reactFlowInstance.getViewport());
+        });
+    });
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+    };
+  }, [densityMode, reactFlowInstance, selectedNodeId, visibleFlowNodes.length]);
 
   const selectedFlowNode = React.useMemo(
     () => decoratedFlowNodes.find((node) => node.id === selectedNodeId) ?? null,
@@ -1189,6 +1299,8 @@ export function ThreadGraphFlow() {
   );
 
   const selectedPreview = selectedFlowNode?.data.preview?.replace(/\s+/g, " ").trim() ?? "";
+  const visibleCanvasNodeCount = decoratedFlowNodes.length;
+  const hiddenCanvasNodeCount = Math.max(0, flowNodes.length - visibleCanvasNodeCount);
   const selectedArtifactSize = formatByteSize(selectedArtifact?.byteSize);
   const selectedArtifactPreviewSize = selectedArtifact?.sourceDataUrl
     ? formatByteSize(estimateDataUrlBytes(selectedArtifact.sourceDataUrl))
@@ -1593,13 +1705,13 @@ export function ThreadGraphFlow() {
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-4 py-3">
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold">Thread Flow</h2>
+            <h2 className="text-sm font-semibold">Canvas</h2>
             <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700">
               Beta
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            React Flow renderer focused on visual clarity. Conversation branches and context artifacts share the same workspace.
+            Conversation branches and reusable context live in one surface. Use filters for overview, then switch to focus mode when you want a cleaner path.
           </p>
           {linkEditMode ? (
             <p className="text-xs text-rose-700">
@@ -1631,13 +1743,33 @@ export function ThreadGraphFlow() {
                 </span>
               </button>
             ))}
+            <button
+              type="button"
+              disabled={!selectedNodeId}
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                densityMode === "focus"
+                  ? "border-violet-500/35 bg-violet-500/10 text-violet-700"
+                  : "border-border/60 bg-background/80 text-muted-foreground hover:bg-background"
+              }`}
+              onClick={() =>
+                setDensityMode((current) => (current === "focus" ? "overview" : "focus"))
+              }
+            >
+              <Focus className="h-3.5 w-3.5" />
+              <span>{densityMode === "focus" ? "Focus path" : "Enter focus"}</span>
+            </button>
           </div>
         </div>
         <div className="flex max-w-[460px] flex-1 flex-col items-stretch gap-2">
           <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
-              {decoratedFlowNodes.length} nodes
+              {visibleCanvasNodeCount} / {flowNodes.length} nodes
             </span>
+            {hiddenCanvasNodeCount > 0 ? (
+              <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
+                {hiddenCanvasNodeCount} hidden
+              </span>
+            ) : null}
             <span className="inline-flex items-center rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-1 text-[11px] text-violet-700">
               {artifacts.length} artifact{artifacts.length === 1 ? "" : "s"}
             </span>
