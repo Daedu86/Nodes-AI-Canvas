@@ -5,6 +5,7 @@ import { getSupportedModelConfig } from "@/lib/model-options";
 
 export type HistoryMode = "last" | "full";
 export type ModelProvider = "ollama" | "openrouter";
+export type SessionViewMode = "chat" | "split" | "canvas";
 
 export type ModelConfig = {
   modelId: string;
@@ -23,6 +24,8 @@ type SessionUiStateContextValue = {
   setLlmEnabled: (value: boolean) => void;
   modelConfig: ModelConfig;
   setModelConfig: (value: ModelConfig) => void;
+  viewMode: SessionViewMode;
+  setViewMode: (value: SessionViewMode) => void;
   splitRatio: number;
   setSplitRatio: (value: number | ((prev: number) => number)) => void;
   linkOverrides: Map<string, LinkOverrideEntry>;
@@ -33,9 +36,11 @@ type SessionUiStateContextValue = {
 const LEGACY_HISTORY_MODE_KEY = "historyMode";
 const LEGACY_LLM_ENABLED_KEY = "llmEnabled";
 const LEGACY_MODEL_CONFIG_KEY = "modelConfig";
+const LEGACY_VIEW_MODE_KEY = "workspaceViewMode";
 const LEGACY_SPLIT_RATIO_KEY = "workspaceSplitRatio";
 const LEGACY_LINK_OVERRIDES_KEY = "threadGraph.linkOverrides.v1";
 const DEFAULT_SPLIT_RATIO = 0.6;
+const DEFAULT_VIEW_MODE: SessionViewMode = "split";
 
 const DEFAULT_MODEL_CONFIG: ModelConfig = getSupportedModelConfig({
   modelId: process.env.NEXT_PUBLIC_DEFAULT_MODEL,
@@ -114,6 +119,17 @@ const readSplitRatio = (sessionId: string) => {
   return Number.isFinite(parsed) ? parsed : DEFAULT_SPLIT_RATIO;
 };
 
+const readViewMode = (sessionId: string): SessionViewMode => {
+  const value = readStorageValue(
+    getScopedStorageKey(sessionId, "viewMode"),
+    LEGACY_VIEW_MODE_KEY,
+  );
+  if (value === "chat" || value === "canvas" || value === "split") {
+    return value;
+  }
+  return DEFAULT_VIEW_MODE;
+};
+
 const readLinkOverrides = (sessionId: string) => {
   const raw = readStorageValue(
     getScopedStorageKey(sessionId, "linkOverrides"),
@@ -147,6 +163,7 @@ export function SessionUiStateProvider({
   const [historyMode, setHistoryMode] = React.useState<HistoryMode>(() => readHistoryMode(sessionId));
   const [llmEnabled, setLlmEnabled] = React.useState<boolean>(() => readLlmEnabled(sessionId));
   const [modelConfig, setModelConfig] = React.useState<ModelConfig>(() => readModelConfig(sessionId));
+  const [viewMode, setViewMode] = React.useState<SessionViewMode>(() => readViewMode(sessionId));
   const [splitRatio, setSplitRatio] = React.useState<number>(() => readSplitRatio(sessionId));
   const [linkOverrides, setLinkOverrides] = React.useState<Map<string, LinkOverrideEntry>>(
     () => readLinkOverrides(sessionId),
@@ -181,6 +198,14 @@ export function SessionUiStateProvider({
 
   React.useEffect(() => {
     try {
+      localStorage.setItem(getScopedStorageKey(sessionId, "viewMode"), viewMode);
+    } catch {
+      // ignore storage errors
+    }
+  }, [sessionId, viewMode]);
+
+  React.useEffect(() => {
+    try {
       localStorage.setItem(getScopedStorageKey(sessionId, "splitRatio"), String(splitRatio));
     } catch {
       // ignore storage errors
@@ -212,13 +237,15 @@ export function SessionUiStateProvider({
       setLlmEnabled,
       modelConfig,
       setModelConfig,
+      viewMode,
+      setViewMode,
       splitRatio,
       setSplitRatio,
       linkOverrides,
       setLinkOverrides,
       sessionId,
     }),
-    [historyMode, llmEnabled, modelConfig, splitRatio, linkOverrides, sessionId],
+    [historyMode, llmEnabled, modelConfig, viewMode, splitRatio, linkOverrides, sessionId],
   );
 
   return (
@@ -237,7 +264,7 @@ export function useSessionUiState() {
 }
 
 export function useWorkspaceSplitState() {
-  const { splitRatio, setSplitRatio } = useSessionUiState();
-  return { splitRatio, setSplitRatio };
+  const { splitRatio, setSplitRatio, viewMode, setViewMode } = useSessionUiState();
+  return { splitRatio, setSplitRatio, viewMode, setViewMode };
 }
 

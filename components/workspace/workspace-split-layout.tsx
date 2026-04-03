@@ -12,7 +12,7 @@ export function WorkspaceSplitLayout({
   leftPanel,
   rightPanel,
 }: WorkspaceSplitLayoutProps) {
-  const { splitRatio, setSplitRatio } = useWorkspaceSplitState();
+  const { splitRatio, setSplitRatio, viewMode } = useWorkspaceSplitState();
   const splitRef = React.useRef<HTMLDivElement | null>(null);
   const pointerIdRef = React.useRef<number | null>(null);
   const resizingRef = React.useRef(false);
@@ -109,6 +109,26 @@ export function WorkspaceSplitLayout({
 
   const leftStyle = { flex: splitRatio, minWidth: 220 };
   const rightStyle = { flex: Math.max(0.1, 1 - splitRatio), minWidth: 220 };
+
+  if (viewMode === "chat") {
+    return (
+      <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
+        <div className="min-h-0 flex-1">
+          {leftPanel}
+        </div>
+      </div>
+    );
+  }
+
+  if (viewMode === "canvas") {
+    return (
+      <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
+        <div className="min-h-0 flex-1">
+          {rightPanel}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
