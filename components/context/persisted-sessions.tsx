@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useSession } from "next-auth/react";
 import type { SessionArtifact, SessionContextLink } from "@/lib/session-artifacts";
 import type { SessionDocument, SessionSummary, SessionThreadExport } from "@/lib/session-documents";
 
@@ -44,30 +45,32 @@ const pickSessionId = (
   return available.find((session) => !session.archived)?.id ?? available[0]?.id ?? null;
 };
 
-const ACTIVE_SESSION_KEY = "assistant-ui.active-session-id.v1";
+const buildActiveSessionKey = (userId: string | null) =>
+  userId ? `nodes.active-session-id.${userId}` : "nodes.active-session-id.v1";
 const KEEPALIVE_SAFE_BODY_BYTES = 60 * 1024;
 
 const PersistedSessionsContext = React.createContext<PersistedSessionsContextValue | null>(null);
 
-const readStoredActiveSessionId = () => {
+const readStoredActiveSessionId = (userId: string | null) => {
   try {
     const urlSessionId = new URLSearchParams(window.location.search).get("sessionId");
     if (urlSessionId && urlSessionId.length > 0) {
       return urlSessionId;
     }
-    return localStorage.getItem(ACTIVE_SESSION_KEY);
+    return localStorage.getItem(buildActiveSessionKey(userId));
   } catch {
     return null;
   }
 };
 
-const writeStoredActiveSessionId = (sessionId: string | null) => {
+const writeStoredActiveSessionId = (userId: string | null, sessionId: string | null) => {
   try {
+    const storageKey = buildActiveSessionKey(userId);
     if (!sessionId) {
-      localStorage.removeItem(ACTIVE_SESSION_KEY);
+      localStorage.removeItem(storageKey);
       return;
     }
-    localStorage.setItem(ACTIVE_SESSION_KEY, sessionId);
+    localStorage.setItem(storageKey, sessionId);
   } catch {
     // ignore storage errors
   }
@@ -90,6 +93,8 @@ async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit) {
 }
 
 export function PersistedSessionsProvider({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
+  const userId = session?.user?.id ?? null;
   const [sessions, setSessions] = React.useState<SessionSummary[]>([]);
   const [activeSession, setActiveSession] = React.useState<SessionDocument | null>(null);
   const [isReady, setIsReady] = React.useState(false);
@@ -97,9 +102,9 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
   const loadSession = React.useCallback(async (sessionId: string) => {
     const data = await fetchJson<SessionResponse>(`/api/sessions/${sessionId}`);
     setActiveSession(data.session);
-    writeStoredActiveSessionId(data.session.id);
+    writeStoredActiveSessionId(userId, data.session.id);
     return data.session;
-  }, []);
+  }, [userId]);
 
   const refreshSessions = React.useCallback(async () => {
     const data = await fetchJson<SessionsListResponse>("/api/sessions?includeArchived=1");
@@ -108,6 +113,15 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
   }, []);
 
   const bootstrap = React.useCallback(async () => {
+    if (status === "loading") {
+      return;
+    }
+    if (!userId) {
+      setSessions([]);
+      setActiveSession(null);
+      setIsReady(true);
+      return;
+    }
     setIsReady(false);
     try {
       let nextSessions = await refreshSessions();
@@ -120,13 +134,13 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
         nextSessions = [created.session];
         setSessions(nextSessions);
         setActiveSession(created.session);
-        writeStoredActiveSessionId(created.session.id);
+        writeStoredActiveSessionId(userId, created.session.id);
         return;
       }
 
       setSessions(nextSessions);
       const preferredId = pickSessionId(nextSessions, {
-        preferredId: readStoredActiveSessionId(),
+        preferredId: readStoredActiveSessionId(userId),
       });
 
       if (preferredId) {
@@ -140,17 +154,17 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
             await loadSession(fallbackSessionId);
           } else {
             setActiveSession(null);
-            writeStoredActiveSessionId(null);
+            writeStoredActiveSessionId(userId, null);
           }
         }
       } else {
         setActiveSession(null);
-        writeStoredActiveSessionId(null);
+        writeStoredActiveSessionId(userId, null);
       }
     } finally {
       setIsReady(true);
     }
-  }, [loadSession, refreshSessions]);
+  }, [loadSession, refreshSessions, status, userId]);
 
   React.useEffect(() => {
     void bootstrap();
@@ -170,9 +184,9 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
     });
     setSessions((prev) => [data.session, ...prev]);
     setActiveSession(data.session);
-    writeStoredActiveSessionId(data.session.id);
+    writeStoredActiveSessionId(userId, data.session.id);
     setIsReady(true);
-  }, []);
+  }, [userId]);
 
   const archiveSession = React.useCallback(async (sessionId: string) => {
     const data = await fetchJson<SessionResponse>(`/api/sessions/${sessionId}`, {
@@ -221,7 +235,7 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
 
     const nextSessionId = pickSessionId(remaining, {
       excludeIds: uniqueSessionIds,
-      preferredId: readStoredActiveSessionId(),
+      preferredId: readStoredActiveSessionId(userId),
     });
 
     if (nextSessionId) {
@@ -235,10 +249,10 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
       return;
     }
 
-    writeStoredActiveSessionId(null);
+    writeStoredActiveSessionId(userId, null);
     setActiveSession(null);
     await createSession();
-  }, [activeSession?.id, createSession, loadSession, refreshSessions]);
+  }, [activeSession?.id, createSession, loadSession, refreshSessions, userId]);
 
   const deleteSession = React.useCallback(async (sessionId: string) => {
     await deleteSessions([sessionId]);

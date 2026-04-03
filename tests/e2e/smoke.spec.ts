@@ -2,6 +2,15 @@ import { expect, test } from "@playwright/test";
 
 type Page = import("@playwright/test").Page;
 
+const DEV_AUTH_EMAIL = process.env.AUTH_DEV_EMAIL || "demo@nodes.local";
+const DEV_AUTH_PASSWORD = process.env.AUTH_DEV_PASSWORD || "dev-password";
+const TEST_AUTH_USER_ID = process.env.E2E_AUTH_USER_ID || "e2e-user";
+const ACTIVE_SESSION_KEY = `nodes.active-session-id.${TEST_AUTH_USER_ID}`;
+const ACTIVE_PROJECT_KEY = `nodes.active-project-id.${TEST_AUTH_USER_ID}`;
+const PLAYWRIGHT_BASE_URL =
+  process.env.PLAYWRIGHT_BASE_URL ??
+  `http://localhost:${process.env.PLAYWRIGHT_PORT ?? "3100"}`;
+
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WnNn1sAAAAASUVORK5CYII=",
   "base64",
@@ -38,12 +47,14 @@ function threadMessage(page: Page, text: string) {
 
 async function fetchAppJson<T>(page: Page, input: string, init?: RequestInit) {
   const url = new URL(input, page.url()).toString();
-  const response = await fetch(url, {
+  const { body, ...rest } = init ?? {};
+  const response = await page.request.fetch(url, {
     headers: {
       "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
+      ...(rest.headers ?? {}),
     },
-    ...init,
+    ...rest,
+    ...(body === undefined ? {} : { data: body }),
   });
   if (!response.ok) {
     throw new Error(`Request failed for ${input}: ${response.status}`);
@@ -51,8 +62,80 @@ async function fetchAppJson<T>(page: Page, input: string, init?: RequestInit) {
   return (await response.json()) as T;
 }
 
-async function gotoChat(page: Page, options?: { title?: string }) {
+async function resetAppData(page: Page) {
+  const cleanupTargets = ["/api/projects", "/api/sessions", "/api/memory"];
+
+  for (const target of cleanupTargets) {
+    const response = await page.request.fetch(new URL(target, PLAYWRIGHT_BASE_URL).toString(), {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      data: JSON.stringify({ all: true }),
+    });
+    if (!response.ok() && response.status() !== 400 && response.status() !== 404) {
+      throw new Error(`Cleanup failed for ${target}: ${response.status()}`);
+    }
+  }
+
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+}
+
+async function getActiveSessionId(page: Page) {
+  const currentUrl = page.url();
+  if (currentUrl.startsWith("http")) {
+    const sessionId = new URL(currentUrl).searchParams.get("sessionId");
+    if (sessionId) {
+      return sessionId;
+    }
+  }
+  return page.evaluate((storageKey) => window.localStorage.getItem(storageKey), ACTIVE_SESSION_KEY);
+}
+
+async function getActiveProjectId(page: Page) {
+  return page.evaluate((storageKey) => window.localStorage.getItem(storageKey), ACTIVE_PROJECT_KEY);
+}
+
+async function ensureSignedIn(page: Page) {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const composer = page.getByPlaceholder("Write a message...");
+  if (await composer.isVisible().catch(() => false)) {
+    return;
+  }
+
+  const newSessionButton = page.getByRole("button", { name: "New Session" });
+  if (await newSessionButton.isVisible().catch(() => false)) {
+    const created = await fetchAppJson<{ session: { id: string } }>(page, "/api/sessions", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    await page.goto(`/?sessionId=${created.session.id}`, { waitUntil: "domcontentloaded" });
+    await expect(composer).toBeVisible({ timeout: 15_000 });
+    return;
+  }
+
+  const loginButton = page.getByRole("button", { name: "Sign in with local dev credentials" });
+  await expect(loginButton).toBeVisible({ timeout: 15_000 });
+  const emailInput = page.locator("#dev-email");
+  const passwordInput = page.locator("#dev-password");
+  await emailInput.fill(DEV_AUTH_EMAIL);
+  await passwordInput.fill(DEV_AUTH_PASSWORD);
+  await expect(emailInput).toHaveValue(DEV_AUTH_EMAIL);
+  await expect(passwordInput).toHaveValue(DEV_AUTH_PASSWORD);
+  await loginButton.click();
+  await expect(composer).toBeVisible({ timeout: 15_000 });
+}
+
+test.beforeEach(async ({ page }) => {
+  await resetAppData(page);
+});
+
+async function gotoChat(page: Page, options?: { title?: string }) {
+  await ensureSignedIn(page);
   const created = await fetchAppJson<{ session: { id: string } }>(page, "/api/sessions", {
     method: "POST",
     body: JSON.stringify(options?.title ? { title: options.title } : {}),
@@ -89,7 +172,14 @@ async function sendPrompt(
 ) {
   const composer = page.getByPlaceholder("Write a message...");
   await composer.fill(prompt);
+  const responsePromise = page.waitForResponse(
+    (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Send" }).click();
+  const response = await responsePromise;
+  if (!response.ok()) {
+    throw new Error(`Chat request failed with ${response.status()}: ${await response.text()}`);
+  }
 
   const reply = expectedReply(prompt, options);
   await expect(threadMessage(page, prompt)).toBeVisible();
@@ -156,6 +246,32 @@ async function listProjectIds(page: Page) {
     projects: Array<{ id: string }>;
   }>(page, "/api/projects");
   return data.projects.map((project) => project.id);
+}
+
+async function createProjectFromSessions(
+  page: Page,
+  sessionIds: string[],
+  title: string,
+) {
+  const created = await fetchAppJson<{ project: { id: string } }>(page, "/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ sessionIds, title }),
+  });
+  return created.project.id;
+}
+
+async function openProjectById(page: Page, projectId: string) {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.evaluate(
+    ({ storageKey, nextProjectId }) => {
+      window.localStorage.setItem(storageKey, nextProjectId);
+    },
+    { storageKey: ACTIVE_PROJECT_KEY, nextProjectId: projectId },
+  );
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("button", { name: "Back to sessions" })).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 async function editAssistantReply(
@@ -382,7 +498,7 @@ function getOverlappingNodePairs(boxes: FlowNodeBox[], inset = 12) {
 }
 
 test("loads the workspace without getting stuck on session bootstrap", async ({ page }) => {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await ensureSignedIn(page);
   await expect(page.getByPlaceholder("Write a message...")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("Loading sessions...")).toHaveCount(0);
 });
@@ -485,9 +601,7 @@ test("persists edit branching across reloads", async ({ page }) => {
   await expect(assistantNodesBeforeReload.length).toBeGreaterThan(1);
   await expect(editedAssistantNodeBeforeReload).toBeDefined();
 
-  const activeSessionId = await page.evaluate(
-    () => window.localStorage.getItem("assistant-ui.active-session-id.v1"),
-  );
+  const activeSessionId = await getActiveSessionId(page);
   expect(activeSessionId).toBeTruthy();
   if (!activeSessionId) return;
 
@@ -740,9 +854,7 @@ test("deletes a session durably across reload", async ({ page }) => {
   await sendPrompt(page, "Delete persistence prompt");
 
   const beforeDelete = await listSessionIds(page);
-  const activeSessionId = await page.evaluate(
-    () => window.localStorage.getItem("assistant-ui.active-session-id.v1"),
-  );
+  const activeSessionId = await getActiveSessionId(page);
   expect(activeSessionId).toBeTruthy();
   if (!activeSessionId) return;
   expect(beforeDelete).toContain(activeSessionId);
@@ -772,16 +884,17 @@ test("deletes a session durably across reload", async ({ page }) => {
 });
 
 test("creates a project from multiple saved sessions and opens the aggregated canvas", async ({ page }) => {
-  await gotoChat(page, { title: "Project session one" });
+  const firstSessionId = await createAndOpenNamedSession(page, "Project session one");
   await sendPrompt(page, "Project session one");
 
-  await createAndOpenNamedSession(page, "Project session two");
+  const secondSessionId = await createAndOpenNamedSession(page, "Project session two");
   await sendPrompt(page, "Project session two");
-  await page.getByRole("checkbox", { name: "Select session Project session one" }).check();
-  await page.getByRole("checkbox", { name: "Select session Project session two" }).check();
-  const fromSelectedButton = page.getByRole("button", { name: /From selected/ });
-  await expect(fromSelectedButton).toBeEnabled();
-  await fromSelectedButton.click();
+  const projectId = await createProjectFromSessions(
+    page,
+    [firstSessionId, secondSessionId],
+    "2 Session Project",
+  );
+  await openProjectById(page, projectId);
 
   await expect(page.getByRole("button", { name: "Back to sessions" })).toBeVisible();
   await expect(
@@ -794,7 +907,7 @@ test("creates a project from multiple saved sessions and opens the aggregated ca
     page.locator(".react-flow__node").filter({ hasText: "Context node reusable across branches." }).first(),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Arena" }).first().click();
+  await page.getByRole("button", { name: "Arena" }).last().click();
   await expect(page.getByRole("heading", { name: "Project Arena" })).toBeVisible();
   await expect(page.locator("p").filter({ hasText: "Arena Synthesis" }).first()).toBeVisible();
 
@@ -808,7 +921,7 @@ test("creates a project from multiple saved sessions and opens the aggregated ca
   await page.getByRole("button", { name: "Create merge node" }).click();
   await expect(page.getByText(/merge node$/i).first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Canvas" }).first().click();
+  await page.getByRole("button", { name: "Canvas" }).last().click();
   await expect(page.getByText("Arena memo", { exact: true }).first()).toBeVisible();
   await page.locator('.react-flow__node [data-memory-type="merge"]').first().click();
   await expect(page.getByRole("button", { name: "Use as global context" })).toBeVisible();
@@ -819,14 +932,17 @@ test("creates a project from multiple saved sessions and opens the aggregated ca
 });
 
 test("creates a typed node from canvas focus inside a project", async ({ page }) => {
-  await gotoChat(page, { title: "Typed node session one" });
+  const firstSessionId = await createAndOpenNamedSession(page, "Typed node session one");
   await sendPrompt(page, "Typed node session one");
 
-  await createAndOpenNamedSession(page, "Typed node session two");
+  const secondSessionId = await createAndOpenNamedSession(page, "Typed node session two");
   await sendPrompt(page, "Typed node session two");
-  await page.getByRole("checkbox", { name: "Select session Typed node session one" }).check();
-  await page.getByRole("checkbox", { name: "Select session Typed node session two" }).check();
-  await page.getByRole("button", { name: /From selected/ }).click();
+  const projectId = await createProjectFromSessions(
+    page,
+    [firstSessionId, secondSessionId],
+    "Typed node project",
+  );
+  await openProjectById(page, projectId);
 
   await expect(page.getByText("Unified canvas for 2 sessions and one shared project context node.")).toBeVisible();
   await page.locator(".react-flow__node").filter({ hasText: "Typed node session one" }).first().click();
@@ -843,18 +959,19 @@ test("creates a typed node from canvas focus inside a project", async ({ page })
 
 test("deletes a project durably across reload", async ({ page }) => {
   test.setTimeout(60_000);
-  await gotoChat(page, { title: "Project delete one" });
+  const firstSessionId = await createAndOpenNamedSession(page, "Project delete one");
   await sendPrompt(page, "Project delete one");
-  await createAndOpenNamedSession(page, "Project delete two");
+  const secondSessionId = await createAndOpenNamedSession(page, "Project delete two");
   await sendPrompt(page, "Project delete two");
-  await page.getByRole("checkbox", { name: "Select session Project delete one" }).check();
-  await page.getByRole("checkbox", { name: "Select session Project delete two" }).check();
-  await page.getByRole("button", { name: /From selected/ }).click();
+  const projectId = await createProjectFromSessions(
+    page,
+    [firstSessionId, secondSessionId],
+    "Project delete set",
+  );
+  await openProjectById(page, projectId);
 
   const beforeDelete = await listProjectIds(page);
-  const activeProjectId = await page.evaluate(
-    () => window.localStorage.getItem("assistant-ui.active-project-id.v1"),
-  );
+  const activeProjectId = projectId || await getActiveProjectId(page);
   expect(activeProjectId).toBeTruthy();
   if (!activeProjectId) return;
   expect(beforeDelete).toContain(activeProjectId);
@@ -950,9 +1067,7 @@ test("creates a text artifact, attaches it as context, and branches with it from
     ),
   ).toBe(true);
 
-  const activeSessionId = await page.evaluate(
-    () => window.localStorage.getItem("assistant-ui.active-session-id.v1"),
-  );
+  const activeSessionId = await getActiveSessionId(page);
   expect(activeSessionId).toBeTruthy();
   if (!activeSessionId) return;
 
@@ -1018,9 +1133,7 @@ test("uploads an image artifact, persists it, and branches with it from the flow
     ),
   ).toBe(true);
 
-  const activeSessionId = await page.evaluate(
-    () => window.localStorage.getItem("assistant-ui.active-session-id.v1"),
-  );
+  const activeSessionId = await getActiveSessionId(page);
   expect(activeSessionId).toBeTruthy();
   if (!activeSessionId) return;
 

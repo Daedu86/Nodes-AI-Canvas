@@ -11,9 +11,9 @@ import {
 } from "@/lib/llm/config";
 import { buildE2eMockTitle, isE2eMockLlmEnabled } from "@/lib/llm/e2e-mock";
 import { normalizeMessages, toPlainTextTranscript } from "@/lib/llm/messages";
-import { enforceLocalApiAccess } from "@/lib/server/api-access";
+import { requireLocalApiUser } from "@/lib/server/request-guards";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const maxDuration = 15;
 
 type TitleRequestBody = {
@@ -33,8 +33,8 @@ function sanitizeTitle(value: string): string {
 }
 
 export async function POST(req: Request) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
   try {
     const { messages: maybeMessages, model, provider: maybeProvider }: TitleRequestBody = await req.json();

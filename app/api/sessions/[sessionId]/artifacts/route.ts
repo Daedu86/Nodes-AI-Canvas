@@ -5,7 +5,7 @@ import {
   DEFAULT_MAX_UPLOAD_IMAGE_BYTES,
   formatBytes,
 } from "@/lib/context-budget";
-import { enforceLocalApiAccess } from "@/lib/server/api-access";
+import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 export const runtime = "nodejs";
 
@@ -16,14 +16,14 @@ type RouteParams = {
 };
 
 export async function POST(req: Request, context: RouteParams) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
   const { sessionId } = await context.params;
 
   try {
     try {
-      await getSession(sessionId);
+      await getSession(sessionId, guarded.user.id);
     } catch {
       return new Response("Session not found", { status: 404 });
     }

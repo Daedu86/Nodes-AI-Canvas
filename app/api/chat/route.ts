@@ -14,7 +14,7 @@ import { buildContextArtifactsUserMessage } from "@/lib/llm/context-builder";
 import { createE2eMockChatResponse, isE2eMockLlmEnabled } from "@/lib/llm/e2e-mock";
 import { normalizeMessages, selectMessagesForHistoryMode } from "@/lib/llm/messages";
 import { openrouterClient } from "@/lib/llm/openrouter";
-import { enforceLocalApiAccess } from "@/lib/server/api-access";
+import { requireLocalApiUser } from "@/lib/server/request-guards";
 import { normalizeLlmContextArtifacts } from "@/lib/session-artifacts";
 
 export const runtime = "nodejs";
@@ -32,8 +32,8 @@ type ChatRequestBody = {
 };
 
 export async function POST(req: Request) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
   const body = (await req.json()) as ChatRequestBody;
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];

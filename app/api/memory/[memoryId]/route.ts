@@ -4,7 +4,9 @@ import {
   type ProjectMemorySourceKind,
   type ProjectMemoryType,
 } from "@/lib/memory-documents";
-import { enforceLocalApiAccess } from "@/lib/server/api-access";
+import { getProject } from "@/lib/project-store";
+import { getSession } from "@/lib/session-store";
+import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 type RouteParams = {
   params: Promise<{
@@ -25,12 +27,12 @@ type PatchMemoryBody = {
 export const runtime = "nodejs";
 
 export async function GET(_: Request, context: RouteParams) {
-  const accessError = enforceLocalApiAccess(_);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(_);
+  if ("response" in guarded) return guarded.response;
 
   const { memoryId } = await context.params;
   try {
-    const item = await getMemoryItem(memoryId);
+    const item = await getMemoryItem(memoryId, guarded.user.id);
     return Response.json({ item });
   } catch {
     return new Response("Memory not found", { status: 404 });
@@ -38,12 +40,38 @@ export async function GET(_: Request, context: RouteParams) {
 }
 
 export async function PATCH(req: Request, context: RouteParams) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
   const { memoryId } = await context.params;
   const body = (await req.json().catch(() => ({}))) as PatchMemoryBody;
   try {
+    let sourceProjectId: string | null | undefined;
+    if (body.sourceProjectId === undefined) {
+      sourceProjectId = undefined;
+    } else if (typeof body.sourceProjectId === "string" && body.sourceProjectId.length > 0) {
+      try {
+        sourceProjectId = (await getProject(body.sourceProjectId, guarded.user.id)).id;
+      } catch {
+        sourceProjectId = null;
+      }
+    } else {
+      sourceProjectId = null;
+    }
+
+    let sourceSessionId: string | null | undefined;
+    if (body.sourceSessionId === undefined) {
+      sourceSessionId = undefined;
+    } else if (typeof body.sourceSessionId === "string" && body.sourceSessionId.length > 0) {
+      try {
+        sourceSessionId = (await getSession(body.sourceSessionId, guarded.user.id)).id;
+      } catch {
+        sourceSessionId = null;
+      }
+    } else {
+      sourceSessionId = null;
+    }
+
     const item = await patchMemoryItem(memoryId, {
       content:
         body.content === undefined
@@ -51,12 +79,7 @@ export async function PATCH(req: Request, context: RouteParams) {
           : typeof body.content === "string"
             ? body.content
             : "",
-      sourceProjectId:
-        body.sourceProjectId === undefined
-          ? undefined
-          : typeof body.sourceProjectId === "string" && body.sourceProjectId.length > 0
-            ? body.sourceProjectId
-            : null,
+      sourceProjectId,
       sourceKeys:
         body.sourceKeys === undefined
           ? undefined
@@ -69,17 +92,12 @@ export async function PATCH(req: Request, context: RouteParams) {
           : body.sourceKind === "session" || body.sourceKind === "branch"
             ? (body.sourceKind as ProjectMemorySourceKind)
             : null,
-      sourceSessionId:
-        body.sourceSessionId === undefined
-          ? undefined
-          : typeof body.sourceSessionId === "string" && body.sourceSessionId.length > 0
-            ? body.sourceSessionId
-            : null,
+      sourceSessionId,
       title: body.title ?? undefined,
       type: PROJECT_MEMORY_TYPES.includes(body.type as ProjectMemoryType)
         ? (body.type as ProjectMemoryType)
         : undefined,
-    });
+    }, guarded.user.id);
     return Response.json({ item });
   } catch {
     return new Response("Memory not found", { status: 404 });
@@ -87,12 +105,12 @@ export async function PATCH(req: Request, context: RouteParams) {
 }
 
 export async function DELETE(_: Request, context: RouteParams) {
-  const accessError = enforceLocalApiAccess(_);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(_);
+  if ("response" in guarded) return guarded.response;
 
   const { memoryId } = await context.params;
   try {
-    await deleteMemoryItem(memoryId);
+    await deleteMemoryItem(memoryId, guarded.user.id);
     return new Response(null, { status: 204 });
   } catch {
     return new Response("Memory not found", { status: 404 });

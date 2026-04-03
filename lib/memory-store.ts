@@ -8,8 +8,13 @@ import {
   type ProjectMemoryType,
 } from "@/lib/memory-documents";
 
+type StoredMemoryItem = ProjectMemoryItem & {
+  ownerId: string | null;
+};
+
 type MemoryPatch = {
   content?: string;
+  ownerId?: string | null;
   sourceProjectId?: string | null;
   sourceKeys?: string[];
   sourceKind?: ProjectMemorySourceKind;
@@ -36,6 +41,15 @@ const getMemoryFilePath = (memoryId: string) => {
   return path.join(getMemoryStoreDir(), `${memoryId}${MEMORY_FILE_EXTENSION}`);
 };
 
+const normalizeOwnerId = (value: unknown) =>
+  typeof value === "string" && value.length > 0 ? value : null;
+
+const toMemoryItem = (storedItem: StoredMemoryItem): ProjectMemoryItem => {
+  const { ownerId, ...item } = storedItem;
+  void ownerId;
+  return item;
+};
+
 const sortMemoryItems = (items: ProjectMemoryItem[]) =>
   [...items].sort((a, b) => {
     const updatedDelta = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
@@ -47,7 +61,7 @@ async function ensureMemoryStoreDir() {
   await fs.mkdir(getMemoryStoreDir(), { recursive: true });
 }
 
-async function writeMemoryItem(item: ProjectMemoryItem) {
+async function writeMemoryItem(item: StoredMemoryItem) {
   await ensureMemoryStoreDir();
   const filePath = getMemoryFilePath(item.id);
   const tempPath = `${filePath}.tmp`;
@@ -55,13 +69,17 @@ async function writeMemoryItem(item: ProjectMemoryItem) {
   await fs.rename(tempPath, filePath);
 }
 
-async function readMemoryItemFromPath(filePath: string): Promise<ProjectMemoryItem> {
+async function readMemoryItemFromPath(filePath: string): Promise<StoredMemoryItem> {
   const raw = await fs.readFile(filePath, "utf8");
-  const parsed = normalizeProjectMemoryItem(JSON.parse(raw));
+  const json = JSON.parse(raw) as { ownerId?: unknown };
+  const parsed = normalizeProjectMemoryItem(json);
   if (!parsed) {
     throw new Error(`Invalid memory item: ${filePath}`);
   }
-  return parsed;
+  return {
+    ...parsed,
+    ownerId: normalizeOwnerId(json.ownerId),
+  };
 }
 
 async function readAllMemoryItems() {
@@ -74,17 +92,58 @@ async function readAllMemoryItems() {
   );
 }
 
-export async function listMemoryItems() {
-  const items = await readAllMemoryItems();
-  return sortMemoryItems(items);
+async function claimMemoryOwnerIfNeeded(item: StoredMemoryItem, ownerId: string) {
+  if (item.ownerId === ownerId) {
+    return item;
+  }
+  if (item.ownerId) {
+    return null;
+  }
+  const claimed = {
+    ...item,
+    ownerId,
+  };
+  await writeMemoryItem(claimed);
+  return claimed;
 }
 
-export async function getMemoryItem(memoryId: string) {
-  return readMemoryItemFromPath(getMemoryFilePath(memoryId));
+async function getStoredMemoryItem(memoryId: string, ownerId?: string) {
+  const item = await readMemoryItemFromPath(getMemoryFilePath(memoryId));
+  if (!ownerId) {
+    return item;
+  }
+  const claimed = await claimMemoryOwnerIfNeeded(item, ownerId);
+  if (!claimed) {
+    throw new Error("Memory not found");
+  }
+  return claimed;
+}
+
+export async function listMemoryItems(options: { ownerId?: string } = {}) {
+  const ownerId = typeof options.ownerId === "string" && options.ownerId.length > 0
+    ? options.ownerId
+    : null;
+  let items = await readAllMemoryItems();
+  if (ownerId) {
+    const visibleItems: StoredMemoryItem[] = [];
+    for (const item of items) {
+      const claimed = await claimMemoryOwnerIfNeeded(item, ownerId);
+      if (claimed) {
+        visibleItems.push(claimed);
+      }
+    }
+    items = visibleItems;
+  }
+  return sortMemoryItems(items.map((item) => toMemoryItem(item)));
+}
+
+export async function getMemoryItem(memoryId: string, ownerId?: string) {
+  return toMemoryItem(await getStoredMemoryItem(memoryId, ownerId));
 }
 
 export async function createMemoryItem(input: {
   content: string;
+  ownerId?: string;
   sourceProjectId?: string | null;
   sourceKeys?: string[];
   sourceKind?: ProjectMemorySourceKind;
@@ -93,10 +152,11 @@ export async function createMemoryItem(input: {
   type: ProjectMemoryType;
 }) {
   const now = new Date().toISOString();
-  const item: ProjectMemoryItem = {
+  const item: StoredMemoryItem = {
     content: input.content,
     createdAt: now,
     id: randomUUID(),
+    ownerId: normalizeOwnerId(input.ownerId),
     sourceProjectId:
       typeof input.sourceProjectId === "string" && input.sourceProjectId.length > 0
         ? input.sourceProjectId
@@ -114,18 +174,19 @@ export async function createMemoryItem(input: {
     updatedAt: now,
   };
   await writeMemoryItem(item);
-  return item;
+  return toMemoryItem(item);
 }
 
-export async function patchMemoryItem(memoryId: string, patch: MemoryPatch) {
-  const current = await getMemoryItem(memoryId);
-  const next: ProjectMemoryItem = {
+export async function patchMemoryItem(memoryId: string, patch: MemoryPatch, ownerId?: string) {
+  const current = await getStoredMemoryItem(memoryId, ownerId);
+  const next: StoredMemoryItem = {
     content:
       patch.content === undefined
         ? current.content
         : patch.content,
     createdAt: current.createdAt,
     id: current.id,
+    ownerId: current.ownerId,
     sourceProjectId:
       patch.sourceProjectId === undefined
         ? current.sourceProjectId
@@ -150,14 +211,15 @@ export async function patchMemoryItem(memoryId: string, patch: MemoryPatch) {
     updatedAt: new Date().toISOString(),
   };
   await writeMemoryItem(next);
-  return next;
+  return toMemoryItem(next);
 }
 
-export async function deleteMemoryItem(memoryId: string) {
-  await fs.rm(getMemoryFilePath(memoryId), { force: true });
+export async function deleteMemoryItem(memoryId: string, ownerId?: string) {
+  const item = await getStoredMemoryItem(memoryId, ownerId);
+  await fs.rm(getMemoryFilePath(item.id), { force: true });
 }
 
-export async function deleteMemoryItems(memoryIds: string[]) {
+export async function deleteMemoryItems(memoryIds: string[], ownerId?: string) {
   const uniqueIds = [...new Set(memoryIds)];
-  await Promise.all(uniqueIds.map((memoryId) => deleteMemoryItem(memoryId)));
+  await Promise.all(uniqueIds.map((memoryId) => deleteMemoryItem(memoryId, ownerId)));
 }

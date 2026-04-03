@@ -9,7 +9,7 @@ import {
   normalizeSessionContextLinksDocument,
   normalizeSessionThreadExport,
 } from "@/lib/session-documents";
-import { enforceLocalApiAccess } from "@/lib/server/api-access";
+import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 export const runtime = "nodejs";
 
@@ -26,21 +26,22 @@ type DeleteSessionsBody = {
 };
 
 export async function GET(req: Request) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
   const url = new URL(req.url);
   const includeArchived = url.searchParams.get("includeArchived") === "1";
-  const sessions = await listSessions({ includeArchived });
+  const sessions = await listSessions({ includeArchived, ownerId: guarded.user.id });
   return Response.json({ sessions });
 }
 
 export async function POST(req: Request) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
   const body = (await req.json().catch(() => ({}))) as CreateSessionBody;
   const session = await createSession({
+    ownerId: guarded.user.id,
     title: body.title ?? null,
     artifacts: normalizeSessionArtifactsDocument(body.artifacts),
     contextLinks: normalizeSessionContextLinksDocument(body.contextLinks),
@@ -50,8 +51,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
   const body = (await req.json().catch(() => ({}))) as DeleteSessionsBody;
   const deleteAll = body.all === true;
@@ -60,13 +61,13 @@ export async function DELETE(req: Request) {
     : [];
 
   const sessionIds = deleteAll
-    ? (await listSessions({ includeArchived: true })).map((session) => session.id)
+    ? (await listSessions({ includeArchived: true, ownerId: guarded.user.id })).map((session) => session.id)
     : [...new Set(requestedIds)];
 
   if (sessionIds.length === 0) {
     return new Response("No sessions selected", { status: 400 });
   }
 
-  await deleteSessionBatch(sessionIds);
+  await deleteSessionBatch(sessionIds, guarded.user.id);
   return Response.json({ deletedIds: sessionIds });
 }

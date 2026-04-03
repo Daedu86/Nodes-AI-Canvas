@@ -19,7 +19,9 @@ import {
   reconcileSessionArtifactBlobs,
 } from "@/lib/session-blob-store";
 
-type StoredSession = Omit<SessionDocument, "messageCount">;
+type StoredSession = Omit<SessionDocument, "messageCount"> & {
+  ownerId: string | null;
+};
 
 type SessionPatch = {
   archived?: boolean;
@@ -47,13 +49,33 @@ const getSessionFilePath = (sessionId: string) => {
   return path.join(getSessionStoreDir(), `${sessionId}${SESSION_FILE_EXTENSION}`);
 };
 
-const toSessionDocument = (session: StoredSession): SessionDocument => ({
-  ...session,
-  snapshot: normalizeSessionThreadExport(session.snapshot),
-  artifacts: normalizeSessionArtifactsDocument(session.artifacts),
-  contextLinks: normalizeSessionContextLinksDocument(session.contextLinks),
-  messageCount: getSessionMessageCount(normalizeSessionThreadExport(session.snapshot)),
-});
+const normalizeOwnerId = (value: unknown) =>
+  typeof value === "string" && value.length > 0 ? value : null;
+
+const toStoredSession = (
+  session: SessionDocument,
+  ownerId: string | null,
+): StoredSession => {
+  const { messageCount, ...storedSession } = session;
+  void messageCount;
+  return {
+    ...storedSession,
+    ownerId,
+  };
+};
+
+const toSessionDocument = (storedSession: StoredSession): SessionDocument => {
+  const { ownerId, ...session } = storedSession;
+  void ownerId;
+  const snapshot = normalizeSessionThreadExport(session.snapshot);
+  return {
+    ...session,
+    snapshot,
+    artifacts: normalizeSessionArtifactsDocument(session.artifacts),
+    contextLinks: normalizeSessionContextLinksDocument(session.contextLinks),
+    messageCount: getSessionMessageCount(snapshot),
+  };
+};
 
 const sortSessions = (sessions: SessionSummary[]) =>
   [...sessions].sort((a, b) => {
@@ -74,11 +96,11 @@ async function writeSessionDocument(session: StoredSession) {
   await fs.rename(tempPath, filePath);
 }
 
-async function readSessionDocumentFromPath(filePath: string): Promise<SessionDocument> {
+async function readSessionDocumentFromPath(filePath: string): Promise<StoredSession> {
   const raw = await fs.readFile(filePath, "utf8");
   const parsed = JSON.parse(raw) as Partial<StoredSession>;
   const snapshot = normalizeSessionThreadExport(parsed.snapshot);
-  return toSessionDocument({
+  return toStoredSession(toSessionDocument({
     id: typeof parsed.id === "string" ? parsed.id : path.basename(filePath, SESSION_FILE_EXTENSION),
     title: typeof parsed.title === "string" && parsed.title.trim().length ? parsed.title.trim() : null,
     archived: parsed.archived === true,
@@ -90,10 +112,11 @@ async function readSessionDocumentFromPath(filePath: string): Promise<SessionDoc
       typeof parsed.updatedAt === "string" && parsed.updatedAt.length
         ? parsed.updatedAt
         : new Date().toISOString(),
+    ownerId: normalizeOwnerId(parsed.ownerId),
     snapshot,
     artifacts: normalizeSessionArtifactsDocument(parsed.artifacts),
     contextLinks: normalizeSessionContextLinksDocument(parsed.contextLinks),
-  });
+  }), normalizeOwnerId(parsed.ownerId));
 }
 
 async function readAllSessionDocuments() {
@@ -106,6 +129,33 @@ async function readAllSessionDocuments() {
   );
 }
 
+async function claimSessionOwnerIfNeeded(session: StoredSession, ownerId: string) {
+  if (session.ownerId === ownerId) {
+    return session;
+  }
+  if (session.ownerId) {
+    return null;
+  }
+  const claimed = {
+    ...session,
+    ownerId,
+  };
+  await writeSessionDocument(claimed);
+  return claimed;
+}
+
+async function getStoredSession(sessionId: string, ownerId?: string) {
+  const session = await readSessionDocumentFromPath(getSessionFilePath(sessionId));
+  if (!ownerId) {
+    return session;
+  }
+  const claimed = await claimSessionOwnerIfNeeded(session, ownerId);
+  if (!claimed) {
+    throw new Error("Session not found");
+  }
+  return claimed;
+}
+
 async function getReferencedBlobRefs() {
   const sessions = await readAllSessionDocuments();
   return sessions.flatMap((session) =>
@@ -115,29 +165,46 @@ async function getReferencedBlobRefs() {
   );
 }
 
-export async function listSessions(options: { includeArchived?: boolean } = {}) {
+export async function listSessions(options: { includeArchived?: boolean; ownerId?: string } = {}) {
   const includeArchived = options.includeArchived === true;
-  const sessions = await readAllSessionDocuments();
+  const ownerId = typeof options.ownerId === "string" && options.ownerId.length > 0
+    ? options.ownerId
+    : null;
+  let sessions = await readAllSessionDocuments();
+
+  if (ownerId) {
+    const visibleSessions: StoredSession[] = [];
+    for (const session of sessions) {
+      const claimed = await claimSessionOwnerIfNeeded(session, ownerId);
+      if (claimed) {
+        visibleSessions.push(claimed);
+      }
+    }
+    sessions = visibleSessions;
+  }
 
   const summaries = sessions
     .filter((session) => includeArchived || !session.archived)
-    .map<SessionSummary>(({ snapshot, ...session }) => ({
-      ...session,
-      messageCount: getSessionMessageCount(snapshot),
-    }));
+    .map<SessionSummary>((storedSession) => {
+      const { ownerId, snapshot, ...session } = storedSession;
+      void ownerId;
+      return {
+        ...session,
+        messageCount: getSessionMessageCount(snapshot),
+      };
+    });
 
   return sortSessions(summaries);
 }
 
-export async function getSession(sessionId: string) {
-  const filePath = getSessionFilePath(sessionId);
-  const session = await readSessionDocumentFromPath(filePath);
-  return session;
+export async function getSession(sessionId: string, ownerId?: string) {
+  return toSessionDocument(await getStoredSession(sessionId, ownerId));
 }
 
 export async function createSession(input: {
   artifacts?: SessionArtifact[];
   contextLinks?: SessionContextLink[];
+  ownerId?: string;
   snapshot?: SessionThreadExport;
   title?: string | null;
 } = {}) {
@@ -148,6 +215,7 @@ export async function createSession(input: {
     archived: false,
     createdAt: now,
     updatedAt: now,
+    ownerId: normalizeOwnerId(input.ownerId),
     snapshot: normalizeSessionThreadExport(input.snapshot ?? EMPTY_SESSION_THREAD_EXPORT),
     artifacts: normalizeSessionArtifactsDocument(input.artifacts),
     contextLinks: normalizeSessionContextLinksDocument(input.contextLinks),
@@ -156,8 +224,8 @@ export async function createSession(input: {
   return toSessionDocument(session);
 }
 
-export async function patchSession(sessionId: string, patch: SessionPatch) {
-  const current = await getSession(sessionId);
+export async function patchSession(sessionId: string, patch: SessionPatch, ownerId?: string) {
+  const current = await getStoredSession(sessionId, ownerId);
   const next: StoredSession = {
     id: current.id,
     title:
@@ -169,6 +237,7 @@ export async function patchSession(sessionId: string, patch: SessionPatch) {
     archived: patch.archived ?? current.archived,
     createdAt: current.createdAt,
     updatedAt: new Date().toISOString(),
+    ownerId: current.ownerId,
     snapshot:
       patch.snapshot === undefined
         ? current.snapshot
@@ -187,15 +256,16 @@ export async function patchSession(sessionId: string, patch: SessionPatch) {
   return toSessionDocument(next);
 }
 
-export async function deleteSession(sessionId: string) {
-  const filePath = getSessionFilePath(sessionId);
+export async function deleteSession(sessionId: string, ownerId?: string) {
+  const session = await getStoredSession(sessionId, ownerId);
+  const filePath = getSessionFilePath(session.id);
   await fs.rm(filePath, { force: true });
-  await deleteSessionBlobDir(sessionId);
+  await deleteSessionBlobDir(session.id);
 }
 
-export async function deleteSessions(sessionIds: string[]) {
+export async function deleteSessions(sessionIds: string[], ownerId?: string) {
   const uniqueSessionIds = [...new Set(sessionIds)];
-  await Promise.all(uniqueSessionIds.map((sessionId) => deleteSession(sessionId)));
+  await Promise.all(uniqueSessionIds.map((sessionId) => deleteSession(sessionId, ownerId)));
 }
 
 export async function getSessionBlobMaintenanceSummary() {

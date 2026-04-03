@@ -15,7 +15,7 @@ import {
 } from "@/lib/llm/config";
 import { isE2eMockLlmEnabled } from "@/lib/llm/e2e-mock";
 import { openrouterClient } from "@/lib/llm/openrouter";
-import { enforceLocalApiAccess } from "@/lib/server/api-access";
+import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -33,8 +33,8 @@ const buildE2eMockCanvasGuideText = (action: CanvasGuideAction, payload: CanvasG
 };
 
 export async function POST(req: Request) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
   try {
     const body = (await req.json()) as CanvasAgentRequestBody;

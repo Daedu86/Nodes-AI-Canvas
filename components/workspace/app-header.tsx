@@ -15,6 +15,7 @@ import { LlmToggleButton } from "@/components/assistant-ui/llm-toggle";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { SessionContextSheet } from "@/components/workspace/session-context-sheet";
+import { AuthStatusButton } from "@/components/auth/auth-status-button";
 import { ProductBrand } from "@/components/workspace/product-brand";
 
 export const AppHeader = () => {
@@ -48,6 +49,7 @@ export const AppHeader = () => {
           {llmEnabled ? "AI on" : "AI off"}
         </span>
         <LlmToggleButton />
+        <AuthStatusButton />
         <ThemeToggle />
       </div>
     </header>

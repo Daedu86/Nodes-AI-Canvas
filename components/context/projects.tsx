@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useSession } from "next-auth/react";
 import type { ProjectDocument, ProjectSummary } from "@/lib/project-documents";
 
 type ProjectsContextValue = {
@@ -38,26 +39,28 @@ type ProjectResponse = {
   project: ProjectDocument;
 };
 
-const ACTIVE_PROJECT_KEY = "assistant-ui.active-project-id.v1";
+const buildActiveProjectKey = (userId: string | null) =>
+  userId ? `nodes.active-project-id.${userId}` : "nodes.active-project-id.v1";
 const AUTO_OPEN_PROJECT_SESSION_THRESHOLD = 10;
 
 const ProjectsContext = React.createContext<ProjectsContextValue | null>(null);
 
-const readStoredActiveProjectId = () => {
+const readStoredActiveProjectId = (userId: string | null) => {
   try {
-    return localStorage.getItem(ACTIVE_PROJECT_KEY);
+    return localStorage.getItem(buildActiveProjectKey(userId));
   } catch {
     return null;
   }
 };
 
-const writeStoredActiveProjectId = (projectId: string | null) => {
+const writeStoredActiveProjectId = (userId: string | null, projectId: string | null) => {
   try {
+    const storageKey = buildActiveProjectKey(userId);
     if (!projectId) {
-      localStorage.removeItem(ACTIVE_PROJECT_KEY);
+      localStorage.removeItem(storageKey);
       return;
     }
-    localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
+    localStorage.setItem(storageKey, projectId);
   } catch {
     // ignore storage errors
   }
@@ -80,6 +83,8 @@ async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit) {
 }
 
 export function ProjectsProvider({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
+  const userId = session?.user?.id ?? null;
   const [projects, setProjects] = React.useState<ProjectSummary[]>([]);
   const [activeProject, setActiveProject] = React.useState<ProjectDocument | null>(null);
   const [isReady, setIsReady] = React.useState(false);
@@ -93,9 +98,9 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
   const loadProject = React.useCallback(async (projectId: string) => {
     const data = await fetchJson<ProjectResponse>(`/api/projects/${projectId}`);
     setActiveProject(data.project);
-    writeStoredActiveProjectId(data.project.id);
+    writeStoredActiveProjectId(userId, data.project.id);
     return data.project;
-  }, []);
+  }, [userId]);
 
   const refreshProjects = React.useCallback(async () => {
     const data = await fetchJson<ProjectsListResponse>("/api/projects");
@@ -107,10 +112,21 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
 
     const bootstrap = async () => {
+      if (status === "loading") {
+        return;
+      }
       setIsReady(false);
       try {
+        if (!userId) {
+          if (mounted) {
+            setProjects([]);
+            setActiveProject(null);
+            setIsReady(true);
+          }
+          return;
+        }
         const loadedProjects = await refreshProjects();
-        const preferredId = readStoredActiveProjectId();
+        const preferredId = readStoredActiveProjectId(userId);
         const preferredProject = preferredId
           ? loadedProjects.find((project) => project.id === preferredId) ?? null
           : null;
@@ -121,7 +137,7 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         ) {
           if (mounted) {
             setActiveProject(null);
-            writeStoredActiveProjectId(null);
+            writeStoredActiveProjectId(userId, null);
           }
         } else if (preferredId && loadedProjects.some((project) => project.id === preferredId)) {
           try {
@@ -129,12 +145,12 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
           } catch {
             if (mounted) {
               setActiveProject(null);
-              writeStoredActiveProjectId(null);
+              writeStoredActiveProjectId(userId, null);
             }
           }
         } else if (mounted) {
           setActiveProject(null);
-          writeStoredActiveProjectId(null);
+          writeStoredActiveProjectId(userId, null);
         }
       } finally {
         if (mounted) {
@@ -148,12 +164,12 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [loadProject, refreshProjects]);
+  }, [loadProject, refreshProjects, status, userId]);
 
   const clearActiveProject = React.useCallback(() => {
     setActiveProject(null);
-    writeStoredActiveProjectId(null);
-  }, []);
+    writeStoredActiveProjectId(userId, null);
+  }, [userId]);
 
   const selectProject = React.useCallback(async (projectId: string) => {
     setIsReady(false);
@@ -178,12 +194,12 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       });
       setProjects((prev) => [data.project, ...prev]);
       setActiveProject(data.project);
-      writeStoredActiveProjectId(data.project.id);
+      writeStoredActiveProjectId(userId, data.project.id);
       return data.project;
     } finally {
       setIsReady(true);
     }
-  }, []);
+  }, [userId]);
 
   const deleteProjects = React.useCallback(async (projectIds: string[]) => {
     const uniqueProjectIds = [...new Set(projectIds)].filter((projectId) => projectId.length > 0);
@@ -195,7 +211,7 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     if (deletingActiveProject) {
       activeProjectRef.current = null;
       setActiveProject(null);
-      writeStoredActiveProjectId(null);
+      writeStoredActiveProjectId(userId, null);
     }
 
     const response = await fetch("/api/projects", {
@@ -218,7 +234,7 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         clearActiveProject();
       }
     }
-  }, [clearActiveProject, loadProject, refreshProjects]);
+  }, [clearActiveProject, loadProject, refreshProjects, userId]);
 
   const deleteProject = React.useCallback(async (projectId: string) => {
     await deleteProjects([projectId]);

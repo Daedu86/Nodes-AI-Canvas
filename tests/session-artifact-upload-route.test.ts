@@ -96,7 +96,7 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(getSessionMock).toHaveBeenCalledWith("session-123");
+    expect(getSessionMock).toHaveBeenCalledWith("session-123", "test-user");
     expect(saveSessionArtifactBlobMock).toHaveBeenCalledWith(
       expect.objectContaining({
         fileName: "diagram.png",

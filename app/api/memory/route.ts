@@ -8,7 +8,9 @@ import {
   type ProjectMemorySourceKind,
   type ProjectMemoryType,
 } from "@/lib/memory-documents";
-import { enforceLocalApiAccess } from "@/lib/server/api-access";
+import { getProject } from "@/lib/project-store";
+import { getSession } from "@/lib/session-store";
+import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 type CreateMemoryBody = {
   content?: string;
@@ -28,16 +30,16 @@ type DeleteMemoryBody = {
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
-  const items = await listMemoryItems();
+  const items = await listMemoryItems({ ownerId: guarded.user.id });
   return Response.json({ items });
 }
 
 export async function POST(req: Request) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
   const body = (await req.json().catch(() => ({}))) as CreateMemoryBody;
   const title = typeof body.title === "string" ? body.title.trim() : "";
@@ -50,12 +52,39 @@ export async function POST(req: Request) {
     return new Response("Title and content are required", { status: 400 });
   }
 
+  const sourceProjectId =
+    typeof body.sourceProjectId === "string" && body.sourceProjectId.length > 0
+      ? body.sourceProjectId
+      : null;
+  const sourceSessionId =
+    typeof body.sourceSessionId === "string" && body.sourceSessionId.length > 0
+      ? body.sourceSessionId
+      : null;
+
+  let resolvedProjectId: string | null = null;
+  if (sourceProjectId) {
+    try {
+      const project = await getProject(sourceProjectId, guarded.user.id);
+      resolvedProjectId = project.id;
+    } catch {
+      resolvedProjectId = null;
+    }
+  }
+
+  let resolvedSessionId: string | null = null;
+  if (sourceSessionId) {
+    try {
+      const session = await getSession(sourceSessionId, guarded.user.id);
+      resolvedSessionId = session.id;
+    } catch {
+      resolvedSessionId = null;
+    }
+  }
+
   const item = await createMemoryItem({
     content,
-    sourceProjectId:
-      typeof body.sourceProjectId === "string" && body.sourceProjectId.length > 0
-        ? body.sourceProjectId
-        : null,
+    ownerId: guarded.user.id,
+    sourceProjectId: resolvedProjectId,
     sourceKeys: Array.isArray(body.sourceKeys)
       ? body.sourceKeys.filter((value): value is string => typeof value === "string" && value.length > 0)
       : [],
@@ -63,10 +92,7 @@ export async function POST(req: Request) {
       body.sourceKind === "session" || body.sourceKind === "branch"
         ? (body.sourceKind as ProjectMemorySourceKind)
         : null,
-    sourceSessionId:
-      typeof body.sourceSessionId === "string" && body.sourceSessionId.length > 0
-        ? body.sourceSessionId
-        : null,
+    sourceSessionId: resolvedSessionId,
     title,
     type,
   });
@@ -74,8 +100,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) return accessError;
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
   const body = (await req.json().catch(() => ({}))) as DeleteMemoryBody;
   const deleteAll = body.all === true;
@@ -83,13 +109,13 @@ export async function DELETE(req: Request) {
     ? body.memoryIds.filter((value): value is string => typeof value === "string" && value.length > 0)
     : [];
   const memoryIds = deleteAll
-    ? (await listMemoryItems()).map((item) => item.id)
+    ? (await listMemoryItems({ ownerId: guarded.user.id })).map((item) => item.id)
     : [...new Set(requestedIds)];
 
   if (memoryIds.length === 0) {
     return new Response("No memory selected", { status: 400 });
   }
 
-  await deleteMemoryItems(memoryIds);
+  await deleteMemoryItems(memoryIds, guarded.user.id);
   return Response.json({ deletedIds: memoryIds });
 }

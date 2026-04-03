@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { execFile } from "node:child_process";
-import { enforceLocalApiAccess } from "@/lib/server/api-access";
+import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,10 +37,8 @@ function execFileAsync(file: string, args: string[], timeout = 30_000) {
 }
 
 export async function POST(req: NextRequest) {
-  const accessError = enforceLocalApiAccess(req);
-  if (accessError) {
-    return accessError;
-  }
+  const guarded = await requireLocalApiUser(req);
+  if ("response" in guarded) return guarded.response;
 
   if (!isOllamaControlEnabled()) {
     return json(

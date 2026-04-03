@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { AuthStatusButton } from "@/components/auth/auth-status-button";
 import { useProjects } from "@/components/context/projects";
 import { ProductBrand } from "@/components/workspace/product-brand";
 
@@ -37,6 +38,7 @@ export function ProjectHeader() {
         <Button type="button" variant="outline" size="sm" onClick={clearActiveProject}>
           Back to sessions
         </Button>
+        <AuthStatusButton />
         <ThemeToggle />
       </div>
     </header>

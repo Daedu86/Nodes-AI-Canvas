@@ -1,12 +1,21 @@
 // @vitest-environment jsdom
 
 import React from "react";
+import { SessionProvider } from "next-auth/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
 import { ProjectsProvider, useProjects } from "../components/context/projects";
 
-const ACTIVE_PROJECT_KEY = "assistant-ui.active-project-id.v1";
+const ACTIVE_PROJECT_KEY = "nodes.active-project-id.test-user";
+const TEST_SESSION = {
+  expires: "2099-01-01T00:00:00.000Z",
+  user: {
+    email: "test@nodes.local",
+    id: "test-user",
+    name: "Test User",
+  },
+};
 
 const createJsonResponse = (payload: unknown) =>
   ({
@@ -23,6 +32,14 @@ function ProjectsSnapshot() {
       <div data-testid="active-project">{activeProjectId ?? "none"}</div>
       <div data-testid="project-count">{projects.length}</div>
     </div>
+  );
+}
+
+function renderWithSession(children: React.ReactNode) {
+  return render(
+    <SessionProvider session={TEST_SESSION}>
+      {children}
+    </SessionProvider>,
   );
 }
 
@@ -82,7 +99,7 @@ describe("ProjectsProvider", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(
+    renderWithSession(
       <ProjectsProvider>
         <ProjectsSnapshot />
       </ProjectsProvider>,
@@ -142,7 +159,7 @@ describe("ProjectsProvider", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    render(
+    renderWithSession(
       <ProjectsProvider>
         <ProjectsSnapshot />
       </ProjectsProvider>,
