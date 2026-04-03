@@ -258,16 +258,64 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
     await deleteSessions([sessionId]);
   }, [deleteSessions]);
 
-  const renameSession = React.useCallback(async (sessionId: string, title: string | null) => {
-    const data = await fetchJson<SessionResponse>(`/api/sessions/${sessionId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ title }),
+  const recoverMissingSession = React.useCallback(async (sessionId: string) => {
+    let remaining: SessionSummary[] = [];
+    try {
+      remaining = await refreshSessions();
+    } catch {
+      setSessions((prev) => prev.filter((session) => session.id !== sessionId));
+    }
+
+    const visibleSessions = remaining.filter((session) => session.id !== sessionId);
+    if (remaining.length > 0) {
+      setSessions(visibleSessions);
+    }
+
+    if (activeSession?.id !== sessionId) {
+      return;
+    }
+
+    const nextSessionId = pickSessionId(visibleSessions, {
+      preferredId: readStoredActiveSessionId(userId),
     });
-    setSessions((prev) =>
-      prev.map((session) => (session.id === sessionId ? data.session : session)),
-    );
-    setActiveSession((prev) => (prev?.id === sessionId ? data.session : prev));
-  }, []);
+
+    if (nextSessionId) {
+      setIsReady(false);
+      try {
+        await loadSession(nextSessionId);
+      } catch {
+        writeStoredActiveSessionId(userId, null);
+        setActiveSession(null);
+        await createSession();
+      } finally {
+        setIsReady(true);
+      }
+      return;
+    }
+
+    writeStoredActiveSessionId(userId, null);
+    setActiveSession(null);
+    await createSession();
+  }, [activeSession?.id, createSession, loadSession, refreshSessions, userId]);
+
+  const renameSession = React.useCallback(async (sessionId: string, title: string | null) => {
+    try {
+      const data = await fetchJson<SessionResponse>(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title }),
+      });
+      setSessions((prev) =>
+        prev.map((session) => (session.id === sessionId ? data.session : session)),
+      );
+      setActiveSession((prev) => (prev?.id === sessionId ? data.session : prev));
+    } catch (error) {
+      if ((error as { status?: number })?.status === 404) {
+        await recoverMissingSession(sessionId);
+        return;
+      }
+      throw error;
+    }
+  }, [recoverMissingSession]);
 
   const saveActiveSessionDocumentPatch = React.useCallback(async (patch: {
     artifacts?: SessionArtifact[];

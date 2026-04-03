@@ -1,0 +1,162 @@
+// @vitest-environment jsdom
+
+import React from "react";
+import { SessionProvider } from "next-auth/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+
+import {
+  PersistedSessionsProvider,
+  usePersistedSessions,
+} from "../components/context/persisted-sessions";
+
+const ACTIVE_SESSION_KEY = "nodes.active-session-id.test-user";
+const TEST_SESSION = {
+  expires: "2099-01-01T00:00:00.000Z",
+  user: {
+    email: "test@nodes.local",
+    id: "test-user",
+    name: "Test User",
+  },
+};
+
+const createJsonResponse = (payload: unknown, status = 200) =>
+  ({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => payload,
+  }) as Response;
+
+const createSessionSummary = (id: string, title: string) => ({
+  archived: false,
+  createdAt: "2026-04-03T10:00:00.000Z",
+  id,
+  messageCount: 1,
+  title,
+  updatedAt: "2026-04-03T10:00:00.000Z",
+});
+
+const createSessionDocument = (id: string, title: string) => ({
+  archived: false,
+  artifacts: [],
+  contextLinks: [],
+  createdAt: "2026-04-03T10:00:00.000Z",
+  id,
+  messageCount: 1,
+  snapshot: {
+    currentRootId: null,
+    roots: [],
+    selectedMessageId: null,
+    version: 1,
+  },
+  title,
+  updatedAt: "2026-04-03T10:00:00.000Z",
+});
+
+function RenameRecoveryProbe() {
+  const { activeSessionId, isReady, renameSession, sessions } = usePersistedSessions();
+  const invokedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!isReady || activeSessionId !== "session-a" || invokedRef.current) {
+      return;
+    }
+    invokedRef.current = true;
+    void renameSession("session-a", "Renamed");
+  }, [activeSessionId, isReady, renameSession]);
+
+  return (
+    <div>
+      <div data-testid="ready">{String(isReady)}</div>
+      <div data-testid="active-session">{activeSessionId ?? "none"}</div>
+      <div data-testid="sessions">{sessions.map((session) => session.id).join(",")}</div>
+    </div>
+  );
+}
+
+function renderWithSession(children: React.ReactNode) {
+  return render(
+    <SessionProvider session={TEST_SESSION}>
+      {children}
+    </SessionProvider>,
+  );
+}
+
+describe("PersistedSessionsProvider", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("recovers gracefully when renaming a missing active session returns 404", async () => {
+    localStorage.setItem(ACTIVE_SESSION_KEY, "session-a");
+    let listCallCount = 0;
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url === "/api/sessions?includeArchived=1") {
+        listCallCount += 1;
+        return createJsonResponse({
+          sessions: listCallCount === 1
+            ? [
+                createSessionSummary("session-a", "Session A"),
+                createSessionSummary("session-b", "Session B"),
+              ]
+            : [createSessionSummary("session-b", "Session B")],
+        });
+      }
+
+      if (url === "/api/sessions/session-a" && method === "GET") {
+        return createJsonResponse({
+          session: createSessionDocument("session-a", "Session A"),
+        });
+      }
+
+      if (url === "/api/sessions/session-a" && method === "PATCH") {
+        return {
+          ok: false,
+          status: 404,
+          json: async () => ({}),
+        } as Response;
+      }
+
+      if (url === "/api/sessions/session-b" && method === "GET") {
+        return createJsonResponse({
+          session: createSessionDocument("session-b", "Session B"),
+        });
+      }
+
+      if (url === "/api/sessions" && method === "POST") {
+        return createJsonResponse({
+          session: createSessionDocument("session-new", "New Session"),
+        }, 201);
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithSession(
+      <PersistedSessionsProvider>
+        <RenameRecoveryProbe />
+      </PersistedSessionsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+      expect(screen.getByTestId("active-session").textContent).toBe("session-b");
+    });
+
+    expect(screen.getByTestId("sessions").textContent).toBe("session-b");
+    expect(localStorage.getItem(ACTIVE_SESSION_KEY)).toBe("session-b");
+  });
+});

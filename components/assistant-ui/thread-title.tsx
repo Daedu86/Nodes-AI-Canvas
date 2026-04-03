@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAssistantRuntime } from "@assistant-ui/react";
-import { PencilIcon } from "lucide-react";
 import { useModelConfig } from "@/components/context/model-config";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
 
@@ -83,27 +82,63 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
 
 export function ThreadTitleEditor() {
   const { activeSession, renameSession } = usePersistedSessions();
-  const title = formatTitle(activeSession?.title, "New Chat");
+  const fallback = "New Chat";
+  const [draftTitle, setDraftTitle] = useState(activeSession?.title ?? "");
+  const [isEditing, setIsEditing] = useState(false);
 
-  const handleRename = () => {
-    if (typeof window === "undefined" || !activeSession) return;
-    const next = window.prompt("Rename session", activeSession.title ?? "") ?? null;
-    if (next === null) return;
-    void renameSession(activeSession.id, next.trim().length ? next.trim() : null);
-  };
+  useEffect(() => {
+    if (isEditing) return;
+    setDraftTitle(activeSession?.title ?? "");
+  }, [activeSession?.id, activeSession?.title, isEditing]);
+
+  const commitRename = useCallback(async () => {
+    if (!activeSession) return;
+    const nextTitle = draftTitle.trim();
+    const currentTitle = activeSession.title?.trim() ?? "";
+    const normalizedTitle = nextTitle.length > 0 ? nextTitle : null;
+    if ((normalizedTitle ?? "") === currentTitle) {
+      setIsEditing(false);
+      return;
+    }
+    setIsEditing(false);
+    try {
+      await renameSession(activeSession.id, normalizedTitle);
+    } catch {
+      setDraftTitle(activeSession.title ?? "");
+    }
+  }, [activeSession, draftTitle, renameSession]);
+
+  const resetRename = useCallback(() => {
+    setDraftTitle(activeSession?.title ?? "");
+    setIsEditing(false);
+  }, [activeSession?.title]);
 
   return (
-    <span className="inline-flex items-center gap-2">
-      <span className="font-medium">{title}</span>
-      <button
-        type="button"
-        title="Rename session"
-        onClick={handleRename}
-        className="text-muted-foreground hover:text-foreground inline-flex items-center rounded p-0.5"
-      >
-        <PencilIcon className="size-3.5" />
-      </button>
-    </span>
+    <input
+      type="text"
+      aria-label="Session title"
+      value={draftTitle}
+      placeholder={fallback}
+      disabled={!activeSession}
+      onChange={(event) => setDraftTitle(event.currentTarget.value)}
+      onFocus={() => setIsEditing(true)}
+      onBlur={() => {
+        void commitRename();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          void commitRename();
+          event.currentTarget.blur();
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          resetRename();
+          event.currentTarget.blur();
+        }
+      }}
+      className="min-w-[12rem] max-w-[34rem] rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-medium text-foreground outline-none transition hover:border-border/60 focus:border-ring focus:bg-background focus:shadow-sm disabled:cursor-default disabled:opacity-70"
+    />
   );
 }
 
