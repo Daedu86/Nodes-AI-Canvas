@@ -99,7 +99,18 @@ export function AuthScreen({
                 <Github className="size-4" />
                 Continue with GitHub
               </Button>
-            ) : null}
+            ) : (
+              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                <div className="flex items-center gap-3 text-sm text-slate-200">
+                  <Github className="size-4" />
+                  <span className="font-medium">GitHub sign-in is not configured in this environment.</span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Add <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_GITHUB_ID</code> and{" "}
+                  <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_GITHUB_SECRET</code> to enable OAuth.
+                </p>
+              </div>
+            )}
 
             {devCredentialsEnabled ? (
               <form className="space-y-4" onSubmit={handleDevLogin}>
