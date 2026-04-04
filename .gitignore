@@ -43,6 +43,7 @@ yarn-error.log*
 .env*
 !.env.example
 AGENTS.md
+supabase/.temp/
 
 # vercel
 .vercel

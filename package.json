@@ -9,6 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "node scripts/apply-assistant-ui-patch.cjs",
+    "setup:supabase-storage": "node --env-file=.env.local scripts/setup-supabase-storage.mjs",
+    "migrate:supabase": "node --env-file=.env.local scripts/migrate-to-supabase.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test"
   },
@@ -21,6 +23,7 @@
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tooltip": "^1.2.7",
+    "@supabase/supabase-js": "^2.101.1",
     "@xyflow/react": "^12.10.1",
     "ai": "^6.0.141",
     "class-variance-authority": "^0.7.1",
@@ -51,6 +54,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
     "jsdom": "^29.0.1",
+    "supabase": "^2.84.10",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^1.5.4"

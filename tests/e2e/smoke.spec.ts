@@ -1095,6 +1095,15 @@ test("uploads an image artifact, persists it, and branches with it from the flow
   const assistantNodeId = graphBefore.nodes.find((node) => node.role === "assistant")?.id;
   expect(assistantNodeId).toBeTruthy();
   if (!assistantNodeId) return;
+  const activeSessionId = await getActiveSessionId(page);
+  expect(activeSessionId).toBeTruthy();
+  if (!activeSessionId) return;
+
+  const uploadResponsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes(`/api/sessions/${activeSessionId}/artifacts`) &&
+      response.request().method() === "POST",
+  );
 
   await page
     .locator('input[type="file"][accept="image/*"]')
@@ -1104,7 +1113,10 @@ test("uploads an image artifact, persists it, and branches with it from the flow
       buffer: ONE_PIXEL_PNG,
     });
 
-  await expect(page.getByLabel("Title")).toHaveValue("diagram");
+  const uploadResponse = await uploadResponsePromise;
+  expect(uploadResponse.ok()).toBe(true);
+  await expect(page.getByText("1 artifact", { exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue("diagram");
   await page.getByLabel("Notes").fill("Important branching reference image.");
   await expect(page.getByText("Image preview", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Attach target ${assistantNodeId}` }).click();
@@ -1135,10 +1147,6 @@ test("uploads an image artifact, persists it, and branches with it from the flow
       (artifact) => artifact.title === "diagram" && artifact.type === "image",
     ),
   ).toBe(true);
-
-  const activeSessionId = await getActiveSessionId(page);
-  expect(activeSessionId).toBeTruthy();
-  if (!activeSessionId) return;
 
   const persistedSession = await fetchPersistedSession(page, activeSessionId);
   expect(

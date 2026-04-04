@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { getPersistenceBackend } from "@/lib/persistence/backend";
+import { getSupabasePersistenceClient } from "@/lib/persistence/supabase/client";
+import { readSupabasePersistenceConfig } from "@/lib/persistence/supabase/config";
 import type { SessionArtifact } from "@/lib/session-artifacts";
 
 export type SessionBlobEntry = {
@@ -131,7 +134,29 @@ const buildMaintenanceSummary = (
   };
 };
 
-export async function saveSessionArtifactBlob(input: {
+const emptyBlobMaintenance = (): SessionBlobMaintenance => ({
+  deduplicatedBlobLinks: 0,
+  orphanBlobCount: 0,
+  orphanBytes: 0,
+  referencedBlobCount: 0,
+  referencedBlobLinks: referencedBlobRefsLengthSafe([]),
+  referencedBytes: 0,
+  totalBlobCount: 0,
+  totalBytes: 0,
+  uniqueReferencedBlobCount: 0,
+});
+
+function referencedBlobRefsLengthSafe(referencedBlobRefs: string[]) {
+  return referencedBlobRefs.filter(Boolean).length;
+}
+
+const emptyBlobCleanup = (): SessionBlobCleanupResult => ({
+  deletedBlobCount: 0,
+  deletedBytes: 0,
+  maintenance: emptyBlobMaintenance(),
+});
+
+async function saveFileSessionArtifactBlob(input: {
   sessionId: string;
   fileName: string;
   bytes: Uint8Array;
@@ -156,17 +181,107 @@ export async function saveSessionArtifactBlob(input: {
   };
 }
 
-export async function deleteSessionArtifactBlob(blobRef: string | null | undefined) {
-  if (!blobRef) return;
+async function saveSupabaseSessionArtifactBlob(input: {
+  sessionId: string;
+  fileName: string;
+  bytes: Uint8Array;
+  mimeType?: string | null;
+}) {
+  ensureSafeSessionId(input.sessionId);
+  const blobRef = buildBlobRef(input.sessionId, input.bytes);
+  const client = getSupabasePersistenceClient();
+  const { storageBucket } = readSupabasePersistenceConfig();
+
+  const { error } = await client.storage
+    .from(storageBucket)
+    .upload(blobRef, input.bytes, {
+      upsert: false,
+      contentType: input.mimeType ?? undefined,
+    });
+
+  if (error && error.statusCode !== "409") {
+    throw new Error(error.message || "Failed to upload artifact blob");
+  }
+
+  return {
+    absolutePath: `supabase://${storageBucket}/${blobRef}`,
+    blobRef,
+    deduplicated: error?.statusCode === "409",
+  };
+}
+
+export async function saveSessionArtifactBlob(input: {
+  sessionId: string;
+  fileName: string;
+  bytes: Uint8Array;
+  mimeType?: string | null;
+}) {
+  return getPersistenceBackend() === "supabase"
+    ? saveSupabaseSessionArtifactBlob(input)
+    : saveFileSessionArtifactBlob(input);
+}
+
+async function deleteFileSessionArtifactBlob(blobRef: string) {
   await fs.rm(getBlobAbsolutePath(blobRef), { force: true });
 }
 
-export async function deleteSessionBlobDir(sessionId: string) {
+async function deleteSupabaseSessionArtifactBlob(blobRef: string) {
+  const client = getSupabasePersistenceClient();
+  const { storageBucket } = readSupabasePersistenceConfig();
+  const { error } = await client.storage.from(storageBucket).remove([blobRef]);
+  if (error) {
+    throw new Error(error.message || "Failed to delete artifact blob");
+  }
+}
+
+export async function deleteSessionArtifactBlob(blobRef: string | null | undefined) {
+  if (!blobRef) return;
+  ensureSafeBlobRef(blobRef);
+  if (getPersistenceBackend() === "supabase") {
+    await deleteSupabaseSessionArtifactBlob(blobRef);
+    return;
+  }
+  await deleteFileSessionArtifactBlob(blobRef);
+}
+
+async function deleteFileSessionBlobDir(sessionId: string) {
   ensureSafeSessionId(sessionId);
   await fs.rm(path.join(getSessionBlobStoreDir(), sessionId), { recursive: true, force: true });
 }
 
+async function deleteSupabaseSessionBlobDir(sessionId: string) {
+  ensureSafeSessionId(sessionId);
+  const client = getSupabasePersistenceClient();
+  const { storageBucket } = readSupabasePersistenceConfig();
+  const { data, error } = await client.storage.from(storageBucket).list(sessionId, {
+    limit: 1000,
+  });
+  if (error) {
+    throw new Error(error.message || "Failed to list session artifact blobs");
+  }
+  const refs = (data ?? [])
+    .map((entry) => entry.name)
+    .filter((name): name is string => typeof name === "string" && name.length > 0)
+    .map((name) => `${sessionId}/${name}`);
+  if (refs.length === 0) return;
+  const removeResult = await client.storage.from(storageBucket).remove(refs);
+  if (removeResult.error) {
+    throw new Error(removeResult.error.message || "Failed to delete session artifact blobs");
+  }
+}
+
+export async function deleteSessionBlobDir(sessionId: string) {
+  if (getPersistenceBackend() === "supabase") {
+    await deleteSupabaseSessionBlobDir(sessionId);
+    return;
+  }
+  await deleteFileSessionBlobDir(sessionId);
+}
+
 export async function listSessionArtifactBlobs() {
+  if (getPersistenceBackend() === "supabase") {
+    return [] as SessionBlobEntry[];
+  }
   const blobStoreDir = getSessionBlobStoreDir();
   await fs.mkdir(blobStoreDir, { recursive: true });
   return listBlobEntriesRecursive(blobStoreDir);
@@ -175,6 +290,14 @@ export async function listSessionArtifactBlobs() {
 export async function getSessionBlobMaintenance(
   referencedBlobRefs: string[],
 ): Promise<SessionBlobMaintenance> {
+  if (getPersistenceBackend() === "supabase") {
+    return {
+      ...emptyBlobMaintenance(),
+      deduplicatedBlobLinks: Math.max(0, referencedBlobRefs.filter(Boolean).length - new Set(referencedBlobRefs.filter(Boolean)).size),
+      referencedBlobLinks: referencedBlobRefs.filter(Boolean).length,
+      uniqueReferencedBlobCount: new Set(referencedBlobRefs.filter(Boolean)).size,
+    };
+  }
   const blobEntries = await listSessionArtifactBlobs();
   return buildMaintenanceSummary(blobEntries, referencedBlobRefs);
 }
@@ -182,6 +305,13 @@ export async function getSessionBlobMaintenance(
 export async function cleanupOrphanedSessionBlobs(
   referencedBlobRefs: string[],
 ): Promise<SessionBlobCleanupResult> {
+  if (getPersistenceBackend() === "supabase") {
+    return {
+      ...emptyBlobCleanup(),
+      maintenance: await getSessionBlobMaintenance(referencedBlobRefs),
+    };
+  }
+
   const blobEntries = await listSessionArtifactBlobs();
   const uniqueReferencedBlobRefs = new Set(referencedBlobRefs.filter(Boolean));
   const orphanEntries = blobEntries.filter((entry) => !uniqueReferencedBlobRefs.has(entry.blobRef));

@@ -48,6 +48,7 @@ export async function POST(req: Request, context: RouteParams) {
       sessionId,
       fileName: file.name,
       bytes,
+      mimeType: file.type || null,
     });
 
     return Response.json({
