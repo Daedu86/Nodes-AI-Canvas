@@ -108,24 +108,26 @@ For a cloud deployment, the production posture should become:
 - authenticated user required
 - ownership enforced server-side
 - remote API allowed in production
+- cross-site mutating requests still blocked by the API guard
 
 Do not keep the app file-backed and simply toggle `ALLOW_REMOTE_API=1`; that would deploy the UI before the persistence layer is actually cloud-ready.
 
 ## Current status
 
-Cloud metadata repositories for:
+Implemented:
 
 - sessions
 - projects
 - memory
-
-are now scaffolded in `lib/persistence/supabase`.
-
-Still pending before fully switching the app:
-
 - artifact blob uploads to Supabase Storage
-- blob cleanup/maintenance against cloud storage
 - one-time migration script from local `data/`
+- Supabase CLI linked to the project for schema and query checks
+
+Still intentionally lightweight:
+
+- blob cleanup/maintenance against cloud storage
+- file-backed repositories still exist as a local fallback
+- there are no browser-side RLS policies yet because the app currently uses Auth.js plus server-side Supabase access
 
 ## Migration command
 

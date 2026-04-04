@@ -213,9 +213,67 @@ npm run dev
 
 Then open [http://localhost:3000](http://localhost:3000).
 
+## Deploying
+
+The simplest cloud setup for Nodes is:
+
+- Vercel Hobby
+- Supabase Free
+
+### Production envs
+
+At minimum, set these in your Vercel project:
+
+```env
+AUTH_SECRET=
+NEXTAUTH_URL=https://your-deployed-url.vercel.app
+AUTH_GITHUB_ID=
+AUTH_GITHUB_SECRET=
+AUTH_ENABLE_DEV_CREDENTIALS=0
+
+ALLOW_REMOTE_API=1
+NODES_PERSISTENCE_BACKEND=supabase
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_SESSION_ARTIFACTS_BUCKET=session-artifacts
+
+OPENROUTER_API_KEY=
+OPENROUTER_API_URL=https://openrouter.ai/api/v1
+OPENROUTER_REFERER=https://your-deployed-url.vercel.app
+OPENROUTER_TITLE=Nodes
+DEFAULT_MODEL=nvidia/nemotron-3-super-120b-a12b:free
+NEXT_PUBLIC_DEFAULT_MODEL=nvidia/nemotron-3-super-120b-a12b:free
+NEXT_PUBLIC_DEFAULT_PROVIDER=openrouter
+```
+
+### Before the first deploy
+
+1. Create the Supabase project and apply [schema.sql](C:\Users\daedu\Documents\Playground\AI Canvas\supabase\schema.sql).
+2. Create or verify the private `session-artifacts` bucket.
+3. If you already have local data, run:
+
+```bash
+npm run setup:supabase-storage
+npm run migrate:supabase
+```
+
+4. Update your GitHub OAuth app callback URL to:
+
+```text
+https://your-deployed-url.vercel.app/api/auth/callback/github
+```
+
+### Notes
+
+- Keep `ALLOW_REMOTE_API=0` for local-only development.
+- Only enable `ALLOW_REMOTE_API=1` when `NODES_PERSISTENCE_BACKEND=supabase`.
+- UI preferences can still stay in browser `localStorage`; shared app data should live in Supabase.
+
 ## Where Your Data Lives
 
-Nodes stores workspace data locally on disk.
+Nodes can run in two persistence modes.
+
+### Local mode
 
 Typical folders:
 
@@ -228,6 +286,14 @@ That means:
 - your saved sessions persist across restarts
 - your projects persist across restarts
 - uploaded files and images are stored locally
+
+### Cloud mode
+
+When `NODES_PERSISTENCE_BACKEND=supabase`:
+
+- sessions, projects, and memory live in Supabase Postgres
+- artifact blobs live in Supabase Storage
+- browser `localStorage` keeps only UI preferences
 
 Your `.env.local` file is ignored by git and is not meant to be committed.
 

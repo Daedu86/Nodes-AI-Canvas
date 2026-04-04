@@ -54,31 +54,29 @@ export function isRemoteApiAllowed() {
 }
 
 export function enforceLocalApiAccess(req: Request) {
-  if (isRemoteApiAllowed()) {
-    return null;
-  }
-
   const requestUrl = new URL(req.url);
-  if (!isLoopbackHostname(requestUrl.hostname)) {
-    return jsonError("Remote API access is disabled for this local-first workspace.");
-  }
-
-  const hostHeader = parseHostname(req.headers.get("host"));
-  if (hostHeader && !isLoopbackHostname(hostHeader)) {
-    return jsonError("Remote host access is disabled for this local-first workspace.");
-  }
-
-  const forwardedFor = req.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const firstHop = forwardedFor.split(",")[0]?.trim();
-    if (!isLoopbackAddress(firstHop)) {
-      return jsonError("Forwarded remote requests are not allowed.");
+  if (!isRemoteApiAllowed()) {
+    if (!isLoopbackHostname(requestUrl.hostname)) {
+      return jsonError("Remote API access is disabled for this local-first workspace.");
     }
-  }
 
-  const realIp = req.headers.get("x-real-ip");
-  if (realIp && !isLoopbackAddress(realIp)) {
-    return jsonError("Remote client addresses are not allowed.");
+    const hostHeader = parseHostname(req.headers.get("host"));
+    if (hostHeader && !isLoopbackHostname(hostHeader)) {
+      return jsonError("Remote host access is disabled for this local-first workspace.");
+    }
+
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    if (forwardedFor) {
+      const firstHop = forwardedFor.split(",")[0]?.trim();
+      if (!isLoopbackAddress(firstHop)) {
+        return jsonError("Forwarded remote requests are not allowed.");
+      }
+    }
+
+    const realIp = req.headers.get("x-real-ip");
+    if (realIp && !isLoopbackAddress(realIp)) {
+      return jsonError("Remote client addresses are not allowed.");
+    }
   }
 
   const method = req.method.toUpperCase();
@@ -89,14 +87,14 @@ export function enforceLocalApiAccess(req: Request) {
   const originHeader = req.headers.get("origin");
   if (originHeader) {
     const originHost = parseHostname(originHeader);
-    if (!originHost || !isLoopbackHostname(originHost) || originHost !== requestUrl.hostname.toLowerCase()) {
-      return jsonError("Cross-origin requests to the local API are blocked.");
+    if (!originHost || originHost !== requestUrl.hostname.toLowerCase()) {
+      return jsonError("Cross-origin requests to the API are blocked.");
     }
   }
 
   const fetchSite = req.headers.get("sec-fetch-site");
   if (fetchSite && !["same-origin", "same-site", "none"].includes(fetchSite)) {
-    return jsonError("Cross-site requests to the local API are blocked.");
+    return jsonError("Cross-site requests to the API are blocked.");
   }
 
   return null;

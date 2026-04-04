@@ -44,7 +44,7 @@ describe("local API access guard", () => {
 
     expect(response?.status).toBe(403);
     await expect(response?.json()).resolves.toMatchObject({
-      error: "Cross-origin requests to the local API are blocked.",
+      error: "Cross-origin requests to the API are blocked.",
     });
   });
 
@@ -56,5 +56,24 @@ describe("local API access guard", () => {
     );
 
     expect(response).toBeNull();
+  });
+
+  it("still blocks cross-site mutations when remote API is allowed", async () => {
+    process.env.ALLOW_REMOTE_API = "1";
+
+    const response = enforceLocalApiAccess(
+      new Request("https://nodes.example/api/sessions", {
+        method: "POST",
+        headers: {
+          origin: "https://attacker.example",
+          "sec-fetch-site": "cross-site",
+        },
+      }),
+    );
+
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: "Cross-origin requests to the API are blocked.",
+    });
   });
 });
