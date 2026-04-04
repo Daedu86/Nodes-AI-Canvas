@@ -2,17 +2,21 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type {
+  ProjectActor,
   ProjectCreateInput,
+  ProjectMemberInput,
   ProjectPatch,
+  ProjectRecord,
   ProjectRepository,
 } from "@/lib/persistence/project-repository";
 import {
   normalizeProjectDocument,
   type ProjectDocument,
+  type ProjectMember,
   type ProjectSummary,
 } from "@/lib/project-documents";
 
-type StoredProject = Omit<ProjectDocument, "sessionCount"> & {
+type StoredProject = Omit<ProjectDocument, "accessRole" | "sessionCount"> & {
   ownerId: string | null;
 };
 
@@ -37,25 +41,10 @@ const getProjectFilePath = (projectId: string) => {
 const normalizeOwnerId = (value: unknown) =>
   typeof value === "string" && value.length > 0 ? value : null;
 
-const toStoredProject = (
-  project: ProjectDocument,
-  ownerId: string | null,
-): StoredProject => {
-  const { sessionCount, ...storedProject } = project;
-  void sessionCount;
-  return {
-    ...storedProject,
-    ownerId,
-  };
-};
-
-const toProjectDocument = (storedProject: StoredProject): ProjectDocument => {
-  const { ownerId, ...project } = storedProject;
-  void ownerId;
-  return {
-    ...project,
-    sessionCount: project.sessionIds.length,
-  };
+const normalizeMemberEmail = (value: string | null | undefined) => {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
 };
 
 const sortProjects = (projects: ProjectSummary[]) =>
@@ -64,6 +53,71 @@ const sortProjects = (projects: ProjectSummary[]) =>
     if (updatedDelta !== 0) return updatedDelta;
     return a.createdAt.localeCompare(b.createdAt);
   });
+
+const toStoredProject = (
+  project: ProjectDocument,
+  ownerId: string | null,
+): StoredProject => {
+  const { accessRole, attachedMemoryItems, sessionCount, sessions, ...storedProject } = project;
+  void accessRole;
+  void attachedMemoryItems;
+  void sessionCount;
+  void sessions;
+  return {
+    ...storedProject,
+    ownerId,
+  };
+};
+
+const toProjectDocument = (
+  storedProject: StoredProject,
+  accessRole: ProjectDocument["accessRole"] = "owner",
+): ProjectDocument => {
+  const { ownerId, ...project } = storedProject;
+  void ownerId;
+  return {
+    ...project,
+    accessRole,
+    sessionCount: project.sessionIds.length,
+  };
+};
+
+const toProjectRecord = (
+  storedProject: StoredProject,
+  accessRole: ProjectDocument["accessRole"],
+): ProjectRecord => {
+  if (!storedProject.ownerId) {
+    throw new Error("Project not found");
+  }
+  return {
+    ...toProjectDocument(storedProject, accessRole),
+    ownerId: storedProject.ownerId,
+  };
+};
+
+const normalizeStoredMembers = (members: ProjectMember[]) =>
+  [...members]
+    .map((member) => ({
+      addedAt:
+        typeof member.addedAt === "string" && member.addedAt.length > 0
+          ? member.addedAt
+          : new Date().toISOString(),
+      email: member.email.trim().toLowerCase(),
+      role: member.role,
+    }))
+    .filter((member) => member.email.length > 0)
+    .sort((a, b) => a.email.localeCompare(b.email));
+
+const getActorRoleForProject = (storedProject: StoredProject, actor: ProjectActor) => {
+  if (storedProject.ownerId === actor.userId) {
+    return "owner" as const;
+  }
+
+  const memberEmail = normalizeMemberEmail(actor.userEmail);
+  if (!memberEmail) return null;
+  const member = storedProject.members.find((entry) => entry.email === memberEmail);
+  return member?.role ?? null;
+};
 
 async function ensureProjectStoreDir() {
   await fs.mkdir(getProjectStoreDir(), { recursive: true });
@@ -84,7 +138,10 @@ async function readProjectDocumentFromPath(filePath: string): Promise<StoredProj
   if (!parsed) {
     throw new Error(`Invalid project document: ${filePath}`);
   }
-  return toStoredProject(parsed, normalizeOwnerId(json.ownerId));
+  return toStoredProject({
+    ...parsed,
+    members: normalizeStoredMembers(parsed.members),
+  }, normalizeOwnerId(json.ownerId));
 }
 
 async function readAllProjectDocuments() {
@@ -143,19 +200,62 @@ export const fileProjectRepository: ProjectRepository = {
     }
 
     return sortProjects(
-      projects.map<ProjectSummary>((storedProject) => {
-        const { ownerId: unusedOwnerId, sessionIds, ...project } = storedProject;
-        void unusedOwnerId;
+      projects.map((storedProject) => {
+        const document = toProjectDocument(storedProject, "owner");
         return {
-          ...project,
-          sessionCount: sessionIds.length,
+          accessRole: document.accessRole,
+          arenaWinnerBranchKey: document.arenaWinnerBranchKey,
+          arenaWinnerSessionId: document.arenaWinnerSessionId,
+          createdAt: document.createdAt,
+          id: document.id,
+          memoryIds: document.memoryIds,
+          sessionCount: document.sessionCount,
+          title: document.title,
+          updatedAt: document.updatedAt,
         };
       }),
     );
   },
 
+  async listProjectsForActor(actor) {
+    const projects = await readAllProjectDocuments();
+    const visibleProjects: ProjectSummary[] = [];
+
+    for (const project of projects) {
+      const claimed = await claimProjectOwnerIfNeeded(project, actor.userId);
+      const nextProject = claimed ?? project;
+      const role = getActorRoleForProject(nextProject, actor);
+      if (!role) continue;
+      const document = toProjectDocument(nextProject, role);
+      visibleProjects.push({
+        accessRole: document.accessRole,
+        arenaWinnerBranchKey: document.arenaWinnerBranchKey,
+        arenaWinnerSessionId: document.arenaWinnerSessionId,
+        createdAt: document.createdAt,
+        id: document.id,
+        memoryIds: document.memoryIds,
+        sessionCount: document.sessionCount,
+        title: document.title,
+        updatedAt: document.updatedAt,
+      });
+    }
+
+    return sortProjects(visibleProjects);
+  },
+
   async getProject(projectId, ownerId) {
-    return toProjectDocument(await getStoredProject(projectId, ownerId));
+    return toProjectDocument(await getStoredProject(projectId, ownerId), "owner");
+  },
+
+  async getProjectRecordForActor(projectId, actor) {
+    const project = await readProjectDocumentFromPath(getProjectFilePath(projectId));
+    const claimed = await claimProjectOwnerIfNeeded(project, actor.userId);
+    const nextProject = claimed ?? project;
+    const role = getActorRoleForProject(nextProject, actor);
+    if (!role) {
+      throw new Error("Project not found");
+    }
+    return toProjectRecord(nextProject, role);
   },
 
   async createProject(input: ProjectCreateInput = {}) {
@@ -173,6 +273,7 @@ export const fileProjectRepository: ProjectRepository = {
       globalContext: typeof input.globalContext === "string" ? input.globalContext : "",
       id: randomUUID(),
       memoryIds,
+      members: [],
       ownerId: normalizeOwnerId(input.ownerId),
       sessionIds,
       title:
@@ -182,7 +283,7 @@ export const fileProjectRepository: ProjectRepository = {
       updatedAt: now,
     };
     await writeProjectDocument(project);
-    return toProjectDocument(project);
+    return toProjectDocument(project, "owner");
   },
 
   async patchProject(projectId, patch: ProjectPatch, ownerId) {
@@ -209,6 +310,7 @@ export const fileProjectRepository: ProjectRepository = {
           : patch.globalContext,
       id: current.id,
       memoryIds,
+      members: current.members,
       ownerId: current.ownerId,
       sessionIds,
       title:
@@ -220,7 +322,50 @@ export const fileProjectRepository: ProjectRepository = {
       updatedAt: new Date().toISOString(),
     };
     await writeProjectDocument(next);
-    return toProjectDocument(next);
+    return toProjectDocument(next, "owner");
+  },
+
+  async upsertProjectMember(projectId, member: ProjectMemberInput, ownerId) {
+    const current = await getStoredProject(projectId, ownerId);
+    const email = normalizeMemberEmail(member.email);
+    if (!email) {
+      throw new Error("A valid member email is required");
+    }
+
+    const nextMembers = [
+      ...current.members.filter((entry) => entry.email !== email),
+      {
+        addedAt:
+          current.members.find((entry) => entry.email === email)?.addedAt
+            ?? new Date().toISOString(),
+        email,
+        role: member.role,
+      } satisfies ProjectMember,
+    ].sort((a, b) => a.email.localeCompare(b.email));
+
+    const next: StoredProject = {
+      ...current,
+      members: nextMembers,
+      updatedAt: new Date().toISOString(),
+    };
+    await writeProjectDocument(next);
+    return toProjectDocument(next, "owner");
+  },
+
+  async removeProjectMember(projectId, memberEmail, ownerId) {
+    const current = await getStoredProject(projectId, ownerId);
+    const email = normalizeMemberEmail(memberEmail);
+    if (!email) {
+      throw new Error("A valid member email is required");
+    }
+
+    const next: StoredProject = {
+      ...current,
+      members: current.members.filter((entry) => entry.email !== email),
+      updatedAt: new Date().toISOString(),
+    };
+    await writeProjectDocument(next);
+    return toProjectDocument(next, "owner");
   },
 
   async deleteProject(projectId, ownerId) {

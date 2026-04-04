@@ -2,7 +2,11 @@
 
 import React from "react";
 import { useSession } from "next-auth/react";
-import type { ProjectDocument, ProjectSummary } from "@/lib/project-documents";
+import type {
+  ProjectCollaboratorRole,
+  ProjectDocument,
+  ProjectSummary,
+} from "@/lib/project-documents";
 
 type ProjectsContextValue = {
   activeProject: ProjectDocument | null;
@@ -19,6 +23,7 @@ type ProjectsContextValue = {
   isReady: boolean;
   projects: ProjectSummary[];
   refreshProjects: () => Promise<ProjectSummary[]>;
+  removeActiveProjectMember: (email: string) => Promise<ProjectDocument | null>;
   renameProject: (projectId: string, title: string | null) => Promise<void>;
   saveActiveProjectPatch: (patch: {
     arenaWinnerBranchKey?: string | null;
@@ -27,6 +32,10 @@ type ProjectsContextValue = {
     memoryIds?: string[];
     sessionIds?: string[];
     title?: string | null;
+  }) => Promise<ProjectDocument | null>;
+  saveActiveProjectMember: (input: {
+    email: string;
+    role: ProjectCollaboratorRole;
   }) => Promise<ProjectDocument | null>;
   selectProject: (projectId: string) => Promise<void>;
 };
@@ -279,6 +288,39 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     return nextPatch;
   }, []);
 
+  const saveActiveProjectMember = React.useCallback(async (input: {
+    email: string;
+    role: ProjectCollaboratorRole;
+  }) => {
+    const projectId = activeProjectRef.current?.id;
+    if (!projectId) return null;
+    const data = await fetchJson<ProjectResponse>(`/api/projects/${projectId}/members`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    setActiveProject(data.project);
+    setProjects((prev) =>
+      prev.map((project) => (project.id === data.project.id ? data.project : project)),
+    );
+    activeProjectRef.current = data.project;
+    return data.project;
+  }, []);
+
+  const removeActiveProjectMember = React.useCallback(async (email: string) => {
+    const projectId = activeProjectRef.current?.id;
+    if (!projectId) return null;
+    const data = await fetchJson<ProjectResponse>(`/api/projects/${projectId}/members`, {
+      method: "DELETE",
+      body: JSON.stringify({ email }),
+    });
+    setActiveProject(data.project);
+    setProjects((prev) =>
+      prev.map((project) => (project.id === data.project.id ? data.project : project)),
+    );
+    activeProjectRef.current = data.project;
+    return data.project;
+  }, []);
+
   const value = React.useMemo<ProjectsContextValue>(() => ({
     activeProject,
     activeProjectId: activeProject?.id ?? null,
@@ -289,7 +331,9 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     isReady,
     projects,
     refreshProjects,
+    removeActiveProjectMember,
     renameProject,
+    saveActiveProjectMember,
     saveActiveProjectPatch,
     selectProject,
   }), [
@@ -301,7 +345,9 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     isReady,
     projects,
     refreshProjects,
+    removeActiveProjectMember,
     renameProject,
+    saveActiveProjectMember,
     saveActiveProjectPatch,
     selectProject,
   ]);

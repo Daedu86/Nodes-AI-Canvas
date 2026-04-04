@@ -7,8 +7,10 @@ import {
   deleteProject,
   deleteProjects,
   getProject,
+  listProjectsForActor,
   listProjects,
   patchProject,
+  upsertProjectMember,
 } from "../lib/project-store";
 
 describe("project-store", () => {
@@ -42,12 +44,15 @@ describe("project-store", () => {
     expect(created.title).toBe("Platform rethink");
     expect(created.sessionCount).toBe(2);
     expect(created.arenaWinnerBranchKey).toBeNull();
+    expect(created.accessRole).toBe("owner");
     expect(created.memoryIds).toEqual(["memory-a"]);
+    expect(created.members).toEqual([]);
     expect(created.arenaWinnerSessionId).toBeNull();
 
     const listed = await listProjects();
     expect(listed).toHaveLength(1);
     expect(listed[0]).toMatchObject({
+      accessRole: "owner",
       id: created.id,
       sessionCount: 2,
       title: "Platform rethink",
@@ -66,6 +71,7 @@ describe("project-store", () => {
       arenaWinnerSessionId: "session-c",
       globalContext: "Merge session context into one review canvas.",
       memoryIds: ["memory-b", "memory-c"],
+      members: [],
       sessionCount: 2,
       sessionIds: ["session-b", "session-c"],
       title: "Merged review board",
@@ -85,5 +91,29 @@ describe("project-store", () => {
 
     await deleteProjects([second.id, third.id]);
     expect(await listProjects()).toHaveLength(0);
+  });
+
+  it("lists shared projects for collaborators with access roles", async () => {
+    const created = await createProject({
+      ownerId: "owner-1",
+      title: "Shared project",
+    });
+
+    await upsertProjectMember(created.id, {
+      email: "viewer@example.com",
+      role: "viewer",
+    }, "owner-1");
+
+    const shared = await listProjectsForActor({
+      userEmail: "viewer@example.com",
+      userId: "viewer-1",
+    });
+
+    expect(shared).toHaveLength(1);
+    expect(shared[0]).toMatchObject({
+      accessRole: "viewer",
+      id: created.id,
+      title: "Shared project",
+    });
   });
 });

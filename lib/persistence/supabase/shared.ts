@@ -6,12 +6,19 @@ import {
   type SessionDocument,
   type SessionSummary,
 } from "@/lib/session-documents";
-import type { ProjectDocument, ProjectSummary } from "@/lib/project-documents";
+import type {
+  ProjectAccessRole,
+  ProjectCollaboratorRole,
+  ProjectDocument,
+  ProjectMember,
+  ProjectSummary,
+} from "@/lib/project-documents";
 import { type ProjectMemoryItem, normalizeProjectMemoryItem } from "@/lib/memory-documents";
 import type {
   SessionBlobCleanupResult,
   SessionBlobMaintenance,
 } from "@/lib/session-blob-store";
+import type { ProjectRecord } from "@/lib/persistence/project-repository";
 
 export const emptyBlobMaintenance = (): SessionBlobMaintenance => ({
   deduplicatedBlobLinks: 0,
@@ -92,19 +99,53 @@ type ProjectRelationRow = {
   session_id?: string | null;
 };
 
+type ProjectMemberRow = {
+  created_at?: string | null;
+  role?: string | null;
+  user_email?: string | null;
+};
+
 type ProjectRow = {
   arena_winner_branch_key: string | null;
   arena_winner_session_id: string | null;
   created_at: string;
   global_context: string;
   id: string;
+  owner_id?: string | null;
+  project_members?: ProjectMemberRow[] | null;
   project_memory_links?: ProjectRelationRow[] | null;
   project_sessions?: ProjectRelationRow[] | null;
   title: string | null;
   updated_at: string;
 };
 
-export const toProjectDocumentFromRow = (row: ProjectRow): ProjectDocument => {
+export const toProjectMembersFromRow = (row: ProjectRow): ProjectMember[] =>
+  (row.project_members ?? [])
+    .flatMap((entry) => {
+      const email =
+        typeof entry.user_email === "string" && entry.user_email.trim().length > 0
+          ? entry.user_email.trim().toLowerCase()
+          : null;
+      const role =
+        entry.role === "editor" || entry.role === "viewer"
+          ? (entry.role as ProjectCollaboratorRole)
+          : null;
+      if (!email || !role) return [];
+      return [{
+        addedAt:
+          typeof entry.created_at === "string" && entry.created_at.length > 0
+            ? entry.created_at
+            : new Date().toISOString(),
+        email,
+        role,
+      }];
+    })
+    .sort((a, b) => a.email.localeCompare(b.email));
+
+export const toProjectDocumentFromRow = (
+  row: ProjectRow,
+  accessRole: ProjectAccessRole = "owner",
+): ProjectDocument => {
   const sessionIds = (row.project_sessions ?? [])
     .map((entry) => entry.session_id)
     .filter((value): value is string => typeof value === "string" && value.length > 0);
@@ -113,12 +154,14 @@ export const toProjectDocumentFromRow = (row: ProjectRow): ProjectDocument => {
     .filter((value): value is string => typeof value === "string" && value.length > 0);
 
   return {
+    accessRole,
     arenaWinnerBranchKey: row.arena_winner_branch_key,
     arenaWinnerSessionId: row.arena_winner_session_id,
     createdAt: row.created_at,
     globalContext: row.global_context,
     id: row.id,
     memoryIds,
+    members: toProjectMembersFromRow(row),
     sessionCount: sessionIds.length,
     sessionIds,
     title: row.title,
@@ -126,9 +169,30 @@ export const toProjectDocumentFromRow = (row: ProjectRow): ProjectDocument => {
   };
 };
 
-export const toProjectSummaryFromRow = (row: ProjectRow): ProjectSummary => {
-  const document = toProjectDocumentFromRow(row);
+export const toProjectRecordFromRow = (
+  row: ProjectRow,
+  accessRole: ProjectAccessRole = "owner",
+): ProjectRecord => {
+  const ownerId =
+    typeof row.owner_id === "string" && row.owner_id.length > 0
+      ? row.owner_id
+      : "";
+  if (!ownerId) {
+    throw new Error(`Invalid project row missing owner id: ${row.id}`);
+  }
   return {
+    ...toProjectDocumentFromRow(row, accessRole),
+    ownerId,
+  };
+};
+
+export const toProjectSummaryFromRow = (
+  row: ProjectRow,
+  accessRole: ProjectAccessRole = "owner",
+): ProjectSummary => {
+  const document = toProjectDocumentFromRow(row, accessRole);
+  return {
+    accessRole: document.accessRole,
     arenaWinnerBranchKey: document.arenaWinnerBranchKey,
     arenaWinnerSessionId: document.arenaWinnerSessionId,
     createdAt: document.createdAt,

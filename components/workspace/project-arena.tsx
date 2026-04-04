@@ -23,6 +23,9 @@ const StatPill = ({ label, value }: { label: string; value: string | number }) =
 );
 
 export function ProjectArena({
+  canEdit,
+  canManageTypedNodes,
+  canOpenSessions,
   compareMode,
   entries,
   summary,
@@ -33,6 +36,9 @@ export function ProjectArena({
   onSaveSummaryToMemory,
   winnerKey,
 }: {
+  canEdit: boolean;
+  canManageTypedNodes: boolean;
+  canOpenSessions: boolean;
   compareMode: ProjectArenaEntryKind;
   entries: ProjectArenaEntry[];
   summary: ProjectArenaSummary | null;
@@ -67,15 +73,15 @@ export function ProjectArena({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onAppendSummary} disabled={!summary}>
+            <Button type="button" variant="outline" size="sm" onClick={onAppendSummary} disabled={!canEdit || !summary}>
               <CopyPlus className="h-3.5 w-3.5" />
               Merge into context
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={onCreateMergeNode} disabled={!summary}>
+            <Button type="button" variant="outline" size="sm" onClick={onCreateMergeNode} disabled={!canManageTypedNodes || !summary}>
               <Sparkles className="h-3.5 w-3.5" />
               Create merge node
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={onSaveSummaryToMemory} disabled={!summary}>
+            <Button type="button" variant="outline" size="sm" onClick={onSaveSummaryToMemory} disabled={!canManageTypedNodes || !summary}>
               <Sparkles className="h-3.5 w-3.5" />
               Save as memory
             </Button>
@@ -123,7 +129,7 @@ export function ProjectArena({
                       <p className="text-xs text-muted-foreground">Updated {formatUpdatedAt(entry.updatedAt)}</p>
                       <p className="text-xs text-muted-foreground">{entry.descriptor}</p>
                     </div>
-                    <Button type="button" variant="outline" size="sm" onClick={() => onOpenSession(entry.sessionId)}>
+                    <Button type="button" variant="outline" size="sm" disabled={!canOpenSessions} onClick={() => onOpenSession(entry.sessionId)}>
                       <ArrowUpRight className="h-3.5 w-3.5" />
                       Open
                     </Button>
@@ -195,7 +201,7 @@ export function ProjectArena({
                       {entries.find((entry) => entry.key === summary.leadKey)?.title ?? "Unknown candidate"}
                     </p>
                     <p className="mt-2 text-sm leading-6 text-foreground/90">{summary.leadReason}</p>
-                    <Button type="button" variant="outline" size="sm" className="mt-3" onClick={onPromoteLead}>
+                    <Button type="button" variant="outline" size="sm" className="mt-3" disabled={!canEdit} onClick={onPromoteLead}>
                       <Sparkles className="h-3.5 w-3.5" />
                       Pick winner
                     </Button>

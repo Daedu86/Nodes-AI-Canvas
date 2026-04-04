@@ -1,8 +1,11 @@
 import {
-  createProject,
   deleteProjects as deleteProjectBatch,
   listProjects,
 } from "@/lib/project-store";
+import {
+  createProjectForUser,
+  listProjectsForUser,
+} from "@/lib/project-collaboration";
 import { listMemoryItems } from "@/lib/memory-store";
 import { listSessions } from "@/lib/session-store";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
@@ -25,7 +28,7 @@ export async function GET(req: Request) {
   const guarded = await requireLocalApiUser(req);
   if ("response" in guarded) return guarded.response;
 
-  const projects = await listProjects({ ownerId: guarded.user.id });
+  const projects = await listProjectsForUser(guarded.user);
   return Response.json({ projects });
 }
 
@@ -48,13 +51,12 @@ export async function POST(req: Request) {
   const allowedMemoryIds = new Set(memoryItems.map((item) => item.id));
   const sessionIds = requestedSessionIds.filter((sessionId) => allowedSessionIds.has(sessionId));
   const memoryIds = requestedMemoryIds.filter((memoryId) => allowedMemoryIds.has(memoryId));
-  const project = await createProject({
+  const project = await createProjectForUser({
     globalContext: typeof body.globalContext === "string" ? body.globalContext : "",
     memoryIds,
-    ownerId: guarded.user.id,
     sessionIds,
     title: body.title ?? null,
-  });
+  }, guarded.user);
   return Response.json({ project }, { status: 201 });
 }
 

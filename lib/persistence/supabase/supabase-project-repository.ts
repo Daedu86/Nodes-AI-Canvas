@@ -1,14 +1,22 @@
-import type { ProjectRepository } from "@/lib/persistence/project-repository";
+import type {
+  ProjectActor,
+  ProjectMemberInput,
+  ProjectRepository,
+} from "@/lib/persistence/project-repository";
+import type { ProjectSummary } from "@/lib/project-documents";
 import { getSupabasePersistenceClient } from "@/lib/persistence/supabase/client";
 import {
   ensureData,
   requireOwnerId,
   toProjectDocumentFromRow,
+  toProjectMembersFromRow,
+  toProjectRecordFromRow,
   toProjectSummaryFromRow,
 } from "@/lib/persistence/supabase/shared";
 
 const projectSelect = `
   id,
+  owner_id,
   title,
   global_context,
   arena_winner_session_id,
@@ -16,8 +24,33 @@ const projectSelect = `
   created_at,
   updated_at,
   project_sessions(session_id, position),
-  project_memory_links(memory_id)
+  project_memory_links(memory_id),
+  project_members(user_email, role, created_at)
 `;
+
+const sortProjectSummaries = (projects: ProjectSummary[]) =>
+  [...projects].sort((a, b) => {
+    const updatedDelta = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    if (updatedDelta !== 0) return updatedDelta;
+    return a.createdAt.localeCompare(b.createdAt);
+  });
+
+const normalizeMemberEmail = (value: string | null | undefined) => {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+};
+
+async function fetchProjectRow(projectId: string) {
+  const client = getSupabasePersistenceClient();
+  const { data, error } = await client
+    .from("projects")
+    .select(projectSelect)
+    .eq("id", projectId)
+    .maybeSingle();
+
+  return ensureData(data, error, "Project not found");
+}
 
 async function replaceProjectSessionLinks(projectId: string, sessionIds: string[]) {
   const client = getSupabasePersistenceClient();
@@ -62,7 +95,58 @@ export const supabaseProjectRepository: ProjectRepository = {
       .order("updated_at", { ascending: false });
 
     const rows = ensureData(data, error, "Failed to list projects");
-    return rows.map(toProjectSummaryFromRow);
+    return rows.map((row) => toProjectSummaryFromRow(row, "owner"));
+  },
+
+  async listProjectsForActor(actor) {
+    const client = getSupabasePersistenceClient();
+    const ownerId = requireOwnerId(actor.userId);
+    const memberEmail = normalizeMemberEmail(actor.userEmail);
+
+    const { data: ownData, error: ownError } = await client
+      .from("projects")
+      .select(projectSelect)
+      .eq("owner_id", ownerId)
+      .order("updated_at", { ascending: false });
+
+    const ownRows = ensureData(ownData, ownError, "Failed to list projects");
+    const ownProjectIds = new Set(ownRows.map((row) => row.id));
+    const ownProjects = ownRows.map((row) => toProjectSummaryFromRow(row, "owner"));
+
+    if (!memberEmail) {
+      return ownProjects;
+    }
+
+    const { data: memberData, error: memberError } = await client
+      .from("project_members")
+      .select("project_id, role")
+      .eq("user_email", memberEmail);
+
+    const membershipRows = ensureData(memberData, memberError, "Failed to list shared projects");
+    const roleByProjectId = new Map<string, "editor" | "viewer">(
+      membershipRows.flatMap((row) => {
+        if (typeof row.project_id !== "string") return [];
+        if (row.role !== "editor" && row.role !== "viewer") return [];
+        return [[row.project_id, row.role] as const];
+      }),
+    );
+    const sharedIds = [...roleByProjectId.keys()].filter((projectId) => !ownProjectIds.has(projectId));
+
+    if (sharedIds.length === 0) {
+      return ownProjects;
+    }
+
+    const { data: sharedData, error: sharedError } = await client
+      .from("projects")
+      .select(projectSelect)
+      .in("id", sharedIds);
+
+    const sharedRows = ensureData(sharedData, sharedError, "Failed to load shared projects");
+    const sharedProjects = sharedRows.map((row) =>
+      toProjectSummaryFromRow(row, roleByProjectId.get(row.id) ?? "viewer"),
+    );
+
+    return sortProjectSummaries([...ownProjects, ...sharedProjects]);
   },
 
   async getProject(projectId, ownerId) {
@@ -75,7 +159,23 @@ export const supabaseProjectRepository: ProjectRepository = {
       .maybeSingle();
 
     const row = ensureData(data, error, "Project not found");
-    return toProjectDocumentFromRow(row);
+    return toProjectDocumentFromRow(row, "owner");
+  },
+
+  async getProjectRecordForActor(projectId, actor: ProjectActor) {
+    const row = await fetchProjectRow(projectId);
+    const ownerId = requireOwnerId(actor.userId);
+    if (row.owner_id === ownerId) {
+      return toProjectRecordFromRow(row, "owner");
+    }
+
+    const memberEmail = normalizeMemberEmail(actor.userEmail);
+    const member = toProjectMembersFromRow(row).find((entry) => entry.email === memberEmail);
+    if (!member) {
+      throw new Error("Project not found");
+    }
+
+    return toProjectRecordFromRow(row, member.role);
   },
 
   async createProject(input = {}) {
@@ -139,6 +239,51 @@ export const supabaseProjectRepository: ProjectRepository = {
     if (patch.memoryIds !== undefined) {
       const memoryIds = [...new Set(patch.memoryIds.filter((entry): entry is string => typeof entry === "string" && entry.length > 0))];
       await replaceProjectMemoryLinks(projectId, memoryIds);
+    }
+
+    return this.getProject(projectId, requireOwnerId(ownerId));
+  },
+
+  async upsertProjectMember(projectId, member: ProjectMemberInput, ownerId) {
+    const client = getSupabasePersistenceClient();
+    const normalizedEmail = normalizeMemberEmail(member.email);
+    if (!normalizedEmail) {
+      throw new Error("A valid member email is required");
+    }
+
+    await this.getProject(projectId, ownerId);
+    const { error } = await client
+      .from("project_members")
+      .upsert(
+        {
+          project_id: projectId,
+          role: member.role,
+          user_email: normalizedEmail,
+        },
+        { onConflict: "project_id,user_email" },
+      );
+    if (error) {
+      throw new Error(error.message || "Failed to update project members");
+    }
+
+    return this.getProject(projectId, requireOwnerId(ownerId));
+  },
+
+  async removeProjectMember(projectId, memberEmail, ownerId) {
+    const client = getSupabasePersistenceClient();
+    const normalizedEmail = normalizeMemberEmail(memberEmail);
+    if (!normalizedEmail) {
+      throw new Error("A valid member email is required");
+    }
+
+    await this.getProject(projectId, ownerId);
+    const { error } = await client
+      .from("project_members")
+      .delete()
+      .eq("project_id", projectId)
+      .eq("user_email", normalizedEmail);
+    if (error) {
+      throw new Error(error.message || "Failed to remove project member");
     }
 
     return this.getProject(projectId, requireOwnerId(ownerId));

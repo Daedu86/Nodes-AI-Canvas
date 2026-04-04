@@ -40,6 +40,20 @@ create table if not exists public.projects (
 create index if not exists projects_owner_updated_idx
   on public.projects (owner_id, updated_at desc);
 
+create table if not exists public.project_members (
+  project_id uuid not null references public.projects (id) on delete cascade,
+  user_email text not null,
+  role text not null,
+  created_at timestamptz not null default timezone('utc', now()),
+  primary key (project_id, user_email),
+  constraint project_member_role_check check (
+    role in ('editor', 'viewer')
+  )
+);
+
+create index if not exists project_members_email_idx
+  on public.project_members (user_email);
+
 create table if not exists public.project_sessions (
   project_id uuid not null references public.projects (id) on delete cascade,
   session_id uuid not null references public.sessions (id) on delete cascade,
@@ -101,6 +115,7 @@ execute function public.set_updated_at();
 
 alter table public.sessions enable row level security;
 alter table public.projects enable row level security;
+alter table public.project_members enable row level security;
 alter table public.project_sessions enable row level security;
 alter table public.memory_items enable row level security;
 alter table public.project_memory_links enable row level security;

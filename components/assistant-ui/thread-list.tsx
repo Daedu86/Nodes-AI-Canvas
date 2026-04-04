@@ -207,6 +207,8 @@ export const ThreadList: FC = () => {
             <div className="flex max-h-[32vh] flex-col overflow-y-auto pb-1">
               {projects.map((project) => {
                 const isActive = project.id === activeProjectId;
+                const accessRole = project.accessRole ?? "owner";
+                const isOwner = accessRole === "owner";
                 return (
                   <div
                     key={project.id}
@@ -227,21 +229,28 @@ export const ThreadList: FC = () => {
                             Open
                           </span>
                         ) : null}
+                        {!isOwner ? (
+                          <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-violet-700">
+                            {accessRole}
+                          </span>
+                        ) : null}
                       </span>
                       <span className="text-muted-foreground truncate text-[11px]">
                         {project.sessionCount} sessions · {formatUpdatedAt(project.updatedAt)}
                       </span>
                     </button>
-                    <TooltipIconButton
-                      className="text-foreground hover:text-destructive mr-3 size-4 p-0 opacity-40 transition group-hover:opacity-100"
-                      variant="ghost"
-                      tooltip="Delete project"
-                      onClick={() => {
-                        void deleteProject(project.id);
-                      }}
-                    >
-                      <Trash2Icon />
-                    </TooltipIconButton>
+                    {isOwner ? (
+                      <TooltipIconButton
+                        className="text-foreground hover:text-destructive mr-3 size-4 p-0 opacity-40 transition group-hover:opacity-100"
+                        variant="ghost"
+                        tooltip="Delete project"
+                        onClick={() => {
+                          void deleteProject(project.id);
+                        }}
+                      >
+                        <Trash2Icon />
+                      </TooltipIconButton>
+                    ) : null}
                   </div>
                 );
               })}

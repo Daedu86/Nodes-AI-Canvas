@@ -1,4 +1,17 @@
-import type { ProjectDocument, ProjectSummary } from "@/lib/project-documents";
+import type {
+  ProjectCollaboratorRole,
+  ProjectDocument,
+  ProjectSummary,
+} from "@/lib/project-documents";
+
+export type ProjectActor = {
+  userEmail: string | null;
+  userId: string;
+};
+
+export type ProjectRecord = ProjectDocument & {
+  ownerId: string;
+};
 
 export type ProjectListOptions = {
   ownerId?: string;
@@ -21,11 +34,20 @@ export type ProjectPatch = {
   title?: string | null;
 };
 
+export type ProjectMemberInput = {
+  email: string;
+  role: ProjectCollaboratorRole;
+};
+
 export interface ProjectRepository {
   createProject(input?: ProjectCreateInput): Promise<ProjectDocument>;
   deleteProject(projectId: string, ownerId?: string): Promise<void>;
   deleteProjects(projectIds: string[], ownerId?: string): Promise<void>;
   getProject(projectId: string, ownerId?: string): Promise<ProjectDocument>;
+  getProjectRecordForActor(projectId: string, actor: ProjectActor): Promise<ProjectRecord>;
   listProjects(options?: ProjectListOptions): Promise<ProjectSummary[]>;
+  listProjectsForActor(actor: ProjectActor): Promise<ProjectSummary[]>;
   patchProject(projectId: string, patch: ProjectPatch, ownerId?: string): Promise<ProjectDocument>;
+  removeProjectMember(projectId: string, memberEmail: string, ownerId?: string): Promise<ProjectDocument>;
+  upsertProjectMember(projectId: string, member: ProjectMemberInput, ownerId?: string): Promise<ProjectDocument>;
 }

@@ -1,4 +1,8 @@
-import { getProject, patchProject } from "@/lib/project-store";
+import {
+  getProjectForUser,
+  patchProjectForUser,
+  ProjectAccessError,
+} from "@/lib/project-collaboration";
 import { listMemoryItems } from "@/lib/memory-store";
 import { listSessions } from "@/lib/session-store";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
@@ -26,9 +30,12 @@ export async function GET(_: Request, context: RouteParams) {
 
   const { projectId } = await context.params;
   try {
-    const project = await getProject(projectId, guarded.user.id);
+    const project = await getProjectForUser(projectId, guarded.user);
     return Response.json({ project });
-  } catch {
+  } catch (error) {
+    if (error instanceof ProjectAccessError) {
+      return new Response(error.message, { status: error.status });
+    }
     return new Response("Project not found", { status: 404 });
   }
 }
@@ -40,18 +47,23 @@ export async function PATCH(req: Request, context: RouteParams) {
   const { projectId } = await context.params;
   const body = (await req.json().catch(() => ({}))) as PatchProjectBody;
   try {
-    const [sessions, memoryItems] = await Promise.all([
-      listSessions({ includeArchived: true, ownerId: guarded.user.id }),
-      listMemoryItems({ ownerId: guarded.user.id }),
-    ]);
+    const currentProject = await getProjectForUser(projectId, guarded.user);
+    const canManageStructure = currentProject.accessRole === "owner";
+    const allowedArenaSessionIds = new Set(currentProject.sessionIds);
+    const [sessions, memoryItems] = canManageStructure
+      ? await Promise.all([
+        listSessions({ includeArchived: true, ownerId: guarded.user.id }),
+        listMemoryItems({ ownerId: guarded.user.id }),
+      ])
+      : [[], []];
     const allowedSessionIds = new Set(sessions.map((session) => session.id));
     const allowedMemoryIds = new Set(memoryItems.map((item) => item.id));
-    const project = await patchProject(projectId, {
+    const project = await patchProjectForUser(projectId, {
       arenaWinnerSessionId:
         body.arenaWinnerSessionId === undefined
           ? undefined
           : typeof body.arenaWinnerSessionId === "string" && body.arenaWinnerSessionId.length > 0
-            && allowedSessionIds.has(body.arenaWinnerSessionId)
+            && allowedArenaSessionIds.has(body.arenaWinnerSessionId)
             ? body.arenaWinnerSessionId
             : null,
       arenaWinnerBranchKey:
@@ -77,9 +89,12 @@ export async function PATCH(req: Request, context: RouteParams) {
           .filter((value) => allowedSessionIds.has(value))
         : undefined,
       title: body.title ?? undefined,
-    }, guarded.user.id);
+    }, guarded.user);
     return Response.json({ project });
-  } catch {
+  } catch (error) {
+    if (error instanceof ProjectAccessError) {
+      return new Response(error.message, { status: error.status });
+    }
     return new Response("Project not found", { status: 404 });
   }
 }

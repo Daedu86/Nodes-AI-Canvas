@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useSession } from "next-auth/react";
 import { ArrowUpRight, BarChart3, BookCopy, GitBranchPlus, Network, PlusIcon, Trash2Icon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { useReusableMemory } from "@/components/context/reusable-memory";
 import { estimateTokenCount, formatBytes } from "@/lib/context-budget";
 import { normalizeMessages, toPlainTextTranscript } from "@/lib/llm/messages";
 import type { ProjectMemorySourceKind, ProjectMemoryType } from "@/lib/memory-documents";
+import type { ProjectCollaboratorRole } from "@/lib/project-documents";
 import {
   PROJECT_EDITABLE_MEMORY_TYPES,
   PROJECT_MEMORY_META,
@@ -34,10 +36,6 @@ import {
   getProjectContextSourceCategoryLabel,
   getProjectContextSourcePreview,
 } from "@/lib/project-context-builder";
-
-type SessionResponse = {
-  session: SessionDocument;
-};
 
 type ArenaCompareMode = "sessions" | "branches";
 type ProjectInspectorTab = "context" | "arena" | "nodes" | "sessions" | "focus";
@@ -101,26 +99,17 @@ const SectionCard = ({
   </section>
 );
 
-async function loadSessionDocument(sessionId: string) {
-  const response = await fetch(`/api/sessions/${sessionId}`);
-  if (!response.ok) {
-    return null;
-  }
-  const data = (await response.json()) as SessionResponse;
-  return data.session;
-}
-
 export function ProjectWorkspace() {
   const {
     activeProject,
     clearActiveProject,
+    removeActiveProjectMember,
+    saveActiveProjectMember,
     saveActiveProjectPatch,
   } = useProjects();
+  const { data: session } = useSession();
   const { selectSession, sessions: sessionSummaries } = usePersistedSessions();
   const { createMemoryItem, deleteMemoryItem, isReady: isMemoryReady, items: memoryItems } = useReusableMemory();
-  const [memberSessions, setMemberSessions] = React.useState<SessionDocument[]>([]);
-  const [loadingMembers, setLoadingMembers] = React.useState(false);
-  const [memberError, setMemberError] = React.useState<string | null>(null);
   const [selectedCanvasItem, setSelectedCanvasItem] = React.useState<ProjectCanvasSelection>(null);
   const [titleDraft, setTitleDraft] = React.useState(activeProject?.title ?? "");
   const [globalContextDraft, setGlobalContextDraft] = React.useState(activeProject?.globalContext ?? "");
@@ -140,6 +129,10 @@ export function ProjectWorkspace() {
   const [memoryActionMessage, setMemoryActionMessage] = React.useState("Create a typed node and attach it to this project.");
   const [selectedContextSourceIds, setSelectedContextSourceIds] = React.useState<string[]>([]);
   const [inspectorTab, setInspectorTab] = React.useState<ProjectInspectorTab>("context");
+  const [memberEmailDraft, setMemberEmailDraft] = React.useState("");
+  const [memberRoleDraft, setMemberRoleDraft] = React.useState<ProjectCollaboratorRole>("viewer");
+  const [memberActionState, setMemberActionState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [memberActionMessage, setMemberActionMessage] = React.useState("Share this project with editors or viewers.");
 
   const shouldPreferArenaOnLoad = React.useMemo(
     () => (activeProject?.sessionIds.length ?? 0) >= PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD,
@@ -156,6 +149,10 @@ export function ProjectWorkspace() {
     setMemoryTypeDraft("summary");
     setMemoryContentDraft("");
     setMemoryActionMessage("Create a typed node and attach it to this project.");
+    setMemberEmailDraft("");
+    setMemberRoleDraft("viewer");
+    setMemberActionState("idle");
+    setMemberActionMessage("Share this project with editors or viewers.");
     setWorkspaceMode(
       (activeProject?.sessionIds.length ?? 0) >= PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD
         ? "arena"
@@ -168,52 +165,23 @@ export function ProjectWorkspace() {
     setInspectorTab("context");
   }, [activeProject?.globalContext, activeProject?.id, activeProject?.sessionIds.length, activeProject?.title]);
 
-  const activeProjectId = activeProject?.id ?? null;
-  const memberSessionIdsKey = activeProject?.sessionIds.join("|") ?? "";
-  const activeProjectSessionIds = React.useMemo(
-    () => activeProject?.sessionIds ?? [],
-    [activeProject?.sessionIds],
+  const memberSessions = React.useMemo<SessionDocument[]>(
+    () => activeProject?.sessions ?? [],
+    [activeProject?.sessions],
   );
-
-  React.useEffect(() => {
-    let mounted = true;
-
-    const loadMembers = async () => {
-      if (!activeProjectId) {
-        if (mounted) {
-          setMemberSessions([]);
-          setLoadingMembers(false);
-          setMemberError(null);
-        }
-        return;
-      }
-
-      setLoadingMembers(true);
-      setMemberError(null);
-      try {
-        const loaded = await Promise.all(activeProjectSessionIds.map((sessionId) => loadSessionDocument(sessionId)));
-        if (!mounted) return;
-        setMemberSessions(loaded.filter((session): session is SessionDocument => session !== null));
-      } catch (error) {
-        if (!mounted) return;
-        setMemberError(error instanceof Error ? error.message : "Failed to load project sessions.");
-        setMemberSessions([]);
-      } finally {
-        if (mounted) {
-          setLoadingMembers(false);
-        }
-      }
-    };
-
-    void loadMembers();
-
-    return () => {
-      mounted = false;
-    };
-  }, [activeProjectId, activeProjectSessionIds, memberSessionIdsKey]);
+  const canEditProject = React.useMemo(
+    () => activeProject?.accessRole === "owner" || activeProject?.accessRole === "editor",
+    [activeProject?.accessRole],
+  );
+  const canManageProject = React.useMemo(
+    () => activeProject?.accessRole === "owner",
+    [activeProject?.accessRole],
+  );
+  const currentUserEmail = session?.user?.email?.trim().toLowerCase() ?? null;
 
   React.useEffect(() => {
     if (!activeProject) return;
+    if (!canEditProject) return;
     if (globalContextDraft === activeProject.globalContext) return;
 
     setContextSaveState("saving");
@@ -224,7 +192,7 @@ export function ProjectWorkspace() {
     }, 500);
 
     return () => window.clearTimeout(timeout);
-  }, [activeProject, globalContextDraft, saveActiveProjectPatch]);
+  }, [activeProject, canEditProject, globalContextDraft, saveActiveProjectPatch]);
 
   React.useEffect(() => {
     if (!selectedCanvasItem) return;
@@ -233,10 +201,11 @@ export function ProjectWorkspace() {
 
   const handleCommitTitle = React.useCallback(async () => {
     if (!activeProject) return;
+    if (!canEditProject) return;
     const normalizedTitle = titleDraft.trim() || null;
     if ((activeProject.title ?? null) === normalizedTitle) return;
     await saveActiveProjectPatch({ title: normalizedTitle });
-  }, [activeProject, saveActiveProjectPatch, titleDraft]);
+  }, [activeProject, canEditProject, saveActiveProjectPatch, titleDraft]);
 
   const handleOpenSession = React.useCallback((sessionId: string) => {
     clearActiveProject();
@@ -245,14 +214,16 @@ export function ProjectWorkspace() {
 
   const handleAddSession = React.useCallback(async (sessionId: string) => {
     if (!activeProject) return;
+    if (!canManageProject) return;
     if (activeProject.sessionIds.includes(sessionId)) return;
     await saveActiveProjectPatch({
       sessionIds: [...activeProject.sessionIds, sessionId],
     });
-  }, [activeProject, saveActiveProjectPatch]);
+  }, [activeProject, canManageProject, saveActiveProjectPatch]);
 
   const handleRemoveSession = React.useCallback(async (sessionId: string) => {
     if (!activeProject) return;
+    if (!canManageProject) return;
     const branchWinnerBelongsToRemovedSession =
       typeof activeProject.arenaWinnerBranchKey === "string" &&
       activeProject.arenaWinnerBranchKey.startsWith(`${sessionId}:`);
@@ -262,25 +233,28 @@ export function ProjectWorkspace() {
         activeProject.arenaWinnerSessionId === sessionId ? null : activeProject.arenaWinnerSessionId,
       sessionIds: activeProject.sessionIds.filter((entry) => entry !== sessionId),
     });
-  }, [activeProject, saveActiveProjectPatch]);
+  }, [activeProject, canManageProject, saveActiveProjectPatch]);
 
   const availableSessions = React.useMemo(() => {
-    if (!activeProject) return [] satisfies SessionSummary[];
+    if (!activeProject || !canManageProject) return [] satisfies SessionSummary[];
     const included = new Set(activeProject.sessionIds);
     return sessionSummaries.filter((session) => !included.has(session.id));
-  }, [activeProject, sessionSummaries]);
+  }, [activeProject, canManageProject, sessionSummaries]);
 
   const attachedMemoryItems = React.useMemo(() => {
     if (!activeProject) return [];
+    if (Array.isArray(activeProject.attachedMemoryItems)) {
+      return activeProject.attachedMemoryItems;
+    }
     const attached = new Set(activeProject.memoryIds);
     return memoryItems.filter((item) => attached.has(item.id));
   }, [activeProject, memoryItems]);
 
   const availableMemoryItems = React.useMemo(() => {
-    if (!activeProject) return [];
+    if (!activeProject || !canManageProject) return [];
     const attached = new Set(activeProject.memoryIds);
     return memoryItems.filter((item) => !attached.has(item.id));
-  }, [activeProject, memoryItems]);
+  }, [activeProject, canManageProject, memoryItems]);
 
   const attachedMemoryGroups = React.useMemo(
     () =>
@@ -489,15 +463,17 @@ export function ProjectWorkspace() {
 
   const handleAppendArenaSummary = React.useCallback(() => {
     if (!arenaSummary) return;
+    if (!canEditProject) return;
     setGlobalContextDraft((prev) => {
       const trimmed = prev.trim();
       return trimmed.length > 0 ? `${trimmed}\n\n${arenaSummary.note}` : arenaSummary.note;
     });
     setWorkspaceMode("canvas");
-  }, [arenaSummary]);
+  }, [arenaSummary, canEditProject]);
 
   const handlePromoteArenaWinner = React.useCallback(async () => {
     if (!arenaSummary) return;
+    if (!canEditProject) return;
     if (arenaSummary.kind === "branch") {
       const leadEntry = arenaEntries.find((entry): entry is ProjectArenaBranchEntry => entry.key === arenaSummary.leadKey && entry.kind === "branch");
       if (!leadEntry) return;
@@ -513,10 +489,11 @@ export function ProjectWorkspace() {
       arenaWinnerBranchKey: null,
       arenaWinnerSessionId: leadEntry.sessionId,
     });
-  }, [arenaEntries, arenaSummary, saveActiveProjectPatch]);
+  }, [arenaEntries, arenaSummary, canEditProject, saveActiveProjectPatch]);
 
   const handleSaveArenaSummaryAsMemory = React.useCallback(async () => {
     if (!activeProject || !arenaSummary) return;
+    if (!canManageProject) return;
     const leadEntry = arenaEntries.find((entry) => entry.key === arenaSummary.leadKey);
     if (!leadEntry) return;
     setMemoryActionState("saving");
@@ -546,6 +523,7 @@ export function ProjectWorkspace() {
     arenaSummary,
     createMemoryItem,
     arenaEntries,
+    canManageProject,
     memoryTitleDraft,
     memoryTypeDraft,
     saveActiveProjectPatch,
@@ -553,6 +531,7 @@ export function ProjectWorkspace() {
 
   const handleCreateArenaMergeNode = React.useCallback(async () => {
     if (!activeProject || !arenaSummary) return;
+    if (!canManageProject) return;
     const leadEntry = arenaEntries.find((entry) => entry.key === arenaSummary.leadKey);
     if (!leadEntry) return;
     setMemoryActionState("saving");
@@ -579,7 +558,7 @@ export function ProjectWorkspace() {
       setMemoryActionState("error");
       setMemoryActionMessage("Could not create the merge node.");
     }
-  }, [activeProject, arenaEntries, arenaSummary, createMemoryItem, saveActiveProjectPatch]);
+  }, [activeProject, arenaEntries, arenaSummary, canManageProject, createMemoryItem, saveActiveProjectPatch]);
 
   const handleSeedTypedNodeFromArena = React.useCallback(() => {
     if (!arenaSummary) return;
@@ -597,6 +576,7 @@ export function ProjectWorkspace() {
 
   const handleSeedTypedNodeFromCanvasFocus = React.useCallback(() => {
     if (!selectedCanvasItem) return;
+    if (!canManageProject) return;
     const summary = summarizeSelectionForTypedNode(selectedCanvasItem);
     if (!summary) return;
     setMemoryContentDraft(summary);
@@ -608,10 +588,11 @@ export function ProjectWorkspace() {
     setMemoryActionState("idle");
     setMemoryActionMessage("Canvas focus copied into the typed node composer.");
     setInspectorTab("nodes");
-  }, [memoryTypeDraft, selectedCanvasItem]);
+  }, [canManageProject, memoryTypeDraft, selectedCanvasItem]);
 
   const handleCreateTypedNode = React.useCallback(async () => {
     if (!activeProject) return;
+    if (!canManageProject) return;
     const title = formatMemoryTitle(memoryTitleDraft);
     const content = memoryContentDraft.trim();
     if (!title || !content) {
@@ -662,6 +643,7 @@ export function ProjectWorkspace() {
   }, [
     activeProject,
     createMemoryItem,
+    canManageProject,
     memoryContentDraft,
     memoryTitleDraft,
     memoryTypeDraft,
@@ -671,34 +653,39 @@ export function ProjectWorkspace() {
 
   const handleAttachMemory = React.useCallback(async (memoryId: string) => {
     if (!activeProject) return;
+    if (!canManageProject) return;
     await saveActiveProjectPatch({
       memoryIds: [...new Set([...activeProject.memoryIds, memoryId])],
     });
-  }, [activeProject, saveActiveProjectPatch]);
+  }, [activeProject, canManageProject, saveActiveProjectPatch]);
 
   const handleDetachMemory = React.useCallback(async (memoryId: string) => {
     if (!activeProject) return;
+    if (!canManageProject) return;
     await saveActiveProjectPatch({
       memoryIds: activeProject.memoryIds.filter((entry) => entry !== memoryId),
     });
-  }, [activeProject, saveActiveProjectPatch]);
+  }, [activeProject, canManageProject, saveActiveProjectPatch]);
 
   const handleDeleteMemory = React.useCallback(async (memoryId: string) => {
     if (!activeProject) return;
+    if (!canManageProject) return;
     await deleteMemoryItem(memoryId);
     await saveActiveProjectPatch({
       memoryIds: activeProject.memoryIds.filter((entry) => entry !== memoryId),
     });
-  }, [activeProject, deleteMemoryItem, saveActiveProjectPatch]);
+  }, [activeProject, canManageProject, deleteMemoryItem, saveActiveProjectPatch]);
 
   const handleReplaceGlobalContextWithMerge = React.useCallback(() => {
+    if (!canEditProject) return;
     const mergeContent = selectedMergeMemory?.content.trim() ?? selectedCanvasItem?.preview.trim() ?? "";
     if (!mergeContent) return;
     setGlobalContextDraft(mergeContent);
     setInspectorTab("context");
-  }, [selectedCanvasItem?.preview, selectedMergeMemory]);
+  }, [canEditProject, selectedCanvasItem?.preview, selectedMergeMemory]);
 
   const handleAppendMergeToGlobalContext = React.useCallback(() => {
+    if (!canEditProject) return;
     const mergeContent = selectedMergeMemory?.content.trim() ?? selectedCanvasItem?.preview.trim() ?? "";
     if (!mergeContent) return;
     setGlobalContextDraft((prev) => {
@@ -708,9 +695,10 @@ export function ProjectWorkspace() {
       return `${trimmed}\n\n${mergeContent}`;
     });
     setInspectorTab("context");
-  }, [selectedCanvasItem?.preview, selectedMergeMemory]);
+  }, [canEditProject, selectedCanvasItem?.preview, selectedMergeMemory]);
 
   const handleAppendSelectedMemoryToGlobalContext = React.useCallback(() => {
+    if (!canEditProject) return;
     const content = selectedMemoryItem?.content.trim() ?? "";
     if (!content) return;
     setGlobalContextDraft((prev) => {
@@ -720,7 +708,7 @@ export function ProjectWorkspace() {
       return `${trimmed}\n\n${content}`;
     });
     setInspectorTab("context");
-  }, [selectedMemoryItem]);
+  }, [canEditProject, selectedMemoryItem]);
 
   const toggleProjectContextSource = React.useCallback((sourceId: string) => {
     setSelectedContextSourceIds((prev) =>
@@ -743,13 +731,15 @@ export function ProjectWorkspace() {
   }, []);
 
   const handleReplaceGlobalContextWithBuilder = React.useCallback(() => {
+    if (!canEditProject) return;
     const nextText = projectContextBuilderDraft.text.trim();
     if (!nextText) return;
     setGlobalContextDraft(nextText);
     setInspectorTab("context");
-  }, [projectContextBuilderDraft.text]);
+  }, [canEditProject, projectContextBuilderDraft.text]);
 
   const handleAppendBuilderToGlobalContext = React.useCallback(() => {
+    if (!canEditProject) return;
     const nextText = projectContextBuilderDraft.text.trim();
     if (!nextText) return;
     setGlobalContextDraft((prev) => {
@@ -759,7 +749,69 @@ export function ProjectWorkspace() {
       return `${trimmed}\n\n${nextText}`;
     });
     setInspectorTab("context");
-  }, [projectContextBuilderDraft.text]);
+  }, [canEditProject, projectContextBuilderDraft.text]);
+
+  const handleSaveProjectMember = React.useCallback(async () => {
+    if (!activeProject || !canManageProject) return;
+    const email = memberEmailDraft.trim().toLowerCase();
+    if (!email) {
+      setMemberActionState("error");
+      setMemberActionMessage("Enter an email before sharing the project.");
+      return;
+    }
+    if (currentUserEmail && email === currentUserEmail) {
+      setMemberActionState("error");
+      setMemberActionMessage("You already own this project.");
+      return;
+    }
+
+    setMemberActionState("saving");
+    setMemberActionMessage(`Adding ${email} as ${memberRoleDraft}...`);
+    try {
+      await saveActiveProjectMember({ email, role: memberRoleDraft });
+      setMemberEmailDraft("");
+      setMemberActionState("saved");
+      setMemberActionMessage(`Project shared with ${email}.`);
+    } catch {
+      setMemberActionState("error");
+      setMemberActionMessage("Could not update project members.");
+    }
+  }, [
+    activeProject,
+    canManageProject,
+    currentUserEmail,
+    memberEmailDraft,
+    memberRoleDraft,
+    saveActiveProjectMember,
+  ]);
+
+  const handleRemoveProjectMember = React.useCallback(async (email: string) => {
+    if (!canManageProject) return;
+    setMemberActionState("saving");
+    setMemberActionMessage(`Removing ${email}...`);
+    try {
+      await removeActiveProjectMember(email);
+      setMemberActionState("saved");
+      setMemberActionMessage(`${email} removed from the project.`);
+    } catch {
+      setMemberActionState("error");
+      setMemberActionMessage("Could not remove that project member.");
+    }
+  }, [canManageProject, removeActiveProjectMember]);
+
+  const handleChangeProjectMemberRole = React.useCallback(async (email: string, role: ProjectCollaboratorRole) => {
+    if (!canManageProject) return;
+    setMemberActionState("saving");
+    setMemberActionMessage(`Updating ${email} to ${role}...`);
+    try {
+      await saveActiveProjectMember({ email, role });
+      setMemberActionState("saved");
+      setMemberActionMessage(`${email} is now ${role}.`);
+    } catch {
+      setMemberActionState("error");
+      setMemberActionMessage("Could not update that project member.");
+    }
+  }, [canManageProject, saveActiveProjectMember]);
 
   if (!activeProject || !projectView) {
     return null;
@@ -779,6 +831,7 @@ export function ProjectWorkspace() {
               </label>
               <Input
                 value={titleDraft}
+                disabled={!canEditProject}
                 onChange={(event) => setTitleDraft(event.currentTarget.value)}
                 onBlur={() => {
                   void handleCommitTitle();
@@ -792,6 +845,26 @@ export function ProjectWorkspace() {
                 }}
                 placeholder="Name this project"
               />
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Access</div>
+                  <div className="mt-1 font-semibold text-foreground">
+                    {activeProject.accessRole === "owner"
+                      ? "Owner"
+                      : activeProject.accessRole === "editor"
+                        ? "Editor"
+                        : "Viewer"}
+                  </div>
+                </div>
+                <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  {activeProject.members.length + 1} collaborator{activeProject.members.length === 0 ? "" : "s"}
+                </span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                Editors can update project context and arena winners. Owners still control attached sessions, typed nodes, and sharing.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-2">
@@ -831,6 +904,118 @@ export function ProjectWorkspace() {
               <p className="mt-1 text-xs text-muted-foreground">
                 This is the combined footprint of the project title, global context, and all included session transcripts.
               </p>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    Collaboration
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    Share this project with specific people. Collaboration stays scoped to this project only.
+                  </p>
+                </div>
+                {canManageProject ? (
+                  <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-emerald-700">
+                    Owner controls sharing
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-3 space-y-2">
+                {activeProject.members.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No collaborators added yet.</p>
+                ) : (
+                  activeProject.members.map((member) => (
+                    <div
+                      key={member.email}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/80 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{member.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {member.role} · added {formatUpdatedAt(member.addedAt)}
+                        </p>
+                      </div>
+                      {canManageProject ? (
+                        <div className="flex items-center gap-2">
+                          <select
+                            aria-label={`Project role for ${member.email}`}
+                            value={member.role}
+                            onChange={(event) => {
+                              void handleChangeProjectMemberRole(
+                                member.email,
+                                event.currentTarget.value as ProjectCollaboratorRole,
+                              );
+                            }}
+                            className="flex h-8 rounded-md border border-input bg-background px-2 text-xs"
+                          >
+                            <option value="viewer">viewer</option>
+                            <option value="editor">editor</option>
+                          </select>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2 text-rose-700"
+                            onClick={() => {
+                              void handleRemoveProjectMember(member.email);
+                            }}
+                          >
+                            <Trash2Icon className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+              {canManageProject ? (
+                <div className="mt-3 space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      aria-label="Project member email"
+                      value={memberEmailDraft}
+                      onChange={(event) => setMemberEmailDraft(event.currentTarget.value)}
+                      placeholder="person@example.com"
+                    />
+                    <select
+                      aria-label="New member role"
+                      value={memberRoleDraft}
+                      onChange={(event) => setMemberRoleDraft(event.currentTarget.value as ProjectCollaboratorRole)}
+                      className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="viewer">Viewer</option>
+                      <option value="editor">Editor</option>
+                    </select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-10 px-3"
+                      onClick={() => {
+                        void handleSaveProjectMember();
+                      }}
+                    >
+                      Share
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    <span
+                      className={
+                        memberActionState === "error"
+                          ? "text-rose-700"
+                          : memberActionState === "saved"
+                            ? "text-emerald-700"
+                            : memberActionState === "saving"
+                              ? "text-sky-700"
+                              : "text-muted-foreground"
+                      }
+                    >
+                      {memberActionMessage}
+                    </span>
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
         </SectionCard>
@@ -890,18 +1075,21 @@ export function ProjectWorkspace() {
           <div className="space-y-4">
             <textarea
               value={globalContextDraft}
+              readOnly={!canEditProject}
               onChange={(event) => setGlobalContextDraft(event.currentTarget.value)}
               placeholder="Describe the cross-session goal, constraints, or synthesis notes for this project..."
               className="min-h-[180px] w-full rounded-xl border border-border/70 bg-background px-3 py-3 text-sm leading-6 text-foreground shadow-sm outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                {contextSaveState === "saving"
+                {!canEditProject
+                  ? "Read-only in viewer mode"
+                  : contextSaveState === "saving"
                   ? "Saving..."
                   : contextSaveState === "saved"
                     ? "Saved"
-                    : contextSaveState === "error"
-                      ? "Save failed"
+                      : contextSaveState === "error"
+                        ? "Save failed"
                       : "Autosaves after edits"}
               </span>
               <span>{formatBytes(encoder.encode(globalContextDraft).length)}</span>
@@ -960,7 +1148,7 @@ export function ProjectWorkspace() {
                   size="sm"
                   className="h-8 px-3"
                   onClick={handleReplaceGlobalContextWithBuilder}
-                  disabled={projectContextBuilderDraft.text.trim().length === 0}
+                  disabled={!canEditProject || projectContextBuilderDraft.text.trim().length === 0}
                 >
                   Replace with builder
                 </Button>
@@ -970,7 +1158,7 @@ export function ProjectWorkspace() {
                   size="sm"
                   className="h-8 px-3"
                   onClick={handleAppendBuilderToGlobalContext}
-                  disabled={projectContextBuilderDraft.text.trim().length === 0}
+                  disabled={!canEditProject || projectContextBuilderDraft.text.trim().length === 0}
                 >
                   Append builder
                 </Button>
@@ -1040,11 +1228,7 @@ export function ProjectWorkspace() {
           description="These saved sessions feed the combined project canvas."
         >
           <div className="space-y-2">
-            {loadingMembers ? (
-              <p className="text-sm text-muted-foreground">Loading member sessions...</p>
-            ) : null}
-            {memberError ? <p className="text-sm text-rose-700">{memberError}</p> : null}
-            {!loadingMembers && memberSessions.length === 0 ? (
+            {memberSessions.length === 0 ? (
               <p className="text-sm text-muted-foreground">This project does not include any sessions yet.</p>
             ) : null}
             {memberSessions.map((session) => (
@@ -1067,6 +1251,7 @@ export function ProjectWorkspace() {
                       variant="outline"
                       size="sm"
                       className="h-8 px-2"
+                      disabled={!canManageProject}
                       onClick={() => handleOpenSession(session.id)}
                     >
                       <ArrowUpRight className="h-3.5 w-3.5" />
@@ -1077,6 +1262,7 @@ export function ProjectWorkspace() {
                       variant="outline"
                       size="sm"
                       className="h-8 px-2 text-rose-700"
+                      disabled={!canManageProject}
                       onClick={() => {
                         void handleRemoveSession(session.id);
                       }}
@@ -1285,7 +1471,7 @@ export function ProjectWorkspace() {
                   onClick={() => {
                     void handleCreateTypedNode();
                   }}
-                  disabled={memoryTitleDraft.trim().length === 0 || memoryContentDraft.trim().length === 0}
+                  disabled={!canManageProject || memoryTitleDraft.trim().length === 0 || memoryContentDraft.trim().length === 0}
                 >
                   <PlusIcon className="h-3.5 w-3.5" />
                   Create typed node
@@ -1295,7 +1481,7 @@ export function ProjectWorkspace() {
                   variant="outline"
                   size="sm"
                   onClick={handleSeedTypedNodeFromArena}
-                  disabled={!arenaSummary}
+                  disabled={!canManageProject || !arenaSummary}
                 >
                   <GitBranchPlus className="h-3.5 w-3.5" />
                   Use arena synthesis
@@ -1305,7 +1491,7 @@ export function ProjectWorkspace() {
                   variant="outline"
                   size="sm"
                   onClick={handleSeedTypedNodeFromCanvasFocus}
-                  disabled={!selectedCanvasItem}
+                  disabled={!canManageProject || !selectedCanvasItem}
                 >
                   <ArrowUpRight className="h-3.5 w-3.5" />
                   Use canvas focus
@@ -1317,7 +1503,7 @@ export function ProjectWorkspace() {
                   onClick={() => {
                     void handleSaveArenaSummaryAsMemory();
                   }}
-                  disabled={!arenaSummary}
+                  disabled={!canManageProject || !arenaSummary}
                 >
                   <BookCopy className="h-3.5 w-3.5" />
                   Save arena synthesis
@@ -1346,6 +1532,10 @@ export function ProjectWorkspace() {
               </p>
               {!isMemoryReady ? (
                 <p className="text-sm text-muted-foreground">Loading memory library...</p>
+              ) : !canManageProject ? (
+                <p className="text-sm text-muted-foreground">
+                  Only the project owner can curate typed nodes and reusable memory in this first collaboration pass.
+                </p>
               ) : attachedMemoryItems.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No typed nodes attached to this project yet.</p>
               ) : (
@@ -1394,6 +1584,7 @@ export function ProjectWorkspace() {
                               variant="outline"
                               size="sm"
                               className="h-8 px-2"
+                              disabled={!canManageProject}
                               onClick={() => {
                                 void handleDetachMemory(item.id);
                               }}
@@ -1405,6 +1596,7 @@ export function ProjectWorkspace() {
                               variant="outline"
                               size="sm"
                               className="h-8 px-2 text-rose-700"
+                              disabled={!canManageProject}
                               onClick={() => {
                                 void handleDeleteMemory(item.id);
                               }}
@@ -1424,7 +1616,11 @@ export function ProjectWorkspace() {
               <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 Memory Library
               </p>
-              {availableMemoryItems.length === 0 ? (
+              {!canManageProject ? (
+                <p className="text-sm text-muted-foreground">
+                  Only the owner can attach or detach items from the shared memory library right now.
+                </p>
+              ) : availableMemoryItems.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Every reusable memory item is already attached.</p>
               ) : (
                 availableMemoryGroups.slice(0, 6).map((group) => (
@@ -1462,6 +1658,7 @@ export function ProjectWorkspace() {
                           variant="outline"
                           size="sm"
                           className="h-8 px-2"
+                          disabled={!canManageProject}
                           onClick={() => {
                             void handleAttachMemory(item.id);
                           }}
@@ -1485,7 +1682,11 @@ export function ProjectWorkspace() {
           description="Pull more saved sessions into the same global project canvas."
         >
           <div className="space-y-2">
-            {availableSessions.length === 0 ? (
+            {!canManageProject ? (
+              <p className="text-sm text-muted-foreground">
+                Only the project owner can change which saved sessions feed this shared canvas.
+              </p>
+            ) : availableSessions.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Every saved session is already inside this project.
               </p>
@@ -1511,6 +1712,7 @@ export function ProjectWorkspace() {
                   onClick={() => {
                     void handleAddSession(session.id);
                   }}
+                  disabled={!canManageProject}
                 >
                   <PlusIcon className="h-3.5 w-3.5" />
                   Add
@@ -1562,6 +1764,7 @@ export function ProjectWorkspace() {
                     type="button"
                     variant="outline"
                     size="sm"
+                    disabled={!canManageProject}
                     onClick={handleSeedTypedNodeFromCanvasFocus}
                   >
                     <PlusIcon className="h-3.5 w-3.5" />
@@ -1581,6 +1784,7 @@ export function ProjectWorkspace() {
                     type="button"
                     variant="outline"
                     size="sm"
+                    disabled={!canEditProject}
                     onClick={handleAppendSelectedMemoryToGlobalContext}
                   >
                     Append to global context
@@ -1600,6 +1804,7 @@ export function ProjectWorkspace() {
                       type="button"
                       variant="outline"
                       size="sm"
+                      disabled={!canEditProject}
                       onClick={handleReplaceGlobalContextWithMerge}
                     >
                       Use as global context
@@ -1608,6 +1813,7 @@ export function ProjectWorkspace() {
                       type="button"
                       variant="outline"
                       size="sm"
+                      disabled={!canEditProject}
                       onClick={handleAppendMergeToGlobalContext}
                     >
                       Append to global context
@@ -1620,6 +1826,7 @@ export function ProjectWorkspace() {
                   type="button"
                   variant="outline"
                   size="sm"
+                  disabled={!canManageProject}
                   onClick={() => handleOpenSession(selectedCanvasItem.sessionId!)}
                 >
                   <ArrowUpRight className="h-3.5 w-3.5" />
@@ -1690,6 +1897,9 @@ export function ProjectWorkspace() {
               />
             ) : (
               <ProjectArena
+                canEdit={canEditProject}
+                canManageTypedNodes={canManageProject}
+                canOpenSessions={canManageProject}
                 compareMode={arenaCompareMode === "sessions" ? "session" : "branch"}
                 entries={arenaEntries}
                 summary={arenaSummary}
