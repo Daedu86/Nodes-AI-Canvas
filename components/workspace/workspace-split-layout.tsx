@@ -4,41 +4,112 @@ import React from "react";
 import { useWorkspaceSplitState } from "@/components/context/session-ui-state";
 
 type WorkspaceSplitLayoutProps = {
-  leftPanel: React.ReactNode;
-  rightPanel: React.ReactNode;
+  chatPanel: React.ReactNode;
+  canvasPanel: React.ReactNode;
+  wikiPanel: React.ReactNode;
+  nodyPanel: React.ReactNode;
 };
 
-export function WorkspaceSplitLayout({
-  leftPanel,
-  rightPanel,
-}: WorkspaceSplitLayoutProps) {
-  const { splitRatio, setSplitRatio, viewMode } = useWorkspaceSplitState();
-  const splitRef = React.useRef<HTMLDivElement | null>(null);
-  const pointerIdRef = React.useRef<number | null>(null);
-  const resizingRef = React.useRef(false);
+const MIN_PANEL_WIDTH = 260;
+const HANDLE_WIDTH = 8;
+const PANEL_GAP = 18;
 
-  const clampFraction = React.useCallback((value: number, containerWidth?: number) => {
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const getPanelWidths = (
+  containerWidth: number,
+  splitRatio: number,
+  secondarySplitRatio: number,
+) => {
+  const chromeWidth = HANDLE_WIDTH * 2 + PANEL_GAP * 4;
+  const usableWidth = Math.max(containerWidth - chromeWidth, MIN_PANEL_WIDTH * 3);
+  const leftWidth = clamp(splitRatio * usableWidth, MIN_PANEL_WIDTH, usableWidth - MIN_PANEL_WIDTH * 2);
+  const remainingWidth = Math.max(usableWidth - leftWidth, MIN_PANEL_WIDTH * 2);
+  const middleWidth = clamp(
+    secondarySplitRatio * remainingWidth,
+    MIN_PANEL_WIDTH,
+    remainingWidth - MIN_PANEL_WIDTH,
+  );
+  const rightWidth = Math.max(MIN_PANEL_WIDTH, remainingWidth - middleWidth);
+
+  return {
+    leftWidth,
+    middleWidth,
+    rightWidth,
+    usableWidth,
+  };
+};
+
+type ResizeHandle = "primary" | "secondary";
+
+export function WorkspaceSplitLayout({
+  chatPanel,
+  canvasPanel,
+  wikiPanel,
+  nodyPanel,
+}: WorkspaceSplitLayoutProps) {
+  const {
+    splitRatio,
+    setSplitRatio,
+    secondarySplitRatio,
+    setSecondarySplitRatio,
+    viewMode,
+  } = useWorkspaceSplitState();
+  const splitRef = React.useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = React.useState(0);
+  const pointerIdRef = React.useRef<number | null>(null);
+  const resizingHandleRef = React.useRef<ResizeHandle | null>(null);
+
+  const clampPrimaryRatio = React.useCallback((value: number, containerWidth?: number) => {
     if (!containerWidth || containerWidth <= 0) {
-      return Math.min(0.8, Math.max(0.2, value));
+      return Math.min(0.7, Math.max(0.22, value));
     }
-    const minPanelWidth = 260;
-    const handleWidth = 8;
-    const usableWidth = Math.max(containerWidth - handleWidth, 1);
-    const minFraction = Math.min(0.5, minPanelWidth / usableWidth);
-    const maxFraction = Math.max(minFraction, 1 - minFraction);
-    const clamped = Math.min(maxFraction, Math.max(minFraction, value));
-    return Number.isFinite(clamped) ? clamped : minFraction;
+    const chromeWidth = HANDLE_WIDTH * 2 + PANEL_GAP * 4;
+    const usableWidth = Math.max(containerWidth - chromeWidth, MIN_PANEL_WIDTH * 3);
+    return clamp(value, MIN_PANEL_WIDTH / usableWidth, (usableWidth - MIN_PANEL_WIDTH * 2) / usableWidth);
   }, []);
+
+  const clampSecondaryRatio = React.useCallback(
+    (value: number, containerWidth?: number, primaryRatio?: number) => {
+      if (!containerWidth || containerWidth <= 0) {
+        return Math.min(0.7, Math.max(0.3, value));
+      }
+      const chromeWidth = HANDLE_WIDTH * 2 + PANEL_GAP * 4;
+      const usableWidth = Math.max(containerWidth - chromeWidth, MIN_PANEL_WIDTH * 3);
+      const leftWidth = clampPrimaryRatio((primaryRatio ?? splitRatio), containerWidth) * usableWidth;
+      const remainingWidth = Math.max(usableWidth - leftWidth, MIN_PANEL_WIDTH * 2);
+      return clamp(value, MIN_PANEL_WIDTH / remainingWidth, (remainingWidth - MIN_PANEL_WIDTH) / remainingWidth);
+    },
+    [clampPrimaryRatio, splitRatio],
+  );
 
   React.useEffect(() => {
     const clampToWidth = () => {
       const width = splitRef.current?.getBoundingClientRect().width ?? 0;
-      setSplitRatio((prev) => clampFraction(prev, width));
+      setContainerWidth(width);
+      setSplitRatio((prev) => clampPrimaryRatio(prev, width));
+      setSecondarySplitRatio((prev) => clampSecondaryRatio(prev, width));
     };
     clampToWidth();
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver((entries) => {
+            const entry = entries[0];
+            const nextWidth = entry?.contentRect.width ?? splitRef.current?.getBoundingClientRect().width ?? 0;
+            setContainerWidth(nextWidth);
+            setSplitRatio((prev) => clampPrimaryRatio(prev, nextWidth));
+            setSecondarySplitRatio((prev) => clampSecondaryRatio(prev, nextWidth));
+          })
+        : null;
+    if (observer && splitRef.current) {
+      observer.observe(splitRef.current);
+    }
     window.addEventListener("resize", clampToWidth);
-    return () => window.removeEventListener("resize", clampToWidth);
-  }, [clampFraction, setSplitRatio]);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", clampToWidth);
+    };
+  }, [clampPrimaryRatio, clampSecondaryRatio, setSecondarySplitRatio, setSplitRatio]);
 
   React.useEffect(
     () => () => {
@@ -49,73 +120,125 @@ export function WorkspaceSplitLayout({
 
   const updateSplitFromPointer = React.useCallback(
     (clientX: number) => {
-      if (!splitRef.current) return;
+      if (!splitRef.current || !resizingHandleRef.current) return;
       const rect = splitRef.current.getBoundingClientRect();
       if (rect.width <= 0) return;
-      const relative = (clientX - rect.left) / rect.width;
-      setSplitRatio(clampFraction(relative, rect.width));
+
+      if (resizingHandleRef.current === "primary") {
+        const chromeWidth = HANDLE_WIDTH * 2 + PANEL_GAP * 4;
+        const usableWidth = Math.max(rect.width - chromeWidth, MIN_PANEL_WIDTH * 3);
+        const leftWidth = clamp(
+          clientX - rect.left,
+          MIN_PANEL_WIDTH,
+          usableWidth - MIN_PANEL_WIDTH * 2,
+        );
+        const nextPrimaryRatio = clampPrimaryRatio(leftWidth / usableWidth, rect.width);
+        setSplitRatio(nextPrimaryRatio);
+        setSecondarySplitRatio((prev) =>
+          clampSecondaryRatio(prev, rect.width, nextPrimaryRatio),
+        );
+        return;
+      }
+
+      const widths = getPanelWidths(rect.width, splitRatio, secondarySplitRatio);
+      const middleStart = rect.left + widths.leftWidth + HANDLE_WIDTH;
+      const nextMiddleWidth = clamp(
+        clientX - middleStart,
+        MIN_PANEL_WIDTH,
+        widths.middleWidth + widths.rightWidth - MIN_PANEL_WIDTH,
+      );
+      const remainingWidth = widths.middleWidth + widths.rightWidth;
+      setSecondarySplitRatio(
+        clampSecondaryRatio(nextMiddleWidth / remainingWidth, rect.width, splitRatio),
+      );
     },
-    [clampFraction, setSplitRatio],
+    [
+      clampPrimaryRatio,
+      clampSecondaryRatio,
+      secondarySplitRatio,
+      setSecondarySplitRatio,
+      setSplitRatio,
+      splitRatio,
+    ],
   );
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handlePointerDown = (handle: ResizeHandle) => (event: React.PointerEvent<HTMLDivElement>) => {
     if (!splitRef.current) return;
-    resizingRef.current = true;
-    pointerIdRef.current = e.pointerId;
+    resizingHandleRef.current = handle;
+    pointerIdRef.current = event.pointerId;
     try {
-      e.currentTarget.setPointerCapture(e.pointerId);
+      event.currentTarget.setPointerCapture(event.pointerId);
     } catch {}
     document.body.style.cursor = "col-resize";
-    updateSplitFromPointer(e.clientX);
+    updateSplitFromPointer(event.clientX);
   };
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!resizingRef.current || pointerIdRef.current !== e.pointerId) return;
-    updateSplitFromPointer(e.clientX);
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizingHandleRef.current || pointerIdRef.current !== event.pointerId) return;
+    updateSplitFromPointer(event.clientX);
   };
 
-  const stopResizing = (e?: React.PointerEvent<HTMLDivElement>) => {
-    resizingRef.current = false;
+  const stopResizing = (event?: React.PointerEvent<HTMLDivElement>) => {
+    resizingHandleRef.current = null;
     pointerIdRef.current = null;
     document.body.style.cursor = "";
-    if (e) {
+    if (event) {
       try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
+        event.currentTarget.releasePointerCapture(event.pointerId);
       } catch {}
     }
   };
 
-  const handleSeparatorDoubleClick = () => {
+  const handleSeparatorDoubleClick = (handle: ResizeHandle) => () => {
     const width = splitRef.current?.getBoundingClientRect().width ?? 0;
-    setSplitRatio(clampFraction(0.6, width));
-  };
-
-  const handleSeparatorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const width = splitRef.current?.getBoundingClientRect().width ?? 0;
-    if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      setSplitRatio((prev) => clampFraction(prev - 0.03, width));
-    } else if (e.key === "ArrowRight") {
-      e.preventDefault();
-      setSplitRatio((prev) => clampFraction(prev + 0.03, width));
-    } else if (e.key === "Home") {
-      e.preventDefault();
-      setSplitRatio(clampFraction(0.3, width));
-    } else if (e.key === "End") {
-      e.preventDefault();
-      setSplitRatio(clampFraction(0.7, width));
+    if (handle === "primary") {
+      setSplitRatio(clampPrimaryRatio(0.34, width));
+      return;
     }
+    setSecondarySplitRatio(clampSecondaryRatio(0.5, width));
   };
 
-  const leftStyle = { flex: splitRatio, minWidth: 220 };
-  const rightStyle = { flex: Math.max(0.1, 1 - splitRatio), minWidth: 220 };
+  const handleSeparatorKeyDown =
+    (handle: ResizeHandle) => (event: React.KeyboardEvent<HTMLDivElement>) => {
+      const width = splitRef.current?.getBoundingClientRect().width ?? 0;
+      const delta = 0.03;
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        if (handle === "primary") {
+          setSplitRatio((prev) => clampPrimaryRatio(prev - delta, width));
+        } else {
+          setSecondarySplitRatio((prev) => clampSecondaryRatio(prev - delta, width));
+        }
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        if (handle === "primary") {
+          setSplitRatio((prev) => clampPrimaryRatio(prev + delta, width));
+        } else {
+          setSecondarySplitRatio((prev) => clampSecondaryRatio(prev + delta, width));
+        }
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        if (handle === "primary") {
+          setSplitRatio(clampPrimaryRatio(0.28, width));
+        } else {
+          setSecondarySplitRatio(clampSecondaryRatio(0.35, width));
+        }
+      } else if (event.key === "End") {
+        event.preventDefault();
+        if (handle === "primary") {
+          setSplitRatio(clampPrimaryRatio(0.44, width));
+        } else {
+          setSecondarySplitRatio(clampSecondaryRatio(0.65, width));
+        }
+      }
+    };
+
+  const { leftWidth, middleWidth, rightWidth } = getPanelWidths(containerWidth, splitRatio, secondarySplitRatio);
 
   if (viewMode === "chat") {
     return (
       <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
-        <div className="min-h-0 flex-1">
-          {leftPanel}
-        </div>
+        <div className="min-h-0 flex-1">{chatPanel}</div>
       </div>
     );
   }
@@ -123,37 +246,74 @@ export function WorkspaceSplitLayout({
   if (viewMode === "canvas") {
     return (
       <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
-        <div className="min-h-0 flex-1">
-          {rightPanel}
-        </div>
+        <div className="min-h-0 flex-1">{canvasPanel}</div>
+      </div>
+    );
+  }
+
+  if (viewMode === "wiki") {
+    return (
+      <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
+        <div className="min-h-0 flex-1">{wikiPanel}</div>
+      </div>
+    );
+  }
+
+  if (viewMode === "nody") {
+    return (
+      <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
+        <div className="min-h-0 flex-1">{nodyPanel}</div>
       </div>
     );
   }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div ref={splitRef} className="flex flex-1 min-h-0 gap-3 px-4 py-4">
-        <div style={leftStyle} className="min-h-0">
-          {leftPanel}
+      <div
+        ref={splitRef}
+        className="flex min-h-0 flex-1 px-5 py-4"
+        style={{ columnGap: `${PANEL_GAP}px` }}
+      >
+        <div style={{ width: leftWidth, minWidth: MIN_PANEL_WIDTH }} className="min-h-0 shrink-0">
+          {chatPanel}
         </div>
         <div
           role="separator"
           tabIndex={0}
           aria-orientation="vertical"
-          aria-label="Resize panels"
-          className="group relative flex h-full w-2 cursor-col-resize items-center justify-center rounded bg-border/40 outline-none transition-colors focus-visible:bg-primary/30"
-          onPointerDown={handlePointerDown}
+          aria-label="Resize chat and canvas panels"
+          className="group relative flex h-full w-2 shrink-0 cursor-col-resize items-center justify-center rounded bg-border/40 outline-none transition-colors focus-visible:bg-primary/30"
+          onPointerDown={handlePointerDown("primary")}
           onPointerMove={handlePointerMove}
           onPointerUp={stopResizing}
           onPointerCancel={stopResizing}
           onLostPointerCapture={stopResizing}
-          onDoubleClick={handleSeparatorDoubleClick}
-          onKeyDown={handleSeparatorKeyDown}
+          onDoubleClick={handleSeparatorDoubleClick("primary")}
+          onKeyDown={handleSeparatorKeyDown("primary")}
         >
           <span className="pointer-events-none h-16 w-px rounded-full bg-border/80 transition-colors group-hover:bg-primary" />
         </div>
-        <div style={rightStyle} className="min-h-0">
-          {rightPanel}
+        <div style={{ width: middleWidth, minWidth: MIN_PANEL_WIDTH }} className="min-h-0 shrink-0">
+          {canvasPanel}
+        </div>
+        <div
+          role="separator"
+          tabIndex={0}
+          aria-orientation="vertical"
+          aria-label="Resize canvas and Nody panels"
+          className="group relative flex h-full w-2 shrink-0 cursor-col-resize items-center justify-center rounded bg-border/40 outline-none transition-colors focus-visible:bg-primary/30"
+          onPointerDown={handlePointerDown("secondary")}
+          onPointerMove={handlePointerMove}
+          onPointerUp={stopResizing}
+          onPointerCancel={stopResizing}
+          onLostPointerCapture={stopResizing}
+          onDoubleClick={handleSeparatorDoubleClick("secondary")}
+          onKeyDown={handleSeparatorKeyDown("secondary")}
+        >
+          <span className="pointer-events-none h-16 w-px rounded-full bg-border/80 transition-colors group-hover:bg-primary" />
+        </div>
+        <div style={{ width: rightWidth, minWidth: MIN_PANEL_WIDTH }} className="min-h-0 shrink-0">
+          {nodyPanel}
         </div>
       </div>
     </div>

@@ -45,8 +45,6 @@ import {
 import { getEdgeKey, nodesShareBranch } from "@/components/assistant-ui/thread-graph/graph-geometry";
 import { GraphBranchActions } from "@/components/assistant-ui/thread-graph-flow/graph-branch-actions";
 import { ArtifactGraphNode } from "@/components/assistant-ui/thread-graph-flow/artifact-node";
-import { CanvasAgentAvatar } from "@/components/assistant-ui/thread-graph-flow/canvas-agent/canvas-agent-avatar";
-import { CanvasAgentPanel } from "@/components/assistant-ui/thread-graph-flow/canvas-agent/canvas-agent-panel";
 import { ThreadGraphEdge } from "@/components/assistant-ui/thread-graph-flow/thread-graph-edge";
 import { layoutThreadGraphFlow } from "@/components/assistant-ui/thread-graph-flow/thread-graph-layout";
 import { ThreadGraphNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-node";
@@ -60,6 +58,7 @@ import { useHistoryMode } from "@/components/context/history-mode";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { useLinkEditor } from "@/components/context/link-editor";
 import { useModelConfig } from "@/components/context/model-config";
+import { useNodyPanel } from "@/components/context/nody-panel";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
 import { useRequestError } from "@/components/context/request-error";
 import { useSessionArtifacts } from "@/components/context/session-artifacts";
@@ -70,10 +69,6 @@ import {
   getBranchOperationDetail,
 } from "@/lib/thread-branching";
 import { executeBranchSpec } from "@/lib/thread-branching-runtime";
-import {
-  buildCanvasGuidePayload,
-  type CanvasGuideAction,
-} from "@/lib/canvas-agent/canvas-agent-context";
 import { formatBytes, getContextBudgetPolicy } from "@/lib/context-budget";
 import {
   type SessionArtifact,
@@ -337,7 +332,6 @@ const LegendItem = ({ color, label }: { color: string; label: string }) => (
 
 type FlowSpotlightMode = "all" | "assistant" | "user" | "bridge" | "edited";
 type FlowDensityMode = "overview" | "focus";
-type CanvasGuidePhase = "idle" | "walking" | "observing" | "thinking" | "speaking";
 
 const flowFilterLabel: Record<FlowSpotlightMode, string> = {
   all: "All",
@@ -358,6 +352,7 @@ export function ThreadGraphFlow() {
   const { historyMode } = useHistoryMode();
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
+  const { publishSnapshot } = useNodyPanel();
   const { clearRequestError, setRequestError } = useRequestError();
   const { activeSession, activeSessionId } = usePersistedSessions();
   const { focusedMessageId, setFocusedMessageId, setViewMode } = useSessionUiState();
@@ -384,17 +379,6 @@ export function ThreadGraphFlow() {
   const [densityMode, setDensityMode] = React.useState<FlowDensityMode>("overview");
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
   const [isSubmittingBranch, setIsSubmittingBranch] = React.useState(false);
-  const [isGuideOpen, setIsGuideOpen] = React.useState(false);
-  const [isGuideBusy, setIsGuideBusy] = React.useState(false);
-  const [guidePhase, setGuidePhase] = React.useState<CanvasGuidePhase>("idle");
-  const [guideInsight, setGuideInsight] = React.useState<string | null>(null);
-  const [guideError, setGuideError] = React.useState<string | null>(null);
-  const [guideFocusNodeId, setGuideFocusNodeId] = React.useState<string | null>(null);
-  const [guideFocusEdgeId, setGuideFocusEdgeId] = React.useState<string | null>(null);
-  const [guideLastAction, setGuideLastAction] = React.useState<CanvasGuideAction | null>(null);
-  const [guideQuestion, setGuideQuestion] = React.useState("");
-  const [guidePosition, setGuidePosition] = React.useState({ x: 26, y: 26 });
-  const [isGuideManual, setIsGuideManual] = React.useState(false);
   const [reactFlowInstance, setReactFlowInstance] = React.useState<
     ReactFlowInstance<ThreadGraphFlowNode, ThreadGraphFlowEdge> | null
   >(null);
@@ -405,26 +389,6 @@ export function ThreadGraphFlow() {
   const imageUploadInputRef = React.useRef<HTMLInputElement | null>(null);
   const fileUploadInputRef = React.useRef<HTMLInputElement | null>(null);
   const flowViewportRef = React.useRef<HTMLDivElement | null>(null);
-  const guideTransitionTimeoutRef = React.useRef<number | null>(null);
-  const guideTargetKeyRef = React.useRef<string | null>(null);
-  const guideSuppressClickRef = React.useRef(false);
-  const guideDragRef = React.useRef<{
-    active: boolean;
-    baseX: number;
-    baseY: number;
-    dragging: boolean;
-    pointerId: number | null;
-    startX: number;
-    startY: number;
-  }>({
-    active: false,
-    baseX: 26,
-    baseY: 26,
-    dragging: false,
-    pointerId: null,
-    startX: 0,
-    startY: 0,
-  });
   const [storedViewport, setStoredViewport] = React.useState<Viewport | null>(() =>
     readFlowViewport(activeSessionId),
   );
@@ -476,29 +440,9 @@ export function ThreadGraphFlow() {
     setLinkEditMode(false);
     setSpotlight("all");
     setDensityMode("overview");
-    setIsGuideOpen(false);
-    setIsGuideBusy(false);
-    setGuidePhase("idle");
-    setGuideInsight(null);
-    setGuideError(null);
-    setGuideFocusNodeId(null);
-    setGuideFocusEdgeId(null);
-    setGuideLastAction(null);
-    setGuideQuestion("");
-    setGuidePosition({ x: 26, y: 26 });
-    setIsGuideManual(false);
-    guideTargetKeyRef.current = null;
     treeSignatureRef.current = null;
     cancelDraft();
   }, [activeSessionId, cancelDraft]);
-
-  React.useEffect(() => {
-    return () => {
-      if (guideTransitionTimeoutRef.current !== null) {
-        window.clearTimeout(guideTransitionTimeoutRef.current);
-      }
-    };
-  }, []);
 
   React.useEffect(() => {
     if (draft && selectedNodeId && draft.anchorId !== selectedNodeId) {
@@ -1314,9 +1258,6 @@ export function ThreadGraphFlow() {
       })),
     [nodes],
   );
-  const guideActiveNodeId = guideFocusNodeId ?? (guideFocusEdgeId ? null : selectedNodeId);
-  const guideActiveEdgeId = guideFocusNodeId ? null : guideFocusEdgeId;
-  const guideHasFocus = Boolean(guideActiveNodeId || guideActiveEdgeId);
   const canvasGuideNodes = React.useMemo(
     () =>
       nodes.map((node) => ({
@@ -1339,353 +1280,35 @@ export function ThreadGraphFlow() {
       })),
     [decoratedFlowEdges],
   );
-
-  const buildGuidePayloadForAction = React.useCallback(
-    (action: CanvasGuideAction, ask?: string | null) =>
-      buildCanvasGuidePayload({
-        action,
-        ask,
-        artifacts,
-        contextLinks,
-        edges: canvasGuideEdges,
-        historyMode,
-        modelId,
-        nodes: canvasGuideNodes,
-        provider,
-        selectedEdgeId: guideActiveEdgeId,
-        selectedNodeId: guideActiveNodeId,
-        sessionId: activeSessionId,
-        sessionTitle: activeSession?.title ?? null,
-      }),
-    [
-      activeSession?.title,
-      activeSessionId,
+  React.useEffect(() => {
+    publishSnapshot({
       artifacts,
-      canvasGuideEdges,
-      canvasGuideNodes,
       contextLinks,
-      guideActiveEdgeId,
-      guideActiveNodeId,
+      edges: canvasGuideEdges,
       historyMode,
+      llmEnabled,
       modelId,
+      nodes: canvasGuideNodes,
       provider,
-    ],
-  );
-
-  const guideFocusLabel = React.useMemo(
-    () => buildGuidePayloadForAction("survey-tree").focus.label,
-    [buildGuidePayloadForAction],
-  );
-
-  const runGuideAction = React.useCallback(
-    async (action: CanvasGuideAction, ask?: string | null) => {
-      if (!llmEnabled) {
-        setGuideError("Enable AI before asking the canvas guide to reason over the workspace.");
-        setIsGuideOpen(true);
-        return;
-      }
-
-      const payload = buildGuidePayloadForAction(action, ask);
-      setIsGuideOpen(true);
-      setGuideError(null);
-      setGuideLastAction(action);
-      setIsGuideBusy(true);
-      setGuidePhase("thinking");
-
-      try {
-        const response = await fetch("/api/canvas-agent", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action,
-            model: modelId,
-            payload,
-            provider,
-          }),
-        });
-
-        const data = (await response.json()) as { error?: string; text?: string };
-        if (!response.ok || !data.text) {
-          throw new Error(data.error ?? `Canvas guide failed: ${response.status}`);
-        }
-
-        setGuideInsight(data.text);
-        setGuideQuestion("");
-        setGuidePhase("speaking");
-      } catch (error) {
-        console.error("Canvas guide request failed", error);
-        setGuideError("Canvas guide could not read this workspace right now. Try again in a moment.");
-        setGuidePhase(guideHasFocus ? "observing" : "idle");
-      } finally {
-        setIsGuideBusy(false);
-      }
-    },
-    [buildGuidePayloadForAction, guideHasFocus, llmEnabled, modelId, provider],
-  );
-
-  const handleAskGuide = React.useCallback(async () => {
-    const question = guideQuestion.trim();
-    if (!question) return;
-    await runGuideAction("ask-guide", question);
-  }, [guideQuestion, runGuideAction]);
-
-  const guideDockHeight = isGuideOpen ? 380 : 68;
-
-  const clampGuidePosition = React.useCallback(
-    (position: { x: number; y: number }) => {
-      const container = flowViewportRef.current;
-      if (!container) return position;
-      const rect = container.getBoundingClientRect();
-      const maxX = Math.max(16, rect.width - 74);
-      const maxY = Math.max(16, rect.height - guideDockHeight - 74);
-      return {
-        x: Math.min(Math.max(16, position.x), maxX),
-        y: Math.min(Math.max(12, position.y), maxY),
-      };
-    },
-    [guideDockHeight],
-  );
-
-  const settleGuidePhase = React.useCallback(
-    (phase: CanvasGuidePhase) => {
-      if (guideTransitionTimeoutRef.current !== null) {
-        window.clearTimeout(guideTransitionTimeoutRef.current);
-      }
-      guideTransitionTimeoutRef.current = window.setTimeout(() => {
-        setGuidePhase(phase);
-      }, 140);
-    },
-    [],
-  );
-
-  const nudgeGuide = React.useCallback(
-    (deltaX: number, deltaY: number) => {
-      setIsGuideManual(true);
-      guideTargetKeyRef.current = null;
-      setGuidePhase("walking");
-      setGuidePosition((previous) =>
-        clampGuidePosition({
-          x: previous.x + deltaX,
-          y: previous.y + deltaY,
-        }),
-      );
-      settleGuidePhase("idle");
-    },
-    [clampGuidePosition, settleGuidePhase],
-  );
-
-  const handleGuideAvatarClick = React.useCallback(() => {
-    if (guideSuppressClickRef.current) {
-      guideSuppressClickRef.current = false;
-      return;
-    }
-    setIsGuideOpen((prev) => !prev);
-  }, []);
-
-  const handleGuideAvatarDoubleClick = React.useCallback(() => {
-    guideSuppressClickRef.current = false;
-    setIsGuideManual(false);
-    guideTargetKeyRef.current = null;
-  }, []);
-
-  const handleGuidePointerDown = React.useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-      event.currentTarget.setPointerCapture(event.pointerId);
-      guideDragRef.current = {
-        active: true,
-        baseX: guidePosition.x,
-        baseY: guidePosition.y,
-        dragging: false,
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-      };
-      setIsGuideManual(true);
-      setGuidePhase("walking");
-      guideTargetKeyRef.current = null;
-    },
-    [guidePosition.x, guidePosition.y],
-  );
-
-  const handleGuidePointerMove = React.useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      const drag = guideDragRef.current;
-      if (!drag.active || drag.pointerId !== event.pointerId) return;
-      const deltaX = event.clientX - drag.startX;
-      const deltaY = event.clientY - drag.startY;
-      if (!drag.dragging && Math.abs(deltaX) + Math.abs(deltaY) > 3) {
-        drag.dragging = true;
-      }
-      setGuidePosition(
-        clampGuidePosition({
-          x: drag.baseX + deltaX,
-          y: drag.baseY + deltaY,
-        }),
-      );
-    },
-    [clampGuidePosition],
-  );
-
-  const handleGuidePointerUp = React.useCallback(
-    (event: React.PointerEvent<HTMLButtonElement>) => {
-      const drag = guideDragRef.current;
-      if (!drag.active || drag.pointerId !== event.pointerId) return;
-      try {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      } catch {}
-      guideDragRef.current = {
-        active: false,
-        baseX: drag.baseX,
-        baseY: drag.baseY,
-        dragging: false,
-        pointerId: null,
-        startX: 0,
-        startY: 0,
-      };
-      if (drag.dragging) {
-        guideSuppressClickRef.current = true;
-        settleGuidePhase("idle");
-      } else {
-        settleGuidePhase(guideHasFocus ? "observing" : "idle");
-      }
-    },
-    [guideHasFocus, settleGuidePhase],
-  );
-
-  const handleGuideKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLButtonElement>) => {
-      const step = event.shiftKey ? 24 : 12;
-      switch (event.key) {
-        case "ArrowUp":
-          event.preventDefault();
-          nudgeGuide(0, -step);
-          break;
-        case "ArrowDown":
-          event.preventDefault();
-          nudgeGuide(0, step);
-          break;
-        case "ArrowLeft":
-          event.preventDefault();
-          nudgeGuide(-step, 0);
-          break;
-        case "ArrowRight":
-          event.preventDefault();
-          nudgeGuide(step, 0);
-          break;
-        default:
-          break;
-      }
-    },
-    [nudgeGuide],
-  );
-
-  React.useEffect(() => {
-    if (!isGuideOpen || guideInsight || isGuideBusy || guideError) return;
-    setGuideInsight(
-      guideHasFocus
-        ? "I am tracking the current focus. Ask me to explain it, summarize the branch, or survey the wider tree."
-        : "I am ready to walk the canvas. Select a node or ask me to survey the tree.",
-    );
-  }, [guideError, guideHasFocus, guideInsight, isGuideBusy, isGuideOpen]);
-
-  React.useEffect(() => {
-    if (!isGuideManual) return;
-    const container = flowViewportRef.current;
-    if (!container) return;
-    const containerRect = container.getBoundingClientRect();
-
-    const probeX = guidePosition.x + 28;
-    const probeY = guidePosition.y + 28;
-    const nodeElements = Array.from(
-      container.querySelectorAll<HTMLElement>(".react-flow__node[data-id]"),
-    );
-
-    const detectedId =
-      nodeElements.find((element) => {
-        const rect = element.getBoundingClientRect();
-        return probeX >= rect.left - containerRect.left &&
-          probeX <= rect.right - containerRect.left &&
-          probeY >= rect.top - containerRect.top &&
-          probeY <= rect.bottom - containerRect.top;
-      })?.dataset.id ?? null;
-
-    const detectedEdgeId =
-      detectedId == null
-        ? document
-            .elementsFromPoint(containerRect.left + probeX, containerRect.top + probeY)
-            .find(
-              (element) =>
-                element instanceof SVGElement &&
-                element.classList.contains("thread-graph-edge-hitbox") &&
-                element.getAttribute("data-edge-id"),
-            )
-            ?.getAttribute("data-edge-id") ?? null
-        : null;
-
-    setGuideFocusNodeId((current) => (current === detectedId ? current : detectedId));
-    setGuideFocusEdgeId((current) => (current === detectedEdgeId ? current : detectedEdgeId));
-
-    if (!isGuideBusy) {
-      setGuidePhase(detectedId || detectedEdgeId ? "observing" : "idle");
-    }
-  }, [guidePosition, isGuideBusy, isGuideManual]);
-
-  React.useEffect(() => {
-    if (isGuideManual) return;
-    const container = flowViewportRef.current;
-    if (!container) return;
-
-    const targetNodeId =
-      selectedNodeId && (nodeIndex.has(selectedNodeId) || artifactIndex.has(selectedNodeId))
-        ? selectedNodeId
-        : nodeIndex.has("__ROOT__")
-          ? "__ROOT__"
-          : null;
-
-    setGuideFocusNodeId((current) => (current === targetNodeId ? current : targetNodeId));
-    setGuideFocusEdgeId((current) => (current === null ? current : null));
-
-    let nextPosition = clampGuidePosition({ x: 26, y: 26 });
-    if (targetNodeId) {
-      const nodeElement = container.querySelector<HTMLElement>(`.react-flow__node[data-id="${targetNodeId}"]`);
-      if (nodeElement) {
-        const containerRect = container.getBoundingClientRect();
-        const nodeRect = nodeElement.getBoundingClientRect();
-        nextPosition = clampGuidePosition({
-          x: nodeRect.left - containerRect.left + nodeRect.width - 24,
-          y: nodeRect.top - containerRect.top - 26,
-        });
-      }
-    }
-
-    setGuidePosition((previous) => {
-      if (Math.abs(previous.x - nextPosition.x) < 1 && Math.abs(previous.y - nextPosition.y) < 1) {
-        return previous;
-      }
-      return nextPosition;
+      selectedEdgeId: null,
+      selectedNodeId,
+      sessionId: activeSessionId,
+      sessionTitle: activeSession?.title ?? null,
     });
-
-    const nextTargetKey = `${targetNodeId ?? "floating"}:${Math.round(nextPosition.x)}:${Math.round(nextPosition.y)}`;
-    if (guideTargetKeyRef.current === nextTargetKey || isGuideBusy) {
-      return;
-    }
-
-    guideTargetKeyRef.current = nextTargetKey;
-    setGuidePhase(targetNodeId ? "walking" : "idle");
-
-    if (guideTransitionTimeoutRef.current !== null) {
-      window.clearTimeout(guideTransitionTimeoutRef.current);
-    }
-
-    if (targetNodeId) {
-      guideTransitionTimeoutRef.current = window.setTimeout(() => {
-        setGuidePhase((current) => (current === "walking" ? "observing" : current));
-      }, 420);
-    }
-  }, [artifactIndex, clampGuidePosition, graphStructureSignature, isGuideBusy, isGuideManual, nodeIndex, selectedNodeId, storedViewport]);
+  }, [
+    activeSession?.title,
+    activeSessionId,
+    artifacts,
+    canvasGuideEdges,
+    canvasGuideNodes,
+    contextLinks,
+    historyMode,
+    llmEnabled,
+    modelId,
+    provider,
+    publishSnapshot,
+    selectedNodeId,
+  ]);
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(125,211,252,0.08),transparent_30%),linear-gradient(180deg,rgba(248,250,252,0.96),rgba(241,245,249,0.98))]">
@@ -1829,15 +1452,11 @@ export function ThreadGraphFlow() {
             ) : null}
             <button
               type="button"
-              className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
-                isGuideOpen
-                  ? "border-sky-500/35 bg-sky-500/10 text-sky-700"
-                  : "border-border/60 bg-background/90 hover:bg-background"
-              }`}
-              onClick={() => setIsGuideOpen((prev) => !prev)}
+              className="inline-flex items-center gap-1 rounded-md border border-sky-500/30 bg-sky-500/10 px-2.5 py-1.5 text-xs text-sky-700 transition-colors hover:bg-sky-500/15"
+              onClick={() => setViewMode("nody")}
             >
               <Bot className="h-3.5 w-3.5" />
-              <span>{isGuideOpen ? "Hide Guide" : "Guide Agent"}</span>
+              <span>Open Nody</span>
             </button>
             <button
               type="button"
@@ -2207,103 +1826,71 @@ export function ThreadGraphFlow() {
       </header>
 
       <div ref={flowViewportRef} className="relative min-h-0 flex-1">
-        <CanvasAgentAvatar
-          insight={guideInsight}
-          onClick={handleGuideAvatarClick}
-          onDoubleClick={handleGuideAvatarDoubleClick}
-          onKeyDown={handleGuideKeyDown}
-          onPointerDown={handleGuidePointerDown}
-          onPointerMove={handleGuidePointerMove}
-          onPointerUp={handleGuidePointerUp}
-          open={isGuideOpen}
-          phase={guidePhase}
-          position={guidePosition}
-        />
-        <div
-          className="absolute inset-x-0 top-0"
-          style={{ bottom: isGuideOpen ? 380 : 68 }}
+        <ReactFlow
+          key={`flow:${activeSessionId}:${graphStructureSignature}`}
+          nodes={decoratedFlowNodes}
+          edges={decoratedFlowEdges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          fitView={!isFlowViewport(storedViewport)}
+          defaultViewport={storedViewport ?? { x: 0, y: 0, zoom: 1 }}
+          fitViewOptions={{ padding: 0.18 }}
+          minZoom={0.3}
+          maxZoom={1.6}
+          onlyRenderVisibleElements
+          nodesDraggable
+          elementsSelectable
+          proOptions={{ hideAttribution: true }}
+          onInit={setReactFlowInstance}
+          onMoveEnd={(_, viewport) => {
+            setStoredViewport(viewport);
+          }}
+          onNodeDragStop={(_, node) => {
+            if (node.data?.kind !== "artifact") return;
+            updateArtifact(node.id, {
+              position: {
+                x: node.position.x,
+                y: node.position.y,
+              },
+            });
+          }}
+          onSelectionChange={({ nodes: selectedNodes }) => {
+            if (selectedNodes[0]?.id) {
+              applyCanvasSelection(selectedNodes[0].id);
+            }
+          }}
+          onNodeClick={(_, node) => {
+            applyCanvasSelection(node.id);
+          }}
+          onNodeDoubleClick={(_, node) => {
+            if (node.data.kind === "artifact" || node.id === "__ROOT__") return;
+            applyCanvasSelection(node.id);
+            setViewMode("split");
+            scrollMessageIntoView(node.id);
+          }}
+          onPaneClick={() => applyCanvasSelection(null)}
+          className="bg-transparent"
+          defaultEdgeOptions={{
+            animated: false,
+          }}
         >
-          <ReactFlow
-            key={`flow:${activeSessionId}:${graphStructureSignature}`}
-            nodes={decoratedFlowNodes}
-            edges={decoratedFlowEdges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            fitView={!isFlowViewport(storedViewport)}
-            defaultViewport={storedViewport ?? { x: 0, y: 0, zoom: 1 }}
-            fitViewOptions={{ padding: 0.18 }}
-            minZoom={0.3}
-            maxZoom={1.6}
-            onlyRenderVisibleElements
-            nodesDraggable
-            elementsSelectable
-            proOptions={{ hideAttribution: true }}
-            onInit={setReactFlowInstance}
-            onMoveEnd={(_, viewport) => {
-              setStoredViewport(viewport);
-            }}
-            onNodeDragStop={(_, node) => {
-              if (node.data?.kind !== "artifact") return;
-              updateArtifact(node.id, {
-                position: {
-                  x: node.position.x,
-                  y: node.position.y,
-                },
-              });
-            }}
-            onSelectionChange={({ nodes: selectedNodes }) => {
-              if (selectedNodes[0]?.id) {
-                applyCanvasSelection(selectedNodes[0].id);
-              }
-            }}
-            onNodeClick={(_, node) => {
-              applyCanvasSelection(node.id);
-            }}
-            onNodeDoubleClick={(_, node) => {
-              if (node.data.kind === "artifact" || node.id === "__ROOT__") return;
-              applyCanvasSelection(node.id);
-              setViewMode("split");
-              scrollMessageIntoView(node.id);
-            }}
-            onPaneClick={() => applyCanvasSelection(null)}
-            className="bg-transparent"
-            defaultEdgeOptions={{
-              animated: false,
-            }}
-          >
-            <Background color="rgba(148,163,184,0.3)" gap={20} size={1.2} />
-            <MiniMap
-              pannable
-              zoomable
-              className="!pointer-events-none !bottom-4 !right-4 !rounded-2xl !border !border-border/70 !bg-background/90 !shadow-lg"
-              nodeColor={(node) =>
-                String(
-                  (node.data as { accent?: string } | undefined)?.accent ?? "rgba(100,116,139,0.85)",
-                )
-              }
-              maskColor="rgba(15,23,42,0.08)"
-            />
-            <Controls
-              className="!bottom-auto !left-auto !right-4 !top-4 [&>button]:!border-border/70 [&>button]:!bg-background/90 [&>button]:!text-foreground"
-              showInteractive={false}
-            />
-          </ReactFlow>
-        </div>
-        <CanvasAgentPanel
-          busy={isGuideBusy}
-          error={guideError}
-          focusLabel={guideFocusLabel}
-          insight={guideInsight}
-          lastAction={guideLastAction}
-          llmEnabled={llmEnabled}
-          onAsk={() => void handleAskGuide()}
-          onQuestionChange={setGuideQuestion}
-          onRunAction={(action) => void runGuideAction(action)}
-          onToggle={() => setIsGuideOpen((prev) => !prev)}
-          open={isGuideOpen}
-          phase={guidePhase}
-          question={guideQuestion}
-        />
+          <Background color="rgba(148,163,184,0.3)" gap={20} size={1.2} />
+          <MiniMap
+            pannable
+            zoomable
+            className="!pointer-events-none !bottom-4 !right-4 !rounded-2xl !border !border-border/70 !bg-background/90 !shadow-lg"
+            nodeColor={(node) =>
+              String(
+                (node.data as { accent?: string } | undefined)?.accent ?? "rgba(100,116,139,0.85)",
+              )
+            }
+            maskColor="rgba(15,23,42,0.08)"
+          />
+          <Controls
+            className="!bottom-auto !left-auto !right-4 !top-4 [&>button]:!border-border/70 [&>button]:!bg-background/90 [&>button]:!text-foreground"
+            showInteractive={false}
+          />
+        </ReactFlow>
       </div>
     </section>
   );

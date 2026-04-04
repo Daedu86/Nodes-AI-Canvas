@@ -5,7 +5,7 @@ import { getSupportedModelConfig } from "@/lib/model-options";
 
 export type HistoryMode = "last" | "full";
 export type ModelProvider = "ollama" | "openrouter";
-export type SessionViewMode = "chat" | "split" | "canvas";
+export type SessionViewMode = "chat" | "split" | "canvas" | "wiki" | "nody";
 
 export type ModelConfig = {
   modelId: string;
@@ -30,6 +30,8 @@ type SessionUiStateContextValue = {
   setViewMode: (value: SessionViewMode) => void;
   splitRatio: number;
   setSplitRatio: (value: number | ((prev: number) => number)) => void;
+  secondarySplitRatio: number;
+  setSecondarySplitRatio: (value: number | ((prev: number) => number)) => void;
   linkOverrides: Map<string, LinkOverrideEntry>;
   setLinkOverrides: React.Dispatch<React.SetStateAction<Map<string, LinkOverrideEntry>>>;
   sessionId: string;
@@ -39,9 +41,9 @@ const LEGACY_HISTORY_MODE_KEY = "historyMode";
 const LEGACY_LLM_ENABLED_KEY = "llmEnabled";
 const LEGACY_MODEL_CONFIG_KEY = "modelConfig";
 const LEGACY_VIEW_MODE_KEY = "workspaceViewMode";
-const LEGACY_SPLIT_RATIO_KEY = "workspaceSplitRatio";
 const LEGACY_LINK_OVERRIDES_KEY = "threadGraph.linkOverrides.v1";
-const DEFAULT_SPLIT_RATIO = 0.6;
+const DEFAULT_SPLIT_RATIO = 1 / 3;
+const DEFAULT_SECONDARY_SPLIT_RATIO = 0.5;
 const DEFAULT_VIEW_MODE: SessionViewMode = "split";
 
 const DEFAULT_MODEL_CONFIG: ModelConfig = getSupportedModelConfig({
@@ -112,13 +114,17 @@ const readModelConfig = (sessionId: string): ModelConfig => {
 };
 
 const readSplitRatio = (sessionId: string) => {
-  const raw = readStorageValue(
-    getScopedStorageKey(sessionId, "splitRatio"),
-    LEGACY_SPLIT_RATIO_KEY,
-  );
+  const raw = readStorageValue(getScopedStorageKey(sessionId, "splitRatio.v2"));
   if (!raw) return DEFAULT_SPLIT_RATIO;
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : DEFAULT_SPLIT_RATIO;
+};
+
+const readSecondarySplitRatio = (sessionId: string) => {
+  const raw = readStorageValue(getScopedStorageKey(sessionId, "secondarySplitRatio.v2"));
+  if (!raw) return DEFAULT_SECONDARY_SPLIT_RATIO;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : DEFAULT_SECONDARY_SPLIT_RATIO;
 };
 
 const readViewMode = (sessionId: string): SessionViewMode => {
@@ -126,7 +132,13 @@ const readViewMode = (sessionId: string): SessionViewMode => {
     getScopedStorageKey(sessionId, "viewMode"),
     LEGACY_VIEW_MODE_KEY,
   );
-  if (value === "chat" || value === "canvas" || value === "split") {
+  if (
+    value === "chat" ||
+    value === "canvas" ||
+    value === "wiki" ||
+    value === "split" ||
+    value === "nody"
+  ) {
     return value;
   }
   return DEFAULT_VIEW_MODE;
@@ -168,6 +180,9 @@ export function SessionUiStateProvider({
   const [modelConfig, setModelConfig] = React.useState<ModelConfig>(() => readModelConfig(sessionId));
   const [viewMode, setViewMode] = React.useState<SessionViewMode>(() => readViewMode(sessionId));
   const [splitRatio, setSplitRatio] = React.useState<number>(() => readSplitRatio(sessionId));
+  const [secondarySplitRatio, setSecondarySplitRatio] = React.useState<number>(() =>
+    readSecondarySplitRatio(sessionId),
+  );
   const [linkOverrides, setLinkOverrides] = React.useState<Map<string, LinkOverrideEntry>>(
     () => readLinkOverrides(sessionId),
   );
@@ -209,11 +224,22 @@ export function SessionUiStateProvider({
 
   React.useEffect(() => {
     try {
-      localStorage.setItem(getScopedStorageKey(sessionId, "splitRatio"), String(splitRatio));
+      localStorage.setItem(getScopedStorageKey(sessionId, "splitRatio.v2"), String(splitRatio));
     } catch {
       // ignore storage errors
     }
   }, [sessionId, splitRatio]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(
+        getScopedStorageKey(sessionId, "secondarySplitRatio.v2"),
+        String(secondarySplitRatio),
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [secondarySplitRatio, sessionId]);
 
   React.useEffect(() => {
     try {
@@ -246,6 +272,8 @@ export function SessionUiStateProvider({
       setViewMode,
       splitRatio,
       setSplitRatio,
+      secondarySplitRatio,
+      setSecondarySplitRatio,
       linkOverrides,
       setLinkOverrides,
       sessionId,
@@ -257,6 +285,7 @@ export function SessionUiStateProvider({
       modelConfig,
       viewMode,
       splitRatio,
+      secondarySplitRatio,
       linkOverrides,
       sessionId,
     ],
@@ -278,7 +307,21 @@ export function useSessionUiState() {
 }
 
 export function useWorkspaceSplitState() {
-  const { splitRatio, setSplitRatio, viewMode, setViewMode } = useSessionUiState();
-  return { splitRatio, setSplitRatio, viewMode, setViewMode };
+  const {
+    splitRatio,
+    setSplitRatio,
+    secondarySplitRatio,
+    setSecondarySplitRatio,
+    viewMode,
+    setViewMode,
+  } = useSessionUiState();
+  return {
+    splitRatio,
+    setSplitRatio,
+    secondarySplitRatio,
+    setSecondarySplitRatio,
+    viewMode,
+    setViewMode,
+  };
 }
 

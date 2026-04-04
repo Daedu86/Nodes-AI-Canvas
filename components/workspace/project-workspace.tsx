@@ -22,6 +22,7 @@ import type { ProjectDocument } from "@/lib/project-documents";
 import type { SessionDocument, SessionSummary } from "@/lib/session-documents";
 import { ProjectCanvas, type ProjectCanvasSelection } from "@/components/workspace/project-canvas";
 import { ProjectArena } from "@/components/workspace/project-arena";
+import { ProjectWiki } from "@/components/workspace/project-wiki";
 import {
   buildProjectArenaBranchEntries,
   type ProjectArenaBranchEntry,
@@ -114,7 +115,7 @@ export function ProjectWorkspace() {
   const [titleDraft, setTitleDraft] = React.useState(activeProject?.title ?? "");
   const [globalContextDraft, setGlobalContextDraft] = React.useState(activeProject?.globalContext ?? "");
   const [contextSaveState, setContextSaveState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [workspaceMode, setWorkspaceMode] = React.useState<"canvas" | "arena">(() =>
+  const [workspaceMode, setWorkspaceMode] = React.useState<"canvas" | "arena" | "wiki">(() =>
     (activeProject?.sessionIds.length ?? 0) >= PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD
       ? "arena"
       : "canvas",
@@ -1851,7 +1852,9 @@ export function ProjectWorkspace() {
               <p className="text-xs text-muted-foreground">
                 {workspaceMode === "canvas"
                   ? `Unified canvas for ${memberSessions.length} session${memberSessions.length === 1 ? "" : "s"} and one shared project context node.`
-                  : `Arena comparison across ${arenaEntries.length} selected ${arenaCompareMode === "sessions" ? `session${arenaEntries.length === 1 ? "" : "s"}` : `branch${arenaEntries.length === 1 ? "" : "es"}`}.`}
+                  : workspaceMode === "arena"
+                    ? `Arena comparison across ${arenaEntries.length} selected ${arenaCompareMode === "sessions" ? `session${arenaEntries.length === 1 ? "" : "s"}` : `branch${arenaEntries.length === 1 ? "" : "es"}`}.`
+                    : "Canonical project wiki compiled from the shared canvas, typed nodes, and project context."}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1862,6 +1865,14 @@ export function ProjectWorkspace() {
                 onClick={() => setWorkspaceMode("canvas")}
               >
                 Canvas
+              </Button>
+              <Button
+                type="button"
+                variant={workspaceMode === "wiki" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setWorkspaceMode("wiki")}
+              >
+                Wiki
               </Button>
               <Button
                 type="button"
@@ -1880,7 +1891,7 @@ export function ProjectWorkspace() {
               </Button>
             </div>
           </div>
-          {shouldPreferArenaOnLoad && workspaceMode !== "canvas" ? (
+          {shouldPreferArenaOnLoad && workspaceMode === "arena" ? (
             <div className="border-b border-border/60 bg-amber-500/5 px-4 py-2">
               <p className="text-xs text-amber-700">
                 Large project detected. Arena opens first so the workspace stays responsive; load the full canvas when you need it.
@@ -1894,6 +1905,13 @@ export function ProjectWorkspace() {
                 sessions={memberSessions}
                 memoryItems={attachedMemoryItems}
                 onSelectionChange={setSelectedCanvasItem}
+              />
+            ) : workspaceMode === "wiki" ? (
+              <ProjectWiki
+                project={projectView}
+                sessions={memberSessions}
+                memoryItems={attachedMemoryItems}
+                focus={selectedCanvasItem}
               />
             ) : (
               <ProjectArena

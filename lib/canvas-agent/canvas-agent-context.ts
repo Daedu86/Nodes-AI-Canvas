@@ -71,6 +71,16 @@ export type CanvasGuideFocus =
 export type CanvasGuidePayload = {
   action: CanvasGuideAction;
   ask?: string | null;
+  knowledgeBase?: {
+    activePageTitle: string;
+    digest: string;
+    pageCount: number;
+    pages: Array<{
+      id: string;
+      summary: string;
+      title: string;
+    }>;
+  };
   session: {
     id: string | null;
     title: string | null;
@@ -359,12 +369,15 @@ export function buildCanvasGuidePayload({
 
 export const buildCanvasGuideSystemPrompt = () =>
   [
-    "You are Canvas Guide, an embodied guide that lives inside the AI Canvas workspace.",
-    "Speak like a thoughtful colleague who is walking the canvas with the user.",
+    "You are Nody, the canvas intelligence inside the Nodes workspace.",
+    "Speak like a thoughtful operator who is watching the graph with the user.",
     "Be specific about branches, nodes, artifacts, and tradeoffs.",
     "Do not invent unseen content. If something is unclear, say so plainly.",
     "Prefer concrete observations, short recommendations, and navigation guidance.",
     "Keep responses compact and useful.",
+    "Always respond with exactly these three section labels on their own lines: Observation, Interpretation, Next move.",
+    "Under each label, write one short paragraph or a few concise sentences.",
+    "In Next move, recommend a concrete action the user can take in Nodes.",
   ].join(" ");
 
 export const buildCanvasGuideUserPrompt = (payload: CanvasGuidePayload) => {
@@ -418,8 +431,23 @@ export const buildCanvasGuideUserPrompt = (payload: CanvasGuidePayload) => {
     lines.push(`User question: ${payload.ask}`);
   }
 
+  if (payload.knowledgeBase) {
+    lines.push(
+      `Knowledge base: active page=${payload.knowledgeBase.activePageTitle} totalPages=${payload.knowledgeBase.pageCount}`,
+    );
+    lines.push(
+      `Knowledge base index:\n${payload.knowledgeBase.pages
+        .map((page) => `- ${page.title}: ${page.summary}`)
+        .join("\n")}`,
+    );
+    lines.push(`Knowledge base digest:\n${payload.knowledgeBase.digest}`);
+  }
+
   lines.push(
-    "Respond in the first person as the guide inside the canvas. Mention what you are looking at, what it means, and the best next move.",
+    "Respond in the first person as Nody inside the canvas workspace.",
+  );
+  lines.push(
+    "Format the answer with exactly these sections: Observation, Interpretation, Next move.",
   );
 
   return lines.join("\n\n");

@@ -25,10 +25,18 @@ function LayoutHarness() {
       <button type="button" onClick={() => setViewMode("canvas")}>
         Show canvas
       </button>
+      <button type="button" onClick={() => setViewMode("wiki")}>
+        Show Wiki
+      </button>
+      <button type="button" onClick={() => setViewMode("nody")}>
+        Show Nody
+      </button>
       <div style={{ width: 1200, height: 800 }}>
         <WorkspaceSplitLayout
-          leftPanel={<div data-testid="chat-panel">chat</div>}
-          rightPanel={<div data-testid="canvas-panel">canvas</div>}
+          chatPanel={<div data-testid="chat-panel">chat</div>}
+          canvasPanel={<div data-testid="canvas-panel">canvas</div>}
+          wikiPanel={<div data-testid="wiki-panel">wiki</div>}
+          nodyPanel={<div data-testid="nody-panel">nody</div>}
         />
       </div>
     </div>
@@ -59,20 +67,26 @@ describe("WorkspaceSplitLayout", () => {
     expect(screen.getByTestId("view-mode").textContent).toBe("split");
     expect(screen.queryByTestId("chat-panel")).not.toBeNull();
     expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
+    expect(screen.queryByTestId("nody-panel")).not.toBeNull();
+    expect(screen.queryByTestId("wiki-panel")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Show canvas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show Wiki" }));
 
-    expect(screen.getByTestId("view-mode").textContent).toBe("canvas");
+    expect(screen.getByTestId("view-mode").textContent).toBe("wiki");
     expect(screen.queryByTestId("chat-panel")).toBeNull();
-    expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
+    expect(screen.queryByTestId("canvas-panel")).toBeNull();
+    expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
+    expect(screen.queryByTestId("nody-panel")).toBeNull();
 
     unmount();
 
     renderLayout("session-a");
 
-    expect(screen.getByTestId("view-mode").textContent).toBe("canvas");
+    expect(screen.getByTestId("view-mode").textContent).toBe("wiki");
     expect(screen.queryByTestId("chat-panel")).toBeNull();
-    expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
+    expect(screen.queryByTestId("canvas-panel")).toBeNull();
+    expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
+    expect(screen.queryByTestId("nody-panel")).toBeNull();
 
     cleanup();
 
@@ -81,5 +95,7 @@ describe("WorkspaceSplitLayout", () => {
     expect(screen.getByTestId("view-mode").textContent).toBe("split");
     expect(screen.queryByTestId("chat-panel")).not.toBeNull();
     expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
+    expect(screen.queryByTestId("nody-panel")).not.toBeNull();
+    expect(screen.queryByTestId("wiki-panel")).toBeNull();
   });
 });
