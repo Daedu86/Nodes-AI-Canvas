@@ -3,6 +3,7 @@ create extension if not exists pgcrypto;
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+set search_path = pg_catalog
 as $$
 begin
   new.updated_at = timezone('utc', now());
@@ -97,6 +98,12 @@ create trigger memory_items_set_updated_at
 before update on public.memory_items
 for each row
 execute function public.set_updated_at();
+
+alter table public.sessions enable row level security;
+alter table public.projects enable row level security;
+alter table public.project_sessions enable row level security;
+alter table public.memory_items enable row level security;
+alter table public.project_memory_links enable row level security;
 
 insert into storage.buckets (id, name, public)
 values ('session-artifacts', 'session-artifacts', false)
