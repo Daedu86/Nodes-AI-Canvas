@@ -45,6 +45,15 @@ import {
 import { getEdgeKey, nodesShareBranch } from "@/components/assistant-ui/thread-graph/graph-geometry";
 import { GraphBranchActions } from "@/components/assistant-ui/thread-graph-flow/graph-branch-actions";
 import { ArtifactGraphNode } from "@/components/assistant-ui/thread-graph-flow/artifact-node";
+import {
+  getArtifactCodeSample,
+  getArtifactHeadline,
+  getArtifactHighlights,
+  getArtifactIntentLabel,
+  getArtifactLineCount,
+  getArtifactReadableRole,
+  getArtifactStatChips,
+} from "@/components/assistant-ui/thread-graph-flow/artifact-presentation";
 import { ThreadGraphEdge } from "@/components/assistant-ui/thread-graph-flow/thread-graph-edge";
 import { layoutThreadGraphFlow } from "@/components/assistant-ui/thread-graph-flow/thread-graph-layout";
 import { ThreadGraphNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-node";
@@ -1249,6 +1258,26 @@ export function ThreadGraphFlow() {
   const selectedArtifactPreviewSize = selectedArtifact?.sourceDataUrl
     ? formatByteSize(estimateDataUrlBytes(selectedArtifact.sourceDataUrl))
     : null;
+  const selectedArtifactHeadline = React.useMemo(
+    () => (selectedArtifact ? getArtifactHeadline(selectedArtifact) : ""),
+    [selectedArtifact],
+  );
+  const selectedArtifactHighlights = React.useMemo(
+    () => (selectedArtifact ? getArtifactHighlights(selectedArtifact, 4) : []),
+    [selectedArtifact],
+  );
+  const selectedArtifactCodeSample = React.useMemo(
+    () => (selectedArtifact ? getArtifactCodeSample(selectedArtifact, 8) : []),
+    [selectedArtifact],
+  );
+  const selectedArtifactStatChips = React.useMemo(
+    () => (selectedArtifact ? getArtifactStatChips(selectedArtifact) : []),
+    [selectedArtifact],
+  );
+  const selectedArtifactLineCount = React.useMemo(
+    () => (selectedArtifact ? getArtifactLineCount(selectedArtifact) : 0),
+    [selectedArtifact],
+  );
   const attachableTargets = React.useMemo(
     () =>
       nodes.filter((node) => !node.isBridge).map((node) => ({
@@ -1546,6 +1575,67 @@ export function ThreadGraphFlow() {
                     </div>
                   )}
                 </div>
+                <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
+                      style={{
+                        borderColor: `${artifactAccent(selectedArtifact.artifactType)}55`,
+                        color: artifactAccent(selectedArtifact.artifactType),
+                      }}
+                    >
+                      {getArtifactReadableRole(selectedArtifact.artifactType)}
+                    </span>
+                    {selectedArtifactStatChips.slice(0, 3).map((chip) => (
+                      <span
+                        key={chip}
+                        className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+                      >
+                        {chip}
+                      </span>
+                    ))}
+                    {selectedArtifact.artifactType === "code" && selectedArtifactLineCount > 0 ? (
+                      <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                        {selectedArtifactLineCount} lines
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Tool-ready card
+                    </p>
+                    <p className="text-sm font-semibold text-foreground/90">{selectedArtifactHeadline}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {getArtifactIntentLabel(selectedArtifact.artifactType)}
+                    </p>
+                  </div>
+                  {selectedArtifact.artifactType === "code" ? (
+                    <div className="overflow-hidden rounded-xl border border-emerald-500/20 bg-slate-950 px-3 py-2 text-[12px] text-emerald-100">
+                      {selectedArtifactCodeSample.length > 0 ? (
+                        selectedArtifactCodeSample.map((line, index) => (
+                          <div key={`${index}:${line}`} className="grid grid-cols-[auto,1fr] gap-3 leading-5">
+                            <span className="select-none text-emerald-300/45">{index + 1}</span>
+                            <code className="truncate font-mono">{line}</code>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="font-mono text-emerald-100/80">No code captured yet.</p>
+                      )}
+                    </div>
+                  ) : selectedArtifactHighlights.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {selectedArtifactHighlights.map((line) => (
+                        <div key={line} className="flex items-start gap-2 text-xs leading-5 text-foreground/84">
+                          <span
+                            className="mt-1 h-1.5 w-1.5 rounded-full"
+                            style={{ backgroundColor: artifactAccent(selectedArtifact.artifactType) }}
+                          />
+                          <span>{line}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
                 {selectedArtifact.artifactType === "image" && selectedArtifact.sourceDataUrl ? (
                   <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
                     <div className="flex items-center gap-2 text-xs font-medium text-foreground/80">
@@ -1562,7 +1652,9 @@ export function ThreadGraphFlow() {
                 ) : null}
                 <label className="space-y-1 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground/80">
-                    {artifactContentLabel(selectedArtifact.artifactType)}
+                    {selectedArtifact.artifactType === "text"
+                      ? "Structured notes"
+                      : artifactContentLabel(selectedArtifact.artifactType)}
                   </span>
                   <textarea
                     rows={6}
