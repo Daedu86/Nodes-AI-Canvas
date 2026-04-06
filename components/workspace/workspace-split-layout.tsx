@@ -16,6 +16,17 @@ const PANEL_GAP = 18;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+const shellClassName =
+  "overflow-hidden rounded-[30px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.86))] shadow-[0_28px_90px_-48px_rgba(15,23,42,0.45)] ring-1 ring-black/[0.04] backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(15,23,42,0.82))] dark:ring-white/[0.03]";
+const shellInnerClassName =
+  "h-full min-h-0 overflow-hidden rounded-[26px] bg-background/90 dark:bg-slate-950/80";
+
+const WorkspacePanelShell = ({ children }: { children: React.ReactNode }) => (
+  <div className={shellClassName}>
+    <div className={shellInnerClassName}>{children}</div>
+  </div>
+);
+
 const getPanelWidths = (
   containerWidth: number,
   splitRatio: number,
@@ -237,52 +248,60 @@ export function WorkspaceSplitLayout({
 
   if (viewMode === "chat") {
     return (
-      <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
-        <div className="min-h-0 flex-1">{chatPanel}</div>
+      <div className="flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.09),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.88),rgba(241,245,249,0.72))] px-5 py-5 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.78))]">
+        <div className="min-h-0 flex-1">
+          <WorkspacePanelShell>{chatPanel}</WorkspacePanelShell>
+        </div>
       </div>
     );
   }
 
   if (viewMode === "canvas") {
     return (
-      <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
-        <div className="min-h-0 flex-1">{canvasPanel}</div>
+      <div className="flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.09),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.88),rgba(241,245,249,0.72))] px-5 py-5 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.78))]">
+        <div className="min-h-0 flex-1">
+          <WorkspacePanelShell>{canvasPanel}</WorkspacePanelShell>
+        </div>
       </div>
     );
   }
 
   if (viewMode === "wiki") {
     return (
-      <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
-        <div className="min-h-0 flex-1">{wikiPanel}</div>
+      <div className="flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.09),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.88),rgba(241,245,249,0.72))] px-5 py-5 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.78))]">
+        <div className="min-h-0 flex-1">
+          <WorkspacePanelShell>{wikiPanel}</WorkspacePanelShell>
+        </div>
       </div>
     );
   }
 
   if (viewMode === "nody") {
     return (
-      <div className="flex flex-1 flex-col overflow-hidden px-4 py-4">
-        <div className="min-h-0 flex-1">{nodyPanel}</div>
+      <div className="flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.09),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.88),rgba(241,245,249,0.72))] px-5 py-5 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.78))]">
+        <div className="min-h-0 flex-1">
+          <WorkspacePanelShell>{nodyPanel}</WorkspacePanelShell>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.09),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.88),rgba(241,245,249,0.72))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.78))]">
       <div
         ref={splitRef}
-        className="flex min-h-0 flex-1 px-5 py-4"
+        className="flex min-h-0 flex-1 px-5 py-5"
         style={{ columnGap: `${PANEL_GAP}px` }}
       >
         <div style={{ width: leftWidth, minWidth: MIN_PANEL_WIDTH }} className="min-h-0 shrink-0">
-          {chatPanel}
+          <WorkspacePanelShell>{chatPanel}</WorkspacePanelShell>
         </div>
         <div
           role="separator"
           tabIndex={0}
           aria-orientation="vertical"
           aria-label="Resize chat and canvas panels"
-          className="group relative flex h-full w-2 shrink-0 cursor-col-resize items-center justify-center rounded bg-border/40 outline-none transition-colors focus-visible:bg-primary/30"
+          className="group relative flex h-full w-2 shrink-0 cursor-col-resize items-center justify-center rounded-full bg-white/45 outline-none transition-colors focus-visible:bg-sky-400/30 dark:bg-white/10"
           onPointerDown={handlePointerDown("primary")}
           onPointerMove={handlePointerMove}
           onPointerUp={stopResizing}
@@ -291,17 +310,17 @@ export function WorkspaceSplitLayout({
           onDoubleClick={handleSeparatorDoubleClick("primary")}
           onKeyDown={handleSeparatorKeyDown("primary")}
         >
-          <span className="pointer-events-none h-16 w-px rounded-full bg-border/80 transition-colors group-hover:bg-primary" />
+          <span className="pointer-events-none h-24 w-px rounded-full bg-slate-400/70 transition-colors group-hover:bg-sky-500 dark:bg-slate-500/70" />
         </div>
         <div style={{ width: middleWidth, minWidth: MIN_PANEL_WIDTH }} className="min-h-0 shrink-0">
-          {canvasPanel}
+          <WorkspacePanelShell>{canvasPanel}</WorkspacePanelShell>
         </div>
         <div
           role="separator"
           tabIndex={0}
           aria-orientation="vertical"
           aria-label="Resize canvas and Nody panels"
-          className="group relative flex h-full w-2 shrink-0 cursor-col-resize items-center justify-center rounded bg-border/40 outline-none transition-colors focus-visible:bg-primary/30"
+          className="group relative flex h-full w-2 shrink-0 cursor-col-resize items-center justify-center rounded-full bg-white/45 outline-none transition-colors focus-visible:bg-sky-400/30 dark:bg-white/10"
           onPointerDown={handlePointerDown("secondary")}
           onPointerMove={handlePointerMove}
           onPointerUp={stopResizing}
@@ -310,10 +329,10 @@ export function WorkspaceSplitLayout({
           onDoubleClick={handleSeparatorDoubleClick("secondary")}
           onKeyDown={handleSeparatorKeyDown("secondary")}
         >
-          <span className="pointer-events-none h-16 w-px rounded-full bg-border/80 transition-colors group-hover:bg-primary" />
+          <span className="pointer-events-none h-24 w-px rounded-full bg-slate-400/70 transition-colors group-hover:bg-sky-500 dark:bg-slate-500/70" />
         </div>
         <div style={{ width: rightWidth, minWidth: MIN_PANEL_WIDTH }} className="min-h-0 shrink-0">
-          {nodyPanel}
+          <WorkspacePanelShell>{nodyPanel}</WorkspacePanelShell>
         </div>
       </div>
     </div>

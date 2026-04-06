@@ -1340,7 +1340,7 @@ export function ThreadGraphFlow() {
   ]);
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(125,211,252,0.08),transparent_30%),linear-gradient(180deg,rgba(248,250,252,0.96),rgba(241,245,249,0.98))]">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.08),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.98),rgba(241,245,249,0.96))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.16),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.12),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.9))]">
       <input
         ref={imageUploadInputRef}
         type="file"
@@ -1354,14 +1354,29 @@ export function ThreadGraphFlow() {
         className="hidden"
         onChange={handleFileUploadChange}
       />
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-4 py-3">
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold">Canvas</h2>
-          <p className="text-xs text-muted-foreground">
-            Conversation branches and reusable context live in one surface. Use filters for overview, then switch to focus mode when you want a cleaner path.
-          </p>
+      <header className="grid gap-4 border-b border-black/[0.04] px-5 py-5 dark:border-white/[0.06] xl:grid-cols-[minmax(0,1.28fr),minmax(360px,0.95fr)]">
+        <div className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-200">
+              Structured input surface
+            </span>
+            <span className="rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {artifacts.length} typed artifact{artifacts.length === 1 ? "" : "s"}
+            </span>
+            {selectedNodeId ? (
+              <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-700 dark:text-violet-200">
+                Active focus
+              </span>
+            ) : null}
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">Canvas</h2>
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+              Shape context with typed artifacts, inspect live branches, and move from loose exploration to reusable knowledge without leaving the workspace.
+            </p>
+          </div>
           {linkEditMode ? (
-            <p className="text-xs text-rose-700">
+            <p className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs leading-5 text-rose-700 dark:text-rose-200">
               Link edit mode is on. Use the floating <span className="font-semibold">Cut link</span> controls on edges, then restore a disconnected node from the detail panel.
             </p>
           ) : null}
@@ -1377,15 +1392,15 @@ export function ThreadGraphFlow() {
               <button
                 key={mode}
                 type="button"
-                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] transition-colors ${
                   spotlight === mode
-                    ? "border-sky-500/35 bg-sky-500/10 text-sky-700"
+                    ? "border-sky-500/35 bg-sky-500/10 text-sky-700 dark:text-sky-200"
                     : "border-border/60 bg-background/80 text-muted-foreground hover:bg-background"
                 }`}
                 onClick={() => setSpotlight(mode)}
               >
                 <span>{flowFilterLabel[mode]}</span>
-                <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px]">
+                <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] dark:bg-white/10">
                   {filterCounts[mode]}
                 </span>
               </button>
@@ -1393,9 +1408,9 @@ export function ThreadGraphFlow() {
             <button
               type="button"
               disabled={!selectedNodeId}
-              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 densityMode === "focus"
-                  ? "border-violet-500/35 bg-violet-500/10 text-violet-700"
+                  ? "border-violet-500/35 bg-violet-500/10 text-violet-700 dark:text-violet-200"
                   : "border-border/60 bg-background/80 text-muted-foreground hover:bg-background"
               }`}
               onClick={() =>
@@ -1407,7 +1422,17 @@ export function ThreadGraphFlow() {
             </button>
           </div>
         </div>
-        <div className="flex max-w-[460px] flex-1 flex-col items-stretch gap-2">
+        <div className="flex max-w-none min-w-0 flex-1 flex-col items-stretch gap-2 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Live workspace state
+            </p>
+            <p className="text-sm text-foreground/85">
+              {hiddenCanvasNodeCount > 0
+                ? `${hiddenCanvasNodeCount} nodes are hidden by current filters or focus mode.`
+                : "Everything relevant is visible in the current stage."}
+            </p>
+          </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
               {visibleCanvasNodeCount} / {flowNodes.length} nodes
@@ -1499,7 +1524,7 @@ export function ThreadGraphFlow() {
           <p className="text-right text-[11px] text-muted-foreground">
             Upload caps: images {formatBytes(contextBudgetPolicy.maxUploadImageBytes)}, files {formatBytes(contextBudgetPolicy.maxUploadFileBytes)}. Image previews are compressed under {formatBytes(contextBudgetPolicy.maxImagePreviewBytes)}.
           </p>
-          <div className="max-h-[320px] overflow-y-auto rounded-2xl border border-border/60 bg-background/85 px-3 py-2 shadow-sm">
+          <div className="max-h-[360px] overflow-y-auto rounded-[26px] border border-border/60 bg-background/85 px-3 py-3 shadow-sm">
             {selectedArtifact ? (
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
@@ -1906,10 +1931,15 @@ export function ThreadGraphFlow() {
                 />
               </div>
             ) : (
-              <div className="space-y-1 text-right">
-                <p className="text-xs font-medium text-foreground/80">No node selected</p>
-                <p className="text-xs text-muted-foreground">
-                  Click a message node to branch or attach context. Click an artifact node to edit reusable context.
+              <div className="space-y-2 rounded-[24px] border border-dashed border-border/70 bg-background/80 px-4 py-5 text-left">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Nothing selected
+                </p>
+                <p className="text-sm font-medium text-foreground/85">
+                  Pick a message node to branch, or select an artifact to shape reusable context.
+                </p>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  The canvas is your structured input layer. Use it to build artifacts the model can reason over without losing human-readable form.
                 </p>
               </div>
             )}
@@ -1917,7 +1947,7 @@ export function ThreadGraphFlow() {
         </div>
       </header>
 
-      <div ref={flowViewportRef} className="relative min-h-0 flex-1">
+      <div ref={flowViewportRef} className="relative min-h-0 flex-1 px-4 pb-4 pt-3">
         <ReactFlow
           key={`flow:${activeSessionId}:${graphStructureSignature}`}
           nodes={decoratedFlowNodes}
@@ -1961,25 +1991,25 @@ export function ThreadGraphFlow() {
             scrollMessageIntoView(node.id);
           }}
           onPaneClick={() => applyCanvasSelection(null)}
-          className="bg-transparent"
+          className="overflow-hidden rounded-[30px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.14),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.08),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.82),rgba(248,250,252,0.88))] shadow-[0_28px_90px_-55px_rgba(15,23,42,0.45)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.1),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.88))]"
           defaultEdgeOptions={{
             animated: false,
           }}
         >
-          <Background color="rgba(148,163,184,0.3)" gap={20} size={1.2} />
+          <Background color="rgba(148,163,184,0.18)" gap={24} size={1.15} />
           <MiniMap
             pannable
             zoomable
-            className="!pointer-events-none !bottom-4 !right-4 !rounded-2xl !border !border-border/70 !bg-background/90 !shadow-lg"
+            className="!pointer-events-none !bottom-5 !right-5 !rounded-[20px] !border !border-white/70 !bg-white/85 !shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] dark:!border-white/10 dark:!bg-slate-950/85"
             nodeColor={(node) =>
               String(
                 (node.data as { accent?: string } | undefined)?.accent ?? "rgba(100,116,139,0.85)",
               )
             }
-            maskColor="rgba(15,23,42,0.08)"
+            maskColor="rgba(15,23,42,0.05)"
           />
           <Controls
-            className="!bottom-auto !left-auto !right-4 !top-4 [&>button]:!border-border/70 [&>button]:!bg-background/90 [&>button]:!text-foreground"
+            className="!bottom-auto !left-auto !right-5 !top-5 [&>button]:!border-white/70 [&>button]:!bg-white/90 [&>button]:!text-foreground [&>button]:!shadow-sm dark:[&>button]:!border-white/10 dark:[&>button]:!bg-slate-950/90"
             showInteractive={false}
           />
         </ReactFlow>

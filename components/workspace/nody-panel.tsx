@@ -134,15 +134,15 @@ export function NodyPanel() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border/60 bg-background">
-      <div className="border-b border-border/60 bg-[linear-gradient(90deg,rgba(14,165,233,0.08),rgba(56,189,248,0.02),rgba(124,58,237,0.04))] px-4 py-3">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.86),rgba(248,250,252,0.94))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.86),rgba(2,6,23,0.88))]">
+      <div className="border-b border-black/[0.04] bg-[linear-gradient(90deg,rgba(14,165,233,0.1),rgba(56,189,248,0.03),rgba(124,58,237,0.05))] px-5 py-5 dark:border-white/[0.06]">
         <div className="flex items-start gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-sky-500/20 bg-sky-500/8 text-sky-700">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-sky-500/20 bg-white/75 text-sky-700 shadow-sm dark:bg-sky-400/10 dark:text-sky-200">
             <Bot className="h-4.5 w-4.5" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-foreground">Nody</p>
+              <p className="text-base font-semibold tracking-[-0.02em] text-foreground">Nody</p>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 <span className={`h-1.5 w-1.5 rounded-full ${statusDotClass}`} />
                 {phaseLabel[phase]}
@@ -151,15 +151,15 @@ export function NodyPanel() {
                 {statusLabel}
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Watches the canvas, interprets the active graph focus, and recommends the next move.
+            <p className="mt-1 max-w-lg text-sm leading-6 text-muted-foreground">
+              Watches the canvas, reads the wiki layer, and turns workspace state into a usable next move.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        <section className="rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+        <section className="rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Focus
@@ -204,7 +204,7 @@ export function NodyPanel() {
           ) : null}
         </section>
 
-        <section className="space-y-3 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
+        <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
           <div className="flex items-center gap-2">
             <Compass className="h-4 w-4 text-sky-700" />
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -238,7 +238,7 @@ export function NodyPanel() {
           </div>
         </section>
 
-        <section className="space-y-3 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
+        <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Structured Insight
@@ -250,15 +250,15 @@ export function NodyPanel() {
 
           {insightSections ? (
             <div className="space-y-3">
-              <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3">
+              <div className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Observation</p>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">{insightSections.observation}</p>
               </div>
-              <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3">
+              <div className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Interpretation</p>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">{insightSections.interpretation}</p>
               </div>
-              <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3">
+              <div className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Next move</p>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">{insightSections.nextMove}</p>
               </div>
@@ -272,7 +272,7 @@ export function NodyPanel() {
           )}
         </section>
 
-        <section className="space-y-3 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
+        <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-sky-700" />
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -307,7 +307,7 @@ export function NodyPanel() {
           ) : null}
         </section>
 
-        <section className="rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
+        <section className="rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
           <div className="flex items-center gap-2">
             <MessageSquareText className="h-4 w-4 text-sky-700" />
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -320,7 +320,7 @@ export function NodyPanel() {
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
             placeholder="Ask what this branch means, what evidence is missing, or what should be promoted next..."
-            className="mt-3 min-h-[120px] w-full resize-y rounded-[16px] border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-sky-500/35"
+            className="mt-3 min-h-[120px] w-full resize-y rounded-[20px] border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-sky-500/35"
           />
           <Button
             type="button"
@@ -336,7 +336,7 @@ export function NodyPanel() {
         </section>
 
         {recentInsights.length > 0 ? (
-          <section className="space-y-3 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
+          <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
             <div className="flex items-center gap-2">
               <Waypoints className="h-4 w-4 text-sky-700" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -345,7 +345,7 @@ export function NodyPanel() {
             </div>
             <div className="space-y-2">
               {recentInsights.map((entry) => (
-                <div key={entry.id} className="rounded-xl border border-border/60 bg-background/80 px-3 py-2.5">
+                <div key={entry.id} className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-2.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       {getCanvasGuideActionLabel(entry.action)}
