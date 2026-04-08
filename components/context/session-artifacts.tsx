@@ -75,6 +75,10 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
     const nextContextLinks = activeSession?.contextLinks ?? [];
     const nextSignature = buildArtifactStateSignature(nextArtifacts, nextContextLinks);
     const switchingSessions = hydratedSessionIdRef.current !== activeSessionId;
+    const localSignature = buildArtifactStateSignature(artifacts, contextLinks);
+    const hasUnsavedLocalChanges =
+      hydratedSessionIdRef.current === activeSessionId &&
+      localSignature !== lastSavedSignatureRef.current;
 
     if (switchingSessions) {
       setArtifacts(nextArtifacts);
@@ -88,10 +92,14 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
       return;
     }
 
+    if (hasUnsavedLocalChanges) {
+      return;
+    }
+
     setArtifacts(nextArtifacts);
     setContextLinks(nextContextLinks);
     lastSavedSignatureRef.current = nextSignature;
-  }, [activeSession?.artifacts, activeSession?.contextLinks, activeSessionId]);
+  }, [activeSession?.artifacts, activeSession?.contextLinks, activeSessionId, artifacts, contextLinks]);
 
   React.useEffect(() => {
     if (!activeSessionId || hydratedSessionIdRef.current !== activeSessionId) return;
