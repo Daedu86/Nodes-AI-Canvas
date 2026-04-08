@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { useProjects } from "@/components/context/projects";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
+import { forceSessionPersist } from "@/lib/session-persist-sync";
 
 const formatTitle = (title: string | null) => title?.trim() || "New Chat";
 const formatProjectTitle = (title: string | null) => title?.trim() || "Untitled Project";
@@ -121,12 +122,14 @@ export const ThreadList: FC = () => {
   }, [allSessionIds, deleteSessions, sessions.length]);
 
   const handleCreateEmptyProject = React.useCallback(async () => {
+    await forceSessionPersist();
     await createProject();
   }, [createProject]);
 
   const handleCreateProjectFromSelected = React.useCallback(async () => {
     const sessionIds = [...selectedSessionIds];
     if (sessionIds.length === 0) return;
+    await forceSessionPersist();
     await createProject({
       sessionIds,
       title: buildProjectTitle(sessionIds),
@@ -219,7 +222,7 @@ export const ThreadList: FC = () => {
                       type="button"
                       className="flex min-w-0 flex-grow flex-col px-3 py-2 text-start"
                       onClick={() => {
-                        void selectProject(project.id);
+                        void forceSessionPersist().then(() => selectProject(project.id));
                       }}
                     >
                       <span className="flex items-center gap-2 truncate text-sm">

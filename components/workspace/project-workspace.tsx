@@ -109,7 +109,7 @@ export function ProjectWorkspace() {
     saveActiveProjectPatch,
   } = useProjects();
   const { data: session } = useSession();
-  const { selectSession, sessions: sessionSummaries } = usePersistedSessions();
+  const { activeSessionId, sessions: sessionSummaries } = usePersistedSessions();
   const { createMemoryItem, deleteMemoryItem, isReady: isMemoryReady, items: memoryItems } = useReusableMemory();
   const [selectedCanvasItem, setSelectedCanvasItem] = React.useState<ProjectCanvasSelection>(null);
   const [titleDraft, setTitleDraft] = React.useState(activeProject?.title ?? "");
@@ -210,8 +210,20 @@ export function ProjectWorkspace() {
 
   const handleOpenSession = React.useCallback((sessionId: string) => {
     clearActiveProject();
-    void selectSession(sessionId);
-  }, [clearActiveProject, selectSession]);
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.location.assign(`/?sessionId=${encodeURIComponent(sessionId)}`);
+  }, [clearActiveProject]);
+
+  const handleExitProject = React.useCallback(() => {
+    clearActiveProject();
+    const targetSessionId = activeSessionId ?? activeProject?.sessionIds[0] ?? null;
+    if (!targetSessionId || typeof window === "undefined") {
+      return;
+    }
+    window.location.assign(`/?sessionId=${encodeURIComponent(targetSessionId)}`);
+  }, [activeProject?.sessionIds, activeSessionId, clearActiveProject]);
 
   const handleAddSession = React.useCallback(async (sessionId: string) => {
     if (!activeProject) return;
@@ -1886,7 +1898,7 @@ export function ProjectWorkspace() {
               >
                 Arena
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={clearActiveProject}>
+              <Button type="button" variant="outline" size="sm" onClick={handleExitProject}>
                 Exit project
               </Button>
             </div>

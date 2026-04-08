@@ -165,7 +165,7 @@ export const EditComposer: FC = () => {
     if (!text) return;
     applyComposerRunConfig(composer, historyMode, modelId, provider);
     clearRequestError();
-    composer.send();
+    composer.send({ startRun: true });
   };
 
   const handleCancel = () => {

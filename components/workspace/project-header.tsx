@@ -7,6 +7,7 @@ import {
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
+import { usePersistedSessions } from "@/components/context/persisted-sessions";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useProjects } from "@/components/context/projects";
@@ -15,7 +16,16 @@ const formatProjectTitle = (title: string | null) => title?.trim() || "Untitled 
 
 export function ProjectHeader() {
   const { activeProject, clearActiveProject } = useProjects();
+  const { activeSessionId } = usePersistedSessions();
   const accessRole = activeProject?.accessRole ?? "owner";
+
+  const handleBackToSessions = () => {
+    clearActiveProject();
+    if (!activeSessionId || typeof window === "undefined") {
+      return;
+    }
+    window.location.assign(`/?sessionId=${encodeURIComponent(activeSessionId)}`);
+  };
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
@@ -37,7 +47,7 @@ export function ProjectHeader() {
         <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-1 text-[11px] font-medium text-violet-700">
           {activeProject?.sessionCount ?? 0} session{activeProject?.sessionCount === 1 ? "" : "s"}
         </span>
-        <Button type="button" variant="outline" size="sm" onClick={clearActiveProject}>
+        <Button type="button" variant="outline" size="sm" onClick={handleBackToSessions}>
           Back to sessions
         </Button>
       </div>

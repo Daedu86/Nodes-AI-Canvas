@@ -412,6 +412,70 @@ test("preserves chat thread and canvas nodes when switching workspace modes", as
   await expect(threadMessage(page, reply)).toBeVisible();
 });
 
+test("preserves a session thread when switching to a project and back", async ({ page }) => {
+  await gotoChat(page, { title: "Source Session" });
+  const sessionId = await getActiveSessionId(page);
+  expect(sessionId).toBeTruthy();
+  if (!sessionId) return;
+
+  const prompt = "Project switch persistence seed";
+  const reply = await sendPrompt(page, prompt);
+
+  await expect
+    .poll(async () => {
+      const persistedBeforeProject = await fetchPersistedSession(page, sessionId);
+      return persistedBeforeProject.session.snapshot.messages.filter((entry) => {
+        const role = (entry.message as { role?: unknown }).role;
+        return role === "user" || role === "assistant";
+      }).length;
+    })
+    .toBe(2);
+
+  const sessionPersistResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes(`/api/sessions/${sessionId}`) &&
+      response.request().method() === "PATCH",
+  );
+  await page.getByRole("button", { name: "Select sessions" }).click();
+  await page.getByRole("checkbox", { name: "Select session Source Session" }).check();
+  await page.getByRole("button", { name: "From selected (1)" }).click();
+  const persistedTransitionResponse = await sessionPersistResponse;
+  console.log(
+    "session transition patch body",
+    persistedTransitionResponse.request().postData(),
+  );
+  await expect(page.getByRole("button", { name: "Back to sessions" })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const persistedBeforeReturn = await fetchPersistedSession(page, sessionId);
+  expect(
+    persistedBeforeReturn.session.snapshot.messages.filter((entry) => {
+      const role = (entry.message as { role?: unknown }).role;
+      return role === "user" || role === "assistant";
+    }).length,
+  ).toBe(2);
+
+  await page.getByRole("button", { name: "Back to sessions" }).click();
+  await expect(threadMessage(page, prompt)).toBeVisible({ timeout: 15_000 });
+  await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole("button", { name: "Show canvas panel" }).click();
+  const graph = await copyGraphJson(page);
+  expect(graph.nodes.map((node) => node.role)).toEqual(["user", "assistant"]);
+
+  const persistedSession = await fetchPersistedSession(page, sessionId);
+  expect(
+    persistedSession.session.snapshot.messages.filter((entry) => {
+      const role = (entry.message as { role?: unknown }).role;
+      return role === "user" || role === "assistant";
+    }).length,
+  ).toBe(2);
+
+  expect(await getActiveProjectId(page)).toBeNull();
+  expect(await getActiveSessionId(page)).toBe(sessionId);
+});
+
 async function createBranchFromChat(
   page: Page,
   {

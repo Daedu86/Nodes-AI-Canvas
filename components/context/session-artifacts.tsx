@@ -51,6 +51,15 @@ const generateLinkId = () =>
     ? crypto.randomUUID()
     : `link-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
+const buildArtifactStateSignature = (
+  artifacts: SessionArtifact[],
+  contextLinks: SessionContextLink[],
+) =>
+  JSON.stringify({
+    artifacts,
+    contextLinks,
+  });
+
 export function SessionArtifactsProvider({ children }: { children: React.ReactNode }) {
   const { activeSession, activeSessionId, saveActiveSessionDocumentPatch } = usePersistedSessions();
   const [artifacts, setArtifacts] = React.useState<SessionArtifact[]>(activeSession?.artifacts ?? []);
@@ -62,13 +71,26 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
   const saveTimeoutRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
-    setArtifacts(activeSession?.artifacts ?? []);
-    setContextLinks(activeSession?.contextLinks ?? []);
-    hydratedSessionIdRef.current = activeSessionId ?? null;
-    lastSavedSignatureRef.current = JSON.stringify({
-      artifacts: activeSession?.artifacts ?? [],
-      contextLinks: activeSession?.contextLinks ?? [],
-    });
+    const nextArtifacts = activeSession?.artifacts ?? [];
+    const nextContextLinks = activeSession?.contextLinks ?? [];
+    const nextSignature = buildArtifactStateSignature(nextArtifacts, nextContextLinks);
+    const switchingSessions = hydratedSessionIdRef.current !== activeSessionId;
+
+    if (switchingSessions) {
+      setArtifacts(nextArtifacts);
+      setContextLinks(nextContextLinks);
+      hydratedSessionIdRef.current = activeSessionId ?? null;
+      lastSavedSignatureRef.current = nextSignature;
+      return;
+    }
+
+    if (nextSignature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    setArtifacts(nextArtifacts);
+    setContextLinks(nextContextLinks);
+    lastSavedSignatureRef.current = nextSignature;
   }, [activeSession?.artifacts, activeSession?.contextLinks, activeSessionId]);
 
   React.useEffect(() => {
@@ -80,7 +102,7 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
         saveTimeoutRef.current = null;
       }
 
-      const signature = JSON.stringify({ artifacts, contextLinks });
+      const signature = buildArtifactStateSignature(artifacts, contextLinks);
       if (signature === lastSavedSignatureRef.current) return;
       lastSavedSignatureRef.current = signature;
       void saveActiveSessionDocumentPatch({ artifacts, contextLinks });
