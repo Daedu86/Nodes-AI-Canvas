@@ -1,12 +1,8 @@
 "use client";
 
 import {
-  ArrowRightLeft,
-  BookCopy,
   Bot,
-  Compass,
   MessageSquareText,
-  Network,
   Sparkles,
   Telescope,
   Waypoints,
@@ -37,33 +33,44 @@ const quickActions: Array<{
 ];
 
 type InsightSections = {
-  interpretation: string;
-  nextMove: string;
-  observation: string;
+  answer: string;
+  next: string | null;
 };
 
 const fallbackInsightSections = (insight: string): InsightSections => ({
-  interpretation: insight.trim(),
-  nextMove: "Use the workspace actions below to keep the reasoning moving.",
-  observation: "Nody produced an unstructured response, so it is shown here as the main interpretation.",
+  answer: insight.trim(),
+  next: null,
 });
 
 const extractSection = (text: string, label: string, fallback: string) => {
-  const pattern = new RegExp(`${label}:\\s*([\\s\\S]*?)(?=\\n(?:Observation|Interpretation|Next move):|$)`, "i");
+  const pattern = new RegExp(`${label}:\\s*([\\s\\S]*?)(?=\\n(?:Answer|Observation|Interpretation|Next move|Next):|$)`, "i");
   const match = text.match(pattern);
   return match?.[1]?.trim() || fallback;
 };
 
 const parseInsight = (insight: string | null): InsightSections | null => {
   if (!insight || insight.trim().length === 0) return null;
-  if (!/(Observation|Interpretation|Next move):/i.test(insight)) {
+  if (/(Answer|Next):/i.test(insight)) {
+    return {
+      answer: extractSection(insight, "Answer", "No answer provided."),
+      next: extractSection(insight, "Next", ""),
+    };
+  }
+  if (/(Observation|Interpretation|Next move):/i.test(insight)) {
+    const observation = extractSection(insight, "Observation", "");
+    const interpretation = extractSection(insight, "Interpretation", "");
+    return {
+      answer: [observation, interpretation].filter((value) => value.length > 0).join("\n\n") || "No answer provided.",
+      next: extractSection(insight, "Next move", ""),
+    };
+  }
+  if (!insight.trim()) {
+    return null;
+  }
+  if (!/(Observation|Interpretation|Next move|Answer|Next):/i.test(insight)) {
     return fallbackInsightSections(insight);
   }
-  return {
-    observation: extractSection(insight, "Observation", "No direct observation provided."),
-    interpretation: extractSection(insight, "Interpretation", "No interpretation provided."),
-    nextMove: extractSection(insight, "Next move", "No next move provided."),
-  };
+  return fallbackInsightSections(insight);
 };
 
 const scrollMessageIntoView = (messageId: string) => {
@@ -91,7 +98,7 @@ export function NodyPanel() {
   } = useNodyPanel();
   const { setFocusedMessageId, setViewMode } = useSessionUiState();
 
-  const statusLabel = busy ? "Synthesizing" : llmEnabled ? "Ready" : "Offline";
+  const statusLabel = busy ? "Thinking" : llmEnabled ? "Ready" : "Offline";
   const statusDotClass = busy ? "bg-amber-500" : llmEnabled ? "bg-emerald-500" : "bg-rose-500";
   const compactFocusLabel = focusLabel.trim().length > 0 ? focusLabel : "Session tree";
   const insightSections = React.useMemo(() => parseInsight(insight), [insight]);
@@ -132,37 +139,55 @@ export function NodyPanel() {
     () => wiki?.pages.find((page) => page.id === selectedWikiPageId) ?? wiki?.pages[0] ?? null,
     [selectedWikiPageId, wiki],
   );
+  const contextLabel = activeWikiPage ? `${compactFocusLabel} · ${activeWikiPage.title}` : compactFocusLabel;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.86),rgba(248,250,252,0.94))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.86),rgba(2,6,23,0.88))]">
-      <div className="border-b border-black/[0.04] bg-[linear-gradient(90deg,rgba(14,165,233,0.1),rgba(56,189,248,0.03),rgba(124,58,237,0.05))] px-5 py-5 dark:border-white/[0.06]">
-        <div className="flex items-start gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-sky-500/20 bg-white/75 text-sky-700 shadow-sm dark:bg-sky-400/10 dark:text-sky-200">
-            <Bot className="h-4.5 w-4.5" />
-          </span>
-          <div className="min-w-0 flex-1">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,252,0.96))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.9))]">
+      <div className="border-b border-black/[0.04] px-5 py-4 dark:border-white/[0.06]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-sky-500/20 bg-white/75 text-sky-700 shadow-sm dark:bg-sky-400/10 dark:text-sky-200">
+                <Bot className="h-4 w-4" />
+              </span>
               <p className="text-base font-semibold tracking-[-0.02em] text-foreground">Nody</p>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 <span className={`h-1.5 w-1.5 rounded-full ${statusDotClass}`} />
-                {phaseLabel[phase]}
-              </span>
-              <span className="inline-flex items-center rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {statusLabel}
               </span>
             </div>
-            <p className="mt-1 max-w-lg text-sm leading-6 text-muted-foreground">
-              Watches the canvas, reads the wiki layer, and turns workspace state into a usable next move.
-            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Ask about the canvas or the wiki.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("canvas")}>
+              Canvas
+            </Button>
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("wiki")}>
+              Wiki
+            </Button>
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("split")}>
+              Split
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!canOpenSelectedMessageInChat}
+              className="h-8 rounded-full px-3 text-xs"
+              onClick={handleOpenSelectedInChat}
+            >
+              <MessageSquareText className="mr-1.5 h-3.5 w-3.5" />
+              Chat
+            </Button>
           </div>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
-        <section className="rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+        <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Focus
+              Context
             </span>
             {lastAction ? (
               <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -170,116 +195,27 @@ export function NodyPanel() {
               </span>
             ) : null}
           </div>
-          <p className="mt-2 text-sm font-medium text-foreground">{compactFocusLabel}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <p className="text-sm font-medium text-foreground">{contextLabel}</p>
+          <div className="flex flex-wrap gap-2">
             <span className="rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
               {workspaceStats.nodeCount} nodes
             </span>
             <span className="rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
-              {workspaceStats.rootBranchCount} root branches
-            </span>
-            <span className="rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
               {workspaceStats.artifactCount} artifacts
             </span>
-          </div>
-          {selectedNode ? (
-            <p className="mt-3 text-xs leading-5 text-muted-foreground">
-              Selected message: <span className="font-medium text-foreground/85">{selectedNode.role}</span> ·{" "}
-              {selectedNode.text.replace(/\s+/g, " ").trim().slice(0, 140) || "No preview"}
-            </p>
-          ) : selectedArtifact ? (
-            <p className="mt-3 text-xs leading-5 text-muted-foreground">
-              Selected artifact: <span className="font-medium text-foreground/85">{selectedArtifact.title}</span>
-            </p>
-          ) : (
-            <p className="mt-3 text-xs leading-5 text-muted-foreground">
-              Nody reasons from the currently selected node or the latest visible canvas context.
-            </p>
-          )}
-          {activeWikiPage ? (
-            <p className="mt-3 text-xs leading-5 text-muted-foreground">
-              Active wiki page: <span className="font-medium text-foreground/85">{activeWikiPage.title}</span> ·{" "}
-              {activeWikiPage.summary}
-            </p>
-          ) : null}
-        </section>
-
-        <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
-          <div className="flex items-center gap-2">
-            <Compass className="h-4 w-4 text-sky-700" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Workspace Actions
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" className="h-9 rounded-full" onClick={() => setViewMode("canvas")}>
-              <Network className="mr-1.5 h-3.5 w-3.5" />
-              Open canvas
-            </Button>
-            <Button type="button" variant="outline" size="sm" className="h-9 rounded-full" onClick={() => setViewMode("wiki")}>
-              <BookCopy className="mr-1.5 h-3.5 w-3.5" />
-              Open wiki
-            </Button>
-            <Button type="button" variant="outline" size="sm" className="h-9 rounded-full" onClick={() => setViewMode("split")}>
-              <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" />
-              Split workspace
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!canOpenSelectedMessageInChat}
-              className="h-9 rounded-full"
-              onClick={handleOpenSelectedInChat}
-            >
-              <MessageSquareText className="mr-1.5 h-3.5 w-3.5" />
-              Open in chat
-            </Button>
-          </div>
-        </section>
-
-        <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Structured Insight
-            </p>
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Output
+            <span className="rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
+              {workspaceStats.rootBranchCount} roots
             </span>
           </div>
-
-          {insightSections ? (
-            <div className="space-y-3">
-              <div className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">Observation</p>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">{insightSections.observation}</p>
-              </div>
-              <div className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Interpretation</p>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">{insightSections.interpretation}</p>
-              </div>
-              <div className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Next move</p>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">{insightSections.nextMove}</p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm leading-6 text-foreground/90">
-              {llmEnabled
-                ? "I am ready. Ask me to explain the focus, summarize the active branch, or survey the whole tree."
-                : "Enable AI to let Nody reason over the canvas."}
-            </p>
-          )}
-        </section>
-
-        <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-sky-700" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Quick Actions
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+          <textarea
+            aria-label="Ask Nody"
+            rows={3}
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            placeholder="Ask about this branch, the wiki, or what to do next..."
+            className="min-h-[96px] w-full resize-y rounded-[20px] border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-sky-500/35"
+          />
+          <div className="flex flex-wrap items-center gap-2">
             {quickActions.map(({ action, icon: Icon }) => (
               <Button
                 key={action}
@@ -287,7 +223,7 @@ export function NodyPanel() {
                 variant="outline"
                 size="sm"
                 disabled={busy || !llmEnabled}
-                className="h-9 rounded-full border-border/60 px-3 text-xs font-medium"
+                className="h-8 rounded-full border-border/60 px-3 text-xs"
                 onClick={() => {
                   void runAction(action);
                 }}
@@ -296,6 +232,17 @@ export function NodyPanel() {
                 {getCanvasGuideActionLabel(action)}
               </Button>
             ))}
+            <Button
+              type="button"
+              disabled={busy || !llmEnabled || question.trim().length === 0}
+              className="h-8 rounded-full px-4 text-xs"
+              onClick={() => {
+                void runAction("ask-guide", question.trim());
+              }}
+            >
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              Ask Nody
+            </Button>
           </div>
           {error ? (
             <div
@@ -307,32 +254,33 @@ export function NodyPanel() {
           ) : null}
         </section>
 
-        <section className="rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
-          <div className="flex items-center gap-2">
-            <MessageSquareText className="h-4 w-4 text-sky-700" />
+        <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Ask Nody
+              Answer
             </p>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              {phaseLabel[phase]}
+            </span>
           </div>
-          <textarea
-            aria-label="Ask Nody"
-            rows={4}
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            placeholder="Ask what this branch means, what evidence is missing, or what should be promoted next..."
-            className="mt-3 min-h-[120px] w-full resize-y rounded-[20px] border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-sky-500/35"
-          />
-          <Button
-            type="button"
-            disabled={busy || !llmEnabled || question.trim().length === 0}
-            className="mt-3 rounded-full"
-            onClick={() => {
-              void runAction("ask-guide", question.trim());
-            }}
-          >
-            <Sparkles className="mr-2 h-4 w-4" />
-            Ask Nody
-          </Button>
+
+          {insightSections ? (
+            <div className="space-y-3">
+              <div className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-3">
+                <p className="whitespace-pre-wrap text-sm leading-6 text-foreground/90">{insightSections.answer}</p>
+              </div>
+              {insightSections.next ? (
+                <div className="rounded-[22px] border border-emerald-500/20 bg-emerald-500/5 px-3 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Next</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">{insightSections.next}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-sm leading-6 text-foreground/90">
+              {llmEnabled ? "Ask Nody to read the current canvas and wiki context." : "Enable AI to use Nody."}
+            </p>
+          )}
         </section>
 
         {recentInsights.length > 0 ? (
@@ -340,7 +288,7 @@ export function NodyPanel() {
             <div className="flex items-center gap-2">
               <Waypoints className="h-4 w-4 text-sky-700" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Recent Passes
+                Recent
               </p>
             </div>
             <div className="space-y-2">
@@ -352,7 +300,7 @@ export function NodyPanel() {
                     </span>
                     <span className="truncate text-xs text-muted-foreground">{entry.focusLabel}</span>
                   </div>
-                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-foreground/85">{entry.text}</p>
+                  <p className="mt-2 line-clamp-2 text-sm leading-6 text-foreground/85">{entry.text}</p>
                 </div>
               ))}
             </div>

@@ -185,7 +185,7 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
             text: responseText,
           },
           ...current,
-        ].slice(0, 4));
+        ].slice(0, 3));
         setQuestion("");
         setPhase("speaking");
       } catch (requestError) {
