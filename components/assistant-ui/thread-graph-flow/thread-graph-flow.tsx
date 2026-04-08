@@ -1340,7 +1340,7 @@ export function ThreadGraphFlow() {
   ]);
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.08),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.98),rgba(241,245,249,0.96))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.16),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.12),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.9))]">
+    <section className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.08),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.98),rgba(241,245,249,0.96))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.16),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.12),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.9))]">
       <input
         ref={imageUploadInputRef}
         type="file"
@@ -1354,45 +1354,124 @@ export function ThreadGraphFlow() {
         className="hidden"
         onChange={handleFileUploadChange}
       />
-      <header className="grid gap-4 border-b border-black/[0.04] px-5 py-5 dark:border-white/[0.06] xl:grid-cols-[minmax(0,1.28fr),minmax(360px,0.95fr)]">
-        <div className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-200">
-              Structured input surface
-            </span>
-            <span className="rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {artifacts.length} typed artifact{artifacts.length === 1 ? "" : "s"}
-            </span>
-            {selectedNodeId ? (
-              <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-700 dark:text-violet-200">
-                Active focus
+      <header className="pointer-events-none absolute inset-x-4 top-4 z-10 flex items-start justify-between gap-4">
+        <div className="pointer-events-auto relative z-20 flex min-w-0 max-w-[min(760px,calc(100%-19rem))] flex-wrap items-center gap-2 rounded-[24px] border border-white/70 bg-white/80 px-3 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+          <div className="mr-2 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-200">
+                Canvas
               </span>
-            ) : null}
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-lg font-semibold tracking-[-0.02em] text-foreground">Canvas</h2>
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              Shape context with typed artifacts, inspect live branches, and move from loose exploration to reusable knowledge without leaving the workspace.
-            </p>
-          </div>
-          {linkEditMode ? (
-            <p className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs leading-5 text-rose-700 dark:text-rose-200">
-              Link edit mode is on. Use the floating <span className="font-semibold">Cut link</span> controls on edges, then restore a disconnected node from the detail panel.
-            </p>
-          ) : null}
-          {legendItems.length > 0 ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {legendItems.map((item) => (
-                <LegendItem key={item.key} color={item.swatch} label={item.label} />
-              ))}
+              {selectedNodeId ? (
+                <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-700 dark:text-violet-200">
+                  Focus
+                </span>
+              ) : null}
+              {legendItems.length > 0 ? (
+                <div className="hidden items-center gap-1.5 md:flex">
+                  {legendItems.slice(0, 3).map((item) => (
+                    <LegendItem key={item.key} color={item.swatch} label={item.label} />
+                  ))}
+                </div>
+              ) : null}
             </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Structured input and live branch editing. The stage is the primary surface.
+            </p>
+          </div>
+          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
+            {visibleCanvasNodeCount} / {flowNodes.length} nodes
+          </span>
+          <span className="inline-flex items-center rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-1 text-[11px] text-violet-700">
+            {artifacts.length} artifact{artifacts.length === 1 ? "" : "s"}
+          </span>
+          {hiddenCanvasNodeCount > 0 ? (
+            <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
+              {hiddenCanvasNodeCount} hidden
+            </span>
           ) : null}
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-[11px] text-violet-700 transition-colors hover:bg-violet-500/15"
+            onClick={() => handleCreateArtifact("text")}
+          >
+            <FilePlus2 className="h-3.5 w-3.5" />
+            <span>New Text</span>
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] text-emerald-700 transition-colors hover:bg-emerald-500/15"
+            onClick={() => handleCreateArtifact("code")}
+          >
+            <Code2 className="h-3.5 w-3.5" />
+            <span>New Code</span>
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-full border border-pink-500/30 bg-pink-500/10 px-2.5 py-1.5 text-[11px] text-pink-700 transition-colors hover:bg-pink-500/15"
+            onClick={() => imageUploadInputRef.current?.click()}
+          >
+            <ImagePlus className="h-3.5 w-3.5" />
+            <span>Upload Image</span>
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1.5 text-[11px] text-blue-700 transition-colors hover:bg-blue-500/15"
+            onClick={() => fileUploadInputRef.current?.click()}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            <span>Upload File</span>
+          </button>
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] transition-colors ${
+              linkEditMode
+                ? "border-rose-500/35 bg-rose-500/10 text-rose-700"
+                : "border-border/60 bg-background/90 hover:bg-background"
+            }`}
+            onClick={() => setLinkEditMode((prev) => !prev)}
+          >
+            <Scissors className="h-3.5 w-3.5" />
+            <span>{linkEditMode ? "Finish Editing" : "Edit Links"}</span>
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/90 px-2.5 py-1.5 text-[11px] transition-colors hover:bg-background"
+            onClick={handleCopyJson}
+          >
+            <CopyIcon className="h-3.5 w-3.5" />
+            <span>Copy JSON</span>
+          </button>
+        </div>
+        {selectedArtifact || (selectedFlowNode && selectedMessageNode) || linkEditMode || overrides.size > 0 ? (
+        <div className="pointer-events-auto relative z-10 mt-16 flex w-[min(320px,42vw)] min-w-0 flex-col gap-2 rounded-[24px] border border-white/70 bg-white/80 px-3 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Canvas focus
+              </p>
+              <p className="text-xs text-foreground/80">
+                {selectedNodeId
+                  ? "Inspector for the current node or artifact."
+                  : "Select a node or artifact to inspect and branch from it."}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1.5 text-[11px] text-sky-700 transition-colors hover:bg-sky-500/15"
+                onClick={() => setViewMode("nody")}
+              >
+                <Bot className="h-3.5 w-3.5" />
+                <span>Open Nody</span>
+              </button>
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             {(Object.keys(flowFilterLabel) as FlowSpotlightMode[]).map((mode) => (
               <button
                 key={mode}
                 type="button"
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] transition-colors ${
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] transition-colors ${
                   spotlight === mode
                     ? "border-sky-500/35 bg-sky-500/10 text-sky-700 dark:text-sky-200"
                     : "border-border/60 bg-background/80 text-muted-foreground hover:bg-background"
@@ -1400,7 +1479,7 @@ export function ThreadGraphFlow() {
                 onClick={() => setSpotlight(mode)}
               >
                 <span>{flowFilterLabel[mode]}</span>
-                <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] dark:bg-white/10">
+                <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] dark:bg-white/10">
                   {filterCounts[mode]}
                 </span>
               </button>
@@ -1408,7 +1487,7 @@ export function ThreadGraphFlow() {
             <button
               type="button"
               disabled={!selectedNodeId}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 densityMode === "focus"
                   ? "border-violet-500/35 bg-violet-500/10 text-violet-700 dark:text-violet-200"
                   : "border-border/60 bg-background/80 text-muted-foreground hover:bg-background"
@@ -1421,109 +1500,21 @@ export function ThreadGraphFlow() {
               <span>{densityMode === "focus" ? "Focus path" : "Enter focus"}</span>
             </button>
           </div>
-        </div>
-        <div className="flex max-w-none min-w-0 flex-1 flex-col items-stretch gap-2 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
-          <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Live workspace state
+          {linkEditMode ? (
+            <p className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[11px] leading-5 text-rose-700 dark:text-rose-200">
+              Link edit mode is on. Use <span className="font-semibold">Cut selected link</span> from the inspector, then restore it when needed.
             </p>
-            <p className="text-sm text-foreground/85">
-              {hiddenCanvasNodeCount > 0
-                ? `${hiddenCanvasNodeCount} nodes are hidden by current filters or focus mode.`
-                : "Everything relevant is visible in the current stage."}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
-              {visibleCanvasNodeCount} / {flowNodes.length} nodes
-            </span>
-            {hiddenCanvasNodeCount > 0 ? (
-              <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
-                {hiddenCanvasNodeCount} hidden
-              </span>
-            ) : null}
-            <span className="inline-flex items-center rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-1 text-[11px] text-violet-700">
-              {artifacts.length} artifact{artifacts.length === 1 ? "" : "s"}
-            </span>
-            {overrides.size > 0 ? (
-              <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-700">
-                {overrides.size} cut links
-              </span>
-            ) : null}
+          ) : null}
+          {overrides.size > 0 ? (
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-xs text-violet-700 transition-colors hover:bg-violet-500/15"
-              onClick={() => handleCreateArtifact("text")}
+              className="inline-flex w-fit items-center gap-1 rounded-full border border-border/60 bg-background/90 px-2.5 py-1.5 text-[11px] hover:bg-background"
+              onClick={resetLinks}
             >
-              <FilePlus2 className="h-3.5 w-3.5" />
-              <span>New Text</span>
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Reset Cuts ({overrides.size})</span>
             </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-xs text-emerald-700 transition-colors hover:bg-emerald-500/15"
-              onClick={() => handleCreateArtifact("code")}
-            >
-              <Code2 className="h-3.5 w-3.5" />
-              <span>New Code</span>
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-pink-500/30 bg-pink-500/10 px-2.5 py-1.5 text-xs text-pink-700 transition-colors hover:bg-pink-500/15"
-              onClick={() => imageUploadInputRef.current?.click()}
-            >
-              <ImagePlus className="h-3.5 w-3.5" />
-              <span>Upload Image</span>
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-blue-500/30 bg-blue-500/10 px-2.5 py-1.5 text-xs text-blue-700 transition-colors hover:bg-blue-500/15"
-              onClick={() => fileUploadInputRef.current?.click()}
-            >
-              <Upload className="h-3.5 w-3.5" />
-              <span>Upload File</span>
-            </button>
-            <button
-              type="button"
-              className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
-                linkEditMode
-                  ? "border-rose-500/35 bg-rose-500/10 text-rose-700"
-                  : "border-border/60 bg-background/90 hover:bg-background"
-              }`}
-              onClick={() => setLinkEditMode((prev) => !prev)}
-            >
-              <Scissors className="h-3.5 w-3.5" />
-              <span>{linkEditMode ? "Finish Editing" : "Edit Links"}</span>
-            </button>
-            {overrides.size > 0 ? (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2.5 py-1.5 text-xs hover:bg-background"
-                onClick={resetLinks}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span>Reset Cuts ({overrides.size})</span>
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-sky-500/30 bg-sky-500/10 px-2.5 py-1.5 text-xs text-sky-700 transition-colors hover:bg-sky-500/15"
-              onClick={() => setViewMode("nody")}
-            >
-              <Bot className="h-3.5 w-3.5" />
-              <span>Open Nody</span>
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/90 px-2.5 py-1.5 text-xs hover:bg-background"
-              onClick={handleCopyJson}
-            >
-              <CopyIcon className="h-3.5 w-3.5" />
-              <span>Copy JSON</span>
-            </button>
-          </div>
-          <p className="text-right text-[11px] text-muted-foreground">
-            Upload caps: images {formatBytes(contextBudgetPolicy.maxUploadImageBytes)}, files {formatBytes(contextBudgetPolicy.maxUploadFileBytes)}. Image previews are compressed under {formatBytes(contextBudgetPolicy.maxImagePreviewBytes)}.
-          </p>
+          ) : null}
           <div className="max-h-[360px] overflow-y-auto rounded-[26px] border border-border/60 bg-background/85 px-3 py-3 shadow-sm">
             {selectedArtifact ? (
               <div className="space-y-3">
@@ -1956,9 +1947,10 @@ export function ThreadGraphFlow() {
             )}
           </div>
         </div>
+        ) : null}
       </header>
 
-      <div ref={flowViewportRef} className="relative min-h-0 flex-1 px-4 pb-4 pt-3">
+      <div ref={flowViewportRef} className="relative min-h-0 flex-1 p-3">
         <ReactFlow
           key={`flow:${activeSessionId}:${graphStructureSignature}`}
           nodes={decoratedFlowNodes}
@@ -2002,7 +1994,7 @@ export function ThreadGraphFlow() {
             scrollMessageIntoView(node.id);
           }}
           onPaneClick={() => applyCanvasSelection(null)}
-          className="overflow-hidden rounded-[30px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.14),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.08),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.82),rgba(248,250,252,0.88))] shadow-[0_28px_90px_-55px_rgba(15,23,42,0.45)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.1),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.88))]"
+          className="overflow-hidden rounded-[32px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.06),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.88),rgba(248,250,252,0.92))] shadow-[0_30px_110px_-60px_rgba(15,23,42,0.5)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.1),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.08),transparent_18%),linear-gradient(180deg,rgba(15,23,42,0.9),rgba(2,6,23,0.92))]"
           defaultEdgeOptions={{
             animated: false,
           }}
@@ -2020,10 +2012,15 @@ export function ThreadGraphFlow() {
             maskColor="rgba(15,23,42,0.05)"
           />
           <Controls
-            className="!bottom-auto !left-auto !right-5 !top-5 [&>button]:!border-white/70 [&>button]:!bg-white/90 [&>button]:!text-foreground [&>button]:!shadow-sm dark:[&>button]:!border-white/10 dark:[&>button]:!bg-slate-950/90"
+            className="!bottom-5 !left-5 !right-auto !top-auto [&>button]:!border-white/70 [&>button]:!bg-white/92 [&>button]:!text-foreground [&>button]:!shadow-sm dark:[&>button]:!border-white/10 dark:[&>button]:!bg-slate-950/92"
             showInteractive={false}
           />
         </ReactFlow>
+        <div className="pointer-events-none absolute bottom-5 left-20 z-10 hidden items-center gap-2 md:flex">
+          <div className="pointer-events-auto rounded-full border border-white/70 bg-white/82 px-3 py-1 text-[11px] text-muted-foreground shadow-[0_18px_48px_-36px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
+            Drag nodes directly on the stage. The canvas is the main workspace.
+          </div>
+        </div>
       </div>
     </section>
   );
