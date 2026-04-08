@@ -8,7 +8,6 @@ import {
 import type { FC } from "react";
 import React from "react";
 import {
-  CornerDownRightIcon,
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -84,16 +83,62 @@ const useResolvedMessagePresentation = () => {
 };
 
 const InlineBranchComposer: FC<{
-  detail: BranchOperationDetail;
+  activeActionKey?: string | null;
+  detail: {
+    key: string;
+    title: string;
+    description: string;
+    placeholder: string;
+    submitLabel: string;
+  };
+  actions?: Array<{
+    key: string;
+    title: string;
+  }>;
   text: string;
   disabled: boolean;
   busy: boolean;
   onCancel: () => void;
   onChange: (value: string) => void;
+  onSelectAction?: (key: string) => void;
   onSubmit: () => void;
-}> = ({ detail, text, disabled, busy, onCancel, onChange, onSubmit }) => {
+}> = ({
+  activeActionKey,
+  detail,
+  actions = [],
+  text,
+  disabled,
+  busy,
+  onCancel,
+  onChange,
+  onSelectAction,
+  onSubmit,
+}) => {
   return (
     <div className="col-span-full rounded-2xl border border-border/60 bg-background/95 px-3 py-3 shadow-sm">
+      {actions.length > 1 ? (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {actions.map((action) => {
+            const active = action.key === activeActionKey;
+            return (
+              <button
+                key={action.key}
+                type="button"
+                onClick={() => onSelectAction?.(action.key)}
+                disabled={disabled || busy}
+                className={cn(
+                  "inline-flex items-center rounded-full border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  active
+                    ? "border-sky-500/35 bg-sky-500/10 text-sky-700"
+                    : "border-border/60 bg-background text-foreground hover:bg-muted",
+                )}
+              >
+                {action.title}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
       <div className="space-y-1">
         <p className="text-xs font-medium text-foreground/80">{detail.title}</p>
         <p className="text-xs text-muted-foreground">{detail.description}</p>
@@ -128,58 +173,11 @@ const InlineBranchComposer: FC<{
   );
 };
 
-const InlineEditComposer: FC<{
-  text: string;
-  disabled: boolean;
-  busy: boolean;
-  onCancel: () => void;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-}> = ({ text, disabled, busy, onCancel, onChange, onSubmit }) => {
-  return (
-    <div className="col-span-full rounded-2xl border border-border/60 bg-background/95 px-3 py-3 shadow-sm">
-      <div className="space-y-1">
-        <p className="text-xs font-medium text-foreground/80">Edit assistant branch</p>
-        <p className="text-xs text-muted-foreground">
-          Create an alternate assistant branch from this reply.
-        </p>
-      </div>
-      <textarea
-        rows={3}
-        value={text}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="Write the edited branch prompt..."
-        disabled={disabled || busy}
-        className="mt-2 min-h-[84px] w-full resize-y rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-sky-500/35"
-      />
-      <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-        <button
-          type="button"
-          className="inline-flex items-center rounded-md border border-border/60 bg-background px-2.5 py-1.5 text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={onCancel}
-          disabled={busy}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="inline-flex items-center rounded-md border border-sky-500/35 bg-sky-500/10 px-2.5 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={onSubmit}
-          disabled={disabled || busy || text.trim().length === 0}
-        >
-          {busy ? "Creating..." : "Send"}
-        </button>
-      </div>
-    </div>
-  );
-};
-
 const UserActionBar: FC<{
-  branchTooltip: string;
   disabled: boolean;
   isDrafting: boolean;
   onBranch: () => void;
-}> = ({ branchTooltip, disabled, isDrafting, onBranch }) => {
+}> = ({ disabled, isDrafting, onBranch }) => {
   return (
     <ActionBarPrimitive.Root
       hideWhenRunning
@@ -192,7 +190,7 @@ const UserActionBar: FC<{
         </TooltipIconButton>
       </ActionBarPrimitive.Edit>
       <TooltipIconButton
-        tooltip={branchTooltip}
+        tooltip="Branch"
         onClick={onBranch}
         disabled={disabled}
         className={cn(isDrafting ? "bg-sky-500/10 text-sky-700" : undefined)}
@@ -205,11 +203,9 @@ const UserActionBar: FC<{
 
 const AssistantActionBar: FC<{
   disabled: boolean;
-  isEditing: boolean;
-  isDrafting: boolean;
-  onEdit: () => void;
+  isBranching: boolean;
   onBranch: () => void;
-}> = ({ disabled, isDrafting, isEditing, onEdit, onBranch }) => {
+}> = ({ disabled, isBranching, onBranch }) => {
   return (
     <ActionBarPrimitive.Root
       hideWhenRunning
@@ -217,14 +213,6 @@ const AssistantActionBar: FC<{
       autohideFloat="single-branch"
       className="text-muted-foreground flex gap-1 col-start-3 row-start-2 -ml-1 data-[floating]:bg-background data-[floating]:absolute data-[floating]:rounded-md data-[floating]:border data-[floating]:p-1 data-[floating]:shadow-sm"
     >
-      <TooltipIconButton
-        tooltip="Edit"
-        onClick={onEdit}
-        disabled={disabled}
-        className={cn(isEditing ? "bg-sky-500/10 text-sky-700" : undefined)}
-      >
-        <PencilIcon />
-      </TooltipIconButton>
       <ActionBarPrimitive.Copy asChild>
         <TooltipIconButton tooltip="Copy">
           <MessagePrimitive.If copied>
@@ -241,12 +229,12 @@ const AssistantActionBar: FC<{
         </TooltipIconButton>
       </ActionBarPrimitive.Reload>
       <TooltipIconButton
-        tooltip="Follow-up prompt"
+        tooltip="Branch"
         onClick={onBranch}
         disabled={disabled}
-        className={cn(isDrafting ? "bg-sky-500/10 text-sky-700" : undefined)}
+        className={cn(isBranching ? "bg-sky-500/10 text-sky-700" : undefined)}
       >
-        <CornerDownRightIcon />
+        <GitBranchPlusIcon />
       </TooltipIconButton>
     </ActionBarPrimitive.Root>
   );
@@ -424,7 +412,6 @@ export const UserMessage: FC = () => {
       }}
     >
       <UserActionBar
-        branchTooltip={branchDetail.title}
         disabled={!llmEnabled || isThreadRunning}
         isDrafting={Boolean(activeDraft)}
         onBranch={handleChooseBranch}
@@ -446,7 +433,14 @@ export const UserMessage: FC = () => {
       {activeDraft ? (
         <div className="col-start-2 row-start-4 w-full max-w-[calc(var(--thread-max-width)*0.8)]">
           <InlineBranchComposer
-            detail={branchDetail}
+            activeActionKey={branchOperation}
+            detail={{
+              key: branchOperation,
+              title: branchDetail.title,
+              description: branchDetail.description,
+              placeholder: branchDetail.placeholder,
+              submitLabel: branchDetail.submitLabel,
+            }}
             text={activeDraft.text}
             disabled={!llmEnabled || isThreadRunning}
             busy={isSubmittingBranch}
@@ -479,6 +473,32 @@ export const AssistantMessage: FC = () => {
   const activeDraft =
     draft && draft.anchorId === message?.id && draft.operation === branchOperation ? draft : null;
   const branchDetail = getBranchOperationDetail(branchOperation);
+  const assistantBranchActions = React.useMemo(
+    () => [
+      {
+        key: "edit-assistant-branch",
+        title: "Edit branch",
+        description: "Create an alternate assistant branch from this reply.",
+        placeholder: "Write the edited branch prompt...",
+        submitLabel: "Create edited branch",
+      },
+      {
+        key: branchOperation,
+        title: branchDetail.title,
+        description: branchDetail.description,
+        placeholder: branchDetail.placeholder,
+        submitLabel: branchDetail.submitLabel,
+      },
+    ],
+    [branchDetail.description, branchDetail.placeholder, branchDetail.submitLabel, branchDetail.title, branchOperation],
+  );
+  const activeAssistantActionKey = isEditingAssistant
+    ? "edit-assistant-branch"
+    : activeDraft
+      ? branchOperation
+      : null;
+  const activeAssistantAction =
+    assistantBranchActions.find((action) => action.key === activeAssistantActionKey) ?? null;
   const { items: repoItems, order } = useThreadRepoItems(runtime, {
     defaultModel: { modelId, provider },
   });
@@ -531,15 +551,27 @@ export const AssistantMessage: FC = () => {
 
   const handleChooseBranch = React.useCallback(() => {
     if (!message?.id) return;
+    setAssistantEditText("");
     setIsEditingAssistant(false);
     beginDraft(message.id, branchOperation);
   }, [beginDraft, branchOperation, message?.id]);
 
-  const handleChooseEdit = React.useCallback(() => {
-    cancelDraft();
-    setAssistantEditText(getMessageText(message as MessageLike));
-    setIsEditingAssistant(true);
-  }, [cancelDraft, message]);
+  const handleSelectAssistantAction = React.useCallback(
+    (actionKey: string) => {
+      if (!message?.id) return;
+      if (actionKey === "edit-assistant-branch") {
+        cancelDraft();
+        setAssistantEditText((current) => current || getMessageText(message as MessageLike));
+        setIsEditingAssistant(true);
+        return;
+      }
+      setIsEditingAssistant(false);
+      if (!activeDraft) {
+        beginDraft(message.id, branchOperation);
+      }
+    },
+    [activeDraft, beginDraft, branchOperation, cancelDraft, message],
+  );
 
   const handleCancelEdit = React.useCallback(() => {
     setAssistantEditText("");
@@ -640,6 +672,30 @@ export const AssistantMessage: FC = () => {
     setRequestError,
   ]);
 
+  const handleCancelAssistantBranch = React.useCallback(() => {
+    cancelDraft();
+    handleCancelEdit();
+  }, [cancelDraft, handleCancelEdit]);
+
+  const handleAssistantBranchTextChange = React.useCallback(
+    (value: string) => {
+      if (isEditingAssistant) {
+        setAssistantEditText(value);
+        return;
+      }
+      setDraftText(value);
+    },
+    [isEditingAssistant, setDraftText],
+  );
+
+  const handleSubmitAssistantBranch = React.useCallback(() => {
+    if (isEditingAssistant) {
+      void handleSubmitEdit();
+      return;
+    }
+    handleSubmitBranch();
+  }, [handleSubmitBranch, handleSubmitEdit, isEditingAssistant]);
+
   return (
     <MessagePrimitive.Root
       data-message-id={message?.id}
@@ -673,9 +729,7 @@ export const AssistantMessage: FC = () => {
 
       <AssistantActionBar
         disabled={!llmEnabled || isThreadRunning}
-        isEditing={isEditingAssistant}
-        isDrafting={Boolean(activeDraft)}
-        onEdit={handleChooseEdit}
+        isBranching={Boolean(activeDraft) || isEditingAssistant}
         onBranch={handleChooseBranch}
       />
 
@@ -686,28 +740,19 @@ export const AssistantMessage: FC = () => {
           activeBranchNumber={syntheticAssistantBranch.activeBranchNumber}
         />
       </div>
-      {activeDraft ? (
+      {activeAssistantAction ? (
         <div className="col-span-2 col-start-2 row-start-3 mt-2 max-w-[calc(var(--thread-max-width)*0.8)]">
           <InlineBranchComposer
-            detail={branchDetail}
-            text={activeDraft.text}
+            activeActionKey={activeAssistantActionKey}
+            actions={assistantBranchActions.map(({ key, title }) => ({ key, title }))}
+            detail={activeAssistantAction}
+            text={isEditingAssistant ? assistantEditText : activeDraft?.text ?? ""}
             disabled={!llmEnabled || isThreadRunning}
-            busy={isSubmittingBranch}
-            onCancel={cancelDraft}
-            onChange={setDraftText}
-            onSubmit={handleSubmitBranch}
-          />
-        </div>
-      ) : null}
-      {isEditingAssistant ? (
-        <div className="col-span-2 col-start-2 row-start-3 mt-2 max-w-[calc(var(--thread-max-width)*0.8)]">
-          <InlineEditComposer
-            text={assistantEditText}
-            disabled={!llmEnabled || isThreadRunning}
-            busy={isSubmittingAssistantEdit}
-            onCancel={handleCancelEdit}
-            onChange={setAssistantEditText}
-            onSubmit={handleSubmitEdit}
+            busy={isEditingAssistant ? isSubmittingAssistantEdit : isSubmittingBranch}
+            onCancel={handleCancelAssistantBranch}
+            onChange={handleAssistantBranchTextChange}
+            onSelectAction={handleSelectAssistantAction}
+            onSubmit={handleSubmitAssistantBranch}
           />
         </div>
       ) : null}

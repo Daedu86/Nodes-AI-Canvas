@@ -284,7 +284,8 @@ async function editAssistantReply(
   }).first();
 
   await assistantMessage.hover();
-  await assistantMessage.getByRole("button", { name: "Edit" }).click();
+  await assistantMessage.getByRole("button", { name: "Branch" }).click();
+  await assistantMessage.getByRole("button", { name: "Edit branch" }).click();
 
   const editComposer = page
     .locator("div")
@@ -298,10 +299,7 @@ async function editAssistantReply(
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
-  await page
-    .getByRole("button", { name: "Cancel" })
-    .locator("xpath=following-sibling::button[normalize-space()='Send'][1]")
-    .click();
+  await assistantMessage.getByRole("button", { name: /Create .*branch|Create follow-up/i }).click();
   await responsePromise;
 
   await expect(threadMessage(page, editedPrompt)).toBeVisible();
@@ -472,11 +470,13 @@ async function createBranchFromChat(
   {
     messageText,
     actionName,
+    panelActionName,
     prompt,
     options,
   }: {
     messageText: string;
     actionName: string;
+    panelActionName?: string;
     prompt: string;
     options?: ReplyOptions;
   },
@@ -487,6 +487,9 @@ async function createBranchFromChat(
 
   await message.hover();
   await message.getByRole("button", { name: actionName }).click();
+  if (panelActionName) {
+    await message.getByRole("button", { name: panelActionName }).click();
+  }
 
   const branchTextarea = message.getByRole("textbox").last();
   await expect(branchTextarea).toBeVisible();
@@ -727,7 +730,7 @@ test("creates a new root branch from the chat thread", async ({ page }) => {
 
   await createBranchFromChat(page, {
     messageText: "Chat root base prompt",
-    actionName: "New root prompt",
+    actionName: "Branch",
     prompt: "Chat-created root branch",
   });
 
@@ -772,7 +775,7 @@ test("creates a sibling user branch from a chat user node", async ({ page }) => 
 
   await createBranchFromChat(page, {
     messageText: "Chat user sibling original",
-    actionName: "Alternative prompt",
+    actionName: "Branch",
     prompt: "Chat user sibling alternative",
   });
 
@@ -814,7 +817,8 @@ test("creates a follow-up user branch from a chat assistant node", async ({ page
 
   await createBranchFromChat(page, {
     messageText: assistantReply,
-    actionName: "Follow-up prompt",
+    actionName: "Branch",
+    panelActionName: "Follow-up prompt",
     prompt: "Chat assistant follow-up prompt",
   });
 
