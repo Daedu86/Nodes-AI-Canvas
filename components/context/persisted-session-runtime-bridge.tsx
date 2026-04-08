@@ -281,10 +281,7 @@ export function PersistedSessionRuntimeBridge() {
           scheduleImportRetry();
           return;
         }
-        const safeToHydrate =
-          switchingSessions ||
-          runtimeSignature === lastSavedSignatureRef.current ||
-          isEmptyThreadExport(runtimeSnapshot);
+        const safeToHydrate = switchingSessions || isEmptyThreadExport(runtimeSnapshot);
 
         if (runtimeSignature === nextSignature) {
           importedSessionIdRef.current = activeSessionId;

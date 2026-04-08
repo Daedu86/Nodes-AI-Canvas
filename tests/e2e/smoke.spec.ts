@@ -431,19 +431,9 @@ test("preserves a session thread when switching to a project and back", async ({
     })
     .toBe(2);
 
-  const sessionPersistResponse = page.waitForResponse(
-    (response) =>
-      response.url().includes(`/api/sessions/${sessionId}`) &&
-      response.request().method() === "PATCH",
-  );
   await page.getByRole("button", { name: "Select sessions" }).click();
   await page.getByRole("checkbox", { name: "Select session Source Session" }).check();
   await page.getByRole("button", { name: "From selected (1)" }).click();
-  const persistedTransitionResponse = await sessionPersistResponse;
-  console.log(
-    "session transition patch body",
-    persistedTransitionResponse.request().postData(),
-  );
   await expect(page.getByRole("button", { name: "Back to sessions" })).toBeVisible({
     timeout: 15_000,
   });
