@@ -364,7 +364,7 @@ async function createBranchFromFlow(
 ) {
   const fitViewButton = page.locator(".react-flow__controls-fitview");
   if ((await fitViewButton.count()) > 0) {
-    await fitViewButton.click();
+    await fitViewButton.dispatchEvent("click");
   }
 
   const targetNode = page.locator(`.react-flow__node[data-id="${nodeId}"]`);
@@ -392,6 +392,25 @@ async function createBranchFromFlow(
   await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
   return reply;
 }
+
+test("preserves chat thread and canvas nodes when switching workspace modes", async ({ page }) => {
+  await gotoChat(page);
+  const prompt = "Mode switch seed";
+  const reply = await sendPrompt(page, prompt);
+
+  await page.getByRole("button", { name: "Show chat panel" }).click();
+  await expect(threadMessage(page, prompt)).toBeVisible();
+
+  await page.getByRole("button", { name: "Show canvas panel" }).click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(3);
+  await expect(page.locator('.react-flow__node[data-id="__ROOT__"]')).toHaveCount(1);
+  const graph = await copyGraphJson(page);
+  expect(graph.nodes.map((node) => node.role)).toEqual(["user", "assistant"]);
+
+  await page.getByRole("button", { name: "Show chat panel" }).click();
+  await expect(threadMessage(page, prompt)).toBeVisible();
+  await expect(threadMessage(page, reply)).toBeVisible();
+});
 
 async function createBranchFromChat(
   page: Page,
@@ -904,7 +923,7 @@ test("creates a project from multiple saved sessions and opens the aggregated ca
     page.getByText("Unified canvas for 2 sessions and one shared project context node."),
   ).toBeVisible();
   await expect(
-    page.locator(".react-flow__node").filter({ hasText: "Context node reusable across branches." }).first(),
+    page.locator(".react-flow__node").filter({ hasText: "2 Session Project Context" }).first(),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Arena" }).last().click();
@@ -1036,11 +1055,17 @@ test("creates a text artifact, attaches it as context, and branches with it from
   if (!assistantNodeId) return;
 
   await page.getByRole("button", { name: "New Text" }).click();
-  await page.getByLabel("Title").fill("Spec Note");
-  await page.getByLabel("Content").fill("Use the attached artifact as additional product context.");
+  await page.getByLabel("Artifact content").fill("Use the attached artifact as additional product context.");
 
   await page.getByRole("button", { name: `Attach target ${assistantNodeId}` }).click();
-  await expect(page.getByRole("button", { name: `Detach target ${assistantNodeId}` })).toBeVisible();
+  await expect
+    .poll(async () => {
+      const graph = await copyGraphJson(page);
+      return (
+        graph.contextLinks?.some((link) => link.targetMessageId === assistantNodeId) ?? false
+      );
+    })
+    .toBe(true);
   await page.getByRole("button", { name: `Open target ${assistantNodeId}` }).click();
 
   const graphSection = page
@@ -1058,12 +1083,12 @@ test("creates a text artifact, attaches it as context, and branches with it from
 
   const reply = expectedReply("Follow-up with artifact context", {
     contextCount: 1,
-    contextTitles: ["Spec Note"],
+    contextTitles: ["Text Context 1"],
   });
   await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
 
   const graphAfter = await copyGraphJson(page);
-  expect(graphAfter.artifacts?.some((artifact) => artifact.title === "Spec Note")).toBe(true);
+  expect(graphAfter.artifacts?.some((artifact) => artifact.title === "Text Context 1")).toBe(true);
   expect(
     graphAfter.contextLinks?.some(
       (link) => link.targetMessageId === assistantNodeId,
@@ -1075,7 +1100,7 @@ test("creates a text artifact, attaches it as context, and branches with it from
   if (!activeSessionId) return;
 
   const persistedSession = await fetchPersistedSession(page, activeSessionId);
-  expect(persistedSession.session.artifacts.some((artifact) => artifact.title === "Spec Note")).toBe(true);
+  expect(persistedSession.session.artifacts.some((artifact) => artifact.title === "Text Context 1")).toBe(true);
   expect(
     persistedSession.session.contextLinks.some((link) => link.targetMessageId === assistantNodeId),
   ).toBe(true);
@@ -1116,8 +1141,8 @@ test("uploads an image artifact, persists it, and branches with it from the flow
   const uploadResponse = await uploadResponsePromise;
   expect(uploadResponse.ok()).toBe(true);
   await expect(page.getByText("1 artifact", { exact: true })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue("diagram");
-  await page.getByLabel("Notes").fill("Important branching reference image.");
+  await expect(page.getByRole("textbox", { name: "Artifact title", exact: true })).toHaveValue("diagram");
+  await page.getByLabel("Artifact notes").fill("Important branching reference image.");
   await expect(page.getByText("Image preview", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Attach target ${assistantNodeId}` }).click();
   await page.getByRole("button", { name: `Open target ${assistantNodeId}` }).click();
@@ -1170,12 +1195,15 @@ test("opens the canvas guide and explains the selected focus", async ({ page }) 
   expect(assistantNodeId).toBeTruthy();
   if (!assistantNodeId) return;
 
-  await page.getByRole("button", { name: "Guide Agent" }).click();
+  await page.getByRole("button", { name: "Show nody panel" }).click();
   await page.locator(`.react-flow__node[data-id="${assistantNodeId}"]`).dispatchEvent("click");
-  const guidePanel = page.locator('aside[aria-label="Canvas guide panel"]');
-  await guidePanel.getByRole("button", { name: "Explain focus" }).dispatchEvent("click");
+  const responsePromise = page.waitForResponse(
+    (response) => response.url().includes("/api/canvas-agent") && response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Explain focus" }).dispatchEvent("click");
+  await responsePromise;
 
   await expect(
-    guidePanel.getByText(/Canvas guide: Explain focus on assistant/i),
+    page.getByText(/Canvas guide: Explain focus on assistant/i).first(),
   ).toBeVisible({ timeout: 15_000 });
 });

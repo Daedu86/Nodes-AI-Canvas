@@ -73,8 +73,8 @@ describe("WorkspaceSplitLayout", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show Wiki" }));
 
     expect(screen.getByTestId("view-mode").textContent).toBe("wiki");
-    expect(screen.queryByTestId("chat-panel")).toBeNull();
-    expect(screen.queryByTestId("canvas-panel")).toBeNull();
+    expect(screen.queryByTestId("chat-panel")).not.toBeNull();
+    expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
     expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
     expect(screen.queryByTestId("nody-panel")).toBeNull();
 
@@ -83,8 +83,8 @@ describe("WorkspaceSplitLayout", () => {
     renderLayout("session-a");
 
     expect(screen.getByTestId("view-mode").textContent).toBe("wiki");
-    expect(screen.queryByTestId("chat-panel")).toBeNull();
-    expect(screen.queryByTestId("canvas-panel")).toBeNull();
+    expect(screen.queryByTestId("chat-panel")).not.toBeNull();
+    expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
     expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
     expect(screen.queryByTestId("nody-panel")).toBeNull();
 

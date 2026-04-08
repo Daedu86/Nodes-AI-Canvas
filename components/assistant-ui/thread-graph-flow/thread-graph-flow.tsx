@@ -1564,6 +1564,7 @@ export function ThreadGraphFlow() {
                     <span className="font-medium text-foreground/80">Title</span>
                     <input
                       type="text"
+                      aria-label="Artifact title"
                       value={selectedArtifact.title}
                       onChange={(event) => updateArtifact(selectedArtifact.id, { title: event.target.value })}
                       className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-violet-500/35"
@@ -1574,6 +1575,7 @@ export function ThreadGraphFlow() {
                       <span className="font-medium text-foreground/80">Language</span>
                       <input
                         type="text"
+                        aria-label="Artifact language"
                         value={selectedArtifact.language ?? ""}
                         onChange={(event) => updateArtifact(selectedArtifact.id, { language: event.target.value })}
                         placeholder="ts"
@@ -1682,6 +1684,15 @@ export function ThreadGraphFlow() {
                       : artifactContentLabel(selectedArtifact.artifactType)}
                   </span>
                   <textarea
+                    aria-label={
+                      selectedArtifact.artifactType === "text"
+                        ? "Artifact content"
+                        : selectedArtifact.artifactType === "image"
+                          ? "Artifact notes"
+                          : selectedArtifact.artifactType === "file"
+                            ? "Artifact extracted text"
+                            : "Artifact content"
+                    }
                     rows={6}
                     value={selectedArtifact.content}
                     onChange={(event) => updateArtifact(selectedArtifact.id, { content: event.target.value })}

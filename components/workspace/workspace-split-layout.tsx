@@ -20,10 +20,31 @@ const shellClassName =
   "overflow-hidden rounded-[30px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.86))] shadow-[0_28px_90px_-48px_rgba(15,23,42,0.45)] ring-1 ring-black/[0.04] backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(15,23,42,0.82))] dark:ring-white/[0.03]";
 const shellInnerClassName =
   "h-full min-h-0 overflow-hidden rounded-[26px] bg-background/90 dark:bg-slate-950/80";
+const workspaceBackdropClassName =
+  "flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.09),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.88),rgba(241,245,249,0.72))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.78))]";
 
 const WorkspacePanelShell = ({ children }: { children: React.ReactNode }) => (
   <div className={shellClassName}>
     <div className={shellInnerClassName}>{children}</div>
+  </div>
+);
+
+const SinglePanelLayer = ({
+  active,
+  children,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+}) => (
+  <div
+    aria-hidden={!active}
+    className={
+      active
+        ? "relative z-10 h-full"
+        : "pointer-events-none absolute inset-0 opacity-0"
+    }
+  >
+    <WorkspacePanelShell>{children}</WorkspacePanelShell>
   </div>
 );
 
@@ -246,48 +267,25 @@ export function WorkspaceSplitLayout({
 
   const { leftWidth, middleWidth, rightWidth } = getPanelWidths(containerWidth, splitRatio, secondarySplitRatio);
 
-  if (viewMode === "chat") {
+  if (viewMode !== "split") {
     return (
-      <div className="flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.09),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.88),rgba(241,245,249,0.72))] px-5 py-5 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.78))]">
-        <div className="min-h-0 flex-1">
-          <WorkspacePanelShell>{chatPanel}</WorkspacePanelShell>
-        </div>
-      </div>
-    );
-  }
-
-  if (viewMode === "canvas") {
-    return (
-      <div className="flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.09),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.88),rgba(241,245,249,0.72))] px-5 py-5 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.78))]">
-        <div className="min-h-0 flex-1">
-          <WorkspacePanelShell>{canvasPanel}</WorkspacePanelShell>
-        </div>
-      </div>
-    );
-  }
-
-  if (viewMode === "wiki") {
-    return (
-      <div className="flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.09),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.88),rgba(241,245,249,0.72))] px-5 py-5 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.78))]">
-        <div className="min-h-0 flex-1">
-          <WorkspacePanelShell>{wikiPanel}</WorkspacePanelShell>
-        </div>
-      </div>
-    );
-  }
-
-  if (viewMode === "nody") {
-    return (
-      <div className="flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.09),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.88),rgba(241,245,249,0.72))] px-5 py-5 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.78))]">
-        <div className="min-h-0 flex-1">
-          <WorkspacePanelShell>{nodyPanel}</WorkspacePanelShell>
+      <div className={`${workspaceBackdropClassName} px-5 py-5`}>
+        <div className="relative min-h-0 flex-1">
+          <SinglePanelLayer active={viewMode === "chat"}>{chatPanel}</SinglePanelLayer>
+          <SinglePanelLayer active={viewMode === "canvas"}>{canvasPanel}</SinglePanelLayer>
+          {viewMode === "wiki" ? (
+            <SinglePanelLayer active>{wikiPanel}</SinglePanelLayer>
+          ) : null}
+          {viewMode === "nody" ? (
+            <SinglePanelLayer active>{nodyPanel}</SinglePanelLayer>
+          ) : null}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.09),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.88),rgba(241,245,249,0.72))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.78))]">
+    <div className={workspaceBackdropClassName}>
       <div
         ref={splitRef}
         className="flex min-h-0 flex-1 px-5 py-5"
