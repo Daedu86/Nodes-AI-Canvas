@@ -18,8 +18,22 @@ export const MODEL_OPTIONS: ModelOption[] = [
     modelId: "stepfun/step-3.5-flash:free",
     provider: "openrouter",
   },
+  {
+    label: "OpenRouter · Qwen 3.6 Plus (free)",
+    modelId: "qwen/qwen3.6-plus:free",
+    provider: "openrouter",
+  },
+  {
+    label: "OpenRouter · Hermes 3 405B (free)",
+    modelId: "nousresearch/hermes-3-llama-3.1-405b:free",
+    provider: "openrouter",
+  },
+  {
+    label: "OpenRouter · Llama 3.3 70B (free)",
+    modelId: "meta-llama/llama-3.3-70b-instruct:free",
+    provider: "openrouter",
+  },
   { label: "Ollama · gemma3:4b (local optional)", modelId: "gemma3:4b", provider: "ollama" },
-  { label: "Ollama · llama3.1:8b (local optional)", modelId: "llama3.1:8b", provider: "ollama" },
 ];
 
 export function getModelOptionKey(option: Pick<ModelOption, "modelId" | "provider">) {

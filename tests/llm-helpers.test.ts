@@ -122,6 +122,13 @@ describe("llm helpers", () => {
       provider: "ollama",
     });
 
+    expect(resolveModelConfig({ model: "qwen/qwen3.6-plus:free", provider: "openrouter" })).toEqual(
+      {
+        modelId: "qwen/qwen3.6-plus:free",
+        provider: "openrouter",
+      },
+    );
+
     expect(
       resolveModelConfig({
         runConfig: {
@@ -142,6 +149,16 @@ describe("llm helpers", () => {
       resolveModelConfig({
         provider: "openrouter",
         model: "openai/gpt-4.1",
+      }),
+    ).toEqual({
+      modelId: "nvidia/nemotron-3-super-120b-a12b:free",
+      provider: "openrouter",
+    });
+
+    expect(
+      resolveModelConfig({
+        provider: "ollama",
+        model: "llama3.1:8b",
       }),
     ).toEqual({
       modelId: "nvidia/nemotron-3-super-120b-a12b:free",

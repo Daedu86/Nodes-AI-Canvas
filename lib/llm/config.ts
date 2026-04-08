@@ -42,8 +42,11 @@ const DEFAULT_ALLOWED_MODELS: Record<Provider, string[]> = {
   openrouter: [
     "nvidia/nemotron-3-super-120b-a12b:free",
     "stepfun/step-3.5-flash:free",
+    "qwen/qwen3.6-plus:free",
+    "nousresearch/hermes-3-llama-3.1-405b:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
   ],
-  ollama: ["gemma3:4b", "llama3.1:8b"],
+  ollama: ["gemma3:4b"],
 };
 
 const parseAllowedModels = (value: string | undefined) =>

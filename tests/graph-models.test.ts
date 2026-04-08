@@ -12,6 +12,9 @@ describe("graph model styling", () => {
     expect(getGraphModelLabel("stepfun/step-3.5-flash:free", "openrouter")).toBe(
       "OpenRouter · Step 3.5 Flash",
     );
+    expect(getGraphModelLabel("qwen/qwen3.6-plus:free", "openrouter")).toBe(
+      "OpenRouter · Qwen 3.6 Plus",
+    );
   });
 
   it("assigns a distinct graph swatch to StepFun free responses", () => {
