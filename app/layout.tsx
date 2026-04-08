@@ -17,6 +17,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Nodes",
   description: "AI decision workspace for branching, comparison, and synthesis.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon.png", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", type: "image/png" }],
+    shortcut: ["/favicon.ico"],
+  },
 };
 
 export default async function RootLayout({
