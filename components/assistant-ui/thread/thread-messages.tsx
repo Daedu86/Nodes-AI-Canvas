@@ -27,6 +27,7 @@ import {
   resolveModel,
   resolveSiblingInfo,
 } from "@/components/assistant-ui/thread/message-utils";
+import { ROOT_NODE_ID } from "@/components/assistant-ui/thread-graph/graph-types";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { useThreadRepoItems } from "@/components/assistant-ui/use-thread-repo-items";
@@ -330,19 +331,13 @@ export const UserMessage: FC = () => {
   const [isSubmittingBranch, setIsSubmittingBranch] = React.useState(false);
   const isThreadRunning = runtime.threads.main.getState().isRunning;
   const isRootUser = resolvedParentId === null;
-  const branchOperation: BranchOperation = "create-sibling-prompt";
+  const branchOperation: BranchOperation = isRootUser ? "new-root-prompt" : "create-sibling-prompt";
   const activeDraft =
     draft && draft.anchorId === message?.id && draft.operation === branchOperation ? draft : null;
-  const branchDetail = React.useMemo<BranchOperationDetail>(() => {
-    if (isRootUser) {
-      const rootDetail = getBranchOperationDetail("new-root-prompt");
-      return {
-        ...rootDetail,
-        operation: branchOperation,
-      };
-    }
-    return getBranchOperationDetail(branchOperation);
-  }, [branchOperation, isRootUser]);
+  const branchDetail = React.useMemo<BranchOperationDetail>(
+    () => getBranchOperationDetail(branchOperation),
+    [branchOperation],
+  );
 
   const handleChooseBranch = React.useCallback(() => {
     if (!message?.id) return;
@@ -352,12 +347,19 @@ export const UserMessage: FC = () => {
   const handleSubmitBranch = React.useCallback(() => {
     if (!message?.id || !activeDraft) return;
     const spec = buildBranchSpec(
-      {
-        id: message.id,
-        parentId: resolvedParentId,
-        role: "user",
-        isBridge: false,
-      },
+      isRootUser
+        ? {
+            id: ROOT_NODE_ID,
+            parentId: null,
+            role: "ROOT",
+            isBridge: false,
+          }
+        : {
+            id: message.id,
+            parentId: resolvedParentId,
+            role: "user",
+            isBridge: false,
+          },
       branchOperation,
     );
 
@@ -401,6 +403,7 @@ export const UserMessage: FC = () => {
     resolvedParentId,
     runtime.threads.main,
     setRequestError,
+    isRootUser,
   ]);
 
   return (
