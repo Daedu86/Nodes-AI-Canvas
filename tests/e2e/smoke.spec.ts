@@ -403,6 +403,7 @@ test("preserves chat thread and canvas nodes when switching workspace modes", as
 
   await page.getByRole("button", { name: "Show canvas panel" }).click();
   await expect(page.locator(".react-flow__node")).toHaveCount(3);
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
   await expect(page.locator('.react-flow__node[data-id="__ROOT__"]')).toHaveCount(1);
   const graph = await copyGraphJson(page);
   expect(graph.nodes.map((node) => node.role)).toEqual(["user", "assistant"]);

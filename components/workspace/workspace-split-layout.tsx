@@ -17,7 +17,7 @@ const PANEL_GAP = 18;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 const shellClassName =
-  "overflow-hidden rounded-[30px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.86))] shadow-[0_28px_90px_-48px_rgba(15,23,42,0.45)] ring-1 ring-black/[0.04] backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(15,23,42,0.82))] dark:ring-white/[0.03]";
+  "h-full min-h-0 overflow-hidden rounded-[30px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.86))] shadow-[0_28px_90px_-48px_rgba(15,23,42,0.45)] ring-1 ring-black/[0.04] backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(15,23,42,0.82))] dark:ring-white/[0.03]";
 const shellInnerClassName =
   "h-full min-h-0 overflow-hidden rounded-[26px] bg-background/90 dark:bg-slate-950/80";
 const workspaceBackdropClassName =
@@ -40,7 +40,7 @@ const SinglePanelLayer = ({
     aria-hidden={!active}
     className={
       active
-        ? "relative z-10 h-full"
+        ? "absolute inset-0 z-10"
         : "pointer-events-none absolute inset-0 opacity-0"
     }
   >
