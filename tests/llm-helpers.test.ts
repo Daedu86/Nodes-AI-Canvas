@@ -122,12 +122,10 @@ describe("llm helpers", () => {
       provider: "ollama",
     });
 
-    expect(resolveModelConfig({ model: "qwen/qwen3.6-plus:free", provider: "openrouter" })).toEqual(
-      {
-        modelId: "qwen/qwen3.6-plus:free",
-        provider: "openrouter",
-      },
-    );
+    expect(resolveModelConfig({ model: "openrouter/free", provider: "openrouter" })).toEqual({
+      modelId: "openrouter/free",
+      provider: "openrouter",
+    });
 
     expect(
       resolveModelConfig({

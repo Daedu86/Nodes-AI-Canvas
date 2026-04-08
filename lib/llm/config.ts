@@ -41,10 +41,10 @@ export const OLLAMA_API_URL = process.env.OLLAMA_API_URL || "http://localhost:11
 const DEFAULT_ALLOWED_MODELS: Record<Provider, string[]> = {
   openrouter: [
     "nvidia/nemotron-3-super-120b-a12b:free",
-    "stepfun/step-3.5-flash:free",
-    "qwen/qwen3.6-plus:free",
-    "nousresearch/hermes-3-llama-3.1-405b:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
+    "openrouter/free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "arcee-ai/trinity-large-preview:free",
+    "arcee-ai/trinity-mini:free",
   ],
   ollama: ["gemma3:4b"],
 };

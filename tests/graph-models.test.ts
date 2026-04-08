@@ -9,15 +9,15 @@ describe("graph model styling", () => {
     expect(
       getGraphModelLabel("nvidia/nemotron-3-super-120b-a12b:free", "openrouter"),
     ).toBe("OpenRouter · Nemotron 3 Super");
-    expect(getGraphModelLabel("stepfun/step-3.5-flash:free", "openrouter")).toBe(
-      "OpenRouter · Step 3.5 Flash",
+    expect(getGraphModelLabel("openrouter/free", "openrouter")).toBe(
+      "OpenRouter · Free Router",
     );
-    expect(getGraphModelLabel("qwen/qwen3.6-plus:free", "openrouter")).toBe(
-      "OpenRouter · Qwen 3.6 Plus",
+    expect(getGraphModelLabel("arcee-ai/trinity-large-preview:free", "openrouter")).toBe(
+      "OpenRouter · Trinity Large Preview",
     );
   });
 
-  it("assigns a distinct graph swatch to StepFun free responses", () => {
+  it("assigns distinct graph swatches to supported free model families", () => {
     const defaults = {
       defaultFill: "rgba(255,255,255,0.94)",
       defaultStroke: "rgba(15,23,42,0.08)",
@@ -29,13 +29,13 @@ describe("graph model styling", () => {
       model: "nvidia/nemotron-3-super-120b-a12b:free",
       provider: "openrouter",
     });
-    const stepfun = getGraphModelPalette({
+    const router = getGraphModelPalette({
       ...defaults,
-      model: "stepfun/step-3.5-flash:free",
+      model: "openrouter/free",
       provider: "openrouter",
     });
 
-    expect(stepfun.swatch).toBe("#0d9488");
-    expect(stepfun.swatch).not.toBe(nemotron.swatch);
+    expect(router.swatch).toBe("#2563eb");
+    expect(router.swatch).toBe(nemotron.swatch);
   });
 });
