@@ -9,6 +9,9 @@ export const MODEL_FALLBACK_HEADER = "x-nodes-model-fallback";
 export type RequestErrorCode =
   | "chat_concurrency_limited"
   | "chat_quota_exceeded"
+  | "missing_anthropic_key"
+  | "missing_google_key"
+  | "missing_openai_key"
   | "missing_openrouter_key"
   | "model_unavailable"
   | "provider_rate_limited"
@@ -146,6 +149,17 @@ export function createResolvedModelHeaders(options: {
 export function getRequestErrorMessageFromResponse(response: Pick<Response, "status" | "headers">) {
   const explicit = response.headers.get(REQUEST_ERROR_MESSAGE_HEADER);
   if (explicit) return explicit;
+
+  const errorCode = response.headers.get(REQUEST_ERROR_CODE_HEADER);
+  if (errorCode === "missing_openai_key") {
+    return "OpenAI needs an API key in Profile > LLM Models.";
+  }
+  if (errorCode === "missing_anthropic_key") {
+    return "Anthropic needs an API key in Profile > LLM Models.";
+  }
+  if (errorCode === "missing_google_key") {
+    return "Gemini needs an API key in Profile > LLM Models.";
+  }
 
   if (response.status === 400) {
     return "The selected model is not available. Choose another model and try again.";

@@ -86,6 +86,7 @@ import {
   type SessionArtifactSemanticType,
   toLlmContextArtifacts,
 } from "@/lib/session-artifacts";
+import { getProviderLabel } from "@/lib/llm/provider-catalog";
 
 const nodeTypes: NodeTypes = {
   artifactNode: ArtifactGraphNode,
@@ -98,9 +99,7 @@ const edgeTypes: EdgeTypes = {
 
 const providerDisplay = (provider?: string | null) => {
   if (!provider) return undefined;
-  if (provider === "openrouter") return "OpenRouter";
-  if (provider === "ollama") return "Ollama";
-  return provider;
+  return getProviderLabel(provider);
 };
 
 const scrollMessageIntoView = (messageId: string) => {

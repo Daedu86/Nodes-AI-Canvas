@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAssistantRuntime } from "@assistant-ui/react";
+import { useLlmSettings } from "@/components/context/llm-settings";
 import { useModelConfig } from "@/components/context/model-config";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
 
@@ -27,6 +28,7 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
   const runtime = useAssistantRuntime();
   const { activeSession, renameSession } = usePersistedSessions();
   const { modelId, provider } = useModelConfig();
+  const { getProviderHeaders } = useLlmSettings();
   const loadingRef = useRef(false);
 
   const messages = useMemo<ThreadMessageLike[]>(() => {
@@ -54,7 +56,10 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
         const slice = messages.slice(-6);
         const response = await fetch("/api/title", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...getProviderHeaders(provider),
+          },
           body: JSON.stringify({ messages: slice, model: modelId, provider }),
         });
         const data: TitleResponse = response.ok ? await response.json() : { title: null };
@@ -70,7 +75,7 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
     return () => {
       isActive = false;
     };
-  }, [activeSession, messages, modelId, provider, renameSession]);
+  }, [activeSession, getProviderHeaders, messages, modelId, provider, renameSession]);
 
   const text = formatTitle(activeSession?.title, fallback);
 

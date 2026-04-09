@@ -1,39 +1,36 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const {
-  generateTextMock,
-  ollamaMock,
-  openrouterClientMock,
-} = vi.hoisted(() => ({
-  generateTextMock: vi.fn(),
-  ollamaMock: vi.fn(),
-  openrouterClientMock: vi.fn(),
-}));
+const { createLanguageModelMock, generateTextMock, getMissingProviderCredentialMock } = vi.hoisted(
+  () => ({
+    createLanguageModelMock: vi.fn(),
+    generateTextMock: vi.fn(),
+    getMissingProviderCredentialMock: vi.fn(),
+  }),
+);
 
 vi.mock("ai", () => ({
   generateText: generateTextMock,
 }));
 
-vi.mock("ollama-ai-provider", () => ({
-  ollama: ollamaMock,
-}));
-
-vi.mock("@/lib/llm/openrouter", () => ({
-  openrouterClient: openrouterClientMock,
+vi.mock("@/lib/llm/provider-runtime", () => ({
+  createLanguageModel: createLanguageModelMock,
+  getMissingProviderCredential: getMissingProviderCredentialMock,
+  getRequestModelOverrides: () => ({}),
 }));
 
 import { POST } from "../app/api/canvas-agent/route";
 
 describe("/api/canvas-agent", () => {
   beforeEach(() => {
-    process.env.OPENROUTER_API_KEY = "test-openrouter-key";
-    ollamaMock.mockImplementation((modelId: string) => ({ provider: "ollama", modelId }));
-    openrouterClientMock.mockImplementation((modelId: string) => ({ provider: "openrouter", modelId }));
+    createLanguageModelMock.mockImplementation((config: { provider: string; modelId: string }) => ({
+      provider: config.provider,
+      modelId: config.modelId,
+    }));
     generateTextMock.mockResolvedValue({ text: "Guide response" });
+    getMissingProviderCredentialMock.mockReturnValue(null);
   });
 
   afterEach(() => {
-    delete process.env.OPENROUTER_API_KEY;
     vi.clearAllMocks();
   });
 

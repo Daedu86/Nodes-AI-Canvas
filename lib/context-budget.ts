@@ -55,7 +55,7 @@ export const getByteBudgetStatus = (
 };
 
 export const getContextBudgetPolicy = (modelConfig: ModelConfig): ContextBudgetPolicy => {
-  if (modelConfig.provider === "openrouter") {
+  if (modelConfig.provider !== "ollama") {
     if (modelConfig.modelId.includes("step-3.5-flash")) {
       return {
         recommendedPromptTokens: 12000,

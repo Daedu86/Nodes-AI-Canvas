@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import React, { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "theme";
@@ -45,11 +45,11 @@ export function ThemeToggle({
     >
       {theme === "dark" ? (
         <>
-          <Sun className="size-4 mr-2" /> Light
+          <Sun className="mr-2 size-4" /> Light
         </>
       ) : (
         <>
-          <Moon className="size-4 mr-2" /> Dark
+          <Moon className="mr-2 size-4" /> Dark
         </>
       )}
     </Button>

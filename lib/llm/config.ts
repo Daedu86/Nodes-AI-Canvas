@@ -1,6 +1,11 @@
 import type { LlmContextArtifact } from "@/lib/session-artifacts";
+import {
+  LLM_PROVIDER_IDS,
+  SAFE_DEFAULT_MODEL,
+  type LlmProviderId,
+} from "@/lib/llm/provider-catalog";
 
-export type Provider = "ollama" | "openrouter";
+export type Provider = LlmProviderId;
 
 export type ModelResolutionRunConfig = {
   historyMode?: string;
@@ -38,12 +43,15 @@ export type ResolvedModelConfig = {
   provider: Provider;
 };
 
-export const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "nvidia/nemotron-3-super-120b-a12b:free";
+export const DEFAULT_MODEL = process.env.DEFAULT_MODEL || SAFE_DEFAULT_MODEL.modelId;
 export const OPENROUTER_BASE_URL =
   process.env.OPENROUTER_API_URL || "https://openrouter.ai/api/v1";
 export const OLLAMA_API_URL = process.env.OLLAMA_API_URL || "http://localhost:11434/api";
 
 const DEFAULT_ALLOWED_MODELS: Record<Provider, string[]> = {
+  anthropic: [],
+  google: [],
+  openai: [],
   openrouter: [
     "nvidia/nemotron-3-super-120b-a12b:free",
     "openrouter/free",
@@ -60,20 +68,47 @@ const parseAllowedModels = (value: string | undefined) =>
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0) ?? [];
 
-const inferProviderFromModel = (modelId: string): Provider =>
-  modelId.includes("/") ? "openrouter" : "ollama";
+const isKnownProvider = (value: string | undefined): value is Provider =>
+  typeof value === "string" && LLM_PROVIDER_IDS.includes(value as Provider);
+
+const inferProviderFromModel = (modelId: string): Provider => {
+  const normalized = modelId.toLowerCase();
+  if (normalized.includes("/")) return "openrouter";
+  if (normalized.includes("claude")) return "anthropic";
+  if (normalized.includes("gemini")) return "google";
+  if (
+    normalized.startsWith("gpt") ||
+    normalized.startsWith("o1") ||
+    normalized.startsWith("o3") ||
+    normalized.startsWith("o4")
+  ) {
+    return "openai";
+  }
+  return "ollama";
+};
 
 export function getAllowedModels(provider: Provider) {
-  const configured = parseAllowedModels(
+  const envValue =
     provider === "openrouter"
       ? process.env.ALLOWED_OPENROUTER_MODELS
-      : process.env.ALLOWED_OLLAMA_MODELS,
-  );
+      : provider === "ollama"
+        ? process.env.ALLOWED_OLLAMA_MODELS
+        : provider === "openai"
+          ? process.env.ALLOWED_OPENAI_MODELS
+          : provider === "anthropic"
+            ? process.env.ALLOWED_ANTHROPIC_MODELS
+            : process.env.ALLOWED_GOOGLE_MODELS;
+  const configured = parseAllowedModels(envValue);
   return configured.length > 0 ? configured : DEFAULT_ALLOWED_MODELS[provider];
 }
 
 export function isAllowedModelConfig(config: { modelId: string; provider: Provider }) {
-  return getAllowedModels(config.provider).includes(config.modelId);
+  if (!config.modelId.trim()) return false;
+  if (config.provider === "openrouter") {
+    return getAllowedModels(config.provider).includes(config.modelId);
+  }
+  const allowed = getAllowedModels(config.provider);
+  return allowed.length > 0 ? allowed.includes(config.modelId) : true;
 }
 
 export function getRequestedModelConfig(input: ModelResolutionInput): ResolvedModelConfig {
@@ -94,7 +129,7 @@ export function getRequestedModelConfig(input: ModelResolutionInput): ResolvedMo
 
   return {
     modelId: model,
-    provider: provider === "openrouter" ? "openrouter" : "ollama",
+    provider: isKnownProvider(provider) ? provider : inferProviderFromModel(model),
   };
 }
 
@@ -128,10 +163,13 @@ export function resolveModelConfig(input: ModelResolutionInput): ResolvedModelCo
 
 export function getModelAttemptChain(primary: ResolvedModelConfig): ResolvedModelConfig[] {
   const attempts: ResolvedModelConfig[] = [{ ...primary }];
-  const preferredProviderModels = getAllowedModels(primary.provider).map((modelId) => ({
-    modelId,
-    provider: primary.provider,
-  }));
+  const preferredProviderModels =
+    primary.provider === "openrouter"
+      ? getAllowedModels(primary.provider).map((modelId) => ({
+          modelId,
+          provider: primary.provider,
+        }))
+      : [];
   const safeDefault = getSafeDefaultModelConfig();
 
   for (const candidate of [...preferredProviderModels, safeDefault]) {

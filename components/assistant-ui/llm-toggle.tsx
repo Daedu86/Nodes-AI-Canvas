@@ -5,12 +5,14 @@ import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { useModelConfig } from "@/components/context/model-config";
 import { Bot, Power } from "lucide-react";
 import React from "react";
+import { getProviderLabel } from "@/lib/llm/provider-catalog";
 
 export function LlmToggleButton() {
   const { llmEnabled, setLlmEnabled } = useLlmEnabled();
   const { provider, modelId } = useModelConfig();
   const tooltip = llmEnabled ? "Disable AI requests" : "Enable AI requests";
-  const detail = provider === "openrouter" ? "OpenRouter" : `Ollama (${modelId})`;
+  const detail =
+    provider === "openrouter" ? "OpenRouter" : `${getProviderLabel(provider)} (${modelId})`;
 
   return (
     <TooltipIconButton

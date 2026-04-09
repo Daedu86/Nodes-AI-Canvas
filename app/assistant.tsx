@@ -4,6 +4,7 @@ import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { useChatRuntime } from "@assistant-ui/react-ai-sdk";
 import dynamic from "next/dynamic";
 import { LinkEditorProvider } from "@/components/context/link-editor";
+import { LlmSettingsProvider, useLlmSettings } from "@/components/context/llm-settings";
 import { MessageLatencyProvider } from "@/components/context/message-latency";
 import { RequestErrorProvider } from "@/components/context/request-error";
 import { SessionArtifactsProvider } from "@/components/context/session-artifacts";
@@ -17,10 +18,12 @@ import { PersistedSessionRuntimeBridge } from "@/components/context/persisted-se
 import React, { useMemo } from "react";
 import { SessionUiStateProvider, useSessionUiState } from "@/components/context/session-ui-state";
 import { NodyPanelProvider } from "@/components/context/nody-panel";
+import { WorkspaceSurfaceProvider, useWorkspaceSurface } from "@/components/context/workspace-surface";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/workspace/app-header";
 import { ChatPanel } from "@/components/workspace/chat-panel";
+import { LlmModelsWorkspace } from "@/components/workspace/llm-models-workspace";
 import { WorkspaceSplitLayout } from "@/components/workspace/workspace-split-layout";
 import {
   getRequestErrorMessageFromResponse,
@@ -97,7 +100,8 @@ const ProjectWorkspace = dynamic(
 );
 
 function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
-  const { historyMode, modelConfig } = useSessionUiState();
+  const { historyMode, modelConfig, setModelConfig } = useSessionUiState();
+  const { getProviderHeaders, getSupportedModelConfig } = useLlmSettings();
   const [requestError, setRequestError] = React.useState<string | null>(null);
   const [latencyVersion, setLatencyVersion] = React.useState(0);
   const pendingLatencyRef = React.useRef<{ startedAt: number; responseStartedAt: number | null } | null>(null);
@@ -105,6 +109,17 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
   React.useEffect(() => {
     setRequestError(null);
   }, [sessionId]);
+
+  React.useEffect(() => {
+    const normalized = getSupportedModelConfig(modelConfig);
+    if (
+      normalized.modelId === modelConfig.modelId &&
+      normalized.provider === modelConfig.provider
+    ) {
+      return;
+    }
+    setModelConfig(normalized);
+  }, [getSupportedModelConfig, modelConfig, setModelConfig]);
 
   const recordPendingLatency = React.useCallback((messageId?: string | null) => {
     const pendingLatency = pendingLatencyRef.current;
@@ -131,16 +146,25 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
     }),
     [historyMode, modelConfig.modelId, modelConfig.provider],
   );
+  const chatRequestHeaders = useMemo(
+    () => getProviderHeaders(modelConfig.provider),
+    [getProviderHeaders, modelConfig.provider],
+  );
   const chatRuntimeOptions = useMemo(
     () => ({
       api: "/api/chat",
       body: chatRequestBody,
       prepareSendMessagesRequest: (options: {
         body?: Record<string, unknown>;
+        headers?: HeadersInit;
       }) => ({
         body: {
           ...(options.body ?? {}),
           ...chatRequestBody,
+        },
+        headers: {
+          ...Object.fromEntries(new Headers(options.headers ?? {}).entries()),
+          ...chatRequestHeaders,
         },
       }),
       onError: (error: Error) => {
@@ -165,7 +189,7 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
         recordPendingLatency(message?.id);
       },
     }),
-    [chatRequestBody, recordPendingLatency],
+    [chatRequestBody, chatRequestHeaders, recordPendingLatency],
   );
 
   const rawRuntime = useChatRuntime(chatRuntimeOptions);
@@ -279,9 +303,14 @@ function ProjectRuntimeShell() {
 
 function WorkspaceShell() {
   const { activeProjectId, isReady } = useProjects();
+  const { activeSurface } = useWorkspaceSurface();
 
   if (!isReady) {
     return null;
+  }
+
+  if (activeSurface === "llm-models") {
+    return <LlmModelsWorkspace />;
   }
 
   return activeProjectId ? <ProjectRuntimeShell /> : <AssistantRuntimeShell />;
@@ -292,12 +321,16 @@ export const Assistant = () => {
     <PersistedSessionsProvider>
       <ProjectsProvider>
         <ReusableMemoryProvider>
-          <SidebarProvider className="h-svh w-full overflow-hidden">
-            <AppSidebar />
-            <SidebarInset className="min-h-0 overflow-hidden">
-              <WorkspaceShell />
-            </SidebarInset>
-          </SidebarProvider>
+          <LlmSettingsProvider>
+            <WorkspaceSurfaceProvider>
+              <SidebarProvider className="h-svh w-full overflow-hidden">
+                <AppSidebar />
+                <SidebarInset className="min-h-0 overflow-hidden">
+                  <WorkspaceShell />
+                </SidebarInset>
+              </SidebarProvider>
+            </WorkspaceSurfaceProvider>
+          </LlmSettingsProvider>
         </ReusableMemoryProvider>
       </ProjectsProvider>
     </PersistedSessionsProvider>

@@ -1,12 +1,15 @@
 "use client";
 
-import { LogOut, UserRound } from "lucide-react";
+import React from "react";
+import { Bot, LogOut, UserRound } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
+import { useWorkspaceSurface } from "@/components/context/workspace-surface";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export function SidebarProfile() {
   const { data: session } = useSession();
+  const { activeSurface, showLlmModels } = useWorkspaceSurface();
   const displayName =
     session?.user?.name?.trim() ||
     session?.user?.email?.trim() ||
@@ -27,6 +30,16 @@ export function SidebarProfile() {
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
+        <Button
+          type="button"
+          variant={activeSurface === "llm-models" ? "default" : "outline"}
+          size="sm"
+          className="w-full justify-start rounded-lg"
+          onClick={showLlmModels}
+        >
+          <Bot className="size-4" />
+          LLM Models
+        </Button>
         <ThemeToggle
           variant="outline"
           size="sm"

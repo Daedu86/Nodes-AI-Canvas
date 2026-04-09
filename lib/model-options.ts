@@ -1,73 +1,105 @@
 import type { ModelConfig } from "@/components/context/model-config";
+import {
+  createProviderModelLabel,
+  DEFAULT_OLLAMA_MODELS,
+  OPENROUTER_FREE_MODEL_OPTIONS,
+  SAFE_DEFAULT_MODEL,
+  type LlmProviderId,
+} from "@/lib/llm/provider-catalog";
 
 export type ModelOption = ModelConfig & { label: string };
 
 export const SAFE_DEFAULT_MODEL_CONFIG: ModelConfig = {
-  modelId: "nvidia/nemotron-3-super-120b-a12b:free",
-  provider: "openrouter",
+  modelId: SAFE_DEFAULT_MODEL.modelId,
+  provider: SAFE_DEFAULT_MODEL.provider,
 };
 
-export const MODEL_OPTIONS: ModelOption[] = [
+export const BUILTIN_MODEL_OPTIONS: ModelOption[] = [
+  ...OPENROUTER_FREE_MODEL_OPTIONS,
   {
-    label: "OpenRouter · Nemotron 3 Super (free)",
-    modelId: SAFE_DEFAULT_MODEL_CONFIG.modelId,
-    provider: SAFE_DEFAULT_MODEL_CONFIG.provider,
+    label: createProviderModelLabel("ollama", DEFAULT_OLLAMA_MODELS[0]!),
+    modelId: DEFAULT_OLLAMA_MODELS[0]!,
+    provider: "ollama",
   },
-  {
-    label: "OpenRouter · Free Router",
-    modelId: "openrouter/free",
-    provider: "openrouter",
-  },
-  {
-    label: "OpenRouter · Nemotron 3 Nano",
-    modelId: "nvidia/nemotron-3-nano-30b-a3b:free",
-    provider: "openrouter",
-  },
-  {
-    label: "OpenRouter · Trinity Large Preview",
-    modelId: "arcee-ai/trinity-large-preview:free",
-    provider: "openrouter",
-  },
-  {
-    label: "OpenRouter · Trinity Mini",
-    modelId: "arcee-ai/trinity-mini:free",
-    provider: "openrouter",
-  },
-  { label: "Ollama · gemma3:4b (local optional)", modelId: "gemma3:4b", provider: "ollama" },
 ];
+
+export const MODEL_OPTIONS = BUILTIN_MODEL_OPTIONS;
+
+export function createDynamicModelOptions(
+  provider: LlmProviderId,
+  modelIds: string[],
+): ModelOption[] {
+  return modelIds.map((modelId) => ({
+    label: createProviderModelLabel(provider, modelId),
+    modelId,
+    provider,
+  }));
+}
+
+export function dedupeModelOptions(options: ModelOption[]) {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    const key = `${option.provider}:${option.modelId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export function getModelOptionKey(option: Pick<ModelOption, "modelId" | "provider">) {
   return `${option.provider}:${option.modelId}`;
 }
 
-export function isSupportedModelConfig(config: ModelConfig) {
-  return MODEL_OPTIONS.some(
+export function isSupportedModelConfig(
+  config: ModelConfig,
+  options: ModelOption[] = MODEL_OPTIONS,
+) {
+  return options.some(
     (option) => option.modelId === config.modelId && option.provider === config.provider,
   );
 }
 
-export function findModelOption(config: ModelConfig) {
+export function findModelOption(
+  config: ModelConfig,
+  options: ModelOption[] = MODEL_OPTIONS,
+) {
   return (
-    MODEL_OPTIONS.find(
+    options.find(
       (option) => option.modelId === config.modelId && option.provider === config.provider,
-    ) ?? MODEL_OPTIONS[0]
+    ) ?? options[0]
   );
 }
 
-export function getSupportedModelConfig(config?: Partial<ModelConfig> | null): ModelConfig {
+export function getSupportedModelConfig(
+  config?: Partial<ModelConfig> | null,
+  options: ModelOption[] = MODEL_OPTIONS,
+): ModelConfig {
   if (
     config &&
     typeof config.modelId === "string" &&
-    (config.provider === "ollama" || config.provider === "openrouter")
+    typeof config.provider === "string"
   ) {
     const candidate: ModelConfig = {
       modelId: config.modelId,
-      provider: config.provider,
+      provider: config.provider as ModelConfig["provider"],
     };
-    if (isSupportedModelConfig(candidate)) {
+    if (isSupportedModelConfig(candidate, options)) {
       return candidate;
     }
   }
 
-  return SAFE_DEFAULT_MODEL_CONFIG;
+  const fallback = options[0] ?? SAFE_DEFAULT_MODEL_CONFIG;
+  return {
+    modelId: fallback.modelId,
+    provider: fallback.provider,
+  };
+}
+
+export function getProviderModelIds(
+  provider: LlmProviderId,
+  options: ModelOption[],
+) {
+  return options
+    .filter((option) => option.provider === provider)
+    .map((option) => option.modelId);
 }

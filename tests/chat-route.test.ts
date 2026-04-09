@@ -3,15 +3,15 @@ import { __resetChatGovernorForTests } from "../lib/server/chat-governor";
 
 const {
   frontendToolsMock,
-  ollamaMock,
-  openrouterClientMock,
+  createLanguageModelMock,
+  getMissingProviderCredentialMock,
   createUIMessageStreamMock,
   createUIMessageStreamResponseMock,
   streamTextMock,
 } = vi.hoisted(() => ({
   frontendToolsMock: vi.fn(),
-  ollamaMock: vi.fn(),
-  openrouterClientMock: vi.fn(),
+  createLanguageModelMock: vi.fn(),
+  getMissingProviderCredentialMock: vi.fn(),
   createUIMessageStreamMock: vi.fn(),
   createUIMessageStreamResponseMock: vi.fn(),
   streamTextMock: vi.fn(),
@@ -27,12 +27,10 @@ vi.mock("@assistant-ui/react-ai-sdk", () => ({
   frontendTools: frontendToolsMock,
 }));
 
-vi.mock("ollama-ai-provider", () => ({
-  ollama: ollamaMock,
-}));
-
-vi.mock("@/lib/llm/openrouter", () => ({
-  openrouterClient: openrouterClientMock,
+vi.mock("@/lib/llm/provider-runtime", () => ({
+  createLanguageModel: createLanguageModelMock,
+  getMissingProviderCredential: getMissingProviderCredentialMock,
+  getRequestModelOverrides: () => ({}),
 }));
 
 import { POST } from "../app/api/chat/route";
@@ -48,11 +46,11 @@ describe("/api/chat", () => {
     createUIMessageStreamMock.mockReturnValue("mock-ui-stream");
     createUIMessageStreamResponseMock.mockImplementation(() => new Response(null, { status: 200 }));
     frontendToolsMock.mockReturnValue({});
-    ollamaMock.mockImplementation((modelId: string) => ({ provider: "ollama", modelId }));
-    openrouterClientMock.mockImplementation((modelId: string) => ({
-      provider: "openrouter",
-      modelId,
+    createLanguageModelMock.mockImplementation((config: { provider: string; modelId: string }) => ({
+      provider: config.provider,
+      modelId: config.modelId,
     }));
+    getMissingProviderCredentialMock.mockReturnValue(null);
     streamTextMock.mockReturnValue({
       toUIMessageStreamResponse: () => new Response("ok", { status: 200 }),
     });
@@ -105,8 +103,12 @@ describe("/api/chat", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(openrouterClientMock).toHaveBeenCalledWith(
-      "nvidia/nemotron-3-super-120b-a12b:free",
+    expect(createLanguageModelMock).toHaveBeenCalledWith(
+      {
+        modelId: "nvidia/nemotron-3-super-120b-a12b:free",
+        provider: "openrouter",
+      },
+      {},
     );
     expect(streamTextMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -243,10 +245,21 @@ describe("/api/chat", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(openrouterClientMock).toHaveBeenNthCalledWith(1, "openrouter/free");
-    expect(openrouterClientMock).toHaveBeenNthCalledWith(
+    expect(createLanguageModelMock).toHaveBeenNthCalledWith(
+      1,
+      {
+        modelId: "openrouter/free",
+        provider: "openrouter",
+      },
+      {},
+    );
+    expect(createLanguageModelMock).toHaveBeenNthCalledWith(
       2,
-      "nvidia/nemotron-3-super-120b-a12b:free",
+      {
+        modelId: "nvidia/nemotron-3-super-120b-a12b:free",
+        provider: "openrouter",
+      },
+      {},
     );
     expect(response.headers.get("x-nodes-model-fallback")).toBe("1");
     expect(response.headers.get("x-nodes-resolved-model")).toBe(
@@ -255,7 +268,11 @@ describe("/api/chat", () => {
   });
 
   it("returns a specific configuration error when the OpenRouter key is missing", async () => {
-    delete process.env.OPENROUTER_API_KEY;
+    getMissingProviderCredentialMock.mockReturnValueOnce({
+      code: "missing_openrouter_key",
+      message: "OpenRouter is not configured on this deployment.",
+      status: 503,
+    });
 
     const response = await POST(
       new Request("http://localhost/api/chat", {

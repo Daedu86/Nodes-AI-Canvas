@@ -127,6 +127,21 @@ describe("llm helpers", () => {
       provider: "openrouter",
     });
 
+    expect(resolveModelConfig({ model: "gpt-5-mini", provider: "openai" })).toEqual({
+      modelId: "gpt-5-mini",
+      provider: "openai",
+    });
+
+    expect(resolveModelConfig({ model: "claude-sonnet-4", provider: "anthropic" })).toEqual({
+      modelId: "claude-sonnet-4",
+      provider: "anthropic",
+    });
+
+    expect(resolveModelConfig({ model: "gemini-2.5-flash", provider: "google" })).toEqual({
+      modelId: "gemini-2.5-flash",
+      provider: "google",
+    });
+
     expect(
       resolveModelConfig({
         runConfig: {

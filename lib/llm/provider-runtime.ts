@@ -1,0 +1,131 @@
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createOllama, ollama } from "ollama-ai-provider";
+import {
+  getOpenRouterMetadataHeaders,
+  OLLAMA_API_URL,
+  OPENROUTER_BASE_URL,
+  type Provider,
+  type ResolvedModelConfig,
+} from "@/lib/llm/config";
+import { readLlmRequestOverrides, type LlmRequestOverrides } from "@/lib/llm/request-overrides";
+
+export type MissingProviderCredential = {
+  code:
+    | "missing_anthropic_key"
+    | "missing_google_key"
+    | "missing_openai_key"
+    | "missing_openrouter_key";
+  message: string;
+  status: number;
+};
+
+const normalizeValue = (value?: string | null) => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+};
+
+const resolveApiKey = (
+  overrideValue: string | undefined,
+  envValue: string | undefined,
+) => normalizeValue(overrideValue) ?? normalizeValue(envValue);
+
+export function getRequestModelOverrides(request: Request | Pick<Request, "headers">) {
+  return readLlmRequestOverrides(request.headers);
+}
+
+export function getMissingProviderCredential(
+  provider: Provider,
+  overrides: LlmRequestOverrides,
+): MissingProviderCredential | null {
+  switch (provider) {
+    case "openrouter":
+      return resolveApiKey(overrides.openrouterApiKey, process.env.OPENROUTER_API_KEY)
+        ? null
+        : {
+            code: "missing_openrouter_key",
+            message: "OpenRouter is not configured on this deployment.",
+            status: 503,
+          };
+    case "openai":
+      return resolveApiKey(overrides.openaiApiKey, process.env.OPENAI_API_KEY)
+        ? null
+        : {
+            code: "missing_openai_key",
+            message: "OpenAI needs an API key in Profile > LLM Models.",
+            status: 400,
+          };
+    case "anthropic":
+      return resolveApiKey(overrides.anthropicApiKey, process.env.ANTHROPIC_API_KEY)
+        ? null
+        : {
+            code: "missing_anthropic_key",
+            message: "Anthropic needs an API key in Profile > LLM Models.",
+            status: 400,
+          };
+    case "google":
+      return resolveApiKey(
+        overrides.googleApiKey,
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      )
+        ? null
+        : {
+            code: "missing_google_key",
+            message: "Gemini needs an API key in Profile > LLM Models.",
+            status: 400,
+          };
+    case "ollama":
+    default:
+      return null;
+  }
+}
+
+export function createLanguageModel(
+  config: ResolvedModelConfig,
+  overrides: LlmRequestOverrides,
+) {
+  switch (config.provider) {
+    case "openrouter": {
+      const apiKey = resolveApiKey(overrides.openrouterApiKey, process.env.OPENROUTER_API_KEY);
+      return createOpenAI({
+        apiKey,
+        baseURL: OPENROUTER_BASE_URL,
+        headers: getOpenRouterMetadataHeaders(),
+        name: "openrouter",
+      })(config.modelId);
+    }
+    case "openai": {
+      const apiKey = resolveApiKey(overrides.openaiApiKey, process.env.OPENAI_API_KEY);
+      return createOpenAI({
+        apiKey,
+        name: "openai",
+      })(config.modelId);
+    }
+    case "anthropic": {
+      const apiKey = resolveApiKey(overrides.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
+      return createAnthropic({
+        apiKey,
+        name: "anthropic.messages",
+      })(config.modelId);
+    }
+    case "google": {
+      const apiKey = resolveApiKey(
+        overrides.googleApiKey,
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      );
+      return createGoogleGenerativeAI({
+        apiKey,
+        name: "google.generative-ai",
+      })(config.modelId);
+    }
+    case "ollama":
+    default: {
+      const baseURL = normalizeValue(overrides.ollamaBaseUrl) ?? OLLAMA_API_URL;
+      if (baseURL === OLLAMA_API_URL) {
+        return ollama(config.modelId);
+      }
+      return createOllama({ baseURL })(config.modelId);
+    }
+  }
+}

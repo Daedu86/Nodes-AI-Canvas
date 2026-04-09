@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useLlmSettings } from "@/components/context/llm-settings";
 import type { HistoryMode } from "@/components/context/session-ui-state";
 import {
   buildCanvasGuidePayload,
@@ -75,6 +76,7 @@ const NodyPanelContext = React.createContext<NodyPanelContextValue | null>(null)
 const defaultFocusLabel = "Session tree";
 
 export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
+  const { getProviderHeaders } = useLlmSettings();
   const [snapshot, setSnapshot] = React.useState<NodySnapshot | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [phase, setPhase] = React.useState<NodyPhase>("idle");
@@ -200,6 +202,7 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...getProviderHeaders(snapshot.provider),
           },
           body: JSON.stringify({
             action,
@@ -236,7 +239,7 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
         setBusy(false);
       }
     },
-    [selectedWikiPageId, snapshot, wiki],
+    [getProviderHeaders, selectedWikiPageId, snapshot, wiki],
   );
 
   React.useEffect(() => {

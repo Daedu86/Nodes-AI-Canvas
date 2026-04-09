@@ -2,10 +2,8 @@
 
 import { frontendTools } from "@assistant-ui/react-ai-sdk";
 import { createUIMessageStream, createUIMessageStreamResponse, type ModelMessage, streamText } from "ai";
-import { ollama } from "ollama-ai-provider";
 import {
   getModelAttemptChain,
-  getOpenRouterApiKey,
   getRequestedModelConfig,
   resolveModelConfig,
   type ModelResolutionMetadata,
@@ -20,7 +18,11 @@ import {
   createRequestErrorResponse,
   createResolvedModelHeaders,
 } from "@/lib/llm/request-errors";
-import { openrouterClient } from "@/lib/llm/openrouter";
+import {
+  createLanguageModel,
+  getMissingProviderCredential,
+  getRequestModelOverrides,
+} from "@/lib/llm/provider-runtime";
 import { reserveChatQuota } from "@/lib/server/chat-governor";
 import {
   createLlmAuditContext,
@@ -52,6 +54,7 @@ export async function POST(req: Request) {
   if ("response" in guarded) return guarded.response;
 
   const body = (await req.json()) as ChatRequestBody;
+  const requestOverrides = getRequestModelOverrides(req);
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
   const messages = normalizeMessages(rawMessages);
   const system = body.system;
@@ -134,21 +137,22 @@ export async function POST(req: Request) {
       currentModel.modelId !== requestedModel.modelId ||
       currentModel.provider !== requestedModel.provider;
 
-    if (currentModel.provider === "openrouter" && !getOpenRouterApiKey()) {
-      console.error("Missing OPENROUTER_API_KEY");
+    const missingCredential = getMissingProviderCredential(currentModel.provider, requestOverrides);
+    if (missingCredential) {
+      console.error(`Missing provider credential for ${currentModel.provider}`);
       quota.grant.release();
       logLlmAuditFailed(
         auditContext,
         currentModel,
-        "missing_openrouter_key",
+        missingCredential.code,
         fallbackApplied,
         Date.now() - auditContext.startedAt,
       );
       return createRequestErrorResponse({
-        code: "missing_openrouter_key",
+        code: missingCredential.code,
         headers: { [REQUEST_ID_HEADER]: auditContext.requestId },
-        message: "OpenRouter is not configured on this deployment.",
-        status: 503,
+        message: missingCredential.message,
+        status: missingCredential.status,
       });
     }
 
@@ -176,10 +180,9 @@ export async function POST(req: Request) {
         });
       };
 
-      const model = (
-        currentModel.provider === "openrouter"
-          ? openrouterClient(currentModel.modelId)
-          : ollama(currentModel.modelId)
+      const model = createLanguageModel(
+        currentModel,
+        requestOverrides,
       ) as Parameters<typeof streamText>[0]["model"];
 
       const artifactContextMessage = buildContextArtifactsUserMessage(contextArtifacts, {

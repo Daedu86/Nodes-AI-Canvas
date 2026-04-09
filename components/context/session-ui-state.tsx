@@ -1,10 +1,11 @@
 "use client";
 
 import React from "react";
+import type { LlmProviderId } from "@/lib/llm/provider-catalog";
 import { getSupportedModelConfig } from "@/lib/model-options";
 
 export type HistoryMode = "last" | "full";
-export type ModelProvider = "ollama" | "openrouter";
+export type ModelProvider = LlmProviderId;
 export type SessionViewMode = "chat" | "split" | "canvas" | "wiki" | "brief" | "nody";
 export type SplitWorkspacePane = "chat" | "canvas" | "wiki" | "brief" | "nody";
 
@@ -73,10 +74,7 @@ const DEFAULT_SPLIT_PANE_VISIBILITY: SplitPaneVisibility = {
 
 const DEFAULT_MODEL_CONFIG: ModelConfig = getSupportedModelConfig({
   modelId: process.env.NEXT_PUBLIC_DEFAULT_MODEL,
-  provider:
-    process.env.NEXT_PUBLIC_DEFAULT_PROVIDER === "ollama"
-      ? "ollama"
-      : "openrouter",
+  provider: (process.env.NEXT_PUBLIC_DEFAULT_PROVIDER as ModelProvider | undefined) ?? "openrouter",
 });
 
 const SessionUiStateContext = React.createContext<SessionUiStateContextValue | null>(null);
@@ -132,11 +130,11 @@ const readModelConfig = (sessionId: string): ModelConfig => {
       parsed &&
       typeof parsed === "object" &&
       typeof parsed.modelId === "string" &&
-      (parsed.provider === "ollama" || parsed.provider === "openrouter")
+      typeof parsed.provider === "string"
     ) {
       return getSupportedModelConfig({
         modelId: parsed.modelId,
-        provider: parsed.provider,
+        provider: parsed.provider as ModelProvider,
       });
     }
   } catch {

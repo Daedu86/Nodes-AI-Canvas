@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { generateText } from "ai";
-import { ollama } from "ollama-ai-provider";
 import {
   buildCanvasGuideSystemPrompt,
   buildCanvasGuideUserPrompt,
@@ -9,12 +8,15 @@ import {
   type CanvasGuidePayload,
 } from "@/lib/canvas-agent/canvas-agent-context";
 import {
-  getOpenRouterApiKey,
   resolveModelConfig,
   type Provider,
 } from "@/lib/llm/config";
 import { isE2eMockLlmEnabled } from "@/lib/llm/e2e-mock";
-import { openrouterClient } from "@/lib/llm/openrouter";
+import {
+  createLanguageModel,
+  getMissingProviderCredential,
+  getRequestModelOverrides,
+} from "@/lib/llm/provider-runtime";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 export const runtime = "nodejs";
@@ -37,6 +39,7 @@ export async function POST(req: Request) {
   if ("response" in guarded) return guarded.response;
 
   try {
+    const requestOverrides = getRequestModelOverrides(req);
     const body = (await req.json()) as CanvasAgentRequestBody;
     const action = body.action;
     const payload = body.payload;
@@ -55,13 +58,14 @@ export async function POST(req: Request) {
       model: body.model,
       provider: body.provider,
     });
-    const model = (
-      provider === "openrouter" ? openrouterClient(modelId) : ollama(modelId)
-    ) as Parameters<typeof generateText>[0]["model"];
-
-    if (provider === "openrouter" && !getOpenRouterApiKey()) {
-      return NextResponse.json({ error: "Missing OPENROUTER_API_KEY" }, { status: 400 });
+    const missingCredential = getMissingProviderCredential(provider, requestOverrides);
+    if (missingCredential) {
+      return NextResponse.json({ error: missingCredential.message }, { status: missingCredential.status });
     }
+    const model = createLanguageModel(
+      { modelId, provider },
+      requestOverrides,
+    ) as Parameters<typeof generateText>[0]["model"];
 
     const result = await generateText({
       model,

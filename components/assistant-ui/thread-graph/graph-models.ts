@@ -1,4 +1,5 @@
 import type { Node } from "@/components/assistant-ui/thread-graph/graph-types";
+import { getProviderLabel } from "@/lib/llm/provider-catalog";
 import { MODEL_OPTIONS } from "@/lib/model-options";
 
 export type GraphLegendItem = {
@@ -68,12 +69,8 @@ export const getGraphModelLabel = (model?: string | null, provider?: string | nu
     return stripOptionSuffix(option.label);
   }
 
-  if (normalizedProvider === "openrouter" && normalizedModel) {
-    return `OpenRouter · ${normalizedModel}`;
-  }
-
-  if (normalizedProvider === "ollama" && normalizedModel) {
-    return `Ollama · ${normalizedModel}`;
+  if (normalizedProvider && normalizedModel) {
+    return `${getProviderLabel(normalizedProvider)} · ${normalizedModel}`;
   }
 
   if (normalizedModel) {

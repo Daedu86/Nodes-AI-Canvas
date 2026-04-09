@@ -1,5 +1,6 @@
 import type { AssistantRuntime } from "@assistant-ui/react";
 import type { ThreadRepoItem } from "@/components/assistant-ui/use-thread-repo-items";
+import { LLM_PROVIDER_IDS } from "@/lib/llm/provider-catalog";
 import { getMessageLatencyEntry } from "@/lib/message-latency-registry";
 import { getModelEntry } from "@/lib/message-model-registry";
 import { computeSiblingGroupId } from "@/lib/sibling-group";
@@ -28,6 +29,8 @@ export type ResolvedLatencyInfo = {
 };
 
 const DEFAULT_SIBLING_INFO: SiblingInfo = { siblingIdStr: "", parentIdDisplay: null };
+const isKnownProvider = (value: unknown): value is string =>
+  typeof value === "string" && LLM_PROVIDER_IDS.includes(value as never);
 
 export const resolveRuntimeParentId = (
   messageId: string | null | undefined,
@@ -106,19 +109,13 @@ export const resolveModel = (
       ? { model: custom.model, provider: custom.provider as string | undefined }
       : null;
   if (fromMessage?.model) {
-    const provider =
-      fromMessage.provider === "ollama" || fromMessage.provider === "openrouter"
-        ? fromMessage.provider
-        : fallbackProvider;
+    const provider = isKnownProvider(fromMessage.provider) ? fromMessage.provider : fallbackProvider;
     return { model: fromMessage.model, provider };
   }
   const id = message?.id;
   const fromRegistry = id ? getModelEntry(id) : undefined;
   if (fromRegistry?.model) {
-    const provider =
-      fromRegistry.provider === "ollama" || fromRegistry.provider === "openrouter"
-        ? fromRegistry.provider
-        : fallbackProvider;
+    const provider = isKnownProvider(fromRegistry.provider) ? fromRegistry.provider : fallbackProvider;
     return { model: fromRegistry.model, provider };
   }
   return { model: fallbackModelId, provider: fallbackProvider };
