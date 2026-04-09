@@ -1913,7 +1913,20 @@ export function ThreadGraphFlow() {
                       ) : null}
                     </div>
                   </div>
-                  <Sparkles className="h-4 w-4 text-violet-600" />
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-md border border-rose-500/35 bg-rose-500/10 px-2.5 py-1.5 text-xs text-rose-700 hover:bg-rose-500/15"
+                      onClick={() => {
+                        deleteArtifact(selectedArtifact.id);
+                        applyCanvasSelection(null);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Delete</span>
+                    </button>
+                    <Sparkles className="h-4 w-4 text-violet-600" />
+                  </div>
                 </div>
                 <div className="grid gap-2 md:grid-cols-[1.4fr,0.8fr]">
                   <label className="space-y-1 text-xs text-muted-foreground">
@@ -2077,19 +2090,6 @@ export function ThreadGraphFlow() {
                       })}
                     </div>
                   )}
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-rose-500/35 bg-rose-500/10 px-2.5 py-1.5 text-xs text-rose-700 hover:bg-rose-500/15"
-                    onClick={() => {
-                      deleteArtifact(selectedArtifact.id);
-                      applyCanvasSelection(null);
-                    }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>Delete artifact</span>
-                  </button>
                 </div>
               </div>
             ) : selectedFlowNode && selectedMessageNode ? (
