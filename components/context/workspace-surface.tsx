@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useSession } from "next-auth/react";
+import { hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
 export type WorkspaceSurface = "llm-models" | "workspace";
 
@@ -39,7 +40,7 @@ export function WorkspaceSurfaceProvider({
   const hasLoadedRef = React.useRef(false);
 
   React.useEffect(() => {
-    const next = readSurface(storageKey);
+    const next = hasPostAuthChatHandoff() ? DEFAULT_SURFACE : readSurface(storageKey);
     hasLoadedRef.current = true;
     setActiveSurface(next);
   }, [storageKey]);

@@ -31,6 +31,7 @@ import {
 } from "@/lib/llm/request-errors";
 import { rememberMessageLatencyEntry } from "@/lib/message-latency-registry";
 import { GraphBranchIntentProvider } from "@/components/context/graph-branch-intent";
+import { clearPostAuthHandoff, hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
 const GraphPanel = dynamic(
   () => import("@/components/workspace/graph-panel").then((mod) => mod.GraphPanel),
@@ -268,11 +269,32 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
   );
 }
 
+function WorkspaceLoadingState({ label }: { label: string }) {
+  return (
+    <div className="flex h-full min-h-0 items-center justify-center bg-background px-6 py-10">
+      <div className="flex max-w-md flex-col items-center gap-3 rounded-2xl border border-border/60 bg-background/80 px-6 py-5 text-center shadow-sm">
+        <div className="h-2.5 w-2.5 rounded-full bg-sky-500" />
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        <p className="text-sm text-muted-foreground">
+          Loading your workspace context and preparing a session.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AssistantRuntimeShell() {
   const { activeSessionId, isReady } = usePersistedSessions();
 
+  React.useEffect(() => {
+    if (!isReady || !activeSessionId || !hasPostAuthChatHandoff()) {
+      return;
+    }
+    clearPostAuthHandoff();
+  }, [activeSessionId, isReady]);
+
   if (!isReady || !activeSessionId) {
-    return null;
+    return <WorkspaceLoadingState label="Opening your session…" />;
   }
 
   return (
@@ -286,7 +308,7 @@ function ProjectRuntimeShell() {
   const { activeProjectId, isReady } = useProjects();
 
   if (!isReady || !activeProjectId) {
-    return null;
+    return <WorkspaceLoadingState label="Opening your project…" />;
   }
 
   return (
@@ -302,7 +324,7 @@ function WorkspaceShell() {
   const { activeSurface } = useWorkspaceSurface();
 
   if (!isReady) {
-    return null;
+    return <WorkspaceLoadingState label="Preparing your workspace…" />;
   }
 
   if (activeSurface === "llm-models") {

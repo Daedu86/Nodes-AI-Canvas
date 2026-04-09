@@ -5,6 +5,7 @@ import { Github, LockKeyhole, Network } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { buildPostAuthCallbackUrl } from "@/lib/client/post-auth-handoff";
 
 type AuthScreenProps = {
   devCredentialsDefaultEmail: string;
@@ -17,6 +18,7 @@ export function AuthScreen({
   devCredentialsEnabled,
   githubConfigured,
 }: AuthScreenProps) {
+  const callbackUrl = buildPostAuthCallbackUrl("/");
   const [email, setEmail] = useState(devCredentialsDefaultEmail);
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,7 +31,7 @@ export function AuthScreen({
     const result = await signIn("dev-credentials", {
       email,
       password,
-      callbackUrl: "/",
+      callbackUrl,
       redirect: false,
     });
     setIsSubmitting(false);
@@ -37,7 +39,7 @@ export function AuthScreen({
       setError("Invalid local credentials.");
       return;
     }
-    window.location.assign(result?.url || "/");
+    window.location.assign(callbackUrl);
   };
 
   return (
@@ -94,7 +96,7 @@ export function AuthScreen({
                 type="button"
                 size="lg"
                 className="w-full justify-center"
-                onClick={() => void signIn("github", { callbackUrl: "/" })}
+                onClick={() => void signIn("github", { callbackUrl })}
               >
                 <Github className="size-4" />
                 Continue with GitHub

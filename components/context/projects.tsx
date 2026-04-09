@@ -7,6 +7,7 @@ import type {
   ProjectDocument,
   ProjectSummary,
 } from "@/lib/project-documents";
+import { hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
 type ProjectsContextValue = {
   activeProject: ProjectDocument | null;
@@ -135,12 +136,18 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         const loadedProjects = await refreshProjects();
+        const shouldStayInWorkspace = hasPostAuthChatHandoff();
         const preferredId = readStoredActiveProjectId(userId);
         const preferredProject = preferredId
           ? loadedProjects.find((project) => project.id === preferredId) ?? null
           : null;
 
-        if (
+        if (shouldStayInWorkspace) {
+          if (mounted) {
+            setActiveProject(null);
+            writeStoredActiveProjectId(userId, null);
+          }
+        } else if (
           preferredProject &&
           preferredProject.sessionCount >= AUTO_OPEN_PROJECT_SESSION_THRESHOLD
         ) {

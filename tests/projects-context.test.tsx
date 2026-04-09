@@ -173,4 +173,64 @@ describe("ProjectsProvider", () => {
     expect(localStorage.getItem(ACTIVE_PROJECT_KEY)).toBe("project-small");
     expect(fetchMock).toHaveBeenCalledWith("/api/projects/project-small", expect.anything());
   });
+
+  it("does not reopen a stored project during post-auth handoff", async () => {
+    localStorage.setItem(ACTIVE_PROJECT_KEY, "project-small");
+    window.history.replaceState({}, "", "/?handoff=chat");
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/projects") {
+        return createJsonResponse({
+          projects: [
+            {
+              arenaWinnerBranchKey: null,
+              arenaWinnerSessionId: null,
+              createdAt: "2026-04-01T09:00:00.000Z",
+              id: "project-small",
+              memoryIds: [],
+              sessionCount: 2,
+              title: "Small project",
+              updatedAt: "2026-04-01T09:00:00.000Z",
+            },
+          ],
+        });
+      }
+
+      if (url === "/api/projects/project-small") {
+        return createJsonResponse({
+          project: {
+            arenaWinnerBranchKey: null,
+            arenaWinnerSessionId: null,
+            createdAt: "2026-04-01T09:00:00.000Z",
+            globalContext: "Keep focus",
+            id: "project-small",
+            memoryIds: [],
+            sessionCount: 2,
+            sessionIds: ["session-a", "session-b"],
+            title: "Small project",
+            updatedAt: "2026-04-01T09:00:00.000Z",
+          },
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithSession(
+      <ProjectsProvider>
+        <ProjectsSnapshot />
+      </ProjectsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+    });
+
+    expect(screen.getByTestId("active-project").textContent).toBe("none");
+    expect(localStorage.getItem(ACTIVE_PROJECT_KEY)).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/projects/project-small", expect.anything());
+  });
 });

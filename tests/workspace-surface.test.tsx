@@ -72,4 +72,19 @@ describe("WorkspaceSurfaceProvider", () => {
     expect(screen.getByRole("heading", { name: "LLM Models" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
   });
+
+  it("forces the main workspace during post-auth handoff", () => {
+    localStorage.setItem("nodes.workspace-surface.v1:user-1", "llm-models");
+    window.history.replaceState({}, "", "/?handoff=chat");
+
+    render(
+      <LlmSettingsProvider>
+        <WorkspaceSurfaceProvider>
+          <SurfaceHarness />
+        </WorkspaceSurfaceProvider>
+      </LlmSettingsProvider>,
+    );
+
+    expect(screen.getByTestId("surface").textContent).toBe("workspace");
+  });
 });

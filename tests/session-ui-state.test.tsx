@@ -28,6 +28,11 @@ function SplitPaneHarness() {
   );
 }
 
+function ViewModeHarness() {
+  const { viewMode } = useSessionUiState();
+  return <div data-testid="view-mode">{viewMode}</div>;
+}
+
 describe("SessionUiStateProvider", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -110,5 +115,17 @@ describe("SessionUiStateProvider", () => {
     expect(screen.getByTestId("split-panes").textContent).toBe(
       "chat:closed|canvas:open|wiki:closed|brief:closed|nody:closed",
     );
+  });
+
+  it("starts a post-auth landing session in chat mode when no session preference exists", () => {
+    window.history.replaceState({}, "", "/?handoff=chat");
+
+    render(
+      <SessionUiStateProvider sessionId="session-post-auth">
+        <ViewModeHarness />
+      </SessionUiStateProvider>,
+    );
+
+    expect(screen.getByTestId("view-mode").textContent).toBe("chat");
   });
 });

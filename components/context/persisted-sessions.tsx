@@ -4,6 +4,7 @@ import React from "react";
 import { useSession } from "next-auth/react";
 import type { SessionArtifact, SessionContextLink } from "@/lib/session-artifacts";
 import type { SessionDocument, SessionSummary, SessionThreadExport } from "@/lib/session-documents";
+import { hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
 type PersistedSessionsContextValue = {
   activeSession: SessionDocument | null;
@@ -124,14 +125,15 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
     }
     setIsReady(false);
     try {
+      const shouldStartFresh = hasPostAuthChatHandoff();
       let nextSessions = await refreshSessions();
 
-      if (nextSessions.length === 0) {
+      if (shouldStartFresh || nextSessions.length === 0) {
         const created = await fetchJson<SessionResponse>("/api/sessions", {
           method: "POST",
           body: JSON.stringify({}),
         });
-        nextSessions = [created.session];
+        nextSessions = [created.session, ...nextSessions.filter((session) => session.id !== created.session.id)];
         setSessions(nextSessions);
         setActiveSession(created.session);
         writeStoredActiveSessionId(userId, created.session.id);

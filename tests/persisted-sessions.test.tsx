@@ -159,4 +159,44 @@ describe("PersistedSessionsProvider", () => {
     expect(screen.getByTestId("sessions").textContent).toBe("session-b");
     expect(localStorage.getItem(ACTIVE_SESSION_KEY)).toBe("session-b");
   });
+
+  it("creates a fresh session during post-auth handoff instead of reopening the stored one", async () => {
+    localStorage.setItem(ACTIVE_SESSION_KEY, "session-a");
+    window.history.replaceState({}, "", "/?handoff=chat");
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url === "/api/sessions?includeArchived=1") {
+        return createJsonResponse({
+          sessions: [createSessionSummary("session-a", "Session A")],
+        });
+      }
+
+      if (url === "/api/sessions" && method === "POST") {
+        return createJsonResponse({
+          session: createSessionDocument("session-fresh", "Fresh Session"),
+        }, 201);
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithSession(
+      <PersistedSessionsProvider>
+        <RenameRecoveryProbe />
+      </PersistedSessionsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+      expect(screen.getByTestId("active-session").textContent).toBe("session-fresh");
+    });
+
+    expect(localStorage.getItem(ACTIVE_SESSION_KEY)).toBe("session-fresh");
+    expect(fetchMock).toHaveBeenCalledWith("/api/sessions", expect.objectContaining({ method: "POST" }));
+  });
 });

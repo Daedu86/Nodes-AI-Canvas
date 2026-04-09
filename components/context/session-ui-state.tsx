@@ -3,6 +3,7 @@
 import React from "react";
 import { LLM_PROVIDER_IDS, type LlmProviderId } from "@/lib/llm/provider-catalog";
 import { getSupportedModelConfig } from "@/lib/model-options";
+import { hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
 export type HistoryMode = "last" | "full";
 export type ModelProvider = LlmProviderId;
@@ -212,6 +213,9 @@ const readViewMode = (sessionId: string): SessionViewMode => {
     value === "nody"
   ) {
     return value;
+  }
+  if (hasPostAuthChatHandoff()) {
+    return "chat";
   }
   return DEFAULT_VIEW_MODE;
 };
