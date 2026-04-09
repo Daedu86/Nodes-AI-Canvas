@@ -23,6 +23,8 @@ const shellInnerClassName =
 type EditableProviderCardProps = {
   apiKey: string;
   enabled: boolean;
+  hasApiKey: boolean;
+  onClearApiKey: () => void;
   models: string[];
   onApiKeyChange: (value: string) => void;
   onEnabledChange: (value: boolean) => void;
@@ -103,6 +105,8 @@ function Field({
 function EditableProviderCard({
   apiKey,
   enabled,
+  hasApiKey,
+  onClearApiKey,
   models,
   onApiKeyChange,
   onEnabledChange,
@@ -130,12 +134,26 @@ function EditableProviderCard({
       />
       <div className="mt-5 space-y-4">
         <Field label={definition.settingsLabel}>
-          <Input
-            type="password"
-            value={apiKey}
-            placeholder="sk-..."
-            onChange={(event) => onApiKeyChange(event.currentTarget.value)}
-          />
+          <div className="space-y-2">
+            <Input
+              type="password"
+              value={apiKey}
+              placeholder={
+                hasApiKey
+                  ? "Stored securely on the server. Type a new key to replace it."
+                  : "sk-..."
+              }
+              onChange={(event) => onApiKeyChange(event.currentTarget.value)}
+            />
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>{hasApiKey ? "Key saved on server" : "No key saved yet"}</span>
+              {hasApiKey ? (
+                <Button type="button" variant="ghost" size="sm" onClick={onClearApiKey}>
+                  Clear saved key
+                </Button>
+              ) : null}
+            </div>
+          </div>
         </Field>
         <Field label="Models">
           <Input
@@ -192,7 +210,8 @@ function OllamaCard() {
 }
 
 function OpenRouterCard() {
-  const { settings, setProviderApiKey, toggleOpenRouterModel } = useLlmSettings();
+  const { clearProviderApiKey, settings, setProviderApiKey, toggleOpenRouterModel } =
+    useLlmSettings();
   const openrouter = settings.providers.openrouter;
   const definition = getProviderDefinition("openrouter");
 
@@ -205,12 +224,35 @@ function OpenRouterCard() {
       />
       <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
         <Field label={definition.settingsLabel}>
-          <Input
-            type="password"
-            value={openrouter.apiKey}
-            placeholder="Optional. Deployment env key still works if this is empty."
-            onChange={(event) => setProviderApiKey("openrouter", event.currentTarget.value)}
-          />
+          <div className="space-y-2">
+            <Input
+              type="password"
+              value={openrouter.apiKey}
+              placeholder={
+                openrouter.hasApiKey
+                  ? "Saved on the server. Type a new key to replace it."
+                  : "Optional. Deployment env key still works if this is empty."
+              }
+              onChange={(event) => setProviderApiKey("openrouter", event.currentTarget.value)}
+            />
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>
+                {openrouter.hasApiKey
+                  ? "Using a user-level OpenRouter key"
+                  : "Using the deployment env key when available"}
+              </span>
+              {openrouter.hasApiKey ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => clearProviderApiKey("openrouter")}
+                >
+                  Clear saved key
+                </Button>
+              ) : null}
+            </div>
+          </div>
         </Field>
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -243,8 +285,15 @@ function OpenRouterCard() {
 }
 
 export function LlmModelsWorkspace() {
-  const { availableModelOptions, isReady, settings, setProviderApiKey, setProviderEnabled, setProviderModels } =
-    useLlmSettings();
+  const {
+    availableModelOptions,
+    clearProviderApiKey,
+    isReady,
+    settings,
+    setProviderApiKey,
+    setProviderEnabled,
+    setProviderModels,
+  } = useLlmSettings();
   const { showWorkspace } = useWorkspaceSurface();
 
   const enabledProviderCount = React.useMemo(
@@ -252,10 +301,15 @@ export function LlmModelsWorkspace() {
       [
         settings.providers.openrouter.enabledModels.length > 0,
         settings.providers.ollama.enabled,
-        settings.providers.openai.enabled && settings.providers.openai.apiKey.trim().length > 0,
+        settings.providers.openai.enabled &&
+          (settings.providers.openai.apiKey.trim().length > 0 ||
+            settings.providers.openai.hasApiKey),
         settings.providers.anthropic.enabled &&
-          settings.providers.anthropic.apiKey.trim().length > 0,
-        settings.providers.google.enabled && settings.providers.google.apiKey.trim().length > 0,
+          (settings.providers.anthropic.apiKey.trim().length > 0 ||
+            settings.providers.anthropic.hasApiKey),
+        settings.providers.google.enabled &&
+          (settings.providers.google.apiKey.trim().length > 0 ||
+            settings.providers.google.hasApiKey),
       ].filter(Boolean).length,
     [settings],
   );
@@ -329,7 +383,9 @@ export function LlmModelsWorkspace() {
                   provider="openai"
                   enabled={settings.providers.openai.enabled}
                   apiKey={settings.providers.openai.apiKey}
+                  hasApiKey={settings.providers.openai.hasApiKey === true}
                   models={settings.providers.openai.models}
+                  onClearApiKey={() => clearProviderApiKey("openai")}
                   onApiKeyChange={(value) => setProviderApiKey("openai", value)}
                   onEnabledChange={(value) => setProviderEnabled("openai", value)}
                   onModelsChange={(value) => setProviderModels("openai", value)}
@@ -338,7 +394,9 @@ export function LlmModelsWorkspace() {
                   provider="anthropic"
                   enabled={settings.providers.anthropic.enabled}
                   apiKey={settings.providers.anthropic.apiKey}
+                  hasApiKey={settings.providers.anthropic.hasApiKey === true}
                   models={settings.providers.anthropic.models}
+                  onClearApiKey={() => clearProviderApiKey("anthropic")}
                   onApiKeyChange={(value) => setProviderApiKey("anthropic", value)}
                   onEnabledChange={(value) => setProviderEnabled("anthropic", value)}
                   onModelsChange={(value) => setProviderModels("anthropic", value)}
@@ -347,7 +405,9 @@ export function LlmModelsWorkspace() {
                   provider="google"
                   enabled={settings.providers.google.enabled}
                   apiKey={settings.providers.google.apiKey}
+                  hasApiKey={settings.providers.google.hasApiKey === true}
                   models={settings.providers.google.models}
+                  onClearApiKey={() => clearProviderApiKey("google")}
                   onApiKeyChange={(value) => setProviderApiKey("google", value)}
                   onEnabledChange={(value) => setProviderEnabled("google", value)}
                   onModelsChange={(value) => setProviderModels("google", value)}

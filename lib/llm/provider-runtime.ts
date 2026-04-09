@@ -2,6 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOllama, ollama } from "ollama-ai-provider";
+import { getLlmSettings } from "@/lib/llm-settings-store";
 import {
   getOpenRouterMetadataHeaders,
   OLLAMA_API_URL,
@@ -9,7 +10,8 @@ import {
   type Provider,
   type ResolvedModelConfig,
 } from "@/lib/llm/config";
-import { readLlmRequestOverrides, type LlmRequestOverrides } from "@/lib/llm/request-overrides";
+import type { LlmSettingsState } from "@/lib/llm/user-settings";
+import { type LlmRequestOverrides } from "@/lib/llm/request-overrides";
 
 export type MissingProviderCredential = {
   code:
@@ -31,8 +33,21 @@ const resolveApiKey = (
   envValue: string | undefined,
 ) => normalizeValue(overrideValue) ?? normalizeValue(envValue);
 
-export function getRequestModelOverrides(request: Request | Pick<Request, "headers">) {
-  return readLlmRequestOverrides(request.headers);
+function createOverridesFromSettings(
+  settings: LlmSettingsState | null | undefined,
+): LlmRequestOverrides {
+  return {
+    anthropicApiKey: normalizeValue(settings?.providers.anthropic.apiKey),
+    googleApiKey: normalizeValue(settings?.providers.google.apiKey),
+    ollamaBaseUrl: normalizeValue(settings?.providers.ollama.baseUrl),
+    openaiApiKey: normalizeValue(settings?.providers.openai.apiKey),
+    openrouterApiKey: normalizeValue(settings?.providers.openrouter.apiKey),
+  };
+}
+
+export async function getUserModelOverrides(userId: string) {
+  const settings = await getLlmSettings(userId);
+  return createOverridesFromSettings(settings);
 }
 
 export function getMissingProviderCredential(

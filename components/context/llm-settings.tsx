@@ -5,10 +5,6 @@ import { useSession } from "next-auth/react";
 import type { ModelConfig } from "@/components/context/model-config";
 import type { LlmProviderId } from "@/lib/llm/provider-catalog";
 import {
-  getProviderOverrideHeaders,
-  type LlmRequestOverrides,
-} from "@/lib/llm/request-overrides";
-import {
   cloneDefaultLlmSettingsState,
   normalizeLlmSettingsState,
   type LlmSettingsState,
@@ -28,10 +24,10 @@ type LlmSettingsResponse = {
 
 type LlmSettingsContextValue = {
   availableModelOptions: ModelOption[];
-  getProviderHeaders: (provider?: string | null) => Record<string, string>;
   getSupportedModelConfig: (config?: Partial<ModelConfig> | null) => ModelConfig;
   isReady: boolean;
   settings: LlmSettingsState;
+  clearProviderApiKey: (provider: ProviderWithApiKey | "openrouter") => void;
   setProviderApiKey: (provider: ProviderWithApiKey | "openrouter", value: string) => void;
   setProviderEnabled: (provider: Exclude<LlmProviderId, "openrouter">, value: boolean) => void;
   setProviderModels: (provider: Exclude<LlmProviderId, "openrouter">, value: string) => void;
@@ -62,20 +58,6 @@ const clearLegacySettings = (storageKey: string) => {
   }
 };
 
-const createProviderHeadersFromSettings = (
-  provider: string | null | undefined,
-  settings: LlmSettingsState,
-) => {
-  const overrides: LlmRequestOverrides = {
-    anthropicApiKey: settings.providers.anthropic.apiKey.trim() || undefined,
-    googleApiKey: settings.providers.google.apiKey.trim() || undefined,
-    ollamaBaseUrl: settings.providers.ollama.baseUrl.trim() || undefined,
-    openaiApiKey: settings.providers.openai.apiKey.trim() || undefined,
-    openrouterApiKey: settings.providers.openrouter.apiKey.trim() || undefined,
-  };
-  return getProviderOverrideHeaders(provider, overrides);
-};
-
 const buildAvailableModelOptions = (settings: LlmSettingsState) => {
   const options: ModelOption[] = [];
 
@@ -93,7 +75,7 @@ const buildAvailableModelOptions = (settings: LlmSettingsState) => {
 
   const addApiProvider = (provider: ProviderWithApiKey) => {
     const entry = settings.providers[provider];
-    if (!entry.enabled || !entry.apiKey.trim()) return;
+    if (!entry.enabled || (!entry.apiKey.trim() && !entry.hasApiKey)) return;
     options.push(...createDynamicModelOptions(provider, entry.models));
   };
 
@@ -288,6 +270,29 @@ export function LlmSettingsProvider({
           [provider]: {
             ...current.providers[provider],
             apiKey: value,
+            clearApiKey: false,
+            hasApiKey:
+              value.trim().length > 0
+                ? true
+                : current.providers[provider].hasApiKey === true &&
+                  current.providers[provider].clearApiKey !== true,
+          },
+        },
+      }));
+    },
+    [],
+  );
+
+  const clearProviderApiKey = React.useCallback(
+    (provider: ProviderWithApiKey | "openrouter") => {
+      setSettings((current) => ({
+        providers: {
+          ...current.providers,
+          [provider]: {
+            ...current.providers[provider],
+            apiKey: "",
+            clearApiKey: true,
+            hasApiKey: false,
           },
         },
       }));
@@ -365,11 +370,6 @@ export function LlmSettingsProvider({
     });
   }, []);
 
-  const getProviderHeaders = React.useCallback(
-    (provider?: string | null) => createProviderHeadersFromSettings(provider, settings),
-    [settings],
-  );
-
   const getSupportedModelConfig = React.useCallback(
     (config?: Partial<ModelConfig> | null) =>
       getSupportedModelConfigFromOptions(config, availableModelOptions),
@@ -379,10 +379,10 @@ export function LlmSettingsProvider({
   const value = React.useMemo<LlmSettingsContextValue>(
     () => ({
       availableModelOptions,
-      getProviderHeaders,
       getSupportedModelConfig,
       isReady,
       settings,
+      clearProviderApiKey,
       setProviderApiKey,
       setProviderEnabled,
       setProviderModels,
@@ -391,10 +391,10 @@ export function LlmSettingsProvider({
     }),
     [
       availableModelOptions,
-      getProviderHeaders,
       getSupportedModelConfig,
       isReady,
       settings,
+      clearProviderApiKey,
       setProviderApiKey,
       setProviderEnabled,
       setProviderModels,

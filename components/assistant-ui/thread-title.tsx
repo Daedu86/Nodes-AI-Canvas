@@ -28,7 +28,7 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
   const runtime = useAssistantRuntime();
   const { activeSession, renameSession } = usePersistedSessions();
   const { modelId, provider } = useModelConfig();
-  const { getProviderHeaders, isReady: llmSettingsReady } = useLlmSettings();
+  const { isReady: llmSettingsReady } = useLlmSettings();
   const loadingRef = useRef(false);
 
   const messages = useMemo<ThreadMessageLike[]>(() => {
@@ -58,7 +58,6 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...getProviderHeaders(provider),
           },
           body: JSON.stringify({ messages: slice, model: modelId, provider }),
         });
@@ -75,7 +74,7 @@ export function ThreadTitle({ variant = "inline", fallback = "New Chat" }: Props
     return () => {
       isActive = false;
     };
-  }, [activeSession, getProviderHeaders, llmSettingsReady, messages, modelId, provider, renameSession]);
+  }, [activeSession, llmSettingsReady, messages, modelId, provider, renameSession]);
 
   const text = formatTitle(activeSession?.title, fallback);
 

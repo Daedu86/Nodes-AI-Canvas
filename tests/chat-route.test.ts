@@ -30,7 +30,7 @@ vi.mock("@assistant-ui/react-ai-sdk", () => ({
 vi.mock("@/lib/llm/provider-runtime", () => ({
   createLanguageModel: createLanguageModelMock,
   getMissingProviderCredential: getMissingProviderCredentialMock,
-  getRequestModelOverrides: () => ({}),
+  getUserModelOverrides: async () => ({}),
 }));
 
 import { POST } from "../app/api/chat/route";

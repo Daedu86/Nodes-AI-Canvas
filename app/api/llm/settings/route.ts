@@ -1,5 +1,9 @@
 import { getLlmSettings, saveLlmSettings } from "@/lib/llm-settings-store";
-import { normalizeLlmSettingsState, type LlmSettingsState } from "@/lib/llm/user-settings";
+import {
+  maskLlmSettingsState,
+  mergeLlmSettingsState,
+  type LlmSettingsState,
+} from "@/lib/llm/user-settings";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 export const runtime = "nodejs";
@@ -17,7 +21,9 @@ export async function GET(req: Request) {
   if ("response" in guarded) return guarded.response;
 
   const settings = await getLlmSettings(guarded.user.id);
-  return Response.json({ settings } satisfies LlmSettingsResponse);
+  return Response.json({
+    settings: maskLlmSettingsState(settings),
+  } satisfies LlmSettingsResponse);
 }
 
 export async function PUT(req: Request) {
@@ -25,9 +31,12 @@ export async function PUT(req: Request) {
   if ("response" in guarded) return guarded.response;
 
   const body = (await req.json().catch(() => ({}))) as PutBody;
+  const current = await getLlmSettings(guarded.user.id);
   const settings = await saveLlmSettings(
     guarded.user.id,
-    normalizeLlmSettingsState(body.settings),
+    mergeLlmSettingsState(current, body.settings),
   );
-  return Response.json({ settings } satisfies LlmSettingsResponse);
+  return Response.json({
+    settings: maskLlmSettingsState(settings),
+  } satisfies LlmSettingsResponse);
 }

@@ -15,7 +15,7 @@ import { isE2eMockLlmEnabled } from "@/lib/llm/e2e-mock";
 import {
   createLanguageModel,
   getMissingProviderCredential,
-  getRequestModelOverrides,
+  getUserModelOverrides,
 } from "@/lib/llm/provider-runtime";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   if ("response" in guarded) return guarded.response;
 
   try {
-    const requestOverrides = getRequestModelOverrides(req);
+    const requestOverrides = await getUserModelOverrides(guarded.user.id);
     const body = (await req.json()) as CanvasAgentRequestBody;
     const action = body.action;
     const payload = body.payload;

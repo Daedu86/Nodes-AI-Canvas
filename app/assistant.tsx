@@ -101,7 +101,7 @@ const ProjectWorkspace = dynamic(
 
 function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
   const { historyMode, modelConfig, setModelConfig } = useSessionUiState();
-  const { getProviderHeaders, getSupportedModelConfig, isReady: llmSettingsReady } = useLlmSettings();
+  const { getSupportedModelConfig, isReady: llmSettingsReady } = useLlmSettings();
   const [requestError, setRequestError] = React.useState<string | null>(null);
   const [latencyVersion, setLatencyVersion] = React.useState(0);
   const pendingLatencyRef = React.useRef<{ startedAt: number; responseStartedAt: number | null } | null>(null);
@@ -149,10 +149,6 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
     }),
     [historyMode, modelConfig.modelId, modelConfig.provider],
   );
-  const chatRequestHeaders = useMemo(
-    () => getProviderHeaders(modelConfig.provider),
-    [getProviderHeaders, modelConfig.provider],
-  );
   const chatRuntimeOptions = useMemo(
     () => ({
       api: "/api/chat",
@@ -165,10 +161,7 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
           ...(options.body ?? {}),
           ...chatRequestBody,
         },
-        headers: {
-          ...Object.fromEntries(new Headers(options.headers ?? {}).entries()),
-          ...chatRequestHeaders,
-        },
+        headers: Object.fromEntries(new Headers(options.headers ?? {}).entries()),
       }),
       onError: (error: Error) => {
         pendingLatencyRef.current = null;
@@ -192,7 +185,7 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
         recordPendingLatency(message?.id);
       },
     }),
-    [chatRequestBody, chatRequestHeaders, recordPendingLatency],
+    [chatRequestBody, recordPendingLatency],
   );
 
   const rawRuntime = useChatRuntime(chatRuntimeOptions);

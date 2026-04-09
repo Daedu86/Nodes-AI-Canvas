@@ -21,7 +21,7 @@ import {
 import {
   createLanguageModel,
   getMissingProviderCredential,
-  getRequestModelOverrides,
+  getUserModelOverrides,
 } from "@/lib/llm/provider-runtime";
 import { reserveChatQuota } from "@/lib/server/chat-governor";
 import {
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
   if ("response" in guarded) return guarded.response;
 
   const body = (await req.json()) as ChatRequestBody;
-  const requestOverrides = getRequestModelOverrides(req);
+  const requestOverrides = await getUserModelOverrides(guarded.user.id);
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
   const messages = normalizeMessages(rawMessages);
   const system = body.system;

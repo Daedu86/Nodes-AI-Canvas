@@ -48,7 +48,9 @@ describe("/api/llm/settings", () => {
       settings: expect.objectContaining({
         providers: expect.objectContaining({
           openai: expect.objectContaining({
+            apiKey: "",
             enabled: true,
+            hasApiKey: true,
             models: ["gpt-5-mini"],
           }),
         }),
@@ -56,7 +58,16 @@ describe("/api/llm/settings", () => {
     });
   });
 
-  it("normalizes and saves submitted settings", async () => {
+  it("preserves an existing saved key when the client sends a masked payload", async () => {
+    getLlmSettingsMock.mockResolvedValue({
+      providers: {
+        anthropic: { apiKey: "", enabled: false, models: [] },
+        google: { apiKey: "", enabled: false, models: [] },
+        ollama: { baseUrl: "http://localhost:11434/api", enabled: true, models: ["gemma3:4b"] },
+        openai: { apiKey: "sk-openai", enabled: true, models: ["gpt-5-mini"] },
+        openrouter: { apiKey: "", enabledModels: ["openrouter/free"] },
+      },
+    });
     saveLlmSettingsMock.mockImplementation(async (_ownerId: string, settings: unknown) => settings);
 
     const response = await PUT(
@@ -66,7 +77,8 @@ describe("/api/llm/settings", () => {
           settings: {
             providers: {
               openai: {
-                apiKey: "sk-openai",
+                apiKey: "",
+                hasApiKey: true,
                 enabled: true,
                 models: ["gpt-5-mini", "gpt-5-mini", "gpt-4.1-mini"],
               },
@@ -82,6 +94,7 @@ describe("/api/llm/settings", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(getLlmSettingsMock).toHaveBeenCalledWith("user-1");
     expect(saveLlmSettingsMock).toHaveBeenCalledWith(
       "user-1",
       expect.objectContaining({
@@ -90,7 +103,62 @@ describe("/api/llm/settings", () => {
             models: ["gemma3:4b"],
           }),
           openai: expect.objectContaining({
+            apiKey: "sk-openai",
             models: ["gpt-5-mini", "gpt-4.1-mini"],
+          }),
+        }),
+      }),
+    );
+    await expect(response.json()).resolves.toEqual({
+      settings: expect.objectContaining({
+        providers: expect.objectContaining({
+          openai: expect.objectContaining({
+            apiKey: "",
+            hasApiKey: true,
+          }),
+        }),
+      }),
+    });
+  });
+
+  it("clears a saved key only when clearApiKey is explicit", async () => {
+    getLlmSettingsMock.mockResolvedValue({
+      providers: {
+        anthropic: { apiKey: "", enabled: false, models: [] },
+        google: { apiKey: "", enabled: false, models: [] },
+        ollama: { baseUrl: "http://localhost:11434/api", enabled: true, models: ["gemma3:4b"] },
+        openai: { apiKey: "sk-openai", enabled: true, models: ["gpt-5-mini"] },
+        openrouter: { apiKey: "", enabledModels: ["openrouter/free"] },
+      },
+    });
+    saveLlmSettingsMock.mockImplementation(async (_ownerId: string, settings: unknown) => settings);
+
+    const response = await PUT(
+      new Request("http://localhost/api/llm/settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          settings: {
+            providers: {
+              openai: {
+                apiKey: "",
+                clearApiKey: true,
+                enabled: true,
+                hasApiKey: false,
+                models: ["gpt-5-mini"],
+              },
+            },
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(saveLlmSettingsMock).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({
+        providers: expect.objectContaining({
+          openai: expect.objectContaining({
+            apiKey: "",
           }),
         }),
       }),

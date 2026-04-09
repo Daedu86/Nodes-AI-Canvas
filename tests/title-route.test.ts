@@ -15,7 +15,7 @@ vi.mock("ai", () => ({
 vi.mock("@/lib/llm/provider-runtime", () => ({
   createLanguageModel: createLanguageModelMock,
   getMissingProviderCredential: getMissingProviderCredentialMock,
-  getRequestModelOverrides: () => ({}),
+  getUserModelOverrides: async () => ({}),
 }));
 
 import { POST } from "../app/api/title/route";

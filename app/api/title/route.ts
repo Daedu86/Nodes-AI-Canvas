@@ -11,7 +11,7 @@ import { normalizeMessages, toPlainTextTranscript } from "@/lib/llm/messages";
 import {
   createLanguageModel,
   getMissingProviderCredential,
-  getRequestModelOverrides,
+  getUserModelOverrides,
 } from "@/lib/llm/provider-runtime";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   if ("response" in guarded) return guarded.response;
 
   try {
-    const requestOverrides = getRequestModelOverrides(req);
+    const requestOverrides = await getUserModelOverrides(guarded.user.id);
     const { messages: maybeMessages, model, provider: maybeProvider }: TitleRequestBody = await req.json();
     const messages = normalizeMessages(Array.isArray(maybeMessages) ? maybeMessages : []);
 
