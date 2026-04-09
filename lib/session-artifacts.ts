@@ -1,9 +1,16 @@
 export type SessionArtifactType = "text" | "code" | "image" | "file";
+export type SessionArtifactSemanticType =
+  | "decision"
+  | "evidence"
+  | "plan"
+  | "question"
+  | "draft";
 
 export type SessionArtifact = {
   id: string;
   title: string;
   artifactType: SessionArtifactType;
+  semanticType?: SessionArtifactSemanticType | null;
   blobRef?: string | null;
   byteSize?: number | null;
   content: string;
@@ -30,6 +37,7 @@ export type LlmContextArtifact = {
   id: string;
   title: string;
   artifactType: SessionArtifactType;
+  semanticType?: SessionArtifactSemanticType | null;
   byteSize?: number | null;
   content: string;
   fileName?: string | null;
@@ -42,6 +50,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isArtifactType = (value: unknown): value is SessionArtifactType =>
   value === "text" || value === "code" || value === "image" || value === "file";
+
+const isArtifactSemanticType = (value: unknown): value is SessionArtifactSemanticType =>
+  value === "decision" ||
+  value === "evidence" ||
+  value === "plan" ||
+  value === "question" ||
+  value === "draft";
 
 const normalizePosition = (value: unknown) => {
   if (typeof value !== "object" || value === null) return null;
@@ -74,6 +89,7 @@ export const normalizeSessionArtifacts = (value: unknown): SessionArtifact[] => 
       id,
       title,
       artifactType,
+      semanticType: isArtifactSemanticType(entry.semanticType) ? entry.semanticType : null,
       blobRef: normalizeNullableString(entry.blobRef),
       content,
       fileName: normalizeNullableString(entry.fileName),
@@ -144,6 +160,7 @@ export const toLlmContextArtifacts = (artifacts: SessionArtifact[]): LlmContextA
     id: artifact.id,
     title: artifact.title,
     artifactType: artifact.artifactType,
+    semanticType: artifact.semanticType ?? null,
     byteSize: artifact.byteSize ?? null,
     content: artifact.content,
     fileName: artifact.fileName ?? null,
@@ -156,6 +173,7 @@ export const normalizeLlmContextArtifacts = (value: unknown): LlmContextArtifact
     id: artifact.id,
     title: artifact.title,
     artifactType: artifact.artifactType,
+    semanticType: artifact.semanticType ?? null,
     byteSize: artifact.byteSize ?? null,
     content: artifact.content,
     fileName: artifact.fileName ?? null,

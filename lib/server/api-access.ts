@@ -1,3 +1,5 @@
+import { getPersistenceBackend } from "@/lib/persistence/backend";
+
 const JSON_HEADERS = {
   "Content-Type": "application/json",
 } as const;
@@ -50,12 +52,23 @@ const jsonError = (error: string, status = 403) =>
   });
 
 export function isRemoteApiAllowed() {
-  return getEnvFlag(process.env.ALLOW_REMOTE_API);
+  return getEnvFlag(process.env.ALLOW_REMOTE_API) && getPersistenceBackend() === "supabase";
 }
 
 export function enforceLocalApiAccess(req: Request) {
   const requestUrl = new URL(req.url);
-  if (!isRemoteApiAllowed()) {
+  const remoteApiEnabled = getEnvFlag(process.env.ALLOW_REMOTE_API);
+  const remoteApiAllowed = isRemoteApiAllowed();
+  if (!remoteApiAllowed) {
+    if (
+      remoteApiEnabled &&
+      getPersistenceBackend() !== "supabase" &&
+      !isLoopbackHostname(requestUrl.hostname)
+    ) {
+      return jsonError(
+        "Remote API access requires the Supabase persistence backend.",
+      );
+    }
     if (!isLoopbackHostname(requestUrl.hostname)) {
       return jsonError("Remote API access is disabled for this local-first workspace.");
     }

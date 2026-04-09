@@ -2,6 +2,7 @@
 
 import {
   Bot,
+  FileText,
   MessageSquareText,
   Sparkles,
   Telescope,
@@ -15,6 +16,8 @@ import {
   getCanvasGuideActionLabel,
   type CanvasGuideAction,
 } from "@/lib/canvas-agent/canvas-agent-context";
+import type { NodySourceCatalogEntry } from "@/lib/nody-insight";
+import type { SessionWikiPageId } from "@/lib/session-wiki";
 
 const phaseLabel = {
   idle: "Idle",
@@ -37,42 +40,6 @@ type InsightSections = {
   next: string | null;
 };
 
-const fallbackInsightSections = (insight: string): InsightSections => ({
-  answer: insight.trim(),
-  next: null,
-});
-
-const extractSection = (text: string, label: string, fallback: string) => {
-  const pattern = new RegExp(`${label}:\\s*([\\s\\S]*?)(?=\\n(?:Answer|Observation|Interpretation|Next move|Next):|$)`, "i");
-  const match = text.match(pattern);
-  return match?.[1]?.trim() || fallback;
-};
-
-const parseInsight = (insight: string | null): InsightSections | null => {
-  if (!insight || insight.trim().length === 0) return null;
-  if (/(Answer|Next):/i.test(insight)) {
-    return {
-      answer: extractSection(insight, "Answer", "No answer provided."),
-      next: extractSection(insight, "Next", ""),
-    };
-  }
-  if (/(Observation|Interpretation|Next move):/i.test(insight)) {
-    const observation = extractSection(insight, "Observation", "");
-    const interpretation = extractSection(insight, "Interpretation", "");
-    return {
-      answer: [observation, interpretation].filter((value) => value.length > 0).join("\n\n") || "No answer provided.",
-      next: extractSection(insight, "Next move", ""),
-    };
-  }
-  if (!insight.trim()) {
-    return null;
-  }
-  if (!/(Observation|Interpretation|Next move|Answer|Next):/i.test(insight)) {
-    return fallbackInsightSections(insight);
-  }
-  return fallbackInsightSections(insight);
-};
-
 const scrollMessageIntoView = (messageId: string) => {
   const element = document.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
   if (!element) return;
@@ -82,26 +49,38 @@ const scrollMessageIntoView = (messageId: string) => {
 export function NodyPanel() {
   const {
     busy,
+    brief,
     error,
     focusLabel,
-    insight,
     lastAction,
     llmEnabled,
     phase,
+    parsedInsight,
     question,
     recentInsights,
+    resolvedSources,
     runAction,
     selectedWikiPageId,
     setQuestion,
+    setSelectedWikiPageId,
     snapshot,
     wiki,
   } = useNodyPanel();
-  const { setFocusedMessageId, setViewMode } = useSessionUiState();
+  const { setCanvasSelectionId, setFocusedMessageId, setViewMode } = useSessionUiState();
 
   const statusLabel = busy ? "Thinking" : llmEnabled ? "Ready" : "Offline";
   const statusDotClass = busy ? "bg-amber-500" : llmEnabled ? "bg-emerald-500" : "bg-rose-500";
   const compactFocusLabel = focusLabel.trim().length > 0 ? focusLabel : "Session tree";
-  const insightSections = React.useMemo(() => parseInsight(insight), [insight]);
+  const insightSections = React.useMemo<InsightSections | null>(
+    () =>
+      parsedInsight
+        ? {
+            answer: parsedInsight.answer,
+            next: parsedInsight.next,
+          }
+        : null,
+    [parsedInsight],
+  );
   const selectedNode = React.useMemo(
     () => snapshot?.nodes.find((node) => node.id === snapshot.selectedNodeId) ?? null,
     [snapshot],
@@ -140,6 +119,18 @@ export function NodyPanel() {
     [selectedWikiPageId, wiki],
   );
   const contextLabel = activeWikiPage ? `${compactFocusLabel} · ${activeWikiPage.title}` : compactFocusLabel;
+  const handleOpenSource = React.useCallback(
+    (source: NodySourceCatalogEntry) => {
+      if (source.kind === "wiki") {
+        setSelectedWikiPageId(String(source.targetId) as SessionWikiPageId);
+        setViewMode("wiki");
+        return;
+      }
+      setCanvasSelectionId(String(source.targetId));
+      setViewMode("canvas");
+    },
+    [setCanvasSelectionId, setSelectedWikiPageId, setViewMode],
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,252,0.96))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.9))]">
@@ -164,6 +155,9 @@ export function NodyPanel() {
             </Button>
             <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("wiki")}>
               Wiki
+            </Button>
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("brief")}>
+              Brief
             </Button>
             <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("split")}>
               Split
@@ -275,6 +269,40 @@ export function NodyPanel() {
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">{insightSections.next}</p>
                 </div>
               ) : null}
+              {resolvedSources.length > 0 ? (
+                <div className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Sources
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 rounded-full px-2.5 text-[11px]"
+                      onClick={() => setViewMode("brief")}
+                    >
+                      <FileText className="mr-1.5 h-3.5 w-3.5" />
+                      Open Brief
+                    </Button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {resolvedSources.map((source) => (
+                      <button
+                        key={source.ref}
+                        type="button"
+                        className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/60 bg-background px-3 py-1.5 text-left text-xs text-foreground/85 transition-colors hover:bg-muted"
+                        onClick={() => handleOpenSource(source)}
+                      >
+                        <span className="truncate">{source.label}</span>
+                        <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground dark:bg-white/10">
+                          {source.kind}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : (
             <p className="text-sm leading-6 text-foreground/90">
@@ -282,6 +310,39 @@ export function NodyPanel() {
             </p>
           )}
         </section>
+
+        {brief ? (
+          <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Brief
+                </p>
+                <p className="mt-1 text-sm text-foreground/90">{brief.summary}</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-full px-3 text-xs"
+                onClick={() => setViewMode("brief")}
+              >
+                <FileText className="mr-1.5 h-3.5 w-3.5" />
+                Open
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {brief.signals.slice(0, 3).map((signal) => (
+                <span
+                  key={signal}
+                  className="rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground"
+                >
+                  {signal}
+                </span>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {recentInsights.length > 0 ? (
           <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">

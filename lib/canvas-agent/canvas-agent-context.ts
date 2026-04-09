@@ -1,4 +1,5 @@
 import type { HistoryMode } from "@/components/context/session-ui-state";
+import type { NodySourceCatalogEntry } from "@/lib/nody-insight";
 import type { SessionArtifact, SessionContextLink } from "@/lib/session-artifacts";
 
 export type CanvasGuideAction = "explain-focus" | "summarize-branch" | "survey-tree" | "ask-guide";
@@ -81,6 +82,7 @@ export type CanvasGuidePayload = {
       title: string;
     }>;
   };
+  sourceCatalog?: NodySourceCatalogEntry[];
   session: {
     id: string | null;
     title: string | null;
@@ -375,9 +377,11 @@ export const buildCanvasGuideSystemPrompt = () =>
     "Do not invent unseen content. If something is unclear, say so plainly.",
     "Prefer short answers, not analysis theater.",
     "Keep responses compact and useful.",
-    "Always respond with exactly these two section labels on their own lines: Answer, Next.",
+    "Always respond with exactly these three section labels on their own lines: Answer, Next, Sources.",
     "Under Answer, write one short paragraph or a few concise sentences.",
     "Under Next, give one concrete action the user can take in Nodes. If no action is needed, say 'None'.",
+    "Under Sources, list 1 to 4 source refs copied exactly from the provided source catalog, separated by commas. If no source applies, say 'None'.",
+    "Never invent source refs.",
   ].join(" ");
 
 export const buildCanvasGuideUserPrompt = (payload: CanvasGuidePayload) => {
@@ -443,12 +447,100 @@ export const buildCanvasGuideUserPrompt = (payload: CanvasGuidePayload) => {
     lines.push(`Knowledge base digest:\n${payload.knowledgeBase.digest}`);
   }
 
+  if (payload.sourceCatalog && payload.sourceCatalog.length > 0) {
+    lines.push(
+      `Source catalog:\n${payload.sourceCatalog
+        .map((entry) => `- ${entry.ref} | ${entry.kind} | ${entry.label} | ${entry.preview ?? "No preview"}`)
+        .join("\n")}`,
+    );
+  }
+
   lines.push(
     "Respond in the first person as Nody inside the canvas workspace.",
   );
   lines.push(
-    "Format the answer with exactly these sections: Answer, Next.",
+    "Format the answer with exactly these sections: Answer, Next, Sources.",
   );
 
   return lines.join("\n\n");
+};
+
+export const buildCanvasGuideSourceCatalog = (
+  payload: CanvasGuidePayload,
+): NodySourceCatalogEntry[] => {
+  const entries = new Map<string, NodySourceCatalogEntry>();
+  const pushEntry = (entry: NodySourceCatalogEntry | null) => {
+    if (!entry || entries.has(entry.ref)) return;
+    entries.set(entry.ref, entry);
+  };
+
+  payload.knowledgeBase?.pages.forEach((page) => {
+    pushEntry({
+      ref: `page:${page.id}`,
+      kind: "wiki",
+      label: `Wiki · ${page.title}`,
+      preview: page.summary,
+      targetId: page.id,
+    });
+  });
+
+  if (payload.focus.kind === "message") {
+    pushEntry({
+      ref: `node:${payload.focus.id}`,
+      kind: "node",
+      label: `${payload.focus.role} · focus`,
+      preview: payload.focus.preview,
+      targetId: payload.focus.id,
+    });
+    payload.focus.linkedArtifacts.forEach((artifact) => {
+      pushEntry({
+        ref: `artifact:${artifact.id}`,
+        kind: "artifact",
+        label: `Artifact · ${artifact.title}`,
+        preview: artifact.artifactType,
+        targetId: artifact.id,
+      });
+    });
+  }
+
+  if (payload.focus.kind === "artifact") {
+    pushEntry({
+      ref: `artifact:${payload.focus.id}`,
+      kind: "artifact",
+      label: payload.focus.label,
+      preview: payload.focus.preview,
+      targetId: payload.focus.id,
+    });
+    payload.focus.linkedTargets.forEach((target) => {
+      pushEntry({
+        ref: `node:${target.id}`,
+        kind: "node",
+        label: `${target.role} · linked target`,
+        preview: target.preview,
+        targetId: target.id,
+      });
+    });
+  }
+
+  payload.branch.nodes.forEach((node) => {
+    pushEntry({
+      ref: `node:${node.id}`,
+      kind: "node",
+      label: `${node.role} · branch`,
+      preview: node.preview,
+      targetId: node.id,
+    });
+  });
+
+  payload.tree.previewNodes.forEach((node) => {
+    pushEntry({
+      ref: `node:${node.id}`,
+      kind: "node",
+      label: `${node.role} · tree`,
+      preview: node.preview,
+      targetId: node.id,
+    });
+  });
+
+  return [...entries.values()];
 };

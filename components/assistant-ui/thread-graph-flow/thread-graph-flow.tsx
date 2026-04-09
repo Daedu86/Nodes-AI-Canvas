@@ -14,6 +14,7 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import {
+  BadgeHelp,
   Code2,
   Bot,
   Copy as CopyIcon,
@@ -22,7 +23,12 @@ import {
   FilePlus2,
   Focus,
   ImagePlus,
+  ListTodo,
+  MoreHorizontal,
+  NotebookPen,
+  Plus,
   RotateCcw,
+  Scale,
   Scissors,
   Sparkles,
   Trash2,
@@ -46,6 +52,7 @@ import { getEdgeKey, nodesShareBranch } from "@/components/assistant-ui/thread-g
 import { GraphBranchActions } from "@/components/assistant-ui/thread-graph-flow/graph-branch-actions";
 import { ArtifactGraphNode } from "@/components/assistant-ui/thread-graph-flow/artifact-node";
 import {
+  getArtifactBadgeLabel,
   getArtifactCodeSample,
   getArtifactHeadline,
   getArtifactHighlights,
@@ -81,6 +88,7 @@ import { executeBranchSpec } from "@/lib/thread-branching-runtime";
 import { formatBytes, getContextBudgetPolicy } from "@/lib/context-budget";
 import {
   type SessionArtifact,
+  type SessionArtifactSemanticType,
   toLlmContextArtifacts,
 } from "@/lib/session-artifacts";
 
@@ -106,8 +114,76 @@ const scrollMessageIntoView = (messageId: string) => {
   element.scrollIntoView({ behavior: "smooth", block: "center" });
 };
 
-const artifactAccent = (artifactType: SessionArtifact["artifactType"]) => {
-  switch (artifactType) {
+const semanticArtifactMeta: Record<
+  SessionArtifactSemanticType,
+  {
+    accent: string;
+    icon: typeof Scale;
+    label: string;
+    placeholder: string;
+    role: string;
+    titlePrefix: string;
+  }
+> = {
+  decision: {
+    accent: "#d97706",
+    icon: Scale,
+    label: "Decision",
+    placeholder: "Decision\nRationale\nRisks\nWhat changes if we choose differently?",
+    role: "Recommendation and rationale",
+    titlePrefix: "Decision",
+  },
+  evidence: {
+    accent: "#0284c7",
+    icon: Crosshair,
+    label: "Evidence",
+    placeholder: "Claim\nSource\nObservation\nWhy it matters",
+    role: "Grounded facts and source notes",
+    titlePrefix: "Evidence",
+  },
+  plan: {
+    accent: "#0f766e",
+    icon: ListTodo,
+    label: "Plan",
+    placeholder: "Goal\nSteps\nDependencies\nStatus",
+    role: "Execution structure and next steps",
+    titlePrefix: "Plan",
+  },
+  question: {
+    accent: "#db2777",
+    icon: BadgeHelp,
+    label: "Question",
+    placeholder: "Open question\nWhy it is unresolved\nWhat would answer it",
+    role: "Unresolved question worth tracking",
+    titlePrefix: "Question",
+  },
+  draft: {
+    accent: "#7c3aed",
+    icon: NotebookPen,
+    label: "Draft",
+    placeholder: "Working draft\nAudience\nMessage goal\nNotes",
+    role: "Working language or copy in progress",
+    titlePrefix: "Draft",
+  },
+};
+
+const getSemanticArtifactMeta = (semanticType?: SessionArtifactSemanticType | null) =>
+  semanticType ? semanticArtifactMeta[semanticType] : null;
+
+const artifactAccent = (
+  artifact:
+    | SessionArtifact["artifactType"]
+    | Pick<SessionArtifact, "artifactType" | "semanticType">,
+  semanticType?: SessionArtifactSemanticType | null,
+) => {
+  const descriptor =
+    typeof artifact === "string"
+      ? { artifactType: artifact, semanticType: semanticType ?? null }
+      : artifact;
+  if (descriptor.artifactType === "text" && descriptor.semanticType) {
+    return getSemanticArtifactMeta(descriptor.semanticType)?.accent ?? "#7c3aed";
+  }
+  switch (descriptor.artifactType) {
     case "code":
       return "#0f766e";
     case "image":
@@ -119,24 +195,24 @@ const artifactAccent = (artifactType: SessionArtifact["artifactType"]) => {
   }
 };
 
-const artifactTypeLabel = (artifactType: SessionArtifact["artifactType"]) => {
-  switch (artifactType) {
-    case "code":
-      return "Code Context";
-    case "image":
-      return "Image Context";
-    case "file":
-      return "File Context";
-    default:
-      return "Text Context";
-  }
-};
+const artifactTypeLabel = (
+  artifact:
+    | SessionArtifact["artifactType"]
+    | Pick<SessionArtifact, "artifactType" | "semanticType">,
+) => getArtifactBadgeLabel(artifact);
 
 const artifactDefaultTitle = (
   artifactType: SessionArtifact["artifactType"],
   existingArtifacts: SessionArtifact[],
+  semanticType?: SessionArtifactSemanticType | null,
 ) => {
-  const count = existingArtifacts.filter((artifact) => artifact.artifactType === artifactType).length + 1;
+  const count =
+    existingArtifacts.filter(
+      (artifact) =>
+        artifact.artifactType === artifactType &&
+        (artifactType !== "text" || (artifact.semanticType ?? null) === (semanticType ?? null)),
+    ).length + 1;
+  const semanticMeta = artifactType === "text" ? getSemanticArtifactMeta(semanticType) : null;
   switch (artifactType) {
     case "code":
       return `Code Context ${count}`;
@@ -145,12 +221,23 @@ const artifactDefaultTitle = (
     case "file":
       return `File Context ${count}`;
     default:
-      return `Text Context ${count}`;
+      return `${semanticMeta?.titlePrefix ?? "Text Context"} ${count}`;
   }
 };
 
-const artifactContentLabel = (artifactType: SessionArtifact["artifactType"]) => {
-  switch (artifactType) {
+const artifactContentLabel = (
+  artifact:
+    | SessionArtifact["artifactType"]
+    | Pick<SessionArtifact, "artifactType" | "semanticType">,
+) => {
+  const descriptor =
+    typeof artifact === "string"
+      ? { artifactType: artifact, semanticType: null as SessionArtifactSemanticType | null }
+      : artifact;
+  if (descriptor.artifactType === "text" && descriptor.semanticType) {
+    return `${getSemanticArtifactMeta(descriptor.semanticType)?.label ?? "Text"} notes`;
+  }
+  switch (descriptor.artifactType) {
     case "image":
       return "Notes";
     case "file":
@@ -160,8 +247,22 @@ const artifactContentLabel = (artifactType: SessionArtifact["artifactType"]) => 
   }
 };
 
-const artifactContentPlaceholder = (artifactType: SessionArtifact["artifactType"]) => {
-  switch (artifactType) {
+const artifactContentPlaceholder = (
+  artifact:
+    | SessionArtifact["artifactType"]
+    | Pick<SessionArtifact, "artifactType" | "semanticType">,
+) => {
+  const descriptor =
+    typeof artifact === "string"
+      ? { artifactType: artifact, semanticType: null as SessionArtifactSemanticType | null }
+      : artifact;
+  if (descriptor.artifactType === "text" && descriptor.semanticType) {
+    return (
+      getSemanticArtifactMeta(descriptor.semanticType)?.placeholder ??
+      "Write reusable context here..."
+    );
+  }
+  switch (descriptor.artifactType) {
     case "code":
       return "Paste code or config here...";
     case "image":
@@ -339,6 +440,23 @@ const LegendItem = ({ color, label }: { color: string; label: string }) => (
   </span>
 );
 
+const canvasToolbarButtonClassName =
+  "inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/92 px-3 py-2 text-[11px] font-medium text-foreground/80 transition-colors hover:bg-background";
+
+const canvasToolbarIconButtonClassName =
+  "inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/92 px-3 py-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground";
+
+const semanticArtifactPresets: Array<{
+  semanticType: SessionArtifactSemanticType;
+  icon: typeof Scale;
+}> = [
+  { semanticType: "decision", icon: Scale },
+  { semanticType: "evidence", icon: Crosshair },
+  { semanticType: "plan", icon: ListTodo },
+  { semanticType: "question", icon: BadgeHelp },
+  { semanticType: "draft", icon: NotebookPen },
+];
+
 type FlowSpotlightMode = "all" | "assistant" | "user" | "bridge" | "edited";
 type FlowDensityMode = "overview" | "focus";
 
@@ -364,7 +482,13 @@ export function ThreadGraphFlow() {
   const { publishSnapshot } = useNodyPanel();
   const { clearRequestError, setRequestError } = useRequestError();
   const { activeSession, activeSessionId } = usePersistedSessions();
-  const { focusedMessageId, setFocusedMessageId, setViewMode } = useSessionUiState();
+  const {
+    canvasSelectionId,
+    focusedMessageId,
+    setCanvasSelectionId,
+    setFocusedMessageId,
+    setViewMode,
+  } = useSessionUiState();
   const {
     artifacts,
     contextLinks,
@@ -386,6 +510,7 @@ export function ThreadGraphFlow() {
   const [linkEditMode, setLinkEditMode] = React.useState(false);
   const [spotlight, setSpotlight] = React.useState<FlowSpotlightMode>("all");
   const [densityMode, setDensityMode] = React.useState<FlowDensityMode>("overview");
+  const [toolbarMenu, setToolbarMenu] = React.useState<"add" | "tools" | null>(null);
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
   const [isSubmittingBranch, setIsSubmittingBranch] = React.useState(false);
   const [reactFlowInstance, setReactFlowInstance] = React.useState<
@@ -397,6 +522,8 @@ export function ThreadGraphFlow() {
   );
   const imageUploadInputRef = React.useRef<HTMLInputElement | null>(null);
   const fileUploadInputRef = React.useRef<HTMLInputElement | null>(null);
+  const inspectorScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const toolbarMenuRef = React.useRef<HTMLDivElement | null>(null);
   const flowViewportRef = React.useRef<HTMLDivElement | null>(null);
   const [storedViewport, setStoredViewport] = React.useState<Viewport | null>(() =>
     readFlowViewport(activeSessionId),
@@ -446,12 +573,30 @@ export function ThreadGraphFlow() {
   React.useEffect(() => {
     setStoredViewport(readFlowViewport(activeSessionId));
     setSelectedNodeId(null);
+    setCanvasSelectionId(null);
     setLinkEditMode(false);
+    setToolbarMenu(null);
     setSpotlight("all");
     setDensityMode("overview");
     treeSignatureRef.current = null;
     cancelDraft();
-  }, [activeSessionId, cancelDraft]);
+  }, [activeSessionId, cancelDraft, setCanvasSelectionId]);
+
+  React.useEffect(() => {
+    if (!toolbarMenu) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (toolbarMenuRef.current?.contains(target)) return;
+      setToolbarMenu(null);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [toolbarMenu]);
 
   React.useEffect(() => {
     if (draft && selectedNodeId && draft.anchorId !== selectedNodeId) {
@@ -603,6 +748,7 @@ export function ThreadGraphFlow() {
   const applyCanvasSelection = React.useCallback(
     (nodeId: string | null) => {
       setSelectedNodeId(nodeId);
+      setCanvasSelectionId(nodeId);
       if (!nodeId || nodeId === "__ROOT__") {
         setFocusedMessageId(null);
         return;
@@ -615,7 +761,7 @@ export function ThreadGraphFlow() {
         setFocusedMessageId(nodeId);
       }
     },
-    [artifactIndex, nodeIndex, setFocusedMessageId],
+    [artifactIndex, nodeIndex, setCanvasSelectionId, setFocusedMessageId],
   );
 
   React.useEffect(() => {
@@ -629,10 +775,33 @@ export function ThreadGraphFlow() {
   }, [focusedMessageId, nodeIndex, selectedNodeId]);
 
   React.useEffect(() => {
+    if (!canvasSelectionId || canvasSelectionId === selectedNodeId) {
+      return;
+    }
+    if (!nodeIndex.has(canvasSelectionId) && !artifactIndex.has(canvasSelectionId)) {
+      return;
+    }
+    applyCanvasSelection(canvasSelectionId);
+  }, [applyCanvasSelection, artifactIndex, canvasSelectionId, nodeIndex, selectedNodeId]);
+
+  React.useEffect(() => {
     if (densityMode === "focus" && !selectedNodeId) {
       setDensityMode("overview");
     }
   }, [densityMode, selectedNodeId]);
+
+  React.useEffect(() => {
+    const inspector = inspectorScrollRef.current;
+    if (!inspector) return;
+    inspector.scrollTop = 0;
+  }, [
+    draft?.anchorId,
+    draft?.operation,
+    linkEditMode,
+    selectedNodeId,
+    selectedArtifact?.id,
+    selectedMessageNode?.id,
+  ]);
 
   const relatedContextIds = React.useMemo(() => {
     const related = new Set<string>();
@@ -694,7 +863,7 @@ export function ThreadGraphFlow() {
       selectable: true,
       draggable: true,
       data: {
-        accent: artifactAccent(artifact.artifactType),
+        accent: artifactAccent(artifact),
         artifactType: artifact.artifactType,
         byteSize: artifact.byteSize ?? null,
         emphasis: "normal",
@@ -707,6 +876,7 @@ export function ThreadGraphFlow() {
         position: artifact.position ?? null,
         preview: artifact.content,
         role: "artifact",
+        semanticType: artifact.semanticType ?? null,
         sourceDataUrl: artifact.sourceDataUrl ?? null,
         title: artifact.title,
       },
@@ -766,7 +936,7 @@ export function ThreadGraphFlow() {
       const artifact = artifactIndex.get(link.artifactId);
       const targetNode = nodeIndex.get(link.targetMessageId);
       if (!artifact || !targetNode) return [];
-      const accent = artifactAccent(artifact.artifactType);
+      const accent = artifactAccent(artifact);
       return [
         {
           id: `context:${link.artifactId}->${link.targetMessageId}`,
@@ -1130,17 +1300,22 @@ export function ThreadGraphFlow() {
   ]);
 
   const handleCreateArtifact = React.useCallback(
-    (artifactType: SessionArtifact["artifactType"]) => {
+    (
+      artifactType: SessionArtifact["artifactType"],
+      options?: { semanticType?: SessionArtifactSemanticType | null },
+    ) => {
       const created = createArtifact({
         artifactType,
-        title: artifactDefaultTitle(artifactType, artifacts),
+        semanticType: options?.semanticType ?? null,
+        title: artifactDefaultTitle(artifactType, artifacts, options?.semanticType ?? null),
         content: "",
         language: artifactType === "code" ? "ts" : null,
       });
       setSelectedNodeId(created.id);
+      setCanvasSelectionId(created.id);
       setFocusedMessageId(null);
     },
-    [artifacts, createArtifact, setFocusedMessageId],
+    [artifacts, createArtifact, setCanvasSelectionId, setFocusedMessageId],
   );
 
   const handleCreateArtifactFromFile = React.useCallback(
@@ -1199,6 +1374,7 @@ export function ThreadGraphFlow() {
           title,
         });
         setSelectedNodeId(created.id);
+        setCanvasSelectionId(created.id);
         setFocusedMessageId(null);
       } catch (error) {
         console.error(`Failed to create ${artifactType} artifact`, error);
@@ -1216,9 +1392,34 @@ export function ThreadGraphFlow() {
       contextBudgetPolicy,
       createArtifact,
       setFocusedMessageId,
+      setCanvasSelectionId,
       setRequestError,
     ],
   );
+
+  const toggleToolbarMenu = React.useCallback((menu: "add" | "tools") => {
+    setToolbarMenu((current) => (current === menu ? null : menu));
+  }, []);
+
+  const handleToolbarArtifactCreate = React.useCallback(
+    (
+      artifactType: SessionArtifact["artifactType"],
+      options?: { semanticType?: SessionArtifactSemanticType | null },
+    ) => {
+      setToolbarMenu(null);
+      handleCreateArtifact(artifactType, options);
+    },
+    [handleCreateArtifact],
+  );
+
+  const handleToolbarUpload = React.useCallback((artifactType: "image" | "file") => {
+    setToolbarMenu(null);
+    if (artifactType === "image") {
+      imageUploadInputRef.current?.click();
+      return;
+    }
+    fileUploadInputRef.current?.click();
+  }, []);
 
   const handleImageUploadChange = React.useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1276,6 +1477,45 @@ export function ThreadGraphFlow() {
   );
   const selectedArtifactLineCount = React.useMemo(
     () => (selectedArtifact ? getArtifactLineCount(selectedArtifact) : 0),
+    [selectedArtifact],
+  );
+  const quickSemanticPresets = React.useMemo(
+    () =>
+      semanticArtifactPresets.filter(({ semanticType }) =>
+        ["decision", "evidence", "draft"].includes(semanticType),
+      ),
+    [],
+  );
+  const secondarySemanticPresets = React.useMemo(
+    () =>
+      semanticArtifactPresets.filter(
+        ({ semanticType }) => !["decision", "evidence", "draft"].includes(semanticType),
+      ),
+    [],
+  );
+  const selectedCanvasLabel = React.useMemo(() => {
+    if (selectedArtifact) {
+      return `${artifactTypeLabel(selectedArtifact)} selected`;
+    }
+    if (selectedMessageNode) {
+      return `${selectedMessageNode.role} branch selected`;
+    }
+    return "No active focus";
+  }, [selectedArtifact, selectedMessageNode]);
+  const selectedCanvasPreview = React.useMemo(() => {
+    if (selectedArtifact) {
+      return trimArtifactPreview(selectedArtifact);
+    }
+    if (selectedPreview.length > 0) {
+      return selectedPreview;
+    }
+    return "Use the canvas to branch, compare, and pin reusable context.";
+  }, [selectedArtifact, selectedPreview]);
+  const selectedArtifactSemanticMeta = React.useMemo(
+    () =>
+      selectedArtifact?.artifactType === "text"
+        ? getSemanticArtifactMeta(selectedArtifact.semanticType ?? null)
+        : null,
     [selectedArtifact],
   );
   const attachableTargets = React.useMemo(
@@ -1355,92 +1595,221 @@ export function ThreadGraphFlow() {
         onChange={handleFileUploadChange}
       />
       <header className="pointer-events-none absolute inset-x-4 top-4 z-10 flex items-start justify-between gap-4">
-        <div className="pointer-events-auto relative z-20 flex min-w-0 max-w-[min(760px,calc(100%-19rem))] flex-wrap items-center gap-2 rounded-[24px] border border-white/70 bg-white/80 px-3 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-          <div className="mr-2 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-200">
-                Canvas
-              </span>
-              {selectedNodeId ? (
-                <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-700 dark:text-violet-200">
-                  Focus
-                </span>
-              ) : null}
-              {legendItems.length > 0 ? (
-                <div className="hidden items-center gap-1.5 md:flex">
-                  {legendItems.slice(0, 3).map((item) => (
-                    <LegendItem key={item.key} color={item.swatch} label={item.label} />
-                  ))}
-                </div>
-              ) : null}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Structured input and live branch editing. The stage is the primary surface.
-            </p>
-          </div>
-          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
-            {visibleCanvasNodeCount} / {flowNodes.length} nodes
-          </span>
-          <span className="inline-flex items-center rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-1 text-[11px] text-violet-700">
-            {artifacts.length} artifact{artifacts.length === 1 ? "" : "s"}
-          </span>
-          {hiddenCanvasNodeCount > 0 ? (
-            <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
-              {hiddenCanvasNodeCount} hidden
+        <div className="pointer-events-auto relative z-10 min-w-0 max-w-[min(440px,46vw)] rounded-[24px] border border-white/70 bg-white/80 px-4 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-200">
+              Canvas
             </span>
-          ) : null}
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-[11px] text-violet-700 transition-colors hover:bg-violet-500/15"
-            onClick={() => handleCreateArtifact("text")}
-          >
-            <FilePlus2 className="h-3.5 w-3.5" />
-            <span>New Text</span>
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] text-emerald-700 transition-colors hover:bg-emerald-500/15"
-            onClick={() => handleCreateArtifact("code")}
-          >
-            <Code2 className="h-3.5 w-3.5" />
-            <span>New Code</span>
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-full border border-pink-500/30 bg-pink-500/10 px-2.5 py-1.5 text-[11px] text-pink-700 transition-colors hover:bg-pink-500/15"
-            onClick={() => imageUploadInputRef.current?.click()}
-          >
-            <ImagePlus className="h-3.5 w-3.5" />
-            <span>Upload Image</span>
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1.5 text-[11px] text-blue-700 transition-colors hover:bg-blue-500/15"
-            onClick={() => fileUploadInputRef.current?.click()}
-          >
-            <Upload className="h-3.5 w-3.5" />
-            <span>Upload File</span>
-          </button>
-          <button
-            type="button"
-            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] transition-colors ${
-              linkEditMode
-                ? "border-rose-500/35 bg-rose-500/10 text-rose-700"
-                : "border-border/60 bg-background/90 hover:bg-background"
-            }`}
-            onClick={() => setLinkEditMode((prev) => !prev)}
-          >
-            <Scissors className="h-3.5 w-3.5" />
-            <span>{linkEditMode ? "Finish Editing" : "Edit Links"}</span>
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/90 px-2.5 py-1.5 text-[11px] transition-colors hover:bg-background"
-            onClick={handleCopyJson}
-          >
-            <CopyIcon className="h-3.5 w-3.5" />
-            <span>Copy JSON</span>
-          </button>
+            {selectedNodeId ? (
+              <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-700 dark:text-violet-200">
+                Focus
+              </span>
+            ) : null}
+            {densityMode === "focus" ? (
+              <span className="rounded-full border border-border/60 bg-background/85 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Path mode
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-2 line-clamp-2 text-sm font-medium text-foreground">{selectedCanvasLabel}</p>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{selectedCanvasPreview}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
+              {visibleCanvasNodeCount} / {flowNodes.length} nodes
+            </span>
+            <span className="inline-flex items-center rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-1 text-[11px] text-violet-700">
+              {artifacts.length} artifact{artifacts.length === 1 ? "" : "s"}
+            </span>
+            {hiddenCanvasNodeCount > 0 ? (
+              <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
+                {hiddenCanvasNodeCount} hidden
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div
+          ref={toolbarMenuRef}
+          className="pointer-events-auto relative z-20 flex items-center gap-2 rounded-[24px] border border-white/70 bg-white/80 px-3 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72"
+        >
+          {quickSemanticPresets.map(({ semanticType, icon: Icon }) => {
+            const meta = getSemanticArtifactMeta(semanticType)!;
+            return (
+              <button
+                key={semanticType}
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-medium transition-colors"
+                style={{
+                  borderColor: `${meta.accent}4d`,
+                  backgroundColor: `${meta.accent}14`,
+                  color: meta.accent,
+                }}
+                onClick={() => handleToolbarArtifactCreate("text", { semanticType })}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{meta.label}</span>
+              </button>
+            );
+          })}
+          <div className="relative">
+            <button
+              type="button"
+              aria-expanded={toolbarMenu === "add"}
+              aria-haspopup="menu"
+              aria-label="Add artifact"
+              className={canvasToolbarButtonClassName}
+              onClick={() => toggleToolbarMenu("add")}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add</span>
+            </button>
+            {toolbarMenu === "add" ? (
+              <div className="absolute right-0 top-[calc(100%+0.55rem)] w-64 rounded-[22px] border border-white/70 bg-white/90 p-2 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/92">
+                <p className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Create artifact
+                </p>
+                <div className="space-y-1">
+                  {secondarySemanticPresets.map(({ semanticType, icon: Icon }) => {
+                    const meta = getSemanticArtifactMeta(semanticType)!;
+                    return (
+                      <button
+                        key={semanticType}
+                        type="button"
+                        className="flex w-full items-start gap-3 rounded-[18px] px-3 py-2 text-left transition-colors hover:bg-background/85"
+                        onClick={() => handleToolbarArtifactCreate("text", { semanticType })}
+                      >
+                        <span
+                          className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full border"
+                          style={{
+                            borderColor: `${meta.accent}4d`,
+                            backgroundColor: `${meta.accent}14`,
+                            color: meta.accent,
+                          }}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium text-foreground">{meta.label}</span>
+                          <span className="block text-xs leading-5 text-muted-foreground">{meta.role}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="my-2 h-px bg-black/[0.06] dark:bg-white/[0.08]" />
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-[18px] px-3 py-2 text-left transition-colors hover:bg-background/85"
+                    onClick={() => handleToolbarArtifactCreate("code")}
+                  >
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-700">
+                      <Code2 className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground">Code</span>
+                      <span className="block text-xs leading-5 text-muted-foreground">Reusable code or config context</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-[18px] px-3 py-2 text-left transition-colors hover:bg-background/85"
+                    onClick={() => handleToolbarUpload("image")}
+                  >
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-pink-500/30 bg-pink-500/10 text-pink-700">
+                      <ImagePlus className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground">Image</span>
+                      <span className="block text-xs leading-5 text-muted-foreground">Add a visual artifact with notes</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-[18px] px-3 py-2 text-left transition-colors hover:bg-background/85"
+                    onClick={() => handleToolbarUpload("file")}
+                  >
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-700">
+                      <Upload className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground">File</span>
+                      <span className="block text-xs leading-5 text-muted-foreground">Import a file and pin the extracted text</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              aria-expanded={toolbarMenu === "tools"}
+              aria-haspopup="menu"
+              aria-label="Canvas tools"
+              className={canvasToolbarIconButtonClassName}
+              onClick={() => toggleToolbarMenu("tools")}
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Tools</span>
+            </button>
+            {toolbarMenu === "tools" ? (
+              <div className="absolute right-0 top-[calc(100%+0.55rem)] w-64 rounded-[22px] border border-white/70 bg-white/90 p-2 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/92">
+                <p className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Canvas tools
+                </p>
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-[18px] px-3 py-2 text-left transition-colors hover:bg-background/85"
+                    onClick={() => {
+                      setToolbarMenu(null);
+                      setLinkEditMode((prev) => !prev);
+                    }}
+                  >
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background/85 text-foreground/80">
+                      <Scissors className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground">
+                        {linkEditMode ? "Finish Editing" : "Edit Links"}
+                      </span>
+                      <span className="block text-xs leading-5 text-muted-foreground">
+                        Cut and restore parent-child links from the graph.
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-[18px] px-3 py-2 text-left transition-colors hover:bg-background/85"
+                    onClick={() => {
+                      setToolbarMenu(null);
+                      handleCopyJson();
+                    }}
+                  >
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background/85 text-foreground/80">
+                      <CopyIcon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-medium text-foreground">Copy JSON</span>
+                      <span className="block text-xs leading-5 text-muted-foreground">
+                        Export the visible graph snapshot for debugging or handoff.
+                      </span>
+                    </span>
+                  </button>
+                </div>
+                {legendItems.length > 0 ? (
+                  <>
+                    <div className="my-2 h-px bg-black/[0.06] dark:bg-white/[0.08]" />
+                    <div className="flex flex-wrap gap-1.5 px-2 pb-1 pt-1">
+                      {legendItems.slice(0, 4).map((item) => (
+                        <LegendItem key={item.key} color={item.swatch} label={item.label} />
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
         {selectedArtifact || (selectedFlowNode && selectedMessageNode) || linkEditMode || overrides.size > 0 ? (
         <div className="pointer-events-auto relative z-10 mt-16 flex w-[min(320px,42vw)] min-w-0 flex-col gap-2 rounded-[24px] border border-white/70 bg-white/80 px-3 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
@@ -1515,7 +1884,10 @@ export function ThreadGraphFlow() {
               <span>Reset Cuts ({overrides.size})</span>
             </button>
           ) : null}
-          <div className="max-h-[360px] overflow-y-auto rounded-[26px] border border-border/60 bg-background/85 px-3 py-3 shadow-sm">
+          <div
+            ref={inspectorScrollRef}
+            className="max-h-[min(34rem,calc(100vh-11rem))] overflow-y-auto rounded-[26px] border border-border/60 bg-background/85 px-3 py-3 shadow-sm"
+          >
             {selectedArtifact ? (
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
@@ -1524,11 +1896,11 @@ export function ThreadGraphFlow() {
                       <span
                         className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
                         style={{
-                          borderColor: `${artifactAccent(selectedArtifact.artifactType)}55`,
-                          color: artifactAccent(selectedArtifact.artifactType),
+                          borderColor: `${artifactAccent(selectedArtifact)}55`,
+                          color: artifactAccent(selectedArtifact),
                         }}
                       >
-                        {artifactTypeLabel(selectedArtifact.artifactType)}
+                        {artifactTypeLabel(selectedArtifact)}
                       </span>
                       <span className="rounded-full border border-border/60 bg-muted/70 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                         {selectedContextLinkedMessageIds.size} linked target{selectedContextLinkedMessageIds.size === 1 ? "" : "s"}
@@ -1561,7 +1933,27 @@ export function ThreadGraphFlow() {
                       className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-violet-500/35"
                     />
                   </label>
-                  {selectedArtifact.artifactType === "code" ? (
+                  {selectedArtifact.artifactType === "text" ? (
+                    <label className="space-y-1 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground/80">Semantic type</span>
+                      <select
+                        aria-label="Artifact semantic type"
+                        value={selectedArtifact.semanticType ?? "draft"}
+                        onChange={(event) =>
+                          updateArtifact(selectedArtifact.id, {
+                            semanticType: event.target.value as SessionArtifactSemanticType,
+                          })
+                        }
+                        className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-violet-500/35"
+                      >
+                        {semanticArtifactPresets.map(({ semanticType }) => (
+                          <option key={semanticType} value={semanticType}>
+                            {getSemanticArtifactMeta(semanticType)?.label ?? semanticType}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : selectedArtifact.artifactType === "code" ? (
                     <label className="space-y-1 text-xs text-muted-foreground">
                       <span className="font-medium text-foreground/80">Language</span>
                       <input
@@ -1598,11 +1990,11 @@ export function ThreadGraphFlow() {
                     <span
                       className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
                       style={{
-                        borderColor: `${artifactAccent(selectedArtifact.artifactType)}55`,
-                        color: artifactAccent(selectedArtifact.artifactType),
+                        borderColor: `${artifactAccent(selectedArtifact)}55`,
+                        color: artifactAccent(selectedArtifact),
                       }}
                     >
-                      {getArtifactReadableRole(selectedArtifact.artifactType)}
+                      {getArtifactReadableRole(selectedArtifact)}
                     </span>
                     {selectedArtifactStatChips.slice(0, 3).map((chip) => (
                       <span
@@ -1624,7 +2016,7 @@ export function ThreadGraphFlow() {
                     </p>
                     <p className="text-sm font-semibold text-foreground/90">{selectedArtifactHeadline}</p>
                     <p className="text-xs text-muted-foreground">
-                      {getArtifactIntentLabel(selectedArtifact.artifactType)}
+                      {getArtifactIntentLabel(selectedArtifact)}
                     </p>
                   </div>
                   {selectedArtifact.artifactType === "code" ? (
@@ -1646,7 +2038,7 @@ export function ThreadGraphFlow() {
                         <div key={line} className="flex items-start gap-2 text-xs leading-5 text-foreground/84">
                           <span
                             className="mt-1 h-1.5 w-1.5 rounded-full"
-                            style={{ backgroundColor: artifactAccent(selectedArtifact.artifactType) }}
+                            style={{ backgroundColor: artifactAccent(selectedArtifact) }}
                           />
                           <span>{line}</span>
                         </div>
@@ -1671,8 +2063,8 @@ export function ThreadGraphFlow() {
                 <label className="space-y-1 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground/80">
                     {selectedArtifact.artifactType === "text"
-                      ? "Structured notes"
-                      : artifactContentLabel(selectedArtifact.artifactType)}
+                      ? artifactContentLabel(selectedArtifact)
+                      : artifactContentLabel(selectedArtifact)}
                   </span>
                   <textarea
                     aria-label={
@@ -1687,10 +2079,18 @@ export function ThreadGraphFlow() {
                     rows={6}
                     value={selectedArtifact.content}
                     onChange={(event) => updateArtifact(selectedArtifact.id, { content: event.target.value })}
-                    placeholder={artifactContentPlaceholder(selectedArtifact.artifactType)}
+                    placeholder={artifactContentPlaceholder(selectedArtifact)}
                     className="min-h-[136px] w-full resize-y rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-violet-500/35"
                   />
                 </label>
+                {selectedArtifactSemanticMeta ? (
+                  <div className="rounded-2xl border border-border/60 bg-background/90 px-3 py-3 text-xs text-muted-foreground shadow-sm">
+                    <p className="font-medium text-foreground/80">
+                      {selectedArtifactSemanticMeta.label} pattern
+                    </p>
+                    <p className="mt-1">{selectedArtifactSemanticMeta.role}</p>
+                  </div>
+                ) : null}
                 <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-foreground/80">Attach to conversation nodes</p>
@@ -1855,6 +2255,21 @@ export function ThreadGraphFlow() {
                     <span>Clear focus</span>
                   </button>
                 </div>
+                <GraphBranchActions
+                  activeDraft={
+                    draft && draft.anchorId === selectedMessageNode.id
+                      ? { operation: draft.operation, text: draft.text }
+                      : null
+                  }
+                  busy={isSubmittingBranch}
+                  contextCount={selectedContextArtifacts.length}
+                  disabled={!llmEnabled || isThreadRunning}
+                  details={selectedBranchOptions}
+                  onCancelDraft={cancelDraft}
+                  onChooseOperation={handleChooseBranchOperation}
+                  onDraftTextChange={setDraftText}
+                  onSubmitDraft={handleSubmitBranchDraft}
+                />
                 <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-foreground/80">Linked context artifacts</p>
@@ -1884,11 +2299,11 @@ export function ThreadGraphFlow() {
                                 <span
                                   className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]"
                                   style={{
-                                    borderColor: `${artifactAccent(artifact.artifactType)}44`,
-                                    color: artifactAccent(artifact.artifactType),
+                                    borderColor: `${artifactAccent(artifact)}44`,
+                                    color: artifactAccent(artifact),
                                   }}
                                 >
-                                  {artifactTypeLabel(artifact.artifactType)}
+                                  {artifactTypeLabel(artifact)}
                                 </span>
                                 <span className="truncate text-xs font-medium text-foreground/85">
                                   {artifact.title}
@@ -1916,21 +2331,6 @@ export function ThreadGraphFlow() {
                     </div>
                   )}
                 </div>
-                <GraphBranchActions
-                  activeDraft={
-                    draft && draft.anchorId === selectedMessageNode.id
-                      ? { operation: draft.operation, text: draft.text }
-                      : null
-                  }
-                  busy={isSubmittingBranch}
-                  contextCount={selectedContextArtifacts.length}
-                  disabled={!llmEnabled || isThreadRunning}
-                  details={selectedBranchOptions}
-                  onCancelDraft={cancelDraft}
-                  onChooseOperation={handleChooseBranchOperation}
-                  onDraftTextChange={setDraftText}
-                  onSubmitDraft={handleSubmitBranchDraft}
-                />
               </div>
             ) : (
               <div className="space-y-2 rounded-[24px] border border-dashed border-border/70 bg-background/80 px-4 py-5 text-left">

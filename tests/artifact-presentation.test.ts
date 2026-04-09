@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getArtifactBadgeLabel,
   getArtifactCodeSample,
   getArtifactHeadline,
   getArtifactHighlights,
@@ -48,5 +49,16 @@ describe("artifact presentation helpers", () => {
   it("maps artifact types to human-readable roles and intents", () => {
     expect(getArtifactReadableRole("image")).toBe("Visual evidence");
     expect(getArtifactIntentLabel("file")).toContain("source file");
+  });
+
+  it("maps semantic text artifacts to typed labels", () => {
+    const artifact = {
+      artifactType: "text" as const,
+      semanticType: "decision" as const,
+    };
+
+    expect(getArtifactBadgeLabel(artifact)).toBe("Decision");
+    expect(getArtifactReadableRole(artifact)).toBe("Decision call");
+    expect(getArtifactIntentLabel(artifact)).toContain("recommendation");
   });
 });

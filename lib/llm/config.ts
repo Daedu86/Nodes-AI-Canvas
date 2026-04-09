@@ -33,6 +33,11 @@ export type ModelResolutionInput = {
   metadata?: ModelResolutionMetadata;
 };
 
+export type ResolvedModelConfig = {
+  modelId: string;
+  provider: Provider;
+};
+
 export const DEFAULT_MODEL = process.env.DEFAULT_MODEL || "nvidia/nemotron-3-super-120b-a12b:free";
 export const OPENROUTER_BASE_URL =
   process.env.OPENROUTER_API_URL || "https://openrouter.ai/api/v1";
@@ -71,10 +76,29 @@ export function isAllowedModelConfig(config: { modelId: string; provider: Provid
   return getAllowedModels(config.provider).includes(config.modelId);
 }
 
-export function getSafeDefaultModelConfig(): {
-  modelId: string;
-  provider: Provider;
-} {
+export function getRequestedModelConfig(input: ModelResolutionInput): ResolvedModelConfig {
+  const model =
+    input.model ??
+    input.metadata?.model ??
+    input.runConfig?.model ??
+    input.metadata?.custom?.model ??
+    input.runConfig?.custom?.model ??
+    DEFAULT_MODEL;
+  const provider =
+    input.provider ??
+    input.metadata?.provider ??
+    input.runConfig?.provider ??
+    input.metadata?.custom?.provider ??
+    input.runConfig?.custom?.provider ??
+    inferProviderFromModel(model);
+
+  return {
+    modelId: model,
+    provider: provider === "openrouter" ? "openrouter" : "ollama",
+  };
+}
+
+export function getSafeDefaultModelConfig(): ResolvedModelConfig {
   const defaultProvider = inferProviderFromModel(DEFAULT_MODEL);
   if (isAllowedModelConfig({ modelId: DEFAULT_MODEL, provider: defaultProvider })) {
     return { modelId: DEFAULT_MODEL, provider: defaultProvider };
@@ -92,38 +116,37 @@ export function getSafeDefaultModelConfig(): {
   };
 }
 
-export function resolveModelConfig(input: ModelResolutionInput): {
-  modelId: string;
-  provider: Provider;
-} {
-  const model =
-    input.model ??
-    input.metadata?.model ??
-    input.runConfig?.model ??
-    input.metadata?.custom?.model ??
-    input.runConfig?.custom?.model ??
-    DEFAULT_MODEL;
-  const provider =
-    input.provider ??
-    input.metadata?.provider ??
-    input.runConfig?.provider ??
-    input.metadata?.custom?.provider ??
-    input.runConfig?.custom?.provider ??
-    (model.includes("/") ? "openrouter" : "ollama");
-
-  const candidate: {
-    modelId: string;
-    provider: Provider;
-  } = {
-    modelId: model,
-    provider: provider === "openrouter" ? "openrouter" : "ollama",
-  };
+export function resolveModelConfig(input: ModelResolutionInput): ResolvedModelConfig {
+  const candidate = getRequestedModelConfig(input);
 
   if (isAllowedModelConfig(candidate)) {
     return candidate;
   }
 
   return getSafeDefaultModelConfig();
+}
+
+export function getModelAttemptChain(primary: ResolvedModelConfig): ResolvedModelConfig[] {
+  const attempts: ResolvedModelConfig[] = [{ ...primary }];
+  const preferredProviderModels = getAllowedModels(primary.provider).map((modelId) => ({
+    modelId,
+    provider: primary.provider,
+  }));
+  const safeDefault = getSafeDefaultModelConfig();
+
+  for (const candidate of [...preferredProviderModels, safeDefault]) {
+    if (
+      attempts.some(
+        (attempt) =>
+          attempt.modelId === candidate.modelId && attempt.provider === candidate.provider,
+      )
+    ) {
+      continue;
+    }
+    attempts.push(candidate);
+  }
+
+  return attempts;
 }
 
 export function getOpenRouterApiKey(): string | undefined {

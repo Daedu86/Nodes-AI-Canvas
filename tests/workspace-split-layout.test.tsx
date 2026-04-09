@@ -28,6 +28,9 @@ function LayoutHarness() {
       <button type="button" onClick={() => setViewMode("wiki")}>
         Show Wiki
       </button>
+      <button type="button" onClick={() => setViewMode("brief")}>
+        Show Brief
+      </button>
       <button type="button" onClick={() => setViewMode("nody")}>
         Show Nody
       </button>
@@ -36,6 +39,7 @@ function LayoutHarness() {
           chatPanel={<div data-testid="chat-panel">chat</div>}
           canvasPanel={<div data-testid="canvas-panel">canvas</div>}
           wikiPanel={<div data-testid="wiki-panel">wiki</div>}
+          briefPanel={<div data-testid="brief-panel">brief</div>}
           nodyPanel={<div data-testid="nody-panel">nody</div>}
         />
       </div>
@@ -69,6 +73,7 @@ describe("WorkspaceSplitLayout", () => {
     expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
     expect(screen.queryByTestId("nody-panel")).not.toBeNull();
     expect(screen.queryByTestId("wiki-panel")).toBeNull();
+    expect(screen.queryByTestId("brief-panel")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show Wiki" }));
 
@@ -77,6 +82,7 @@ describe("WorkspaceSplitLayout", () => {
     expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
     expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
     expect(screen.queryByTestId("nody-panel")).toBeNull();
+    expect(screen.queryByTestId("brief-panel")).toBeNull();
 
     unmount();
 
@@ -87,6 +93,7 @@ describe("WorkspaceSplitLayout", () => {
     expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
     expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
     expect(screen.queryByTestId("nody-panel")).toBeNull();
+    expect(screen.queryByTestId("brief-panel")).toBeNull();
 
     cleanup();
 
@@ -97,5 +104,6 @@ describe("WorkspaceSplitLayout", () => {
     expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
     expect(screen.queryByTestId("nody-panel")).not.toBeNull();
     expect(screen.queryByTestId("wiki-panel")).toBeNull();
+    expect(screen.queryByTestId("brief-panel")).toBeNull();
   });
 });

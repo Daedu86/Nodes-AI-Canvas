@@ -4,6 +4,7 @@ import React from "react";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
 import type {
   SessionArtifact,
+  SessionArtifactSemanticType,
   SessionArtifactType,
   SessionContextLink,
 } from "@/lib/session-artifacts";
@@ -13,6 +14,7 @@ type SessionArtifactsContextValue = {
   contextLinks: SessionContextLink[];
   createArtifact: (input: {
     artifactType: SessionArtifactType;
+    semanticType?: SessionArtifactSemanticType | null;
     blobRef?: string | null;
     byteSize?: number | null;
     title: string;
@@ -33,7 +35,16 @@ type SessionArtifactsContextValue = {
     patch: Partial<
       Pick<
         SessionArtifact,
-        "blobRef" | "byteSize" | "content" | "fileName" | "language" | "mimeType" | "position" | "sourceDataUrl" | "title"
+        | "blobRef"
+        | "byteSize"
+        | "content"
+        | "fileName"
+        | "language"
+        | "mimeType"
+        | "position"
+        | "semanticType"
+        | "sourceDataUrl"
+        | "title"
       >
     >,
   ) => void;
@@ -132,6 +143,7 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
   const createArtifact = React.useCallback(
     (input: {
       artifactType: SessionArtifactType;
+      semanticType?: SessionArtifactSemanticType | null;
       blobRef?: string | null;
       byteSize?: number | null;
       title: string;
@@ -146,6 +158,7 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
       const artifact: SessionArtifact = {
         id: generateArtifactId(),
         artifactType: input.artifactType,
+        semanticType: input.semanticType ?? null,
         blobRef: input.blobRef ?? null,
         byteSize: input.byteSize ?? null,
         title: input.title.trim(),
@@ -170,7 +183,16 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
       patch: Partial<
         Pick<
           SessionArtifact,
-          "blobRef" | "byteSize" | "content" | "fileName" | "language" | "mimeType" | "position" | "sourceDataUrl" | "title"
+          | "blobRef"
+          | "byteSize"
+          | "content"
+          | "fileName"
+          | "language"
+          | "mimeType"
+          | "position"
+          | "semanticType"
+          | "sourceDataUrl"
+          | "title"
         >
       >,
     ) => {
@@ -188,6 +210,7 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
                 ...(patch.byteSize !== undefined ? { byteSize: patch.byteSize } : {}),
                 ...(patch.blobRef !== undefined ? { blobRef: patch.blobRef } : {}),
                 ...(patch.position !== undefined ? { position: patch.position } : {}),
+                ...(patch.semanticType !== undefined ? { semanticType: patch.semanticType } : {}),
                 ...(patch.sourceDataUrl !== undefined ? { sourceDataUrl: patch.sourceDataUrl } : {}),
                 updatedAt: new Date().toISOString(),
               },

@@ -1,9 +1,24 @@
-import type { SessionArtifact, SessionArtifactType } from "@/lib/session-artifacts";
+import type {
+  SessionArtifact,
+  SessionArtifactSemanticType,
+  SessionArtifactType,
+} from "@/lib/session-artifacts";
 
 type ArtifactLike = Pick<
   SessionArtifact,
-  "artifactType" | "title" | "content" | "fileName" | "language" | "mimeType" | "byteSize"
+  | "artifactType"
+  | "semanticType"
+  | "title"
+  | "content"
+  | "fileName"
+  | "language"
+  | "mimeType"
+  | "byteSize"
 >;
+
+type ArtifactDescriptor =
+  | SessionArtifactType
+  | Pick<SessionArtifact, "artifactType" | "semanticType">;
 
 const stripMarkdownNoise = (value: string) =>
   value
@@ -20,8 +35,28 @@ const normalizeArtifactLines = (content: string) =>
     .map((line) => stripMarkdownNoise(line))
     .filter((line) => line.length > 0);
 
-export const getArtifactReadableRole = (artifactType: SessionArtifactType) => {
-  switch (artifactType) {
+export const getArtifactReadableRole = (artifactType: ArtifactDescriptor) => {
+  const descriptor =
+    typeof artifactType === "string"
+      ? { artifactType, semanticType: null as SessionArtifactSemanticType | null }
+      : artifactType;
+  if (descriptor.artifactType === "text") {
+    switch (descriptor.semanticType) {
+      case "decision":
+        return "Decision call";
+      case "evidence":
+        return "Evidence set";
+      case "plan":
+        return "Execution plan";
+      case "question":
+        return "Open question";
+      case "draft":
+        return "Working draft";
+      default:
+        return "Reusable brief";
+    }
+  }
+  switch (descriptor.artifactType) {
     case "code":
       return "Executable block";
     case "image":
@@ -33,8 +68,28 @@ export const getArtifactReadableRole = (artifactType: SessionArtifactType) => {
   }
 };
 
-export const getArtifactIntentLabel = (artifactType: SessionArtifactType) => {
-  switch (artifactType) {
+export const getArtifactIntentLabel = (artifactType: ArtifactDescriptor) => {
+  const descriptor =
+    typeof artifactType === "string"
+      ? { artifactType, semanticType: null as SessionArtifactSemanticType | null }
+      : artifactType;
+  if (descriptor.artifactType === "text") {
+    switch (descriptor.semanticType) {
+      case "decision":
+        return "Use this when the model needs the current recommendation plus rationale.";
+      case "evidence":
+        return "Use this when the model needs grounded facts, references, or source-backed observations.";
+      case "plan":
+        return "Use this when the model needs ordered steps, milestones, or execution structure.";
+      case "question":
+        return "Use this when the model should keep an unresolved question visible and actionable.";
+      case "draft":
+        return "Use this when the model needs working copy, rough language, or a message in progress.";
+      default:
+        return "Use this when the model needs stable narrative context.";
+    }
+  }
+  switch (descriptor.artifactType) {
     case "code":
       return "Use this when the model needs exact syntax or implementation detail.";
     case "image":
@@ -43,6 +98,39 @@ export const getArtifactIntentLabel = (artifactType: SessionArtifactType) => {
       return "Use this when the model needs a source file plus extracted notes.";
     default:
       return "Use this when the model needs stable narrative context.";
+  }
+};
+
+export const getArtifactBadgeLabel = (artifact: ArtifactDescriptor) => {
+  const descriptor =
+    typeof artifact === "string"
+      ? { artifactType: artifact, semanticType: null as SessionArtifactSemanticType | null }
+      : artifact;
+  if (descriptor.artifactType === "text") {
+    switch (descriptor.semanticType) {
+      case "decision":
+        return "Decision";
+      case "evidence":
+        return "Evidence";
+      case "plan":
+        return "Plan";
+      case "question":
+        return "Question";
+      case "draft":
+        return "Draft";
+      default:
+        return "Text context";
+    }
+  }
+  switch (descriptor.artifactType) {
+    case "code":
+      return "Code context";
+    case "image":
+      return "Image context";
+    case "file":
+      return "File context";
+    default:
+      return "Text context";
   }
 };
 
@@ -77,6 +165,9 @@ export const getArtifactLineCount = (artifact: ArtifactLike) => {
 
 export const getArtifactStatChips = (artifact: ArtifactLike) => {
   const chips: string[] = [];
+  if (artifact.artifactType === "text" && artifact.semanticType) {
+    chips.push(getArtifactBadgeLabel(artifact));
+  }
   if (artifact.language) chips.push(artifact.language);
   if (artifact.fileName) chips.push(artifact.fileName);
   if (artifact.mimeType) chips.push(artifact.mimeType);

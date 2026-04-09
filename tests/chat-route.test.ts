@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { __resetChatGovernorForTests } from "../lib/server/chat-governor";
 
 const {
   frontendToolsMock,
@@ -39,6 +40,10 @@ import { POST } from "../app/api/chat/route";
 describe("/api/chat", () => {
   beforeEach(() => {
     process.env.OPENROUTER_API_KEY = "test-openrouter-key";
+    delete process.env.NODES_CHAT_LIMIT_PER_MINUTE;
+    delete process.env.NODES_CHAT_LIMIT_PER_HOUR;
+    delete process.env.NODES_CHAT_LIMIT_CONCURRENT;
+    __resetChatGovernorForTests();
 
     createUIMessageStreamMock.mockReturnValue("mock-ui-stream");
     createUIMessageStreamResponseMock.mockImplementation(() => new Response(null, { status: 200 }));
@@ -55,6 +60,10 @@ describe("/api/chat", () => {
 
   afterEach(() => {
     delete process.env.OPENROUTER_API_KEY;
+    delete process.env.NODES_CHAT_LIMIT_PER_MINUTE;
+    delete process.env.NODES_CHAT_LIMIT_PER_HOUR;
+    delete process.env.NODES_CHAT_LIMIT_CONCURRENT;
+    __resetChatGovernorForTests();
     vi.clearAllMocks();
   });
 
@@ -209,5 +218,142 @@ describe("/api/chat", () => {
 
     expect(response.status).toBe(500);
     await expect(response.text()).resolves.toBe("The assistant request could not be completed.");
+  });
+
+  it("retries the next allowed OpenRouter model when the selected model is unavailable", async () => {
+    streamTextMock.mockImplementation(({ model }: { model: { modelId: string } }) => {
+      if (model.modelId === "openrouter/free") {
+        throw new Error("404 Not Found");
+      }
+      return {
+        toUIMessageStreamResponse: ({ headers }: { headers?: HeadersInit }) =>
+          new Response("ok", { status: 200, headers }),
+      };
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          model: "openrouter/free",
+          messages: [{ id: "u1", role: "user", content: "hello" }],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(openrouterClientMock).toHaveBeenNthCalledWith(1, "openrouter/free");
+    expect(openrouterClientMock).toHaveBeenNthCalledWith(
+      2,
+      "nvidia/nemotron-3-super-120b-a12b:free",
+    );
+    expect(response.headers.get("x-nodes-model-fallback")).toBe("1");
+    expect(response.headers.get("x-nodes-resolved-model")).toBe(
+      "nvidia/nemotron-3-super-120b-a12b:free",
+    );
+  });
+
+  it("returns a specific configuration error when the OpenRouter key is missing", async () => {
+    delete process.env.OPENROUTER_API_KEY;
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          model: "nvidia/nemotron-3-super-120b-a12b:free",
+          messages: [{ id: "u1", role: "user", content: "hello" }],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("x-nodes-error-code")).toBe("missing_openrouter_key");
+    await expect(response.text()).resolves.toBe("OpenRouter is not configured on this deployment.");
+  });
+
+  it("maps repeated provider rate limits to a specific client-safe response", async () => {
+    streamTextMock.mockImplementation(() => {
+      throw new Error("429 Too Many Requests");
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          model: "openrouter/free",
+          messages: [{ id: "u1", role: "user", content: "hello" }],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("x-nodes-error-code")).toBe("provider_rate_limited");
+    await expect(response.text()).resolves.toBe(
+      "This model is rate limited right now. Try again in a moment or choose another model.",
+    );
+  });
+
+  it("rejects chat requests once the per-minute quota is exhausted", async () => {
+    process.env.NODES_CHAT_LIMIT_PER_MINUTE = "1";
+
+    const first = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          model: "nvidia/nemotron-3-super-120b-a12b:free",
+          messages: [{ id: "u1", role: "user", content: "hello" }],
+        }),
+      }),
+    );
+
+    expect(first.status).toBe(200);
+
+    const second = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          model: "nvidia/nemotron-3-super-120b-a12b:free",
+          messages: [{ id: "u2", role: "user", content: "again" }],
+        }),
+      }),
+    );
+
+    expect(second.status).toBe(429);
+    expect(second.headers.get("x-nodes-error-code")).toBe("chat_quota_exceeded");
+    expect(second.headers.get("Retry-After")).toBeTruthy();
+    await expect(second.text()).resolves.toBe(
+      "This user has hit the current assistant usage limit. Wait a bit before sending another request.",
+    );
+  });
+
+  it("emits a structured audit log for successful requests", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    streamTextMock.mockReturnValue({
+      toUIMessageStreamResponse: ({ headers }: { headers?: HeadersInit }) =>
+        new Response("ok", { status: 200, headers }),
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          model: "nvidia/nemotron-3-super-120b-a12b:free",
+          messages: [{ id: "u1", role: "user", content: "hello" }],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(infoSpy).toHaveBeenCalledWith(
+      "[nodes-llm-audit]",
+      expect.stringContaining("\"status\":\"accepted\""),
+    );
   });
 });

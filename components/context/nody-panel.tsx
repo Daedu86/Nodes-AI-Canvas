@@ -4,10 +4,18 @@ import React from "react";
 import type { HistoryMode } from "@/components/context/session-ui-state";
 import {
   buildCanvasGuidePayload,
+  buildCanvasGuideSourceCatalog,
   type CanvasGuideAction,
   type CanvasGuideGraphEdge,
   type CanvasGuideGraphNode,
 } from "@/lib/canvas-agent/canvas-agent-context";
+import {
+  parseNodyInsight,
+  resolveNodySources,
+  type NodySourceCatalogEntry,
+  type ParsedNodyInsight,
+} from "@/lib/nody-insight";
+import { buildSessionBrief, type SessionBrief } from "@/lib/session-brief";
 import type { SessionArtifact, SessionContextLink } from "@/lib/session-artifacts";
 import {
   buildSessionWiki,
@@ -41,20 +49,24 @@ type NodyInsightEntry = {
 
 type NodyPanelContextValue = {
   busy: boolean;
+  brief: SessionBrief | null;
   error: string | null;
   focusLabel: string;
   insight: string | null;
   lastAction: CanvasGuideAction | null;
   llmEnabled: boolean;
   phase: NodyPhase;
+  parsedInsight: ParsedNodyInsight | null;
   publishSnapshot: (snapshot: NodySnapshot | null) => void;
   question: string;
   recentInsights: NodyInsightEntry[];
+  resolvedSources: NodySourceCatalogEntry[];
   runAction: (action: CanvasGuideAction, ask?: string | null) => Promise<void>;
   setQuestion: (value: string) => void;
   selectedWikiPageId: SessionWikiPageId;
   setSelectedWikiPageId: (value: SessionWikiPageId) => void;
   snapshot: NodySnapshot | null;
+  sourceCatalog: NodySourceCatalogEntry[];
   wiki: SessionWiki | null;
 };
 
@@ -72,6 +84,7 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
   const [question, setQuestion] = React.useState("");
   const [recentInsights, setRecentInsights] = React.useState<NodyInsightEntry[]>([]);
   const [selectedWikiPageId, setSelectedWikiPageId] = React.useState<SessionWikiPageId>("overview");
+  const [sourceCatalog, setSourceCatalog] = React.useState<NodySourceCatalogEntry[]>([]);
 
   const wiki = React.useMemo(
     () =>
@@ -103,6 +116,28 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
       sessionId: snapshot.sessionId,
       sessionTitle: snapshot.sessionTitle,
     }).focus.label;
+  }, [snapshot]);
+
+  const parsedInsight = React.useMemo(() => parseNodyInsight(insight), [insight]);
+  const resolvedSources = React.useMemo(
+    () => resolveNodySources(sourceCatalog, parsedInsight?.sourceRefs ?? []),
+    [parsedInsight, sourceCatalog],
+  );
+  const brief = React.useMemo(() => {
+    if (!snapshot && !wiki && !parsedInsight) return null;
+    return buildSessionBrief({
+      artifacts: snapshot?.artifacts ?? [],
+      insight: parsedInsight,
+      sessionTitle: snapshot?.sessionTitle ?? null,
+      sources: resolvedSources,
+      wiki,
+    });
+  }, [parsedInsight, resolvedSources, snapshot, wiki]);
+
+  React.useEffect(() => {
+    if (!snapshot) {
+      setSourceCatalog([]);
+    }
   }, [snapshot]);
 
   const runAction = React.useCallback(
@@ -150,6 +185,10 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
             },
           }
         : payload;
+      const payloadWithSources = {
+        ...payloadWithWiki,
+        sourceCatalog: buildCanvasGuideSourceCatalog(payloadWithWiki),
+      };
 
       setBusy(true);
       setError(null);
@@ -165,7 +204,7 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({
             action,
             model: snapshot.modelId,
-            payload: payloadWithWiki,
+            payload: payloadWithSources,
             provider: snapshot.provider,
           }),
         });
@@ -177,6 +216,7 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
         const responseText = data.text;
 
         setInsight(responseText);
+        setSourceCatalog(payloadWithSources.sourceCatalog);
         setRecentInsights((current) => [
           {
             action,
@@ -211,34 +251,42 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
   const value = React.useMemo<NodyPanelContextValue>(
     () => ({
       busy,
+      brief,
       error,
       focusLabel,
       insight,
       lastAction,
       llmEnabled: snapshot?.llmEnabled ?? true,
       phase,
+      parsedInsight,
       publishSnapshot: setSnapshot,
       question,
       recentInsights,
+      resolvedSources,
       runAction,
       setQuestion,
       selectedWikiPageId,
       setSelectedWikiPageId,
       snapshot,
+      sourceCatalog,
       wiki,
     }),
     [
       busy,
+      brief,
       error,
       focusLabel,
       insight,
       lastAction,
       phase,
+      parsedInsight,
       question,
       recentInsights,
+      resolvedSources,
       runAction,
       selectedWikiPageId,
       snapshot,
+      sourceCatalog,
       wiki,
     ],
   );

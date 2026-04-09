@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth/next";
 import type { Provider } from "next-auth/providers/index";
 import Credentials from "next-auth/providers/credentials";
 import GitHub from "next-auth/providers/github";
+import { isE2eEnvAuthAllowed } from "@/lib/server/e2e-auth";
 
 const DEV_AUTH_EMAIL = process.env.AUTH_DEV_EMAIL?.trim() || "demo@nodes.local";
 const DEV_AUTH_PASSWORD = process.env.AUTH_DEV_PASSWORD?.trim() || "dev-password";
@@ -59,6 +60,7 @@ export const authUiConfig = {
 } as const;
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.AUTH_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim(),
   session: {
     strategy: "jwt",
   },
@@ -85,7 +87,7 @@ export const authOptions: NextAuthOptions = {
 };
 
 function getE2eSession(): Session | null {
-  if (!E2E_AUTH_USER_ID) {
+  if (!isE2eEnvAuthAllowed() || !E2E_AUTH_USER_ID) {
     return null;
   }
   return {

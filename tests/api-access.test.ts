@@ -4,6 +4,7 @@ import { enforceLocalApiAccess } from "../lib/server/api-access";
 describe("local API access guard", () => {
   afterEach(() => {
     delete process.env.ALLOW_REMOTE_API;
+    delete process.env.NODES_PERSISTENCE_BACKEND;
   });
 
   it("allows loopback requests", async () => {
@@ -50,6 +51,7 @@ describe("local API access guard", () => {
 
   it("can be bypassed explicitly for trusted remote deployments", async () => {
     process.env.ALLOW_REMOTE_API = "1";
+    process.env.NODES_PERSISTENCE_BACKEND = "supabase";
 
     const response = enforceLocalApiAccess(
       new Request("https://example.com/api/sessions", { method: "POST" }),
@@ -60,6 +62,7 @@ describe("local API access guard", () => {
 
   it("still blocks cross-site mutations when remote API is allowed", async () => {
     process.env.ALLOW_REMOTE_API = "1";
+    process.env.NODES_PERSISTENCE_BACKEND = "supabase";
 
     const response = enforceLocalApiAccess(
       new Request("https://nodes.example/api/sessions", {
@@ -74,6 +77,20 @@ describe("local API access guard", () => {
     expect(response?.status).toBe(403);
     await expect(response?.json()).resolves.toMatchObject({
       error: "Cross-origin requests to the API are blocked.",
+    });
+  });
+
+  it("blocks remote API access on the file backend even when the flag is enabled", async () => {
+    process.env.ALLOW_REMOTE_API = "1";
+    process.env.NODES_PERSISTENCE_BACKEND = "file";
+
+    const response = enforceLocalApiAccess(
+      new Request("https://example.com/api/sessions", { method: "POST" }),
+    );
+
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toMatchObject({
+      error: "Remote API access requires the Supabase persistence backend.",
     });
   });
 });

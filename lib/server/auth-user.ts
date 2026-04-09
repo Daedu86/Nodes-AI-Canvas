@@ -1,4 +1,8 @@
 import { auth } from "@/auth";
+import {
+  isE2eEnvAuthAllowed,
+  isE2eHeaderAuthAllowed,
+} from "@/lib/server/e2e-auth";
 
 const JSON_HEADERS = {
   "Content-Type": "application/json",
@@ -11,29 +15,30 @@ export type AuthenticatedUser = {
 };
 
 function getTestAuthenticatedUser(req?: Request): AuthenticatedUser | null {
-  if (process.env.NODE_ENV !== "test") {
-    if (!process.env.E2E_AUTH_USER_ID) {
+  if (isE2eHeaderAuthAllowed()) {
+    if (req?.headers.get("x-test-auth") === "none") {
       return null;
     }
+
+    const id = req?.headers.get("x-test-user-id")?.trim() || "test-user";
+    const email = req?.headers.get("x-test-user-email")?.trim() || "test@nodes.local";
+    const name = req?.headers.get("x-test-user-name")?.trim() || "Test User";
+
     return {
-      email: process.env.E2E_AUTH_USER_EMAIL?.trim() || "e2e@nodes.local",
-      id: process.env.E2E_AUTH_USER_ID,
-      name: process.env.E2E_AUTH_USER_NAME?.trim() || "E2E User",
+      email,
+      id,
+      name,
     };
   }
 
-  if (req?.headers.get("x-test-auth") === "none") {
+  if (!isE2eEnvAuthAllowed() || !process.env.E2E_AUTH_USER_ID) {
     return null;
   }
 
-  const id = req?.headers.get("x-test-user-id")?.trim() || "test-user";
-  const email = req?.headers.get("x-test-user-email")?.trim() || "test@nodes.local";
-  const name = req?.headers.get("x-test-user-name")?.trim() || "Test User";
-
   return {
-    email,
-    id,
-    name,
+    email: process.env.E2E_AUTH_USER_EMAIL?.trim() || "e2e@nodes.local",
+    id: process.env.E2E_AUTH_USER_ID,
+    name: process.env.E2E_AUTH_USER_NAME?.trim() || "E2E User",
   };
 }
 

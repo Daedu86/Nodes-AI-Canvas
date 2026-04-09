@@ -2,7 +2,10 @@
 
 import type { Edge, Node } from "@xyflow/react";
 import type { ProjectMemoryType } from "@/lib/memory-documents";
-import type { SessionArtifactType } from "@/lib/session-artifacts";
+import type {
+  SessionArtifactSemanticType,
+  SessionArtifactType,
+} from "@/lib/session-artifacts";
 
 export type ThreadGraphFlowNodeData = {
   accent?: string;
@@ -25,6 +28,7 @@ export type ThreadGraphFlowNodeData = {
   model?: string | null;
   modelLabel?: string;
   mimeType?: string | null;
+  semanticType?: SessionArtifactSemanticType | null;
   position?: { x: number; y: number } | null;
   preview: string;
   provider?: string | null;

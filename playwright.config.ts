@@ -44,6 +44,7 @@ export default defineConfig({
       AUTH_DEV_NAME: process.env.AUTH_DEV_NAME ?? "Local Developer",
       AUTH_DEV_PASSWORD: process.env.AUTH_DEV_PASSWORD ?? "dev-password",
       AUTH_SECRET: process.env.AUTH_SECRET ?? "playwright-auth-secret",
+      ALLOW_E2E_AUTH_OVERRIDE: "1",
       E2E_MOCK_LLM: "1",
       E2E_AUTH_USER_EMAIL: "e2e@nodes.local",
       E2E_AUTH_USER_ID: "e2e-user",

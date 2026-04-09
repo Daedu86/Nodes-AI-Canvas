@@ -22,6 +22,10 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/workspace/app-header";
 import { ChatPanel } from "@/components/workspace/chat-panel";
 import { WorkspaceSplitLayout } from "@/components/workspace/workspace-split-layout";
+import {
+  getRequestErrorMessageFromResponse,
+  getRequestErrorMessageFromThrowable,
+} from "@/lib/llm/request-errors";
 import { rememberMessageLatencyEntry } from "@/lib/message-latency-registry";
 import { GraphBranchIntentProvider } from "@/components/context/graph-branch-intent";
 
@@ -55,6 +59,18 @@ const WikiPanel = dynamic(
     loading: () => (
       <div className="flex h-full min-h-0 items-center justify-center rounded-lg border border-border/60 bg-background p-4 text-sm text-muted-foreground">
         Loading wiki…
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
+const BriefPanel = dynamic(
+  () => import("@/components/workspace/brief-panel").then((mod) => mod.BriefPanel),
+  {
+    loading: () => (
+      <div className="flex h-full min-h-0 items-center justify-center rounded-lg border border-border/60 bg-background p-4 text-sm text-muted-foreground">
+        Loading brief…
       </div>
     ),
     ssr: false,
@@ -127,9 +143,9 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
           ...chatRequestBody,
         },
       }),
-      onError: () => {
+      onError: (error: Error) => {
         pendingLatencyRef.current = null;
-        setRequestError("Assistant request failed. Check the selected model or provider and try again.");
+        setRequestError(getRequestErrorMessageFromThrowable(error));
       },
       onResponse: (response: Response) => {
         if (response.ok) {
@@ -143,7 +159,7 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
           return;
         }
         pendingLatencyRef.current = null;
-        setRequestError("Assistant request failed. Check the selected model or provider and try again.");
+        setRequestError(getRequestErrorMessageFromResponse(response));
       },
       onFinish: ({ message }: { message?: { id?: string } }) => {
         recordPendingLatency(message?.id);
@@ -218,6 +234,7 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
                       chatPanel={<ChatPanel />}
                       canvasPanel={<GraphPanel />}
                       wikiPanel={<WikiPanel />}
+                      briefPanel={<BriefPanel />}
                       nodyPanel={<NodyPanel />}
                     />
                   </>

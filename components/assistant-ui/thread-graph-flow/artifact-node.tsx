@@ -4,6 +4,7 @@ import { memo } from "react";
 import { Code2, File, FileImage, FileText, ImageIcon, Link2, Move } from "lucide-react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
+  getArtifactBadgeLabel,
   getArtifactCodeSample,
   getArtifactHeadline,
   getArtifactHighlights,
@@ -44,6 +45,7 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
     fileName: data.fileName ?? null,
     language: data.language ?? null,
     mimeType: data.mimeType ?? null,
+    semanticType: data.semanticType ?? null,
     title: data.title ?? "",
   };
   const headline = getArtifactHeadline(artifactLike);
@@ -96,13 +98,7 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
                   <span>
                     {memoryMeta
                       ? memoryMeta.shortLabel
-                      : isCode
-                      ? "Code context"
-                      : isImage
-                        ? "Image context"
-                        : isFile
-                          ? "File context"
-                          : "Text context"}
+                      : getArtifactBadgeLabel(artifactLike)}
                   </span>
                 </span>
                 {data.language ? (

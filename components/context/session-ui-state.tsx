@@ -5,7 +5,7 @@ import { getSupportedModelConfig } from "@/lib/model-options";
 
 export type HistoryMode = "last" | "full";
 export type ModelProvider = "ollama" | "openrouter";
-export type SessionViewMode = "chat" | "split" | "canvas" | "wiki" | "nody";
+export type SessionViewMode = "chat" | "split" | "canvas" | "wiki" | "brief" | "nody";
 
 export type ModelConfig = {
   modelId: string;
@@ -22,6 +22,8 @@ type SessionUiStateContextValue = {
   setHistoryMode: (value: HistoryMode) => void;
   focusedMessageId: string | null;
   setFocusedMessageId: (value: string | null) => void;
+  canvasSelectionId: string | null;
+  setCanvasSelectionId: (value: string | null) => void;
   llmEnabled: boolean;
   setLlmEnabled: (value: boolean) => void;
   modelConfig: ModelConfig;
@@ -42,8 +44,10 @@ const LEGACY_LLM_ENABLED_KEY = "llmEnabled";
 const LEGACY_MODEL_CONFIG_KEY = "modelConfig";
 const LEGACY_VIEW_MODE_KEY = "workspaceViewMode";
 const LEGACY_LINK_OVERRIDES_KEY = "threadGraph.linkOverrides.v1";
-const DEFAULT_SPLIT_RATIO = 1 / 3;
-const DEFAULT_SECONDARY_SPLIT_RATIO = 0.5;
+const OLD_DEFAULT_SPLIT_RATIO = 1 / 3;
+const OLD_DEFAULT_SECONDARY_SPLIT_RATIO = 0.5;
+const DEFAULT_SPLIT_RATIO = 0.28;
+const DEFAULT_SECONDARY_SPLIT_RATIO = 0.58;
 const DEFAULT_VIEW_MODE: SessionViewMode = "split";
 
 const DEFAULT_MODEL_CONFIG: ModelConfig = getSupportedModelConfig({
@@ -68,6 +72,13 @@ const readStorageValue = (sessionKey: string, legacyKey?: string) => {
   } catch {
     return null;
   }
+};
+
+const readNumericStorageValue = (sessionKey: string, fallbackSessionKey?: string) => {
+  const raw = readStorageValue(sessionKey, fallbackSessionKey);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 const readHistoryMode = (sessionId: string): HistoryMode => {
@@ -114,17 +125,27 @@ const readModelConfig = (sessionId: string): ModelConfig => {
 };
 
 const readSplitRatio = (sessionId: string) => {
-  const raw = readStorageValue(getScopedStorageKey(sessionId, "splitRatio.v2"));
-  if (!raw) return DEFAULT_SPLIT_RATIO;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : DEFAULT_SPLIT_RATIO;
+  const parsed = readNumericStorageValue(
+    getScopedStorageKey(sessionId, "splitRatio.v3"),
+    getScopedStorageKey(sessionId, "splitRatio.v2"),
+  );
+  if (parsed === null) return DEFAULT_SPLIT_RATIO;
+  if (Math.abs(parsed - OLD_DEFAULT_SPLIT_RATIO) < 0.001) {
+    return DEFAULT_SPLIT_RATIO;
+  }
+  return parsed;
 };
 
 const readSecondarySplitRatio = (sessionId: string) => {
-  const raw = readStorageValue(getScopedStorageKey(sessionId, "secondarySplitRatio.v2"));
-  if (!raw) return DEFAULT_SECONDARY_SPLIT_RATIO;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : DEFAULT_SECONDARY_SPLIT_RATIO;
+  const parsed = readNumericStorageValue(
+    getScopedStorageKey(sessionId, "secondarySplitRatio.v3"),
+    getScopedStorageKey(sessionId, "secondarySplitRatio.v2"),
+  );
+  if (parsed === null) return DEFAULT_SECONDARY_SPLIT_RATIO;
+  if (Math.abs(parsed - OLD_DEFAULT_SECONDARY_SPLIT_RATIO) < 0.001) {
+    return DEFAULT_SECONDARY_SPLIT_RATIO;
+  }
+  return parsed;
 };
 
 const readViewMode = (sessionId: string): SessionViewMode => {
@@ -136,6 +157,7 @@ const readViewMode = (sessionId: string): SessionViewMode => {
     value === "chat" ||
     value === "canvas" ||
     value === "wiki" ||
+    value === "brief" ||
     value === "split" ||
     value === "nody"
   ) {
@@ -176,6 +198,7 @@ export function SessionUiStateProvider({
 }) {
   const [historyMode, setHistoryMode] = React.useState<HistoryMode>(() => readHistoryMode(sessionId));
   const [focusedMessageId, setFocusedMessageId] = React.useState<string | null>(null);
+  const [canvasSelectionId, setCanvasSelectionId] = React.useState<string | null>(null);
   const [llmEnabled, setLlmEnabled] = React.useState<boolean>(() => readLlmEnabled(sessionId));
   const [modelConfig, setModelConfig] = React.useState<ModelConfig>(() => readModelConfig(sessionId));
   const [viewMode, setViewMode] = React.useState<SessionViewMode>(() => readViewMode(sessionId));
@@ -224,7 +247,7 @@ export function SessionUiStateProvider({
 
   React.useEffect(() => {
     try {
-      localStorage.setItem(getScopedStorageKey(sessionId, "splitRatio.v2"), String(splitRatio));
+      localStorage.setItem(getScopedStorageKey(sessionId, "splitRatio.v3"), String(splitRatio));
     } catch {
       // ignore storage errors
     }
@@ -233,7 +256,7 @@ export function SessionUiStateProvider({
   React.useEffect(() => {
     try {
       localStorage.setItem(
-        getScopedStorageKey(sessionId, "secondarySplitRatio.v2"),
+        getScopedStorageKey(sessionId, "secondarySplitRatio.v3"),
         String(secondarySplitRatio),
       );
     } catch {
@@ -264,6 +287,8 @@ export function SessionUiStateProvider({
       setHistoryMode,
       focusedMessageId,
       setFocusedMessageId,
+      canvasSelectionId,
+      setCanvasSelectionId,
       llmEnabled,
       setLlmEnabled,
       modelConfig,
@@ -281,6 +306,7 @@ export function SessionUiStateProvider({
     [
       historyMode,
       focusedMessageId,
+      canvasSelectionId,
       llmEnabled,
       modelConfig,
       viewMode,

@@ -195,6 +195,7 @@ async function copyGraphJson(page: Page) {
     await dialog.accept();
   });
 
+  await page.getByRole("button", { name: /Canvas tools/i }).click();
   await page.getByRole("button", { name: /Copy JSON/i }).click();
   const clipboardText = await page.evaluate(async () => navigator.clipboard.readText());
   return JSON.parse(clipboardText) as {
@@ -905,6 +906,7 @@ test("cuts and restores a graph link from the flow renderer", async ({ page }) =
   expect(parentChildCountBeforeCut).toBeGreaterThan(0);
   if (!assistantNodeId) return;
 
+  await page.getByRole("button", { name: /Canvas tools/i }).click();
   await page.getByRole("button", { name: "Edit Links" }).click();
   await page.locator(`.react-flow__node[data-id="${assistantNodeId}"]`).dispatchEvent("click");
   await page.getByRole("button", { name: "Cut selected link" }).click();
@@ -1103,7 +1105,7 @@ test("shows a visible fallback message when the provider request fails", async (
   await expect(composer).toBeVisible();
 });
 
-test("creates a text artifact, attaches it as context, and branches with it from the flow", async ({ page }) => {
+test("creates a semantic text artifact, attaches it as context, and branches with it from the flow", async ({ page }) => {
   test.setTimeout(60_000);
   await gotoChat(page);
   await sendPrompt(page, "Artifact context seed");
@@ -1113,7 +1115,7 @@ test("creates a text artifact, attaches it as context, and branches with it from
   expect(assistantNodeId).toBeTruthy();
   if (!assistantNodeId) return;
 
-  await page.getByRole("button", { name: "New Text" }).click();
+  await page.getByRole("button", { name: "Draft" }).click();
   await page.getByLabel("Artifact content").fill("Use the attached artifact as additional product context.");
 
   await page.getByRole("button", { name: `Attach target ${assistantNodeId}` }).click();
@@ -1137,17 +1139,19 @@ test("creates a text artifact, attaches it as context, and branches with it from
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Create follow-up with context" }).click();
+  await graphSection
+    .getByRole("button", { name: "Create follow-up with context" })
+    .evaluate((button: HTMLButtonElement) => button.click());
   await responsePromise;
 
   const reply = expectedReply("Follow-up with artifact context", {
     contextCount: 1,
-    contextTitles: ["Text Context 1"],
+    contextTitles: ["Draft 1"],
   });
   await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
 
   const graphAfter = await copyGraphJson(page);
-  expect(graphAfter.artifacts?.some((artifact) => artifact.title === "Text Context 1")).toBe(true);
+  expect(graphAfter.artifacts?.some((artifact) => artifact.title === "Draft 1")).toBe(true);
   expect(
     graphAfter.contextLinks?.some(
       (link) => link.targetMessageId === assistantNodeId,
@@ -1159,7 +1163,7 @@ test("creates a text artifact, attaches it as context, and branches with it from
   if (!activeSessionId) return;
 
   const persistedSession = await fetchPersistedSession(page, activeSessionId);
-  expect(persistedSession.session.artifacts.some((artifact) => artifact.title === "Text Context 1")).toBe(true);
+  expect(persistedSession.session.artifacts.some((artifact) => artifact.title === "Draft 1")).toBe(true);
   expect(
     persistedSession.session.contextLinks.some((link) => link.targetMessageId === assistantNodeId),
   ).toBe(true);
