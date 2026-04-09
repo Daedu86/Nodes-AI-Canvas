@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Bot, LogOut, UserRound } from "lucide-react";
+import { BookOpenText, Bot, LogOut, UserRound } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useWorkspaceSurface } from "@/components/context/workspace-surface";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export function SidebarProfile() {
   const { data: session } = useSession();
-  const { activeSurface, showLlmModels } = useWorkspaceSurface();
+  const { activeSurface, showKnowledgeCenter, showLlmModels } = useWorkspaceSurface();
   const displayName =
     session?.user?.name?.trim() ||
     session?.user?.email?.trim() ||
@@ -30,6 +30,16 @@ export function SidebarProfile() {
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
+        <Button
+          type="button"
+          variant={activeSurface === "knowledge-center" ? "default" : "outline"}
+          size="sm"
+          className="w-full justify-start rounded-lg"
+          onClick={showKnowledgeCenter}
+        >
+          <BookOpenText className="size-4" />
+          Knowledge Center
+        </Button>
         <Button
           type="button"
           variant={activeSurface === "llm-models" ? "default" : "outline"}

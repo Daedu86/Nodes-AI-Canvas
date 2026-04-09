@@ -36,7 +36,16 @@ function SurfaceHarness() {
     <div>
       <SidebarProfile />
       <div data-testid="surface">{activeSurface}</div>
-      {activeSurface === "llm-models" ? <LlmModelsWorkspace /> : <div>Workspace</div>}
+      {activeSurface === "llm-models" ? (
+        <LlmModelsWorkspace />
+      ) : activeSurface === "knowledge-center" ? (
+        <div>
+          <h1>Knowledge Center</h1>
+          <button type="button">Back</button>
+        </div>
+      ) : (
+        <div>Workspace</div>
+      )}
     </div>
   );
 }
@@ -70,6 +79,26 @@ describe("WorkspaceSurfaceProvider", () => {
 
     expect(screen.getByTestId("surface").textContent).toBe("llm-models");
     expect(screen.getByRole("heading", { name: "LLM Models" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
+  });
+
+  it("opens the Knowledge Center workspace from Profile", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <LlmSettingsProvider>
+        <WorkspaceSurfaceProvider>
+          <SurfaceHarness />
+        </WorkspaceSurfaceProvider>
+      </LlmSettingsProvider>,
+    );
+
+    expect(screen.getByTestId("surface").textContent).toBe("workspace");
+
+    await user.click(screen.getByRole("button", { name: "Knowledge Center" }));
+
+    expect(screen.getByTestId("surface").textContent).toBe("knowledge-center");
+    expect(screen.getByRole("heading", { name: "Knowledge Center" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
   });
 

@@ -23,6 +23,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/workspace/app-header";
 import { ChatPanel } from "@/components/workspace/chat-panel";
+import { KnowledgeCenterWorkspace } from "@/components/workspace/knowledge-center-workspace";
 import { LlmModelsWorkspace } from "@/components/workspace/llm-models-workspace";
 import { WorkspaceSplitLayout } from "@/components/workspace/workspace-split-layout";
 import {
@@ -329,6 +330,9 @@ function WorkspaceShell() {
 
   if (activeSurface === "llm-models") {
     return <LlmModelsWorkspace />;
+  }
+  if (activeSurface === "knowledge-center") {
+    return <KnowledgeCenterWorkspace />;
   }
 
   return activeProjectId ? <ProjectRuntimeShell /> : <AssistantRuntimeShell />;
