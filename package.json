@@ -23,6 +23,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@supabase/supabase-js": "^2.102.1",
+    "@vercel/speed-insights": "^2.0.0",
     "@xyflow/react": "^12.10.2",
     "ai": "^6.0.141",
     "class-variance-authority": "^0.7.1",

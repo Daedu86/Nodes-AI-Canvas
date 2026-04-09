@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { auth } from "@/auth";
 import { AuthSessionProvider } from "@/components/auth/auth-session-provider";
 import "./globals.css";
@@ -40,6 +41,7 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthSessionProvider session={session}>{children}</AuthSessionProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
