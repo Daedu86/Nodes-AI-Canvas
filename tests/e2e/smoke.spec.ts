@@ -25,6 +25,35 @@ type ReplyOptions = {
   contextTitles?: string[];
 };
 
+function normalizeSelectedModelValue(value: string) {
+  const match = value.match(/^(openrouter|ollama|openai|anthropic|google):(.+)$/);
+  if (!match) {
+    return {
+      model: value,
+      provider: inferProviderFromModel(value),
+    };
+  }
+  return {
+    model: match[2],
+    provider: match[1],
+  };
+}
+
+function inferProviderFromModel(modelId: string) {
+  if (modelId.includes("/")) return "openrouter";
+  if (modelId.toLowerCase().includes("claude")) return "anthropic";
+  if (modelId.toLowerCase().includes("gemini")) return "google";
+  if (
+    modelId.startsWith("gpt") ||
+    modelId.startsWith("o1") ||
+    modelId.startsWith("o3") ||
+    modelId.startsWith("o4")
+  ) {
+    return "openai";
+  }
+  return "ollama";
+}
+
 function expectedReply(
   prompt: string,
   {
@@ -171,6 +200,24 @@ async function sendPrompt(
   options?: ReplyOptions,
 ) {
   const composer = page.getByPlaceholder("Write a message...");
+  const rawSelectedModel =
+    options?.model ??
+    (await page.getByRole("combobox", { name: "Model" }).evaluate((element) => {
+      if (element instanceof HTMLSelectElement) {
+        return element.value;
+      }
+      return element.getAttribute("value") ?? "";
+    }));
+  const normalizedSelection = rawSelectedModel
+    ? normalizeSelectedModelValue(rawSelectedModel)
+    : null;
+  const resolvedOptions: ReplyOptions = {
+    ...options,
+    model: normalizedSelection?.model || options?.model,
+    provider:
+      options?.provider ??
+      (normalizedSelection?.provider ?? options?.provider ?? "openrouter"),
+  };
   await composer.fill(prompt);
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
@@ -181,7 +228,7 @@ async function sendPrompt(
     throw new Error(`Chat request failed with ${response.status()}: ${await response.text()}`);
   }
 
-  const reply = expectedReply(prompt, options);
+  const reply = expectedReply(prompt, resolvedOptions);
   await expect(threadMessage(page, prompt)).toBeVisible();
   await expect(threadMessage(page, reply)).toBeVisible({
     timeout: 15_000,
@@ -386,7 +433,24 @@ async function createBranchFromFlow(
   await page.getByRole("button", { name: /Create .*branch|Create follow-up/i }).click();
   await responsePromise;
 
-  const reply = expectedReply(prompt, options);
+  const rawSelectedModel =
+    options?.model ??
+    (await page.getByRole("combobox", { name: "Model" }).evaluate((element) => {
+      if (element instanceof HTMLSelectElement) {
+        return element.value;
+      }
+      return element.getAttribute("value") ?? "";
+    }));
+  const normalizedSelection = rawSelectedModel
+    ? normalizeSelectedModelValue(rawSelectedModel)
+    : null;
+  const reply = expectedReply(prompt, {
+    ...options,
+    model: normalizedSelection?.model || options?.model,
+    provider:
+      options?.provider ??
+      (normalizedSelection?.provider ?? options?.provider ?? "openrouter"),
+  });
   await expect(threadMessage(page, prompt)).toBeVisible();
   await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
   return reply;

@@ -164,7 +164,7 @@ describe("llm helpers", () => {
         model: "openai/gpt-4.1",
       }),
     ).toEqual({
-      modelId: "nvidia/nemotron-3-super-120b-a12b:free",
+      modelId: "nvidia/nemotron-3-nano-30b-a3b:free",
       provider: "openrouter",
     });
 
@@ -174,7 +174,7 @@ describe("llm helpers", () => {
         model: "llama3.1:8b",
       }),
     ).toEqual({
-      modelId: "nvidia/nemotron-3-super-120b-a12b:free",
+      modelId: "nvidia/nemotron-3-nano-30b-a3b:free",
       provider: "openrouter",
     });
   });

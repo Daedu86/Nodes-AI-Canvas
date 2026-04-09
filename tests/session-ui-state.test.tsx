@@ -77,7 +77,7 @@ describe("SessionUiStateProvider", () => {
     );
 
     expect(screen.getByTestId("model-config").textContent).toBe(
-      "openrouter:nvidia/nemotron-3-super-120b-a12b:free",
+      "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
     );
   });
 

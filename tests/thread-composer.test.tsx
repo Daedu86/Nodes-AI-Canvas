@@ -20,6 +20,10 @@ const llmState = vi.hoisted(() => ({
   llmEnabled: true,
 }));
 
+const threadState = vi.hoisted(() => ({
+  isRunning: false,
+}));
+
 const modelConfigState = vi.hoisted(() => ({
   modelId: "nvidia/nemotron-3-super-120b-a12b:free",
   provider: "openrouter",
@@ -46,7 +50,7 @@ vi.mock("@assistant-ui/react", async () => {
     running?: boolean;
   }) => {
     if (typeof running === "boolean") {
-      return running ? null : <>{children}</>;
+      return running === threadState.isRunning ? <>{children}</> : null;
     }
     return <>{children}</>;
   };
@@ -86,6 +90,9 @@ vi.mock("@assistant-ui/react", async () => {
     useAssistantRuntime: vi.fn(() => null),
     useComposerRuntime: vi.fn(() => composerRuntimeMock),
     useMessage: vi.fn(() => null),
+    useThread: vi.fn((selector?: (state: { isRunning: boolean }) => unknown) =>
+      selector ? selector(threadState) : threadState,
+    ),
   };
 });
 
@@ -155,6 +162,7 @@ describe("Composer", () => {
   beforeEach(() => {
     historyModeState.historyMode = "last";
     llmState.llmEnabled = true;
+    threadState.isRunning = false;
     composerRuntimeMock.cancel.mockReset();
     composerRuntimeMock.getState.mockReset();
     composerRuntimeMock.send.mockReset();
@@ -211,5 +219,18 @@ describe("Composer", () => {
 
     fireEvent.click(sendButton);
     expect(composerRuntimeMock.send).not.toHaveBeenCalled();
+  });
+
+  it("blocks duplicate sends while a run is already active", () => {
+    threadState.isRunning = true;
+    render(<Composer />);
+
+    const input = screen.getByPlaceholderText("Write a message...");
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: false });
+
+    expect(composerRuntimeMock.send).not.toHaveBeenCalled();
+    expect(requestErrorState.setRequestError).toHaveBeenCalledWith(
+      "The assistant is still responding. Wait for it to finish or cancel the current run.",
+    );
   });
 });

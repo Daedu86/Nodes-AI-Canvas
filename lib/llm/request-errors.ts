@@ -28,6 +28,10 @@ export type RequestErrorDetails = {
 
 const DEFAULT_ERROR_MESSAGE =
   "Assistant request failed. Check the selected model or provider and try again.";
+const ACTIVE_RUN_ERROR_MESSAGE =
+  "The assistant is still responding. Wait for it to finish or cancel the current run.";
+const QUOTA_EXCEEDED_ERROR_MESSAGE =
+  "You have hit the current assistant usage limit. Wait a bit before sending another request.";
 
 const OLLAMA_UNAVAILABLE_TOKENS = [
   "econnrefused",
@@ -104,6 +108,7 @@ export function classifyRequestError(
     status === 502 ||
     status === 503 ||
     status === 504 ||
+    message.includes("no content") ||
     message.includes("service unavailable") ||
     message.includes("gateway") ||
     message.includes("timed out")
@@ -148,9 +153,22 @@ export function createResolvedModelHeaders(options: {
 
 export function getRequestErrorMessageFromResponse(response: Pick<Response, "status" | "headers">) {
   const explicit = response.headers.get(REQUEST_ERROR_MESSAGE_HEADER);
-  if (explicit) return explicit;
-
   const errorCode = response.headers.get(REQUEST_ERROR_CODE_HEADER);
+  if (errorCode === "chat_concurrency_limited") {
+    return ACTIVE_RUN_ERROR_MESSAGE;
+  }
+  if (errorCode === "chat_quota_exceeded") {
+    return QUOTA_EXCEEDED_ERROR_MESSAGE;
+  }
+  if (errorCode === "provider_rate_limited") {
+    return "This model is rate limited right now. Try again in a moment or choose another model.";
+  }
+  if (errorCode === "model_unavailable") {
+    return "The selected model is not available anymore. Choose another model and try again.";
+  }
+  if (errorCode === "ollama_unavailable") {
+    return "Ollama is not reachable. Start it locally or switch to an OpenRouter model.";
+  }
   if (errorCode === "missing_openai_key") {
     return "OpenAI needs an API key in Profile > LLM Models.";
   }
@@ -160,6 +178,10 @@ export function getRequestErrorMessageFromResponse(response: Pick<Response, "sta
   if (errorCode === "missing_google_key") {
     return "Gemini needs an API key in Profile > LLM Models.";
   }
+  if (errorCode === "missing_openrouter_key") {
+    return "OpenRouter needs an API key in Profile > LLM Models or in the server environment.";
+  }
+  if (explicit) return explicit;
 
   if (response.status === 400) {
     return "The selected model is not available. Choose another model and try again.";
@@ -178,6 +200,12 @@ export function getRequestErrorMessageFromResponse(response: Pick<Response, "sta
 
 export function getRequestErrorMessageFromThrowable(error: unknown) {
   const message = getErrorMessage(error).toLowerCase();
+  if (message.includes("too many assistant runs")) {
+    return ACTIVE_RUN_ERROR_MESSAGE;
+  }
+  if (message.includes("rate limit") || message.includes("too many requests")) {
+    return "This model is rate limited right now. Try again in a moment or choose another model.";
+  }
   if (message.includes("network") || message.includes("fetch") || message.includes("failed")) {
     return "The assistant request could not reach the backend. Check the connection and try again.";
   }

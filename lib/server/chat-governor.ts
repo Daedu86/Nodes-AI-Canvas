@@ -86,7 +86,7 @@ export function reserveChatQuota(userId: string, now = Date.now()): ChatQuotaRes
       rejection: {
         code: "chat_concurrency_limited",
         headers,
-        message: "Too many assistant runs are already active for this user. Wait a moment and try again.",
+        message: "The assistant is still responding. Wait for it to finish or cancel the current run.",
         retryAfterSeconds: 5,
         status: 429,
       },
@@ -105,7 +105,7 @@ export function reserveChatQuota(userId: string, now = Date.now()): ChatQuotaRes
       rejection: {
         code: "chat_quota_exceeded",
         headers,
-        message: "This user has hit the current assistant usage limit. Wait a bit before sending another request.",
+        message: "You have hit the current assistant usage limit. Wait a bit before sending another request.",
         retryAfterSeconds: Math.ceil(retryAfterMs / SECOND),
         status: 429,
       },

@@ -236,7 +236,7 @@ export async function POST(req: Request) {
       return result.toUIMessageStreamResponse({
         originalMessages: rawMessages as never[],
         headers,
-        onError: () => "The assistant request could not be completed.",
+        onError: (error) => classifyRequestError(error, currentModel).message,
       });
     } catch (error) {
       const classified = classifyRequestError(error, currentModel);
@@ -252,7 +252,9 @@ export async function POST(req: Request) {
       const shouldRetry =
         currentModel.provider === "openrouter" &&
         hasFallbackCandidate &&
-        (classified.code === "model_unavailable" || classified.code === "provider_rate_limited");
+        (classified.code === "model_unavailable" ||
+          classified.code === "provider_rate_limited" ||
+          classified.code === "provider_unavailable");
 
       if (shouldRetry) {
         continue;

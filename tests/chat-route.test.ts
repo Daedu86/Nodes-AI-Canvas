@@ -201,7 +201,7 @@ describe("/api/chat", () => {
     );
   });
 
-  it("returns a generic client-safe error message from the stream layer", async () => {
+  it("returns a classified client-safe error message from the stream layer", async () => {
     streamTextMock.mockReturnValueOnce({
       toUIMessageStreamResponse: ({ onError }: { onError: (error: unknown) => string }) =>
         new Response(onError(new Error("upstream provider trace")), { status: 500 }),
@@ -219,7 +219,9 @@ describe("/api/chat", () => {
     );
 
     expect(response.status).toBe(500);
-    await expect(response.text()).resolves.toBe("The assistant request could not be completed.");
+    await expect(response.text()).resolves.toBe(
+      "The assistant backend is unavailable right now. Try again in a moment.",
+    );
   });
 
   it("retries the next allowed OpenRouter model when the selected model is unavailable", async () => {
@@ -256,14 +258,14 @@ describe("/api/chat", () => {
     expect(createLanguageModelMock).toHaveBeenNthCalledWith(
       2,
       {
-        modelId: "nvidia/nemotron-3-super-120b-a12b:free",
+        modelId: "nvidia/nemotron-3-nano-30b-a3b:free",
         provider: "openrouter",
       },
       {},
     );
     expect(response.headers.get("x-nodes-model-fallback")).toBe("1");
     expect(response.headers.get("x-nodes-resolved-model")).toBe(
-      "nvidia/nemotron-3-super-120b-a12b:free",
+      "nvidia/nemotron-3-nano-30b-a3b:free",
     );
   });
 
@@ -344,7 +346,46 @@ describe("/api/chat", () => {
     expect(second.headers.get("x-nodes-error-code")).toBe("chat_quota_exceeded");
     expect(second.headers.get("Retry-After")).toBeTruthy();
     await expect(second.text()).resolves.toBe(
-      "This user has hit the current assistant usage limit. Wait a bit before sending another request.",
+      "You have hit the current assistant usage limit. Wait a bit before sending another request.",
+    );
+  });
+
+  it("rejects overlapping requests with a specific concurrency error", async () => {
+    process.env.NODES_CHAT_LIMIT_CONCURRENT = "1";
+
+    streamTextMock.mockReturnValue({
+      toUIMessageStreamResponse: ({ headers }: { headers?: HeadersInit }) =>
+        new Response("ok", { status: 200, headers }),
+    });
+
+    const first = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          model: "nvidia/nemotron-3-nano-30b-a3b:free",
+          messages: [{ id: "u1", role: "user", content: "hello" }],
+        }),
+      }),
+    );
+
+    expect(first.status).toBe(200);
+
+    const second = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          model: "nvidia/nemotron-3-nano-30b-a3b:free",
+          messages: [{ id: "u2", role: "user", content: "again" }],
+        }),
+      }),
+    );
+
+    expect(second.status).toBe(429);
+    expect(second.headers.get("x-nodes-error-code")).toBe("chat_concurrency_limited");
+    await expect(second.text()).resolves.toBe(
+      "The assistant is still responding. Wait for it to finish or cancel the current run.",
     );
   });
 

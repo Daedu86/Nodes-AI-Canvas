@@ -1,6 +1,7 @@
 import type { LlmContextArtifact } from "@/lib/session-artifacts";
 import {
   LLM_PROVIDER_IDS,
+  OPENROUTER_FREE_MODEL_OPTIONS,
   SAFE_DEFAULT_MODEL,
   type LlmProviderId,
 } from "@/lib/llm/provider-catalog";
@@ -52,13 +53,7 @@ const DEFAULT_ALLOWED_MODELS: Record<Provider, string[]> = {
   anthropic: [],
   google: [],
   openai: [],
-  openrouter: [
-    "nvidia/nemotron-3-super-120b-a12b:free",
-    "openrouter/free",
-    "nvidia/nemotron-3-nano-30b-a3b:free",
-    "arcee-ai/trinity-large-preview:free",
-    "arcee-ai/trinity-mini:free",
-  ],
+  openrouter: OPENROUTER_FREE_MODEL_OPTIONS.map((option) => option.modelId),
   ollama: ["gemma3:4b"],
 };
 

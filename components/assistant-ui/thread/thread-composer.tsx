@@ -2,6 +2,7 @@ import {
   ComposerPrimitive,
   ThreadPrimitive,
   useComposerRuntime,
+  useThread,
 } from "@assistant-ui/react";
 import type { FC } from "react";
 import React from "react";
@@ -26,6 +27,9 @@ const applyComposerRunConfig = (
     // Runtime may be unavailable during initialization.
   }
 };
+
+const ACTIVE_RUN_ERROR_MESSAGE =
+  "The assistant is still responding. Wait for it to finish or cancel the current run.";
 
 const HistoryModeControls: FC<{
   historyMode: "last" | "full";
@@ -90,10 +94,11 @@ const ComposerAction: FC<{ onSend: () => void; onCancel: () => void }> = ({
 
 export const Composer: FC = () => {
   const composer = useComposerRuntime();
+  const isRunning = useThread((state) => state.isRunning);
   const { historyMode, setHistoryMode } = useHistoryMode();
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
-  const { clearRequestError, requestError } = useRequestError();
+  const { clearRequestError, requestError, setRequestError } = useRequestError();
 
   React.useEffect(() => {
     applyComposerRunConfig(composer, historyMode, modelId, provider);
@@ -101,12 +106,16 @@ export const Composer: FC = () => {
 
   const handleSend = React.useCallback(() => {
     if (!composer || !llmEnabled) return;
+    if (isRunning) {
+      setRequestError(ACTIVE_RUN_ERROR_MESSAGE);
+      return;
+    }
     const state = composer.getState();
     const text = state.text.trim();
     if (!text) return;
     clearRequestError();
     composer.send();
-  }, [clearRequestError, composer, llmEnabled]);
+  }, [clearRequestError, composer, isRunning, llmEnabled, setRequestError]);
 
   const handleCancel = React.useCallback(() => {
     if (!composer) return;
@@ -153,13 +162,18 @@ export const Composer: FC = () => {
 
 export const EditComposer: FC = () => {
   const composer = useComposerRuntime();
+  const isRunning = useThread((state) => state.isRunning);
   const { historyMode, setHistoryMode } = useHistoryMode();
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
-  const { clearRequestError, requestError } = useRequestError();
+  const { clearRequestError, requestError, setRequestError } = useRequestError();
 
   const handleSend = () => {
     if (!composer || !llmEnabled) return;
+    if (isRunning) {
+      setRequestError(ACTIVE_RUN_ERROR_MESSAGE);
+      return;
+    }
     const state = composer.getState();
     const text = state.text.trim();
     if (!text) return;
@@ -194,7 +208,7 @@ export const EditComposer: FC = () => {
         <Button type="button" variant="ghost" onClick={handleCancel} disabled={!llmEnabled}>
           Cancel
         </Button>
-        <Button type="button" onClick={handleSend} disabled={!llmEnabled}>
+        <Button type="button" onClick={handleSend} disabled={!llmEnabled || isRunning}>
           Send
         </Button>
       </div>

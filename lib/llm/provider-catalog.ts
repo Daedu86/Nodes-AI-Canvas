@@ -24,18 +24,18 @@ export type ProviderModelOption = {
 
 export const OPENROUTER_FREE_MODEL_OPTIONS: ProviderModelOption[] = [
   {
-    label: "OpenRouter · Nemotron 3 Super (free)",
-    modelId: "nvidia/nemotron-3-super-120b-a12b:free",
-    provider: "openrouter",
-  },
-  {
-    label: "OpenRouter · Free Router",
-    modelId: "openrouter/free",
-    provider: "openrouter",
-  },
-  {
     label: "OpenRouter · Nemotron 3 Nano",
     modelId: "nvidia/nemotron-3-nano-30b-a3b:free",
+    provider: "openrouter",
+  },
+  {
+    label: "OpenRouter · Trinity Mini",
+    modelId: "arcee-ai/trinity-mini:free",
+    provider: "openrouter",
+  },
+  {
+    label: "OpenRouter · Nemotron 3 Super (free)",
+    modelId: "nvidia/nemotron-3-super-120b-a12b:free",
     provider: "openrouter",
   },
   {
@@ -44,8 +44,8 @@ export const OPENROUTER_FREE_MODEL_OPTIONS: ProviderModelOption[] = [
     provider: "openrouter",
   },
   {
-    label: "OpenRouter · Trinity Mini",
-    modelId: "arcee-ai/trinity-mini:free",
+    label: "OpenRouter · Free Router",
+    modelId: "openrouter/free",
     provider: "openrouter",
   },
 ];
