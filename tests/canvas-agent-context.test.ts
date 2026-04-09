@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCanvasGuidePayload,
+  buildCanvasGuideSourceCatalog,
   getCanvasGuideActionLabel,
 } from "../lib/canvas-agent/canvas-agent-context";
 
@@ -80,11 +81,11 @@ describe("canvas guide context", () => {
       action: "survey-tree",
       artifacts: [
         {
-          artifactType: "code",
-          content: "const flow = true;",
+          artifactType: "text",
+          content: "This branch should stay focused on evidence before deciding.",
           createdAt: "2026-03-27T10:00:00.000Z",
           id: "artifact-code",
-          language: "ts",
+          semanticType: "evidence",
           title: "Flow snippet",
           updatedAt: "2026-03-27T10:00:00.000Z",
         },
@@ -114,7 +115,7 @@ describe("canvas guide context", () => {
     expect(payload.focus).toMatchObject({
       kind: "artifact",
       id: "artifact-code",
-      artifactType: "code",
+      artifactType: "text",
     });
     if (payload.focus.kind === "artifact") {
       expect(payload.focus.linkedTargets).toEqual([
@@ -127,6 +128,46 @@ describe("canvas guide context", () => {
     }
     expect(payload.tree.artifactCount).toBe(1);
     expect(payload.tree.nodeCount).toBe(1);
+    expect(payload.artifacts.previewArtifacts[0]).toMatchObject({
+      id: "artifact-code",
+      semanticType: "evidence",
+    });
+  });
+
+  it("includes semantic artifacts in the Nody source catalog even when they are not selected", () => {
+    const payload = buildCanvasGuidePayload({
+      action: "survey-tree",
+      artifacts: [
+        {
+          artifactType: "text",
+          content: "Ship the brief after we lock the citations.",
+          createdAt: "2026-03-27T10:00:00.000Z",
+          id: "artifact-decision",
+          semanticType: "decision",
+          title: "Launch sequence",
+          updatedAt: "2026-03-27T10:00:00.000Z",
+        },
+      ],
+      contextLinks: [],
+      historyMode: "last",
+      modelId: "stepfun/step-3.5-flash:free",
+      nodes: [{ id: "__ROOT__", parentId: null, role: "ROOT", text: "Conversation Root" }],
+      edges: [],
+      provider: "openrouter",
+      selectedEdgeId: null,
+      selectedNodeId: null,
+      sessionId: "session-2",
+      sessionTitle: "Artifact sources",
+    });
+
+    const catalog = buildCanvasGuideSourceCatalog(payload);
+    expect(catalog).toContainEqual(
+      expect.objectContaining({
+        kind: "artifact",
+        label: "Decision · Launch sequence",
+        ref: "artifact:artifact-decision",
+      }),
+    );
   });
 
   it("builds a branch focus when the guide stands over an edge", () => {

@@ -59,4 +59,51 @@ describe("session brief builder", () => {
     ]);
     expect(brief.signals[0]).toContain("decision artifact");
   });
+
+  it("falls back to semantic artifacts when Nody sources are missing", () => {
+    const brief = buildSessionBrief({
+      artifacts: [
+        {
+          artifactType: "text",
+          content: "Adopt semantic artifacts before adding more providers.",
+          createdAt: "2026-04-09T00:00:00.000Z",
+          id: "decision-1",
+          semanticType: "decision",
+          title: "Priority decision",
+          updatedAt: "2026-04-09T00:00:00.000Z",
+        },
+        {
+          artifactType: "text",
+          content: "The current canvas already supports typed semantic notes.",
+          createdAt: "2026-04-09T00:00:00.000Z",
+          id: "evidence-1",
+          semanticType: "evidence",
+          title: "Canvas evidence",
+          updatedAt: "2026-04-09T00:00:00.000Z",
+        },
+        {
+          artifactType: "text",
+          content: "How should merge work across worlds?",
+          createdAt: "2026-04-09T00:00:00.000Z",
+          id: "question-1",
+          semanticType: "question",
+          title: "Merge worlds",
+          updatedAt: "2026-04-09T00:00:00.000Z",
+        },
+      ],
+      insight: null,
+      sessionTitle: "Nodes",
+      sources: [],
+      wiki: null,
+    });
+
+    expect(brief.recommendation).toContain("Adopt semantic artifacts");
+    expect(brief.evidence).toEqual([
+      expect.objectContaining({
+        kind: "artifact",
+        ref: "artifact:evidence-1",
+      }),
+    ]);
+    expect(brief.openQuestions[0]).toContain("Merge worlds");
+  });
 });

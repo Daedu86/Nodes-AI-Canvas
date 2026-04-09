@@ -1,6 +1,6 @@
 "use client";
 
-import { BookCopy, ChevronRight, FileQuestion, GitBranchPlus, Network, Paperclip } from "lucide-react";
+import { BookCopy, ChevronRight, FileQuestion, GitBranchPlus, Network, Paperclip, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNodyPanel } from "@/components/context/nody-panel";
 import { useSessionUiState } from "@/components/context/session-ui-state";
@@ -10,6 +10,7 @@ const pageIcon: Record<SessionWikiPageId, typeof BookCopy> = {
   "open-questions": FileQuestion,
   artifacts: Paperclip,
   branches: GitBranchPlus,
+  decisions: Scale,
   focus: ChevronRight,
   overview: Network,
 };

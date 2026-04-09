@@ -286,17 +286,29 @@ export function NodyPanel() {
                       Open Brief
                     </Button>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 grid gap-2">
                     {resolvedSources.map((source) => (
                       <button
                         key={source.ref}
                         type="button"
-                        className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/60 bg-background px-3 py-1.5 text-left text-xs text-foreground/85 transition-colors hover:bg-muted"
+                        className="flex w-full items-start justify-between gap-3 rounded-[20px] border border-border/60 bg-background px-3 py-2.5 text-left transition-colors hover:bg-muted"
                         onClick={() => handleOpenSource(source)}
                       >
-                        <span className="truncate">{source.label}</span>
-                        <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground dark:bg-white/10">
-                          {source.kind}
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-medium text-foreground/90">{source.label}</span>
+                            <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground dark:bg-white/10">
+                              {source.kind}
+                            </span>
+                          </div>
+                          {source.preview ? (
+                            <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-muted-foreground">
+                              {source.preview}
+                            </p>
+                          ) : null}
+                        </div>
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-700">
+                          Open
                         </span>
                       </button>
                     ))}

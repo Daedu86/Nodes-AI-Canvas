@@ -45,6 +45,22 @@ export type LlmContextArtifact = {
   mimeType?: string | null;
 };
 
+const semanticArtifactLabels: Record<SessionArtifactSemanticType, string> = {
+  decision: "Decision",
+  evidence: "Evidence",
+  plan: "Plan",
+  question: "Question",
+  draft: "Draft",
+};
+
+const semanticArtifactRoles: Record<SessionArtifactSemanticType, string> = {
+  decision: "Recommendation and rationale",
+  evidence: "Grounded facts and supporting observations",
+  plan: "Execution steps and dependencies",
+  question: "Open question worth resolving",
+  draft: "Working language or unfinished copy",
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
@@ -71,6 +87,12 @@ const normalizeNullableNumber = (value: unknown) =>
 
 const normalizeNullableString = (value: unknown) =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+const trimArtifactText = (value: string, maxLength = 220) => {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return "No preview available.";
+  return compact.length > maxLength ? `${compact.slice(0, maxLength - 1)}…` : compact;
+};
 
 export const normalizeSessionArtifacts = (value: unknown): SessionArtifact[] => {
   if (!Array.isArray(value)) return [];
@@ -180,3 +202,47 @@ export const normalizeLlmContextArtifacts = (value: unknown): LlmContextArtifact
     language: artifact.language ?? null,
     mimeType: artifact.mimeType ?? null,
   }));
+
+export const getSemanticArtifactLabel = (
+  semanticType?: SessionArtifactSemanticType | null,
+) => (semanticType ? semanticArtifactLabels[semanticType] : null);
+
+export const getSemanticArtifactRole = (
+  semanticType?: SessionArtifactSemanticType | null,
+) => (semanticType ? semanticArtifactRoles[semanticType] : null);
+
+export const getSessionArtifactDisplayLabel = (
+  artifact:
+    | Pick<SessionArtifact, "artifactType" | "semanticType">
+    | LlmContextArtifact,
+) => {
+  if (artifact.artifactType === "text" && artifact.semanticType) {
+    return getSemanticArtifactLabel(artifact.semanticType) ?? "Text";
+  }
+  switch (artifact.artifactType) {
+    case "code":
+      return "Code";
+    case "image":
+      return "Image";
+    case "file":
+      return "File";
+    default:
+      return "Text";
+  }
+};
+
+export const getSessionArtifactPreview = (
+  artifact: Pick<
+    SessionArtifact,
+    "artifactType" | "content" | "fileName" | "semanticType" | "title"
+  >,
+  maxLength = 220,
+) => {
+  if (artifact.content.trim().length > 0) {
+    return trimArtifactText(artifact.content, maxLength);
+  }
+  if (artifact.fileName) {
+    return `${getSessionArtifactDisplayLabel(artifact)} · ${artifact.fileName}`;
+  }
+  return artifact.title?.trim() || `${getSessionArtifactDisplayLabel(artifact)} artifact`;
+};

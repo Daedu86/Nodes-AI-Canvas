@@ -142,6 +142,18 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
     }
   }, [snapshot]);
 
+  React.useEffect(() => {
+    setBusy(false);
+    setError(null);
+    setInsight(null);
+    setLastAction(null);
+    setQuestion("");
+    setRecentInsights([]);
+    setSelectedWikiPageId("overview");
+    setSourceCatalog([]);
+    setPhase("idle");
+  }, [snapshot?.sessionId]);
+
   const runAction = React.useCallback(
     async (action: CanvasGuideAction, ask?: string | null) => {
       if (!snapshot) {

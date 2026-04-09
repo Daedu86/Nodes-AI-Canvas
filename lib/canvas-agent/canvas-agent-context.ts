@@ -1,6 +1,11 @@
 import type { HistoryMode } from "@/components/context/session-ui-state";
 import type { NodySourceCatalogEntry } from "@/lib/nody-insight";
-import type { SessionArtifact, SessionContextLink } from "@/lib/session-artifacts";
+import {
+  getSessionArtifactDisplayLabel,
+  getSessionArtifactPreview,
+  type SessionArtifact,
+  type SessionContextLink,
+} from "@/lib/session-artifacts";
 
 export type CanvasGuideAction = "explain-focus" | "summarize-branch" | "survey-tree" | "ask-guide";
 
@@ -113,6 +118,17 @@ export type CanvasGuidePayload = {
       preview: string;
     }>;
   };
+  artifacts: {
+    semanticCount: number;
+    previewArtifacts: Array<{
+      id: string;
+      title: string;
+      artifactType: SessionArtifact["artifactType"];
+      semanticType: SessionArtifact["semanticType"];
+      linkedTargetCount: number;
+      preview: string;
+    }>;
+  };
 };
 
 type BuildCanvasGuidePayloadArgs = {
@@ -179,15 +195,8 @@ const buildTranscript = (nodes: CanvasGuideGraphNode[]) =>
     .map((node) => `${node.role}: ${trimText(node.text, 320)}`)
     .join("\n");
 
-const buildArtifactPreview = (artifact: SessionArtifact) => {
-  if (artifact.content.trim().length > 0) {
-    return trimText(artifact.content, 220);
-  }
-  if (artifact.fileName) {
-    return `${artifact.artifactType} file ${artifact.fileName}`;
-  }
-  return `${artifact.artifactType} artifact`;
-};
+const buildArtifactPreview = (artifact: SessionArtifact) =>
+  getSessionArtifactPreview(artifact, 220);
 
 export const getCanvasGuideActionLabel = (action: CanvasGuideAction) => {
   switch (action) {
@@ -366,6 +375,19 @@ export function buildCanvasGuidePayload({
         preview: trimText(node.text, 140),
       })),
     },
+    artifacts: {
+      semanticCount: artifacts.filter(
+        (artifact) => artifact.artifactType === "text" && artifact.semanticType,
+      ).length,
+      previewArtifacts: artifacts.slice(0, 12).map((artifact) => ({
+        id: artifact.id,
+        title: artifact.title,
+        artifactType: artifact.artifactType,
+        semanticType: artifact.semanticType ?? null,
+        linkedTargetCount: contextLinks.filter((link) => link.artifactId === artifact.id).length,
+        preview: buildArtifactPreview(artifact),
+      })),
+    },
   };
 }
 
@@ -430,6 +452,17 @@ export const buildCanvasGuideUserPrompt = (payload: CanvasGuidePayload) => {
       .map((node) => `- ${node.role} [${node.id}] ${node.preview}`)
       .join("\n")}`,
   );
+
+  if (payload.artifacts.previewArtifacts.length > 0) {
+    lines.push(
+      `Artifact preview: semantic=${payload.artifacts.semanticCount} total=${payload.tree.artifactCount}\n${payload.artifacts.previewArtifacts
+        .map(
+          (artifact) =>
+            `- ${getSessionArtifactDisplayLabel(artifact)} [${artifact.id}] ${artifact.title} | links=${artifact.linkedTargetCount} | ${artifact.preview}`,
+        )
+        .join("\n")}`,
+    );
+  }
 
   if (payload.ask) {
     lines.push(`User question: ${payload.ask}`);
@@ -539,6 +572,16 @@ export const buildCanvasGuideSourceCatalog = (
       label: `${node.role} · tree`,
       preview: node.preview,
       targetId: node.id,
+    });
+  });
+
+  payload.artifacts.previewArtifacts.forEach((artifact) => {
+    pushEntry({
+      ref: `artifact:${artifact.id}`,
+      kind: "artifact",
+      label: `${getSessionArtifactDisplayLabel(artifact)} · ${artifact.title}`,
+      preview: artifact.preview,
+      targetId: artifact.id,
     });
   });
 
