@@ -53,12 +53,7 @@ import { GraphBranchActions } from "@/components/assistant-ui/thread-graph-flow/
 import { ArtifactGraphNode } from "@/components/assistant-ui/thread-graph-flow/artifact-node";
 import {
   getArtifactBadgeLabel,
-  getArtifactCodeSample,
-  getArtifactHeadline,
-  getArtifactHighlights,
-  getArtifactIntentLabel,
   getArtifactLineCount,
-  getArtifactReadableRole,
   getArtifactStatChips,
 } from "@/components/assistant-ui/thread-graph-flow/artifact-presentation";
 import { ThreadGraphEdge } from "@/components/assistant-ui/thread-graph-flow/thread-graph-edge";
@@ -1459,18 +1454,6 @@ export function ThreadGraphFlow() {
   const selectedArtifactPreviewSize = selectedArtifact?.sourceDataUrl
     ? formatByteSize(estimateDataUrlBytes(selectedArtifact.sourceDataUrl))
     : null;
-  const selectedArtifactHeadline = React.useMemo(
-    () => (selectedArtifact ? getArtifactHeadline(selectedArtifact) : ""),
-    [selectedArtifact],
-  );
-  const selectedArtifactHighlights = React.useMemo(
-    () => (selectedArtifact ? getArtifactHighlights(selectedArtifact, 4) : []),
-    [selectedArtifact],
-  );
-  const selectedArtifactCodeSample = React.useMemo(
-    () => (selectedArtifact ? getArtifactCodeSample(selectedArtifact, 8) : []),
-    [selectedArtifact],
-  );
   const selectedArtifactStatChips = React.useMemo(
     () => (selectedArtifact ? getArtifactStatChips(selectedArtifact) : []),
     [selectedArtifact],
@@ -1891,8 +1874,8 @@ export function ThreadGraphFlow() {
             {selectedArtifact ? (
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span
                         className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
                         style={{
@@ -1915,10 +1898,20 @@ export function ThreadGraphFlow() {
                           preview {selectedArtifactPreviewSize}
                         </span>
                       ) : null}
+                      {selectedArtifactStatChips.slice(0, 2).map((chip) => (
+                        <span
+                          key={chip}
+                          className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+                        >
+                          {chip}
+                        </span>
+                      ))}
+                      {selectedArtifact.artifactType === "code" && selectedArtifactLineCount > 0 ? (
+                        <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                          {selectedArtifactLineCount} lines
+                        </span>
+                      ) : null}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Artifact nodes live outside the chat tree and can be reused as context for multiple branches.
-                    </p>
                   </div>
                   <Sparkles className="h-4 w-4 text-violet-600" />
                 </div>
@@ -1985,72 +1978,11 @@ export function ThreadGraphFlow() {
                     </div>
                   )}
                 </div>
-                <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                      style={{
-                        borderColor: `${artifactAccent(selectedArtifact)}55`,
-                        color: artifactAccent(selectedArtifact),
-                      }}
-                    >
-                      {getArtifactReadableRole(selectedArtifact)}
-                    </span>
-                    {selectedArtifactStatChips.slice(0, 3).map((chip) => (
-                      <span
-                        key={chip}
-                        className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
-                      >
-                        {chip}
-                      </span>
-                    ))}
-                    {selectedArtifact.artifactType === "code" && selectedArtifactLineCount > 0 ? (
-                      <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                        {selectedArtifactLineCount} lines
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                      Tool-ready card
-                    </p>
-                    <p className="text-sm font-semibold text-foreground/90">{selectedArtifactHeadline}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {getArtifactIntentLabel(selectedArtifact)}
-                    </p>
-                  </div>
-                  {selectedArtifact.artifactType === "code" ? (
-                    <div className="overflow-hidden rounded-xl border border-emerald-500/20 bg-slate-950 px-3 py-2 text-[12px] text-emerald-100">
-                      {selectedArtifactCodeSample.length > 0 ? (
-                        selectedArtifactCodeSample.map((line, index) => (
-                          <div key={`${index}:${line}`} className="grid grid-cols-[auto,1fr] gap-3 leading-5">
-                            <span className="select-none text-emerald-300/45">{index + 1}</span>
-                            <code className="truncate font-mono">{line}</code>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="font-mono text-emerald-100/80">No code captured yet.</p>
-                      )}
-                    </div>
-                  ) : selectedArtifactHighlights.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {selectedArtifactHighlights.map((line) => (
-                        <div key={line} className="flex items-start gap-2 text-xs leading-5 text-foreground/84">
-                          <span
-                            className="mt-1 h-1.5 w-1.5 rounded-full"
-                            style={{ backgroundColor: artifactAccent(selectedArtifact) }}
-                          />
-                          <span>{line}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
                 {selectedArtifact.artifactType === "image" && selectedArtifact.sourceDataUrl ? (
                   <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
                     <div className="flex items-center gap-2 text-xs font-medium text-foreground/80">
                       <FileImage className="h-4 w-4 text-pink-600" />
-                      <span>Image preview</span>
+                      <span>Preview</span>
                     </div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -2083,75 +2015,70 @@ export function ThreadGraphFlow() {
                     className="min-h-[136px] w-full resize-y rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-violet-500/35"
                   />
                 </label>
-                {selectedArtifactSemanticMeta ? (
-                  <div className="rounded-2xl border border-border/60 bg-background/90 px-3 py-3 text-xs text-muted-foreground shadow-sm">
-                    <p className="font-medium text-foreground/80">
-                      {selectedArtifactSemanticMeta.label} pattern
-                    </p>
-                    <p className="mt-1">{selectedArtifactSemanticMeta.role}</p>
-                  </div>
-                ) : null}
                 <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-foreground/80">Attach to conversation nodes</p>
-                    <p className="text-xs text-muted-foreground">
-                      Link this artifact to any branch anchor, then jump there to create a contextual branch.
-                    </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-foreground/80">Links</p>
+                    {selectedArtifactSemanticMeta ? (
+                      <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                        {selectedArtifactSemanticMeta.label}
+                      </span>
+                    ) : null}
                   </div>
-                  <div className="max-h-[148px] space-y-2 overflow-y-auto pr-1">
-                    {attachableTargets.map((target) => {
-                      const isLinked = isArtifactLinkedToTarget(selectedArtifact.id, target.id);
-                      return (
-                        <div
-                          key={target.id}
-                          className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${
-                            isLinked
-                              ? "border-violet-500/30 bg-violet-500/10"
-                              : "border-border/60 bg-background"
-                          }`}
-                        >
-                          <div className="min-w-0 space-y-1">
+                  {attachableTargets.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No available targets.</p>
+                  ) : (
+                    <div className="max-h-[148px] space-y-2 overflow-y-auto pr-1">
+                      {attachableTargets.map((target) => {
+                        const isLinked = isArtifactLinkedToTarget(selectedArtifact.id, target.id);
+                        return (
+                          <div
+                            key={target.id}
+                            className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${
+                              isLinked
+                                ? "border-violet-500/30 bg-violet-500/10"
+                                : "border-border/60 bg-background"
+                            }`}
+                          >
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                                  {target.role}
+                                </span>
+                                <span className="truncate text-xs font-medium text-foreground/85">
+                                  {target.preview}
+                                </span>
+                              </div>
+                            </div>
                             <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                                {target.role}
-                              </span>
-                              <span className="truncate text-xs font-medium text-foreground/85">
-                                {target.preview}
-                              </span>
+                              <button
+                                type="button"
+                                aria-label={`${isLinked ? "Detach" : "Attach"} target ${target.id}`}
+                                className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs ${
+                                  isLinked
+                                    ? "border-violet-500/35 bg-violet-500/10 text-violet-700 hover:bg-violet-500/15"
+                                    : "border-border/60 bg-background hover:bg-muted"
+                                }`}
+                                onClick={() => handleToggleArtifactLink(selectedArtifact.id, target.id)}
+                              >
+                                {isLinked ? <Unlink2 className="h-3.5 w-3.5" /> : <FilePlus2 className="h-3.5 w-3.5" />}
+                                <span>{isLinked ? "Detach" : "Attach"}</span>
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Open target ${target.id}`}
+                                className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs hover:bg-muted"
+                                onClick={() => applyCanvasSelection(target.id)}
+                              >
+                                <span>Open</span>
+                              </button>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              aria-label={`${isLinked ? "Detach" : "Attach"} target ${target.id}`}
-                              className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs ${
-                                isLinked
-                                  ? "border-violet-500/35 bg-violet-500/10 text-violet-700 hover:bg-violet-500/15"
-                                  : "border-border/60 bg-background hover:bg-muted"
-                              }`}
-                              onClick={() => handleToggleArtifactLink(selectedArtifact.id, target.id)}
-                            >
-                              {isLinked ? <Unlink2 className="h-3.5 w-3.5" /> : <FilePlus2 className="h-3.5 w-3.5" />}
-                              <span>{isLinked ? "Detach" : "Attach"}</span>
-                            </button>
-                            <button
-                              type="button"
-                              aria-label={`Open target ${target.id}`}
-                              className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs hover:bg-muted"
-                              onClick={() => applyCanvasSelection(target.id)}
-                            >
-                              <span>Open target</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-muted-foreground">
-                    Drag this node in the canvas to reposition it. Linked targets stay attached.
-                  </p>
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <button
                     type="button"
                     className="inline-flex items-center gap-1 rounded-md border border-rose-500/35 bg-rose-500/10 px-2.5 py-1.5 text-xs text-rose-700 hover:bg-rose-500/15"
