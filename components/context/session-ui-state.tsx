@@ -6,6 +6,17 @@ import { getSupportedModelConfig } from "@/lib/model-options";
 export type HistoryMode = "last" | "full";
 export type ModelProvider = "ollama" | "openrouter";
 export type SessionViewMode = "chat" | "split" | "canvas" | "wiki" | "brief" | "nody";
+export type SplitWorkspacePane = "chat" | "canvas" | "wiki" | "brief" | "nody";
+
+export const SPLIT_WORKSPACE_PANES: SplitWorkspacePane[] = [
+  "chat",
+  "canvas",
+  "wiki",
+  "brief",
+  "nody",
+];
+
+export type SplitPaneVisibility = Record<SplitWorkspacePane, boolean>;
 
 export type ModelConfig = {
   modelId: string;
@@ -30,6 +41,9 @@ type SessionUiStateContextValue = {
   setModelConfig: (value: ModelConfig) => void;
   viewMode: SessionViewMode;
   setViewMode: (value: SessionViewMode) => void;
+  splitPaneVisibility: SplitPaneVisibility;
+  setSplitPaneOpen: (pane: SplitWorkspacePane, open: boolean) => void;
+  toggleSplitPane: (pane: SplitWorkspacePane) => void;
   splitRatio: number;
   setSplitRatio: (value: number | ((prev: number) => number)) => void;
   secondarySplitRatio: number;
@@ -49,6 +63,13 @@ const OLD_DEFAULT_SECONDARY_SPLIT_RATIO = 0.5;
 const DEFAULT_SPLIT_RATIO = 0.28;
 const DEFAULT_SECONDARY_SPLIT_RATIO = 0.58;
 const DEFAULT_VIEW_MODE: SessionViewMode = "split";
+const DEFAULT_SPLIT_PANE_VISIBILITY: SplitPaneVisibility = {
+  chat: true,
+  canvas: true,
+  wiki: true,
+  brief: true,
+  nody: true,
+};
 
 const DEFAULT_MODEL_CONFIG: ModelConfig = getSupportedModelConfig({
   modelId: process.env.NEXT_PUBLIC_DEFAULT_MODEL,
@@ -148,6 +169,36 @@ const readSecondarySplitRatio = (sessionId: string) => {
   return parsed;
 };
 
+const ensureAtLeastOneSplitPane = (value: SplitPaneVisibility): SplitPaneVisibility => {
+  if (SPLIT_WORKSPACE_PANES.some((pane) => value[pane])) {
+    return value;
+  }
+  return {
+    ...value,
+    canvas: true,
+  };
+};
+
+const readSplitPaneVisibility = (sessionId: string): SplitPaneVisibility => {
+  const raw = readStorageValue(getScopedStorageKey(sessionId, "splitPaneVisibility"));
+  if (!raw) {
+    return DEFAULT_SPLIT_PANE_VISIBILITY;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<Record<SplitWorkspacePane, boolean>>;
+    return ensureAtLeastOneSplitPane({
+      chat: parsed.chat ?? DEFAULT_SPLIT_PANE_VISIBILITY.chat,
+      canvas: parsed.canvas ?? DEFAULT_SPLIT_PANE_VISIBILITY.canvas,
+      wiki: parsed.wiki ?? DEFAULT_SPLIT_PANE_VISIBILITY.wiki,
+      brief: parsed.brief ?? DEFAULT_SPLIT_PANE_VISIBILITY.brief,
+      nody: parsed.nody ?? DEFAULT_SPLIT_PANE_VISIBILITY.nody,
+    });
+  } catch {
+    return DEFAULT_SPLIT_PANE_VISIBILITY;
+  }
+};
+
 const readViewMode = (sessionId: string): SessionViewMode => {
   const value = readStorageValue(
     getScopedStorageKey(sessionId, "viewMode"),
@@ -202,6 +253,9 @@ export function SessionUiStateProvider({
   const [llmEnabled, setLlmEnabled] = React.useState<boolean>(() => readLlmEnabled(sessionId));
   const [modelConfig, setModelConfig] = React.useState<ModelConfig>(() => readModelConfig(sessionId));
   const [viewMode, setViewMode] = React.useState<SessionViewMode>(() => readViewMode(sessionId));
+  const [splitPaneVisibility, setSplitPaneVisibility] = React.useState<SplitPaneVisibility>(() =>
+    readSplitPaneVisibility(sessionId),
+  );
   const [splitRatio, setSplitRatio] = React.useState<number>(() => readSplitRatio(sessionId));
   const [secondarySplitRatio, setSecondarySplitRatio] = React.useState<number>(() =>
     readSecondarySplitRatio(sessionId),
@@ -247,6 +301,17 @@ export function SessionUiStateProvider({
 
   React.useEffect(() => {
     try {
+      localStorage.setItem(
+        getScopedStorageKey(sessionId, "splitPaneVisibility"),
+        JSON.stringify(splitPaneVisibility),
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [sessionId, splitPaneVisibility]);
+
+  React.useEffect(() => {
+    try {
       localStorage.setItem(getScopedStorageKey(sessionId, "splitRatio.v3"), String(splitRatio));
     } catch {
       // ignore storage errors
@@ -281,6 +346,32 @@ export function SessionUiStateProvider({
     }
   }, [linkOverrides, sessionId]);
 
+  const setSplitPaneOpen = React.useCallback((pane: SplitWorkspacePane, open: boolean) => {
+    setSplitPaneVisibility((prev) => {
+      const next = ensureAtLeastOneSplitPane({
+        ...prev,
+        [pane]: open,
+      });
+      if (SPLIT_WORKSPACE_PANES.every((key) => prev[key] === next[key])) {
+        return prev;
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSplitPane = React.useCallback((pane: SplitWorkspacePane) => {
+    setSplitPaneVisibility((prev) => {
+      const next = ensureAtLeastOneSplitPane({
+        ...prev,
+        [pane]: !prev[pane],
+      });
+      if (SPLIT_WORKSPACE_PANES.every((key) => prev[key] === next[key])) {
+        return prev;
+      }
+      return next;
+    });
+  }, []);
+
   const value = React.useMemo<SessionUiStateContextValue>(
     () => ({
       historyMode,
@@ -295,6 +386,9 @@ export function SessionUiStateProvider({
       setModelConfig,
       viewMode,
       setViewMode,
+      splitPaneVisibility,
+      setSplitPaneOpen,
+      toggleSplitPane,
       splitRatio,
       setSplitRatio,
       secondarySplitRatio,
@@ -310,6 +404,9 @@ export function SessionUiStateProvider({
       llmEnabled,
       modelConfig,
       viewMode,
+      splitPaneVisibility,
+      setSplitPaneOpen,
+      toggleSplitPane,
       splitRatio,
       secondarySplitRatio,
       linkOverrides,
@@ -340,6 +437,9 @@ export function useWorkspaceSplitState() {
     setSecondarySplitRatio,
     viewMode,
     setViewMode,
+    splitPaneVisibility,
+    setSplitPaneOpen,
+    toggleSplitPane,
   } = useSessionUiState();
   return {
     splitRatio,
@@ -348,6 +448,9 @@ export function useWorkspaceSplitState() {
     setSecondarySplitRatio,
     viewMode,
     setViewMode,
+    splitPaneVisibility,
+    setSplitPaneOpen,
+    toggleSplitPane,
   };
 }
 

@@ -72,7 +72,11 @@ describe("WorkspaceSplitLayout", () => {
     expect(screen.queryByTestId("chat-panel")).not.toBeNull();
     expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
     expect(screen.queryByTestId("nody-panel")).not.toBeNull();
-    expect(screen.queryByTestId("wiki-panel")).toBeNull();
+    expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
+    expect(screen.queryByTestId("brief-panel")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide Brief pane in split" }));
+
     expect(screen.queryByTestId("brief-panel")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show Wiki" }));
@@ -95,6 +99,14 @@ describe("WorkspaceSplitLayout", () => {
     expect(screen.queryByTestId("nody-panel")).toBeNull();
     expect(screen.queryByTestId("brief-panel")).toBeNull();
 
+    fireEvent.click(screen.getByRole("button", { name: "Show split" }));
+
+    expect(screen.queryByTestId("chat-panel")).not.toBeNull();
+    expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
+    expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
+    expect(screen.queryByTestId("nody-panel")).not.toBeNull();
+    expect(screen.queryByTestId("brief-panel")).toBeNull();
+
     cleanup();
 
     renderLayout("session-b");
@@ -103,7 +115,7 @@ describe("WorkspaceSplitLayout", () => {
     expect(screen.queryByTestId("chat-panel")).not.toBeNull();
     expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
     expect(screen.queryByTestId("nody-panel")).not.toBeNull();
-    expect(screen.queryByTestId("wiki-panel")).toBeNull();
-    expect(screen.queryByTestId("brief-panel")).toBeNull();
+    expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
+    expect(screen.queryByTestId("brief-panel")).not.toBeNull();
   });
 });

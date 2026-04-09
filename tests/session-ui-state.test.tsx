@@ -4,6 +4,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import {
+  SPLIT_WORKSPACE_PANES,
   SessionUiStateProvider,
   useSessionUiState,
 } from "../components/context/session-ui-state";
@@ -16,6 +17,15 @@ function ModelConfigHarness() {
 function SplitRatioHarness() {
   const { splitRatio, secondarySplitRatio } = useSessionUiState();
   return <div data-testid="split-ratios">{`${splitRatio.toFixed(2)}:${secondarySplitRatio.toFixed(2)}`}</div>;
+}
+
+function SplitPaneHarness() {
+  const { splitPaneVisibility } = useSessionUiState();
+  return (
+    <div data-testid="split-panes">
+      {SPLIT_WORKSPACE_PANES.map((pane) => `${pane}:${splitPaneVisibility[pane] ? "open" : "closed"}`).join("|")}
+    </div>
+  );
 }
 
 describe("SessionUiStateProvider", () => {
@@ -59,5 +69,28 @@ describe("SessionUiStateProvider", () => {
     );
 
     expect(screen.getByTestId("split-ratios").textContent).toBe("0.28:0.58");
+  });
+
+  it("defaults split mode to all five workspace panes and guards against empty persisted state", () => {
+    localStorage.setItem(
+      "session-ui.splitPaneVisibility.v1:session-a",
+      JSON.stringify({
+        chat: false,
+        canvas: false,
+        wiki: false,
+        brief: false,
+        nody: false,
+      }),
+    );
+
+    render(
+      <SessionUiStateProvider sessionId="session-a">
+        <SplitPaneHarness />
+      </SessionUiStateProvider>,
+    );
+
+    expect(screen.getByTestId("split-panes").textContent).toBe(
+      "chat:closed|canvas:open|wiki:closed|brief:closed|nody:closed",
+    );
   });
 });
