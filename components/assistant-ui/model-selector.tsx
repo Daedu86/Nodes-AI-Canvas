@@ -7,7 +7,7 @@ import { findModelOption, getModelOptionKey } from "@/lib/model-options";
 
 export function ModelSelector() {
   const { modelId, provider, setModelConfig } = useModelConfig();
-  const { availableModelOptions, getSupportedModelConfig } = useLlmSettings();
+  const { availableModelOptions, getSupportedModelConfig, isReady } = useLlmSettings();
   const selectedOption = findModelOption(
     getSupportedModelConfig({ modelId, provider }),
     availableModelOptions,
@@ -19,6 +19,7 @@ export function ModelSelector() {
       Model
       <select
         className="text-foreground bg-muted/70 hover:bg-muted focus-visible:ring-ring flex min-w-48 items-center rounded-md border px-2 py-1 text-xs outline-none transition-colors"
+        disabled={!isReady}
         value={selectedKey}
         onChange={(e) => {
           const option = availableModelOptions.find(

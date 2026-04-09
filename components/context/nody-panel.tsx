@@ -76,7 +76,7 @@ const NodyPanelContext = React.createContext<NodyPanelContextValue | null>(null)
 const defaultFocusLabel = "Session tree";
 
 export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
-  const { getProviderHeaders } = useLlmSettings();
+  const { getProviderHeaders, isReady: llmSettingsReady } = useLlmSettings();
   const [snapshot, setSnapshot] = React.useState<NodySnapshot | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [phase, setPhase] = React.useState<NodyPhase>("idle");
@@ -152,6 +152,12 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
 
       if (!snapshot.llmEnabled) {
         setError("Enable AI before asking Nody to reason over the workspace.");
+        setPhase("idle");
+        return;
+      }
+
+      if (!llmSettingsReady) {
+        setError("Model settings are still loading. Try again in a moment.");
         setPhase("idle");
         return;
       }
@@ -239,7 +245,7 @@ export function NodyPanelProvider({ children }: { children: React.ReactNode }) {
         setBusy(false);
       }
     },
-    [getProviderHeaders, selectedWikiPageId, snapshot, wiki],
+    [getProviderHeaders, llmSettingsReady, selectedWikiPageId, snapshot, wiki],
   );
 
   React.useEffect(() => {

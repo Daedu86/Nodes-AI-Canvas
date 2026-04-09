@@ -21,6 +21,7 @@ const resolveDir = (envName, fallbackSegments) =>
 const sessionStoreDir = resolveDir("SESSION_STORE_DIR", ["data", "sessions"]);
 const projectStoreDir = resolveDir("PROJECT_STORE_DIR", ["data", "projects"]);
 const memoryStoreDir = resolveDir("PROJECT_MEMORY_STORE_DIR", ["data", "memory"]);
+const llmSettingsStoreDir = resolveDir("LLM_SETTINGS_STORE_DIR", ["data", "llm-settings"]);
 const blobStoreDir = resolveDir("SESSION_BLOB_STORE_DIR", ["data", "session-blobs"]);
 
 const supabaseUrl = readRequiredEnv("SUPABASE_URL");
@@ -290,11 +291,51 @@ const migrateMemory = async () => {
   return { memory: memoryRows.length };
 };
 
+const migrateLlmSettings = async () => {
+  const files = await listJsonFiles(llmSettingsStoreDir);
+  const settingsRows = [];
+
+  for (const filePath of files) {
+    const json = await readJson(filePath);
+    const ownerId = normalizeOwnerId(
+      json.ownerId,
+      "llm-settings",
+      json.ownerId || path.basename(filePath),
+    );
+    settingsRows.push({
+      owner_id: ownerId,
+      settings_json: typeof json.settings === "object" && json.settings ? json.settings : {},
+      created_at:
+        typeof json.createdAt === "string" && json.createdAt.length > 0
+          ? json.createdAt
+          : new Date().toISOString(),
+      updated_at:
+        typeof json.updatedAt === "string" && json.updatedAt.length > 0
+          ? json.updatedAt
+          : new Date().toISOString(),
+    });
+  }
+
+  if (settingsRows.length === 0) {
+    return { llmSettings: 0 };
+  }
+
+  const { error } = await client.from("llm_settings").upsert(settingsRows, {
+    onConflict: "owner_id",
+  });
+  if (error) {
+    throw new Error(error.message || "Failed to upsert llm_settings");
+  }
+
+  return { llmSettings: settingsRows.length };
+};
+
 const main = async () => {
   console.log("Migrating local Nodes data to Supabase...");
   console.log(`- sessions: ${sessionStoreDir}`);
   console.log(`- projects: ${projectStoreDir}`);
   console.log(`- memory: ${memoryStoreDir}`);
+  console.log(`- llm settings: ${llmSettingsStoreDir}`);
   console.log(`- blobs: ${blobStoreDir}`);
   console.log(`- bucket: ${storageBucket}`);
 
@@ -303,6 +344,7 @@ const main = async () => {
   const sessionResult = await migrateSessions();
   const projectResult = await migrateProjects();
   const memoryResult = await migrateMemory();
+  const llmSettingsResult = await migrateLlmSettings();
 
   console.log("Migration complete.");
   console.log(`- sessions upserted: ${sessionResult.rows.length}`);
@@ -312,6 +354,7 @@ const main = async () => {
   console.log(`- project/session links: ${projectResult.projectSessionLinks}`);
   console.log(`- project/memory links: ${projectResult.projectMemoryLinks}`);
   console.log(`- memory rows upserted: ${memoryResult.memory}`);
+  console.log(`- llm settings upserted: ${llmSettingsResult.llmSettings}`);
 
   if (sessionResult.missingBlobs.length > 0) {
     console.log("Missing blob refs:");

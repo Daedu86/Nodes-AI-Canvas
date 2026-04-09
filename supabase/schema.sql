@@ -88,6 +88,13 @@ create table if not exists public.memory_items (
 create index if not exists memory_owner_updated_idx
   on public.memory_items (owner_id, updated_at desc);
 
+create table if not exists public.llm_settings (
+  owner_id text primary key,
+  settings_json jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
 create table if not exists public.project_memory_links (
   project_id uuid not null references public.projects (id) on delete cascade,
   memory_id uuid not null references public.memory_items (id) on delete cascade,
@@ -113,11 +120,17 @@ before update on public.memory_items
 for each row
 execute function public.set_updated_at();
 
+create trigger llm_settings_set_updated_at
+before update on public.llm_settings
+for each row
+execute function public.set_updated_at();
+
 alter table public.sessions enable row level security;
 alter table public.projects enable row level security;
 alter table public.project_members enable row level security;
 alter table public.project_sessions enable row level security;
 alter table public.memory_items enable row level security;
+alter table public.llm_settings enable row level security;
 alter table public.project_memory_links enable row level security;
 
 insert into storage.buckets (id, name, public)

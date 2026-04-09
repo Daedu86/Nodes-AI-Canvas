@@ -243,7 +243,7 @@ function OpenRouterCard() {
 }
 
 export function LlmModelsWorkspace() {
-  const { availableModelOptions, settings, setProviderApiKey, setProviderEnabled, setProviderModels } =
+  const { availableModelOptions, isReady, settings, setProviderApiKey, setProviderEnabled, setProviderModels } =
     useLlmSettings();
   const { showWorkspace } = useWorkspaceSurface();
 
@@ -277,6 +277,11 @@ export function LlmModelsWorkspace() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Pick the models exposed in the selector and add provider credentials per user.
               </p>
+              {!isReady ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Syncing your saved model settings…
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
               <div className="rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground">
@@ -288,58 +293,68 @@ export function LlmModelsWorkspace() {
             </div>
           </div>
 
-          <OpenRouterCard />
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <OllamaCard />
+          {!isReady ? (
             <Card>
-              <ProviderHeader
-                icon={<Bot className="size-4" />}
-                provider="Selector"
-                subtitle="Only usable models appear in the top model selector."
-              />
-              <div className="mt-5 flex flex-wrap gap-2">
-                {availableModelOptions.map((option) => (
-                  <span
-                    key={`${option.provider}:${option.modelId}`}
-                    className="rounded-full border border-border/60 bg-background/85 px-3 py-1.5 text-xs font-medium text-foreground"
-                  >
-                    {option.label.replace(`${getProviderLabel(option.provider)} · `, "")}
-                  </span>
-                ))}
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Loading your saved provider connections and model list.
+              </p>
             </Card>
-          </div>
+          ) : (
+            <>
+              <OpenRouterCard />
 
-          <div className="grid gap-4 xl:grid-cols-3">
-            <EditableProviderCard
-              provider="openai"
-              enabled={settings.providers.openai.enabled}
-              apiKey={settings.providers.openai.apiKey}
-              models={settings.providers.openai.models}
-              onApiKeyChange={(value) => setProviderApiKey("openai", value)}
-              onEnabledChange={(value) => setProviderEnabled("openai", value)}
-              onModelsChange={(value) => setProviderModels("openai", value)}
-            />
-            <EditableProviderCard
-              provider="anthropic"
-              enabled={settings.providers.anthropic.enabled}
-              apiKey={settings.providers.anthropic.apiKey}
-              models={settings.providers.anthropic.models}
-              onApiKeyChange={(value) => setProviderApiKey("anthropic", value)}
-              onEnabledChange={(value) => setProviderEnabled("anthropic", value)}
-              onModelsChange={(value) => setProviderModels("anthropic", value)}
-            />
-            <EditableProviderCard
-              provider="google"
-              enabled={settings.providers.google.enabled}
-              apiKey={settings.providers.google.apiKey}
-              models={settings.providers.google.models}
-              onApiKeyChange={(value) => setProviderApiKey("google", value)}
-              onEnabledChange={(value) => setProviderEnabled("google", value)}
-              onModelsChange={(value) => setProviderModels("google", value)}
-            />
-          </div>
+              <div className="grid gap-4 xl:grid-cols-2">
+                <OllamaCard />
+                <Card>
+                  <ProviderHeader
+                    icon={<Bot className="size-4" />}
+                    provider="Selector"
+                    subtitle="Only usable models appear in the top model selector."
+                  />
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {availableModelOptions.map((option) => (
+                      <span
+                        key={`${option.provider}:${option.modelId}`}
+                        className="rounded-full border border-border/60 bg-background/85 px-3 py-1.5 text-xs font-medium text-foreground"
+                      >
+                        {option.label.replace(`${getProviderLabel(option.provider)} · `, "")}
+                      </span>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-3">
+                <EditableProviderCard
+                  provider="openai"
+                  enabled={settings.providers.openai.enabled}
+                  apiKey={settings.providers.openai.apiKey}
+                  models={settings.providers.openai.models}
+                  onApiKeyChange={(value) => setProviderApiKey("openai", value)}
+                  onEnabledChange={(value) => setProviderEnabled("openai", value)}
+                  onModelsChange={(value) => setProviderModels("openai", value)}
+                />
+                <EditableProviderCard
+                  provider="anthropic"
+                  enabled={settings.providers.anthropic.enabled}
+                  apiKey={settings.providers.anthropic.apiKey}
+                  models={settings.providers.anthropic.models}
+                  onApiKeyChange={(value) => setProviderApiKey("anthropic", value)}
+                  onEnabledChange={(value) => setProviderEnabled("anthropic", value)}
+                  onModelsChange={(value) => setProviderModels("anthropic", value)}
+                />
+                <EditableProviderCard
+                  provider="google"
+                  enabled={settings.providers.google.enabled}
+                  apiKey={settings.providers.google.apiKey}
+                  models={settings.providers.google.models}
+                  onApiKeyChange={(value) => setProviderApiKey("google", value)}
+                  onEnabledChange={(value) => setProviderEnabled("google", value)}
+                  onModelsChange={(value) => setProviderModels("google", value)}
+                />
+              </div>
+            </>
+          )}
         </div>
       </WorkspaceShell>
     </div>

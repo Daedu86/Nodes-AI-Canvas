@@ -12,6 +12,8 @@ import {
 } from "../components/context/workspace-surface";
 import { LlmModelsWorkspace } from "../components/workspace/llm-models-workspace";
 
+const fetchMock = vi.fn();
+
 vi.mock("next-auth/react", () => ({
   signOut: vi.fn(),
   useSession: () => ({
@@ -24,6 +26,8 @@ vi.mock("next-auth/react", () => ({
     },
   }),
 }));
+
+vi.stubGlobal("fetch", fetchMock);
 
 function SurfaceHarness() {
   const { activeSurface } = useWorkspaceSurface();
@@ -40,6 +44,8 @@ function SurfaceHarness() {
 describe("WorkspaceSurfaceProvider", () => {
   beforeEach(() => {
     localStorage.clear();
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async () => Response.json({ settings: null }));
   });
 
   afterEach(() => {

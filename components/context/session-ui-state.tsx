@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import type { LlmProviderId } from "@/lib/llm/provider-catalog";
+import { LLM_PROVIDER_IDS, type LlmProviderId } from "@/lib/llm/provider-catalog";
 import { getSupportedModelConfig } from "@/lib/model-options";
 
 export type HistoryMode = "last" | "full";
@@ -130,12 +130,13 @@ const readModelConfig = (sessionId: string): ModelConfig => {
       parsed &&
       typeof parsed === "object" &&
       typeof parsed.modelId === "string" &&
-      typeof parsed.provider === "string"
+      typeof parsed.provider === "string" &&
+      (LLM_PROVIDER_IDS as readonly string[]).includes(parsed.provider)
     ) {
-      return getSupportedModelConfig({
+      return {
         modelId: parsed.modelId,
         provider: parsed.provider as ModelProvider,
-      });
+      };
     }
   } catch {
     // ignore malformed persisted state

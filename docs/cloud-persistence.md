@@ -9,6 +9,7 @@ Move these server-side stores out of `data/*.json` and into Postgres:
 - sessions
 - projects
 - memory items
+- user LLM settings
 - project/session links
 - project/memory links
 
@@ -25,7 +26,6 @@ These values are UI preferences, not shared business data:
 - session view mode (`chat`, `split`, `canvas`)
 - split ratio
 - history mode
-- selected model/provider
 - temporary graph focus state
 
 Those can stay browser-local even after cloud migration.
@@ -77,6 +77,7 @@ Defined in [schema.sql](C:\Users\daedu\Documents\Playground\AI Canvas\supabase\s
 - `projects`
 - `project_sessions`
 - `memory_items`
+- `llm_settings`
 - `project_memory_links`
 
 And one private storage bucket:
@@ -119,6 +120,7 @@ Implemented:
 - sessions
 - projects
 - memory
+- user-level LLM settings
 - artifact blob uploads to Supabase Storage
 - one-time migration script from local `data/`
 - Supabase CLI linked to the project for schema and query checks

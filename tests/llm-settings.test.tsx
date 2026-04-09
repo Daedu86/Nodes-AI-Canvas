@@ -9,6 +9,8 @@ import {
   useLlmSettings,
 } from "../components/context/llm-settings";
 
+const fetchMock = vi.fn();
+
 vi.mock("next-auth/react", () => ({
   useSession: () => ({
     data: {
@@ -16,8 +18,11 @@ vi.mock("next-auth/react", () => ({
         id: "user-1",
       },
     },
+    status: "authenticated",
   }),
 }));
+
+vi.stubGlobal("fetch", fetchMock);
 
 function Harness() {
   const {
@@ -51,6 +56,16 @@ function Harness() {
 describe("LlmSettingsProvider", () => {
   beforeEach(() => {
     localStorage.clear();
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (method === "GET") {
+        return Response.json({ settings: null });
+      }
+
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      return Response.json({ settings: body.settings ?? null });
+    });
   });
 
   afterEach(() => {
@@ -58,14 +73,14 @@ describe("LlmSettingsProvider", () => {
     localStorage.clear();
   });
 
-  it("exposes the built-in OpenRouter and Ollama models by default", () => {
+  it("exposes the built-in OpenRouter and Ollama models by default", async () => {
     render(
       <LlmSettingsProvider>
         <Harness />
       </LlmSettingsProvider>,
     );
 
-    expect(screen.getByTestId("options").textContent).toContain(
+    expect((await screen.findByTestId("options")).textContent).toContain(
       "openrouter:nvidia/nemotron-3-super-120b-a12b:free",
     );
     expect(screen.getByTestId("options").textContent).toContain("ollama:gemma3:4b");
@@ -80,6 +95,7 @@ describe("LlmSettingsProvider", () => {
       </LlmSettingsProvider>,
     );
 
+    await screen.findByTestId("options");
     await user.click(screen.getByRole("button", { name: "enable-openai" }));
     await user.click(screen.getByRole("button", { name: "key-openai" }));
     await user.click(screen.getByRole("button", { name: "models-openai" }));

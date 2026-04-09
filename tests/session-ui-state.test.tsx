@@ -38,12 +38,30 @@ describe("SessionUiStateProvider", () => {
     localStorage.clear();
   });
 
-  it("normalizes stale persisted model configs to a supported default", () => {
+  it("preserves known custom provider model configs from storage", () => {
     localStorage.setItem(
       "session-ui.modelConfig.v1:session-a",
       JSON.stringify({
-        provider: "openrouter",
-        modelId: "qwen/qwen3.6-plus:free",
+        provider: "openai",
+        modelId: "gpt-5-mini",
+      }),
+    );
+
+    render(
+      <SessionUiStateProvider sessionId="session-a">
+        <ModelConfigHarness />
+      </SessionUiStateProvider>,
+    );
+
+    expect(screen.getByTestId("model-config").textContent).toBe("openai:gpt-5-mini");
+  });
+
+  it("falls back when a persisted provider is malformed", () => {
+    localStorage.setItem(
+      "session-ui.modelConfig.v1:session-a",
+      JSON.stringify({
+        provider: "unknown-lab",
+        modelId: "mystery-model",
       }),
     );
 

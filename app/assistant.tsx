@@ -101,7 +101,7 @@ const ProjectWorkspace = dynamic(
 
 function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
   const { historyMode, modelConfig, setModelConfig } = useSessionUiState();
-  const { getProviderHeaders, getSupportedModelConfig } = useLlmSettings();
+  const { getProviderHeaders, getSupportedModelConfig, isReady: llmSettingsReady } = useLlmSettings();
   const [requestError, setRequestError] = React.useState<string | null>(null);
   const [latencyVersion, setLatencyVersion] = React.useState(0);
   const pendingLatencyRef = React.useRef<{ startedAt: number; responseStartedAt: number | null } | null>(null);
@@ -111,6 +111,9 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
   }, [sessionId]);
 
   React.useEffect(() => {
+    if (!llmSettingsReady) {
+      return;
+    }
     const normalized = getSupportedModelConfig(modelConfig);
     if (
       normalized.modelId === modelConfig.modelId &&
@@ -119,7 +122,7 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
       return;
     }
     setModelConfig(normalized);
-  }, [getSupportedModelConfig, modelConfig, setModelConfig]);
+  }, [getSupportedModelConfig, llmSettingsReady, modelConfig, setModelConfig]);
 
   const recordPendingLatency = React.useCallback((messageId?: string | null) => {
     const pendingLatency = pendingLatencyRef.current;
