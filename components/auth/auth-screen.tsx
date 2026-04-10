@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Github, LockKeyhole, Network } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -8,21 +8,35 @@ import { Input } from "@/components/ui/input";
 import { buildPostAuthCallbackUrl } from "@/lib/client/post-auth-handoff";
 
 type AuthScreenProps = {
+  canonicalAppUrl: string | null;
   devCredentialsDefaultEmail: string;
   devCredentialsEnabled: boolean;
   githubConfigured: boolean;
 };
 
 export function AuthScreen({
+  canonicalAppUrl,
   devCredentialsDefaultEmail,
   devCredentialsEnabled,
   githubConfigured,
 }: AuthScreenProps) {
-  const callbackUrl = buildPostAuthCallbackUrl("/");
+  const callbackUrl = useMemo(
+    () => buildPostAuthCallbackUrl("/", canonicalAppUrl),
+    [canonicalAppUrl],
+  );
   const [email, setEmail] = useState(devCredentialsDefaultEmail);
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!canonicalAppUrl) return;
+    const canonicalOrigin = new URL(canonicalAppUrl).origin;
+    if (window.location.origin === canonicalOrigin) return;
+    const current = new URL(window.location.href);
+    const target = new URL(`${current.pathname}${current.search}${current.hash}`, canonicalOrigin);
+    window.location.replace(target.toString());
+  }, [canonicalAppUrl]);
 
   const handleDevLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

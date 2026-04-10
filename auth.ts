@@ -54,6 +54,7 @@ if (devCredentialsEnabled) {
 }
 
 export const authUiConfig = {
+  canonicalAppUrl: process.env.NEXTAUTH_URL?.trim() || null,
   devCredentialsDefaultEmail: DEV_AUTH_EMAIL,
   devCredentialsEnabled,
   githubConfigured,
