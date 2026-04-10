@@ -5,15 +5,70 @@ import { BookOpenText, Bot, LogOut, UserRound } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useWorkspaceSurface } from "@/components/context/workspace-surface";
 import { Button } from "@/components/ui/button";
+import { useSidebar } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export function SidebarProfile() {
   const { data: session } = useSession();
   const { activeSurface, showKnowledgeCenter, showLlmModels } = useWorkspaceSurface();
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
   const displayName =
     session?.user?.name?.trim() ||
     session?.user?.email?.trim() ||
     "Signed in";
+
+  if (isCollapsed) {
+    return (
+      <div className="flex flex-col items-center gap-2 rounded-[16px] border border-border/80 bg-card/88 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+        <div
+          className="flex size-9 items-center justify-center rounded-[12px] border border-border/80 bg-muted/60 text-muted-foreground"
+          title={displayName}
+        >
+          <UserRound className="size-4" />
+        </div>
+
+        <Button
+          type="button"
+          variant={activeSurface === "knowledge-center" ? "default" : "outline"}
+          size="icon"
+          className="size-9"
+          onClick={showKnowledgeCenter}
+          title="Knowledge Center"
+          aria-label="Knowledge Center"
+        >
+          <BookOpenText className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          variant={activeSurface === "llm-models" ? "default" : "outline"}
+          size="icon"
+          className="size-9"
+          onClick={showLlmModels}
+          title="LLM Models"
+          aria-label="LLM Models"
+        >
+          <Bot className="size-4" />
+        </Button>
+        <ThemeToggle
+          variant="outline"
+          size="icon"
+          className="size-9"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="size-9"
+          onClick={() => void signOut({ callbackUrl: "/" })}
+          title="Sign out"
+          aria-label="Sign out"
+        >
+          <LogOut className="size-4" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-[16px] border border-border/80 bg-card/88 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">

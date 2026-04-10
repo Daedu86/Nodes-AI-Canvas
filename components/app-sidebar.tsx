@@ -14,7 +14,7 @@ import { ProductBrand } from "@/components/workspace/product-brand"
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar variant="inset" collapsible="icon" {...props}>
-      <SidebarHeader className="px-4 py-4">
+      <SidebarHeader className="px-4 py-4 group-data-[state=collapsed]:px-2 group-data-[state=collapsed]:py-3">
         <ProductBrand />
       </SidebarHeader>
       <SidebarSeparator />
@@ -22,7 +22,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <ThreadList />
       </SidebarContent>
       <SidebarSeparator />
-      <SidebarFooter className="p-4 pt-3">
+      <SidebarFooter className="p-4 pt-3 group-data-[state=collapsed]:p-2 group-data-[state=collapsed]:pt-2">
         <SidebarProfile />
       </SidebarFooter>
       <SidebarRail />
