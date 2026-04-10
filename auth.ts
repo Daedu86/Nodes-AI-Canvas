@@ -53,6 +53,28 @@ if (devCredentialsEnabled) {
   );
 }
 
+function formatAuthLoggerMetadata(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined;
+  }
+
+  const record = metadata as Record<string, unknown>;
+  const error = record.error;
+
+  return {
+    message: typeof record.message === "string" ? record.message : undefined,
+    provider: typeof record.provider === "string" ? record.provider : undefined,
+    errorName:
+      error && typeof error === "object" && "name" in error && typeof error.name === "string"
+        ? error.name
+        : undefined,
+    errorMessage:
+      error && typeof error === "object" && "message" in error && typeof error.message === "string"
+        ? error.message
+        : undefined,
+  };
+}
+
 export const authUiConfig = {
   canonicalAppUrl: process.env.NEXTAUTH_URL?.trim() || null,
   devCredentialsDefaultEmail: DEV_AUTH_EMAIL,
@@ -69,6 +91,11 @@ export const authOptions: NextAuthOptions = {
     signIn: "/",
   },
   providers,
+  logger: {
+    error(code, metadata) {
+      console.error("[auth][next-auth][error]", code, formatAuthLoggerMetadata(metadata));
+    },
+  },
   callbacks: {
     jwt({ token, user }) {
       if (user?.id) {

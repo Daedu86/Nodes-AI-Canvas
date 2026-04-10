@@ -9,6 +9,7 @@ type PageProps = {
 };
 
 export default async function Page({ searchParams }: PageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {};
   const canonicalAppUrl = authUiConfig.canonicalAppUrl;
   if (canonicalAppUrl) {
     const requestHeaders = await headers();
@@ -20,7 +21,6 @@ export default async function Page({ searchParams }: PageProps) {
       const canonicalOrigin = new URL(canonicalAppUrl).origin;
       if (currentOrigin !== canonicalOrigin) {
         const target = new URL(canonicalAppUrl);
-        const resolvedSearchParams = (await searchParams) ?? {};
         for (const [key, value] of Object.entries(resolvedSearchParams)) {
           if (Array.isArray(value)) {
             value.forEach((entry) => target.searchParams.append(key, entry));
@@ -35,7 +35,9 @@ export default async function Page({ searchParams }: PageProps) {
 
   const session = await auth();
   if (!session?.user?.id) {
-    return <AuthScreen {...authUiConfig} />;
+    const authError =
+      typeof resolvedSearchParams.error === "string" ? resolvedSearchParams.error : null;
+    return <AuthScreen {...authUiConfig} authError={authError} />;
   }
   return <Assistant />;
 }

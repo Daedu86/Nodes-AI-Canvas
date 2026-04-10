@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Github, LockKeyhole, Network } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,28 @@ import { Input } from "@/components/ui/input";
 import { buildPostAuthCallbackUrl } from "@/lib/client/post-auth-handoff";
 
 type AuthScreenProps = {
+  authError?: string | null;
   canonicalAppUrl: string | null;
   devCredentialsDefaultEmail: string;
   devCredentialsEnabled: boolean;
   githubConfigured: boolean;
 };
 
+const getAuthErrorMessage = (error?: string | null) => {
+  switch (error) {
+    case "OAuthCallback":
+      return "GitHub sign-in failed during the OAuth callback. This usually means the production GitHub OAuth callback URL or client secret is wrong.";
+    case "AccessDenied":
+      return "The sign-in request was denied before a session could be created.";
+    case "Configuration":
+      return "Authentication is misconfigured in this environment.";
+    default:
+      return null;
+  }
+};
+
 export function AuthScreen({
+  authError,
   canonicalAppUrl,
   devCredentialsDefaultEmail,
   devCredentialsEnabled,
@@ -28,6 +43,7 @@ export function AuthScreen({
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const authErrorMessage = useMemo(() => getAuthErrorMessage(authError), [authError]);
 
   useEffect(() => {
     if (!canonicalAppUrl) return;
@@ -104,6 +120,12 @@ export function AuthScreen({
               </p>
               <h2 className="mt-2 text-2xl font-semibold text-white">Access Nodes</h2>
             </div>
+
+            {authErrorMessage ? (
+              <div className="rounded-xl border border-rose-400/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                {authErrorMessage}
+              </div>
+            ) : null}
 
             {githubConfigured ? (
               <Button
