@@ -34,11 +34,11 @@ type SplitPaneDefinition = {
 };
 
 const shellClassName =
-  "h-full min-h-0 overflow-hidden rounded-[30px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.86))] shadow-[0_28px_90px_-48px_rgba(15,23,42,0.45)] ring-1 ring-black/[0.04] backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(15,23,42,0.82))] dark:ring-white/[0.03]";
+  "h-full min-h-0 overflow-hidden rounded-[20px] border border-border/80 bg-card/94 shadow-[0_20px_54px_-38px_rgba(0,0,0,0.7)] backdrop-blur-md";
 const shellInnerClassName =
-  "h-full min-h-0 overflow-hidden rounded-[26px] bg-background/90 dark:bg-slate-950/80";
+  "h-full min-h-0 overflow-hidden rounded-[18px] bg-background/90";
 const workspaceBackdropClassName =
-  "flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.1),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.07),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.92),rgba(241,245,249,0.78))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.94),rgba(2,6,23,0.82))]";
+  "flex flex-1 flex-col overflow-hidden bg-[linear-gradient(180deg,rgba(11,13,19,0.92),rgba(9,11,16,0.98))]";
 
 const WorkspacePanelShell = ({ children }: { children: React.ReactNode }) => (
   <div className={shellClassName}>
@@ -154,7 +154,7 @@ export function WorkspaceSplitLayout({
   return (
     <div className={workspaceBackdropClassName}>
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 py-4 md:px-5 md:py-5">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-[14px] border border-border/70 bg-card/72 px-2 py-2">
           {splitPanes.map(({ icon: Icon, id, label }) => {
             const isOpen = splitPaneVisibility[id];
             const isLastOpenPane = isOpen && visibleSplitPanes.length === 1;
@@ -168,8 +168,8 @@ export function WorkspaceSplitLayout({
                 disabled={isLastOpenPane}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                   isOpen
-                    ? "border-sky-300/80 bg-white/85 text-foreground shadow-sm dark:border-sky-400/40 dark:bg-slate-950/70"
-                    : "border-border/70 bg-background/70 text-muted-foreground hover:border-sky-200 hover:text-foreground dark:bg-slate-950/40"
+                    ? "border-border/90 bg-card text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                    : "border-transparent bg-transparent text-muted-foreground hover:border-border/70 hover:bg-muted/60 hover:text-foreground"
                 } ${isLastOpenPane ? "cursor-default opacity-70" : ""}`}
                 onClick={() => toggleSplitPane(id)}
               >

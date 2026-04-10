@@ -15,11 +15,11 @@ export function ProductBrand({
 }: ProductBrandProps) {
   return (
     <div className={cn("flex items-center gap-3", className)} {...props}>
-      <div className="relative flex size-10 shrink-0 items-center justify-center rounded-2xl border border-sky-400/25 bg-[radial-gradient(circle_at_top,_rgba(96,165,250,0.36),_rgba(15,23,42,0.94)_58%)] shadow-[0_10px_24px_-16px_rgba(56,189,248,0.85)]">
+      <div className="relative flex size-9 shrink-0 items-center justify-center rounded-[12px] border border-white/8 bg-[linear-gradient(180deg,rgba(24,24,31,0.96),rgba(15,15,21,0.98))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
         <svg
           aria-hidden="true"
           viewBox="0 0 40 40"
-          className="size-7 text-slate-50"
+          className="size-6 text-slate-50"
           fill="none"
           stroke="currentColor"
           strokeWidth="2.25"
@@ -37,11 +37,11 @@ export function ProductBrand({
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-semibold tracking-[0.18em] text-foreground uppercase">
+          <span className="truncate text-[13px] font-semibold tracking-[0.16em] text-foreground uppercase">
             Nodes
           </span>
           {modeLabel ? (
-            <span className="rounded-full border border-sky-400/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium tracking-[0.12em] text-sky-200 uppercase">
+            <span className="rounded-full border border-border/80 bg-muted/80 px-2 py-0.5 text-[9px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
               {modeLabel}
             </span>
           ) : null}

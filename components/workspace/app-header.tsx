@@ -34,9 +34,9 @@ export const AppHeader = () => {
   ];
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border/80 bg-card/88 px-4 backdrop-blur-md">
       <SidebarTrigger />
-      <Separator orientation="vertical" className="mr-2 h-4" />
+      <Separator orientation="vertical" className="mr-1 h-4 bg-border/80" />
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -46,7 +46,7 @@ export const AppHeader = () => {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <div className="ml-2 flex items-center rounded-lg border border-border/60 bg-muted/30 p-1">
+      <div className="ml-1 flex items-center rounded-[12px] border border-border/80 bg-muted/55 p-1">
         {viewOptions.map(({ icon: Icon, label, value }) => {
           const isActive = viewMode === value;
           return (
@@ -55,10 +55,10 @@ export const AppHeader = () => {
               type="button"
               aria-pressed={isActive}
               aria-label={`Show ${label.toLowerCase()} panel`}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition ${
+              className={`inline-flex items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-[11px] font-medium transition ${
                 isActive
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-background/70 hover:text-foreground"
+                  ? "border border-border/80 bg-card text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                  : "text-muted-foreground hover:bg-card/70 hover:text-foreground"
               }`}
               onClick={() => setViewMode(value)}
             >
@@ -72,10 +72,10 @@ export const AppHeader = () => {
         <ModelSelector />
         <SessionContextSheet />
         <span
-          className={`rounded-full border px-2 py-1 text-[11px] font-medium ${
+          className={`rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] ${
             llmEnabled
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-              : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+              : "border-amber-500/25 bg-amber-500/10 text-amber-200"
           }`}
         >
           {llmEnabled ? "AI on" : "AI off"}

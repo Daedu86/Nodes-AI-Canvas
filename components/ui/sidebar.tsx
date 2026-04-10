@@ -27,7 +27,7 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem"
+const SIDEBAR_WIDTH = "17rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
@@ -139,7 +139,7 @@ function SidebarProvider({
             } as React.CSSProperties
           }
           className={cn(
-            "group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full",
+            "group/sidebar-wrapper has-data-[variant=inset]:bg-transparent flex min-h-svh w-full",
             className
           )}
           {...props}
@@ -235,7 +235,7 @@ function Sidebar({
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
-            ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
+            ? "p-3 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(6))+2px)]"
             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
           className
         )}
@@ -244,7 +244,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
+          className="bg-sidebar/96 flex h-full w-full flex-col border border-sidebar-border/80 shadow-[0_22px_60px_-40px_rgba(0,0,0,0.7)] backdrop-blur-md group-data-[variant=floating]:rounded-[20px] group-data-[variant=inset]:rounded-[20px]"
         >
           {children}
         </div>
@@ -264,9 +264,9 @@ function SidebarTrigger({
     <Button
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
-      variant="ghost"
+      variant="outline"
       size="icon"
-      className={cn("size-7", className)}
+      className={cn("size-8 rounded-[10px] border-border/70 bg-card/80 text-muted-foreground hover:text-foreground", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
@@ -309,8 +309,8 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
     <main
       data-slot="sidebar-inset"
       className={cn(
-        "bg-background relative flex w-full flex-1 flex-col",
-        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
+        "bg-transparent relative flex w-full flex-1 flex-col",
+        "md:peer-data-[variant=inset]:m-3 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-[22px] md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-3",
         className
       )}
       {...props}
@@ -337,7 +337,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-header"
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex flex-col gap-2 p-3", className)}
       {...props}
     />
   )
@@ -348,7 +348,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-footer"
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex flex-col gap-2 p-3", className)}
       {...props}
     />
   )
@@ -362,7 +362,7 @@ function SidebarSeparator({
     <Separator
       data-slot="sidebar-separator"
       data-sidebar="separator"
-      className={cn("bg-sidebar-border mx-2 w-auto", className)}
+      className={cn("bg-sidebar-border/90 mx-3 w-auto", className)}
       {...props}
     />
   )

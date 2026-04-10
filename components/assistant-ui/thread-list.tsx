@@ -140,7 +140,7 @@ export const ThreadList: FC = () => {
 
   return (
     <div className="flex flex-col items-stretch gap-3 px-1 py-2">
-      <div className="overflow-hidden rounded-xl border border-border/60 bg-background/60 shadow-sm">
+      <div className="overflow-hidden rounded-[16px] border border-border/80 bg-card/70">
         <button
           type="button"
           className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-muted/60"
@@ -161,13 +161,13 @@ export const ThreadList: FC = () => {
         </button>
 
         {projectsOpen ? (
-          <div className="border-t border-border/60">
+          <div className="border-t border-border/80">
             <div className="flex flex-wrap items-center gap-2 px-3 py-2">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 rounded-lg px-3 text-xs"
+                className="h-8 px-3 text-xs"
                 onClick={() => {
                   void handleCreateEmptyProject();
                 }}
@@ -179,7 +179,7 @@ export const ThreadList: FC = () => {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 rounded-lg px-3 text-xs"
+                className="h-8 px-3 text-xs"
                 onClick={() => {
                   if (!manageSessions) {
                     setManageSessions(true);
@@ -215,7 +215,7 @@ export const ThreadList: FC = () => {
                 return (
                   <div
                     key={project.id}
-                    className="group data-[active]:bg-muted hover:bg-muted mx-1 mb-1 flex items-center gap-2 rounded-xl border border-transparent px-1 transition data-[active]:border-sky-500/15"
+                    className="group data-[active]:bg-muted/70 hover:bg-muted/60 mx-1 mb-1 flex items-center gap-2 rounded-[12px] border border-transparent px-1 transition data-[active]:border-primary/20"
                     data-active={isActive ? "true" : "false"}
                   >
                     <button
@@ -262,7 +262,7 @@ export const ThreadList: FC = () => {
         ) : null}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border/60 bg-background/60 shadow-sm">
+      <div className="overflow-hidden rounded-[16px] border border-border/80 bg-card/70">
         <button
           type="button"
           className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-muted/60"
@@ -283,13 +283,13 @@ export const ThreadList: FC = () => {
         </button>
 
         {savedSessionsOpen ? (
-          <div className="border-t border-border/60">
+          <div className="border-t border-border/80">
             <div className="flex flex-wrap items-center gap-2 px-3 py-2">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 rounded-lg border-sky-500/20 bg-sky-500/10 px-3 text-xs text-sky-700 hover:bg-sky-500/15 hover:text-sky-800"
+                className="h-8 border-primary/20 bg-primary/12 px-3 text-xs text-primary hover:bg-primary/16 hover:text-primary"
                 onClick={() => {
                   clearActiveProject();
                   void createSession();
@@ -304,7 +304,7 @@ export const ThreadList: FC = () => {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-8 rounded-lg px-3 text-xs"
+                    className="h-8 px-3 text-xs"
                     onClick={() => setManageSessions(true)}
                     disabled={sessions.length === 0}
                   >
@@ -321,7 +321,7 @@ export const ThreadList: FC = () => {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-8 rounded-lg px-3 text-xs"
+                    className="h-8 px-3 text-xs"
                     onClick={() => {
                       setManageSessions(false);
                       setSelectedSessionIds(new Set());
@@ -333,7 +333,7 @@ export const ThreadList: FC = () => {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-8 rounded-lg px-3 text-xs"
+                    className="h-8 px-3 text-xs"
                     onClick={handleSelectAll}
                     disabled={sessions.length === 0}
                   >
@@ -344,7 +344,7 @@ export const ThreadList: FC = () => {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-8 rounded-lg px-3 text-xs"
+                    className="h-8 px-3 text-xs"
                     onClick={handleDeleteSelected}
                     disabled={selectedCount === 0}
                   >
@@ -355,7 +355,7 @@ export const ThreadList: FC = () => {
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="h-8 rounded-lg px-3 text-xs"
+                    className="h-8 px-3 text-xs"
                     onClick={handleDeleteAll}
                     disabled={sessions.length === 0}
                   >
@@ -383,7 +383,7 @@ export const ThreadList: FC = () => {
                 return (
                   <div
                     key={session.id}
-                    className="group data-[active]:bg-muted hover:bg-muted focus-visible:bg-muted focus-visible:ring-ring mx-1 mb-1 flex items-center gap-2 rounded-xl border border-transparent px-1 transition-all focus-visible:outline-none focus-visible:ring-2 data-[active]:border-emerald-500/15"
+                    className="group data-[active]:bg-muted/70 hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-ring mx-1 mb-1 flex items-center gap-2 rounded-[12px] border border-transparent px-1 transition-all focus-visible:outline-none focus-visible:ring-2 data-[active]:border-emerald-500/15"
                     data-active={isActive ? "true" : "false"}
                   >
                     {manageSessions ? (

@@ -77,7 +77,7 @@ const renderWikiBlocks = (lines: string[]) => {
       return (
         <ul key={index} className="space-y-2 text-sm leading-7 text-foreground/90">
           {normalized.map((line) => (
-            <li key={line} className="rounded-2xl border border-border/60 bg-background/80 px-3 py-2">
+            <li key={line} className="rounded-[12px] border border-border/80 bg-background/80 px-3 py-2">
               {line.replace(/^-\s+/, "")}
             </li>
           ))}
@@ -101,11 +101,11 @@ export function WikiPanel() {
   const activeSections = activePage ? parseWikiSections(activePage.body) : [];
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.08),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.84),rgba(248,250,252,0.94))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.86),rgba(2,6,23,0.88))]">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-black/[0.04] bg-white/55 backdrop-blur dark:border-white/[0.06] dark:bg-white/[0.03]">
-        <div className="border-b border-black/[0.04] px-5 py-5 dark:border-white/[0.06]">
+    <div className="flex h-full min-h-0 overflow-hidden bg-background">
+      <aside className="flex w-60 shrink-0 flex-col border-r border-border/80 bg-card/72 backdrop-blur">
+        <div className="border-b border-border/80 px-5 py-5">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-sky-500/20 bg-white/80 text-sky-700 shadow-sm dark:bg-sky-400/10 dark:text-sky-200">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] border border-border/80 bg-muted/60 text-foreground">
               <BookCopy className="h-4 w-4" />
             </span>
             <div>
@@ -130,14 +130,14 @@ export function WikiPanel() {
               <button
                 key={page.id}
                 type="button"
-                className={`mb-2 flex w-full items-start gap-2 rounded-[22px] border px-3 py-3 text-left transition-colors ${
+                className={`mb-2 flex w-full items-start gap-2 rounded-[12px] border px-3 py-3 text-left transition-colors ${
                   isActive
-                    ? "border-sky-500/30 bg-sky-500/10 shadow-sm"
-                    : "border-border/60 bg-background/70 hover:bg-background"
+                    ? "border-primary/35 bg-primary/10"
+                    : "border-border/80 bg-background/70 hover:bg-muted/60"
                 }`}
                 onClick={() => setSelectedWikiPageId(page.id)}
               >
-                <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${isActive ? "text-sky-700" : "text-muted-foreground"}`} />
+                <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">{page.title}</p>
                   <p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">{page.summary}</p>
@@ -155,7 +155,7 @@ export function WikiPanel() {
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         {activePage ? (
           <article className="mx-auto flex max-w-4xl flex-col gap-5">
-            <header className="rounded-[32px] border border-white/70 bg-white/78 px-6 py-5 shadow-[0_28px_90px_-50px_rgba(15,23,42,0.38)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+            <header className="rounded-[18px] border border-border/80 bg-card/88 px-6 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -165,10 +165,10 @@ export function WikiPanel() {
                   <p className="max-w-3xl text-sm leading-7 text-muted-foreground">{activePage.summary}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full border border-border/60 bg-background/85 px-2.5 py-1 text-[11px] text-muted-foreground">
+                  <span className="rounded-full border border-border/80 bg-background/85 px-2.5 py-1 text-[11px] text-muted-foreground">
                     {wiki?.pages.length ?? 0} pages
                   </span>
-                  <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[11px] text-sky-700">
+                  <span className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] text-primary">
                     {activeSections.length > 0 ? `${activeSections.length} sections` : "Narrative page"}
                   </span>
                 </div>
@@ -179,7 +179,7 @@ export function WikiPanel() {
                 activeSections.map((section, index) => (
                   <div
                     key={`${section.heading ?? "section"}-${index}`}
-                    className="rounded-[30px] border border-white/70 bg-white/75 px-5 py-5 shadow-[0_28px_90px_-50px_rgba(15,23,42,0.38)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]"
+                    className="rounded-[18px] border border-border/80 bg-card/88 px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
                   >
                     <div className="space-y-3">
                       <div className="space-y-1">
@@ -192,7 +192,7 @@ export function WikiPanel() {
                   </div>
                 ))
               ) : (
-                <section className="rounded-[30px] border border-white/70 bg-white/75 px-5 py-5 shadow-[0_28px_90px_-50px_rgba(15,23,42,0.38)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+                <section className="rounded-[18px] border border-border/80 bg-card/88 px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                   <pre className="whitespace-pre-wrap font-sans text-sm leading-7 text-foreground/90">
                     {activePage.body}
                   </pre>

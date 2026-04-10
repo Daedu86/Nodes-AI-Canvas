@@ -133,16 +133,16 @@ export function NodyPanel() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.1),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,252,0.96))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_24%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.1),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.9))]">
-      <div className="border-b border-black/[0.04] px-5 py-4 dark:border-white/[0.06]">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      <div className="border-b border-border/80 bg-card/72 px-5 py-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-sky-500/20 bg-white/75 text-sky-700 shadow-sm dark:bg-sky-400/10 dark:text-sky-200">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] border border-border/80 bg-muted/60 text-foreground">
                 <Bot className="h-4 w-4" />
               </span>
               <p className="text-base font-semibold tracking-[-0.02em] text-foreground">Nody</p>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 <span className={`h-1.5 w-1.5 rounded-full ${statusDotClass}`} />
                 {statusLabel}
               </span>
@@ -178,26 +178,26 @@ export function NodyPanel() {
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
-        <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+        <section className="space-y-3 rounded-[18px] border border-border/80 bg-card/88 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="rounded-full border border-border/80 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Context
             </span>
             {lastAction ? (
-              <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <span className="rounded-full border border-border/80 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 {getCanvasGuideActionLabel(lastAction)}
               </span>
             ) : null}
           </div>
           <p className="text-sm font-medium text-foreground">{contextLabel}</p>
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
+            <span className="rounded-full border border-border/80 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
               {workspaceStats.nodeCount} nodes
             </span>
-            <span className="rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
+            <span className="rounded-full border border-border/80 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
               {workspaceStats.artifactCount} artifacts
             </span>
-            <span className="rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
+            <span className="rounded-full border border-border/80 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
               {workspaceStats.rootBranchCount} roots
             </span>
           </div>
@@ -207,7 +207,7 @@ export function NodyPanel() {
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
             placeholder="Ask about this branch, the wiki, or what to do next..."
-            className="min-h-[96px] w-full resize-y rounded-[20px] border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-sky-500/35"
+            className="min-h-[96px] w-full resize-y rounded-[12px] border border-border/80 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary/35"
           />
           <div className="flex flex-wrap items-center gap-2">
             {quickActions.map(({ action, icon: Icon }) => (
@@ -217,12 +217,12 @@ export function NodyPanel() {
                 variant="outline"
                 size="sm"
                 disabled={busy || !llmEnabled}
-                className="h-8 rounded-full border-border/60 px-3 text-xs"
+                className="h-8 rounded-full border-border/80 px-3 text-xs"
                 onClick={() => {
                   void runAction(action);
                 }}
               >
-                <Icon className="mr-1.5 h-3.5 w-3.5 text-sky-700" />
+                <Icon className="mr-1.5 h-3.5 w-3.5 text-primary" />
                 {getCanvasGuideActionLabel(action)}
               </Button>
             ))}
@@ -248,7 +248,7 @@ export function NodyPanel() {
           ) : null}
         </section>
 
-        <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+        <section className="space-y-3 rounded-[18px] border border-border/80 bg-card/88 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Answer
@@ -260,17 +260,17 @@ export function NodyPanel() {
 
           {insightSections ? (
             <div className="space-y-3">
-              <div className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-3">
+              <div className="rounded-[12px] border border-border/80 bg-background/80 px-3 py-3">
                 <p className="whitespace-pre-wrap text-sm leading-6 text-foreground/90">{insightSections.answer}</p>
               </div>
               {insightSections.next ? (
-                <div className="rounded-[22px] border border-emerald-500/20 bg-emerald-500/5 px-3 py-3">
+                <div className="rounded-[12px] border border-emerald-500/20 bg-emerald-500/5 px-3 py-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Next</p>
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">{insightSections.next}</p>
                 </div>
               ) : null}
               {resolvedSources.length > 0 ? (
-                <div className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-3">
+                <div className="rounded-[12px] border border-border/80 bg-background/80 px-3 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                       Sources
@@ -291,13 +291,13 @@ export function NodyPanel() {
                       <button
                         key={source.ref}
                         type="button"
-                        className="flex w-full items-start justify-between gap-3 rounded-[20px] border border-border/60 bg-background px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                        className="flex w-full items-start justify-between gap-3 rounded-[12px] border border-border/80 bg-background px-3 py-2.5 text-left transition-colors hover:bg-muted/70"
                         onClick={() => handleOpenSource(source)}
                       >
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs font-medium text-foreground/90">{source.label}</span>
-                            <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground dark:bg-white/10">
+                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                               {source.kind}
                             </span>
                           </div>
@@ -307,7 +307,7 @@ export function NodyPanel() {
                             </p>
                           ) : null}
                         </div>
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-700">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
                           Open
                         </span>
                       </button>
@@ -324,7 +324,7 @@ export function NodyPanel() {
         </section>
 
         {brief ? (
-          <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+          <section className="space-y-3 rounded-[18px] border border-border/80 bg-card/88 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -347,7 +347,7 @@ export function NodyPanel() {
               {brief.signals.slice(0, 3).map((signal) => (
                 <span
                   key={signal}
-                  className="rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground"
+                  className="rounded-full border border-border/80 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground"
                 >
                   {signal}
                 </span>
@@ -357,18 +357,18 @@ export function NodyPanel() {
         ) : null}
 
         {recentInsights.length > 0 ? (
-          <section className="space-y-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-4 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/[0.03]">
+          <section className="space-y-3 rounded-[18px] border border-border/80 bg-card/88 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
             <div className="flex items-center gap-2">
-              <Waypoints className="h-4 w-4 text-sky-700" />
+              <Waypoints className="h-4 w-4 text-primary" />
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Recent
               </p>
             </div>
             <div className="space-y-2">
               {recentInsights.map((entry) => (
-                <div key={entry.id} className="rounded-[22px] border border-border/60 bg-background/80 px-3 py-2.5">
+                <div key={entry.id} className="rounded-[12px] border border-border/80 bg-background/80 px-3 py-2.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    <span className="rounded-full border border-border/80 bg-background/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       {getCanvasGuideActionLabel(entry.action)}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">{entry.focusLabel}</span>

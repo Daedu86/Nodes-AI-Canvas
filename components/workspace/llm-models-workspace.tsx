@@ -14,11 +14,11 @@ import {
 } from "@/lib/llm/provider-catalog";
 
 const workspaceBackdropClassName =
-  "flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.1),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.07),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.92),rgba(241,245,249,0.78))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.94),rgba(2,6,23,0.82))]";
+  "flex flex-1 flex-col overflow-hidden bg-[linear-gradient(180deg,rgba(11,13,19,0.92),rgba(9,11,16,0.98))]";
 const shellClassName =
-  "h-full min-h-0 overflow-hidden rounded-[30px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.86))] shadow-[0_28px_90px_-48px_rgba(15,23,42,0.45)] ring-1 ring-black/[0.04] backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(15,23,42,0.82))] dark:ring-white/[0.03]";
+  "h-full min-h-0 overflow-hidden rounded-[20px] border border-border/80 bg-card/94 shadow-[0_20px_54px_-38px_rgba(0,0,0,0.7)] backdrop-blur-md";
 const shellInnerClassName =
-  "h-full min-h-0 overflow-auto rounded-[26px] bg-background/92 p-5 dark:bg-slate-950/80 md:p-6";
+  "h-full min-h-0 overflow-auto rounded-[18px] bg-background/92 p-5 md:p-6";
 
 type EditableProviderCardProps = {
   apiKey: string;
@@ -49,7 +49,7 @@ function Card({
 }) {
   return (
     <section
-      className={`rounded-[28px] border border-border/60 bg-white/85 p-5 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.38)] dark:bg-slate-950/65 ${className}`}
+      className={`rounded-[18px] border border-border/80 bg-card/88 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] ${className}`}
     >
       {children}
     </section>
@@ -69,7 +69,7 @@ function ProviderHeader({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/50 text-foreground">
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-[12px] border border-border/80 bg-muted/60 text-foreground">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
@@ -268,8 +268,8 @@ function OpenRouterCard() {
                   aria-pressed={active}
                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                     active
-                      ? "border-sky-300/80 bg-sky-500/10 text-foreground dark:border-sky-400/40"
-                      : "border-border/70 bg-background text-muted-foreground hover:text-foreground"
+                      ? "border-primary/35 bg-primary/12 text-foreground"
+                      : "border-border/80 bg-background text-muted-foreground hover:text-foreground"
                   }`}
                   onClick={() => toggleOpenRouterModel(option.modelId)}
                 >
@@ -338,10 +338,10 @@ export function LlmModelsWorkspace() {
               ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
-              <div className="rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <div className="rounded-full border border-border/70 bg-muted/55 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
                 {availableModelOptions.length} models ready
               </div>
-              <div className="rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <div className="rounded-full border border-border/70 bg-muted/55 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
                 {enabledProviderCount} providers live
               </div>
             </div>
@@ -369,7 +369,7 @@ export function LlmModelsWorkspace() {
                     {availableModelOptions.map((option) => (
                       <span
                         key={`${option.provider}:${option.modelId}`}
-                        className="rounded-full border border-border/60 bg-background/85 px-3 py-1.5 text-xs font-medium text-foreground"
+                        className="rounded-full border border-border/80 bg-background/85 px-3 py-1.5 text-xs font-medium text-foreground"
                       >
                         {option.label.replace(`${getProviderLabel(option.provider)} · `, "")}
                       </span>

@@ -16,11 +16,11 @@ import { ProductBrand } from "@/components/workspace/product-brand";
 import { Button } from "@/components/ui/button";
 
 const workspaceBackdropClassName =
-  "flex flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.08),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.92),rgba(241,245,249,0.78))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.94),rgba(2,6,23,0.82))]";
+  "flex flex-1 flex-col overflow-hidden bg-[linear-gradient(180deg,rgba(11,13,19,0.92),rgba(9,11,16,0.98))]";
 const shellClassName =
-  "h-full min-h-0 overflow-hidden rounded-[30px] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.86))] shadow-[0_28px_90px_-48px_rgba(15,23,42,0.45)] ring-1 ring-black/[0.04] backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(15,23,42,0.82))] dark:ring-white/[0.03]";
+  "h-full min-h-0 overflow-hidden rounded-[20px] border border-border/80 bg-card/94 shadow-[0_20px_54px_-38px_rgba(0,0,0,0.7)] backdrop-blur-md";
 const shellInnerClassName =
-  "h-full min-h-0 overflow-auto rounded-[26px] bg-background/92 p-5 dark:bg-slate-950/80 md:p-6";
+  "h-full min-h-0 overflow-auto rounded-[18px] bg-background/92 p-5 md:p-6";
 
 const sections = [
   {
@@ -114,7 +114,7 @@ function Card({
 }) {
   return (
     <section
-      className={`rounded-[28px] border border-border/60 bg-white/85 p-5 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.38)] dark:bg-slate-950/65 ${className}`}
+      className={`rounded-[18px] border border-border/80 bg-card/88 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] ${className}`}
     >
       {children}
     </section>
@@ -143,7 +143,7 @@ export function KnowledgeCenterWorkspace() {
                 use the workspace as a system instead of a plain chat.
               </p>
             </div>
-            <div className="rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+            <div className="rounded-full border border-border/70 bg-muted/55 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
               Product handbook
             </div>
           </div>
@@ -162,7 +162,7 @@ export function KnowledgeCenterWorkspace() {
                 </div>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-[22px] border border-border/60 bg-background/80 px-4 py-3">
+                <div className="rounded-[14px] border border-border/80 bg-background/80 px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     Inputs
                   </p>
@@ -170,7 +170,7 @@ export function KnowledgeCenterWorkspace() {
                     Chat and Canvas are where the user and the system create and structure work.
                   </p>
                 </div>
-                <div className="rounded-[22px] border border-border/60 bg-background/80 px-4 py-3">
+                <div className="rounded-[14px] border border-border/80 bg-background/80 px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     Outputs
                   </p>
@@ -197,7 +197,7 @@ export function KnowledgeCenterWorkspace() {
                 ].map((item) => (
                   <div
                     key={item}
-                    className="rounded-[18px] border border-border/60 bg-background/80 px-3 py-2 text-sm text-foreground/90"
+                    className="rounded-[12px] border border-border/80 bg-background/80 px-3 py-2 text-sm text-foreground/90"
                   >
                     {item}
                   </div>
@@ -213,7 +213,7 @@ export function KnowledgeCenterWorkspace() {
                 return (
                   <Card key={section.id} className="scroll-mt-8" >
                     <div id={section.id} className="flex items-start gap-3">
-                      <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-muted/50 text-foreground">
+                      <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-[12px] border border-border/80 bg-muted/60 text-foreground">
                         <Icon className="size-4" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -230,7 +230,7 @@ export function KnowledgeCenterWorkspace() {
                           {section.bullets.map((bullet) => (
                             <div
                               key={bullet}
-                              className="rounded-[20px] border border-border/60 bg-background/80 px-3 py-2.5 text-sm text-foreground/90"
+                            className="rounded-[12px] border border-border/80 bg-background/80 px-3 py-2.5 text-sm text-foreground/90"
                             >
                               {bullet}
                             </div>
@@ -253,7 +253,7 @@ export function KnowledgeCenterWorkspace() {
                     <a
                       key={section.id}
                       href={`#${section.id}`}
-                      className="flex items-center justify-between rounded-[18px] border border-border/60 bg-background/80 px-3 py-2 text-sm text-foreground/90 transition hover:bg-muted"
+                      className="flex items-center justify-between rounded-[12px] border border-border/80 bg-background/80 px-3 py-2 text-sm text-foreground/90 transition hover:bg-muted/70"
                     >
                       <span>{section.title}</span>
                       <FileText className="size-4 text-muted-foreground" />
