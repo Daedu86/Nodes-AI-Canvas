@@ -60,20 +60,20 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
       data-memory-id={data.memoryId ?? undefined}
       data-memory-type={data.memoryType ?? undefined}
       className={[
-        "group relative min-w-[300px] max-w-[340px] rounded-[28px] border border-border/70 bg-background/95 p-[1px] shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] transition-all duration-200",
-        selected ? "ring-2 ring-violet-400/70" : "ring-1 ring-border/40",
+        "group relative min-w-[300px] max-w-[340px] rounded-[28px] border border-white/10 bg-slate-950/95 p-[1px] shadow-[0_18px_42px_-28px_rgba(15,23,42,0.4)] transition-all duration-200",
+        selected ? "ring-2 ring-violet-400/70" : "ring-1 ring-white/10",
         dragging ? "scale-[1.015]" : "scale-100",
       ].join(" ")}
       style={{
         boxShadow: selected ? `0 24px 60px -30px ${accent}66, 0 0 0 1px ${accent}22` : undefined,
       }}
     >
-      <div className="relative overflow-hidden rounded-[27px] border border-border/40 bg-background/95 px-4 py-3">
+      <div className="relative overflow-hidden rounded-[27px] border border-white/8 bg-slate-950/95 px-4 py-3">
         <div
           className="pointer-events-none absolute inset-0 opacity-90"
           style={{
             backgroundImage:
-              "radial-gradient(circle at top right, rgba(255,255,255,0.9), transparent 36%), linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92))",
+              "radial-gradient(circle at top right, rgba(148,163,184,0.12), transparent 36%), linear-gradient(180deg, rgba(20,23,31,0.98), rgba(15,17,24,0.98))",
           }}
         />
         <div className="pointer-events-none absolute left-0 top-0 h-full w-1.5" style={{ backgroundColor: accent }} />
@@ -82,7 +82,7 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
         <Handle
           type="source"
           position={Position.Right}
-          className="!h-3 !w-3 !border-2 !border-background !bg-slate-500/90"
+          className="!h-3 !w-3 !border-2 !border-slate-950 !bg-slate-300/90"
           style={{ right: -7 }}
         />
 
@@ -92,7 +92,11 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
               <div className="flex flex-wrap items-center gap-2">
                 <span
                   className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                  style={{ borderColor: `${accent}55`, color: accent }}
+                  style={{
+                    backgroundColor: `${accent}14`,
+                    borderColor: `${accent}33`,
+                    color: accent,
+                  }}
                 >
                   <Icon className="h-3 w-3" />
                   <span>
@@ -102,39 +106,39 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
                   </span>
                 </span>
                 {data.language ? (
-                  <span className="inline-flex items-center rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-300">
                     {data.language}
                   </span>
                 ) : null}
                 {data.fileName ? (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-slate-300">
                     {isImage ? <FileImage className="h-3 w-3" /> : <File className="h-3 w-3" />}
                     <span>{data.fileName}</span>
                   </span>
                 ) : null}
               </div>
               <div className="space-y-1.5">
-                <p className="text-sm font-semibold text-foreground/90">{data.title ?? "Untitled artifact"}</p>
+                <p className="text-sm font-semibold text-slate-100">{data.title ?? "Untitled artifact"}</p>
                 <p className="text-[11px] uppercase tracking-[0.16em]" style={{ color: accent }}>
                   {readableRole}
                 </p>
-                <p className="text-xs text-muted-foreground">{intentLabel}</p>
+                <p className="text-xs text-slate-300/78">{intentLabel}</p>
               </div>
             </div>
-            <div className="flex flex-col items-end gap-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-              <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/85 px-2 py-0.5">
+            <div className="flex flex-col items-end gap-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5">
                 <Move className="h-3 w-3" />
                 <span>Draggable</span>
               </span>
               {selected ? (
-                <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-violet-700">
+                <span className="rounded-full border border-violet-400/25 bg-violet-400/12 px-2 py-0.5 text-violet-200">
                   Focus
                 </span>
               ) : null}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-border/50 bg-muted/25 px-3 py-2">
+          <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
             {isImage && data.sourceDataUrl ? (
               <div className="space-y-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -144,17 +148,17 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
                   className="h-28 w-full rounded-xl object-cover"
                 />
                 <div className="space-y-2">
-                  <p className="text-sm font-medium leading-5 text-foreground/90">{headline}</p>
+                  <p className="text-sm font-medium leading-5 text-slate-100">{headline}</p>
                   {highlights.length > 0 ? (
                     <div className="space-y-1">
                       {highlights.slice(0, 2).map((line) => (
-                        <p key={line} className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+                        <p key={line} className="line-clamp-2 text-xs leading-5 text-slate-300/78">
                           {line}
                         </p>
                       ))}
                     </div>
                   ) : (
-                    <p className="line-clamp-3 text-sm leading-5 text-foreground/88">{previewText(data.preview)}</p>
+                    <p className="line-clamp-3 text-sm leading-5 text-slate-100/88">{previewText(data.preview)}</p>
                   )}
                 </div>
               </div>
@@ -164,7 +168,7 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
                   <span>Code sample</span>
                   {data.language ? <span>{data.language}</span> : null}
                 </div>
-                <div className="overflow-hidden rounded-xl border border-emerald-500/20 bg-slate-950 px-3 py-2 text-[12px] text-emerald-100">
+                <div className="overflow-hidden rounded-xl border border-emerald-500/18 bg-black/40 px-3 py-2 text-[12px] text-emerald-100">
                   {codeSample.length > 0 ? (
                     codeSample.map((line, index) => (
                       <div key={`${index}:${line}`} className="grid grid-cols-[auto,1fr] gap-3 leading-5">
@@ -179,56 +183,56 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-sm font-medium leading-5 text-foreground/90">{headline}</p>
+                <p className="text-sm font-medium leading-5 text-slate-100">{headline}</p>
                 {highlights.length > 0 ? (
                   <div className="space-y-1">
                     {highlights.map((line) => (
-                      <div key={line} className="flex items-start gap-2 text-xs leading-5 text-foreground/84">
+                      <div key={line} className="flex items-start gap-2 text-xs leading-5 text-slate-200/84">
                         <span className="mt-1 h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent }} />
                         <span className="line-clamp-2">{line}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="line-clamp-4 text-sm leading-5 text-foreground/88">{previewText(data.preview)}</p>
+                  <p className="line-clamp-4 text-sm leading-5 text-slate-100/88">{previewText(data.preview)}</p>
                 )}
               </div>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 px-2 py-0.5">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300/80">
+            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5">
               <Link2 className="h-3 w-3" />
               <span>{linkedCount} linked target{linkedCount === 1 ? "" : "s"}</span>
             </span>
             {sizeLabel ? (
-              <span className="rounded-full border border-border/60 bg-muted/60 px-2 py-0.5">
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5">
                 {sizeLabel}
               </span>
             ) : null}
             {statChips.slice(0, 2).map((chip) => (
-              <span key={chip} className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5">
+              <span key={chip} className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5">
                 {chip}
               </span>
             ))}
             {isCode ? (
-              <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-emerald-700">
+              <span className="rounded-full border border-emerald-400/25 bg-emerald-400/12 px-2 py-0.5 text-emerald-200">
                 executable context
               </span>
             ) : memoryMeta ? (
-              <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-amber-700">
+              <span className="rounded-full border border-amber-400/25 bg-amber-400/12 px-2 py-0.5 text-amber-200">
                 typed memory
               </span>
             ) : isImage ? (
-              <span className="rounded-full border border-pink-500/25 bg-pink-500/10 px-2 py-0.5 text-pink-700">
+              <span className="rounded-full border border-pink-400/25 bg-pink-400/12 px-2 py-0.5 text-pink-200">
                 visual context
               </span>
             ) : isFile ? (
-              <span className="rounded-full border border-blue-500/25 bg-blue-500/10 px-2 py-0.5 text-blue-700">
+              <span className="rounded-full border border-blue-400/25 bg-blue-400/12 px-2 py-0.5 text-blue-200">
                 uploaded file
               </span>
             ) : (
-              <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-violet-700">
+              <span className="rounded-full border border-violet-400/25 bg-violet-400/12 px-2 py-0.5 text-violet-200">
                 narrative context
               </span>
             )}
