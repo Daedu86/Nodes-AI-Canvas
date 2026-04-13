@@ -2,18 +2,21 @@
 
 import {
   ArrowLeft,
+  Check,
   Compass,
+  Copy,
   GitBranch,
   KeyRound,
   Keyboard,
   Layers3,
   ListChecks,
   MessageSquareText,
+  MoveRight,
   Network,
   Sparkles,
   SquareKanban,
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useWorkspaceSurface } from "@/components/context/workspace-surface";
 import { ProductBrand } from "@/components/workspace/product-brand";
 import { Button } from "@/components/ui/button";
@@ -39,6 +42,12 @@ type DocPage = {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   sections: DocSection[];
+};
+
+type ReleaseNote = {
+  title: string;
+  body: string;
+  tag: string;
 };
 
 const pages: DocPage[] = [
@@ -276,6 +285,29 @@ const pages: DocPage[] = [
   },
 ];
 
+const releaseNotes: ReleaseNote[] = [
+  {
+    title: "Google sign-in is now available",
+    body: "Users can authenticate with Google OAuth in addition to GitHub, keeping onboarding lighter for non-technical teams.",
+    tag: "Auth",
+  },
+  {
+    title: "Knowledge Center became a real docs surface",
+    body: "The product guide now behaves like a wiki: searchable navigation, page-level structure, and deep links to sections.",
+    tag: "Docs",
+  },
+  {
+    title: "Model settings are stored server-side",
+    body: "Provider keys no longer live in the browser, and per-user model setup is now persisted in the backend.",
+    tag: "Security",
+  },
+  {
+    title: "Branching controls are unified",
+    body: "Chat branching now uses a single entry point so edit branches and follow-ups are easier to understand.",
+    tag: "Workflow",
+  },
+];
+
 function WorkspaceShell({ children }: { children: React.ReactNode }) {
   return (
     <div className={shellClassName}>
@@ -300,10 +332,29 @@ function Card({
   );
 }
 
+function sectionAnchor(pageId: string, sectionId: string) {
+  return `${pageId}-${sectionId}`;
+}
+
+function buildKnowledgeHash(pageId: string, sectionId?: string) {
+  return `knowledge/${pageId}${sectionId ? `/${sectionId}` : ""}`;
+}
+
+function parseKnowledgeHash(hash: string) {
+  const normalized = hash.replace(/^#/, "");
+  if (!normalized.startsWith("knowledge/")) return null;
+  const [, pageId = "", sectionId = ""] = normalized.split("/");
+  return {
+    pageId,
+    sectionId: sectionId || null,
+  };
+}
+
 export function KnowledgeCenterWorkspace() {
   const { showWorkspace } = useWorkspaceSurface();
   const [activePageId, setActivePageId] = useState(pages[0]?.id ?? "getting-started");
   const [query, setQuery] = useState("");
+  const [copiedTarget, setCopiedTarget] = useState<string | null>(null);
 
   const activePage = useMemo(
     () => pages.find((page) => page.id === activePageId) ?? pages[0]!,
@@ -327,6 +378,67 @@ export function KnowledgeCenterWorkspace() {
   }, [query]);
 
   const activeSections = activePage.sections;
+
+  const writeLink = useCallback(async (pageId: string, sectionId?: string) => {
+    if (typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    url.hash = buildKnowledgeHash(pageId, sectionId);
+    await navigator.clipboard.writeText(url.toString());
+    setCopiedTarget(sectionId ? `${pageId}:${sectionId}` : pageId);
+    window.setTimeout(() => setCopiedTarget((current) => (current === (sectionId ? `${pageId}:${sectionId}` : pageId) ? null : current)), 1800);
+  }, []);
+
+  const syncHash = useCallback((pageId: string, sectionId?: string) => {
+    if (typeof window === "undefined") return;
+    const nextHash = buildKnowledgeHash(pageId, sectionId);
+    if (window.location.hash.replace(/^#/, "") === nextHash) return;
+    window.history.replaceState({}, "", `${window.location.pathname}${window.location.search}#${nextHash}`);
+  }, []);
+
+  const scrollToSection = useCallback((pageId: string, sectionId: string) => {
+    if (typeof window === "undefined") return;
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(sectionAnchor(pageId, sectionId));
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
+  const handleSelectPage = useCallback(
+    (pageId: string) => {
+      setActivePageId(pageId);
+      syncHash(pageId);
+    },
+    [syncHash],
+  );
+
+  const handleSelectSection = useCallback(
+    (pageId: string, sectionId: string) => {
+      setActivePageId(pageId);
+      syncHash(pageId, sectionId);
+      scrollToSection(pageId, sectionId);
+    },
+    [scrollToSection, syncHash],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const applyHash = () => {
+      const parsed = parseKnowledgeHash(window.location.hash);
+      if (!parsed?.pageId) return;
+      if (!pages.some((page) => page.id === parsed.pageId)) return;
+
+      setActivePageId(parsed.pageId);
+      if (parsed.sectionId) {
+        window.setTimeout(() => scrollToSection(parsed.pageId, parsed.sectionId!), 40);
+      }
+    };
+
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, [scrollToSection]);
 
   return (
     <div className={`${workspaceBackdropClassName} px-4 py-4 md:px-5 md:py-5`}>
@@ -377,6 +489,11 @@ export function KnowledgeCenterWorkspace() {
                   aria-label="Search knowledge center"
                 />
                 <nav className="max-h-[calc(100vh-320px)] space-y-2 overflow-auto pr-1">
+                  {filteredPages.length === 0 ? (
+                    <div className="rounded-[14px] border border-border/70 bg-card/40 px-3 py-3 text-sm text-muted-foreground">
+                      No docs match that search yet.
+                    </div>
+                  ) : null}
                   {filteredPages.map((page) => {
                     const Icon = page.icon;
                     const isActive = page.id === activePage.id;
@@ -384,7 +501,7 @@ export function KnowledgeCenterWorkspace() {
                       <button
                         key={page.id}
                         type="button"
-                        onClick={() => setActivePageId(page.id)}
+                        onClick={() => handleSelectPage(page.id)}
                         className={`w-full rounded-[14px] border px-3 py-2 text-left transition ${
                           isActive
                             ? "border-border/90 bg-background/85 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
@@ -430,19 +547,88 @@ export function KnowledgeCenterWorkspace() {
                         {activePage.description}
                       </p>
                     </div>
-                    <div className="hidden rounded-[14px] border border-border/70 bg-background/70 px-3 py-2 text-xs text-muted-foreground md:block">
-                      Tip: open Split and keep this on the side.
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void writeLink(activePage.id)}
+                      >
+                        {copiedTarget === activePage.id ? (
+                          <Check className="size-4" />
+                        ) : (
+                          <Copy className="size-4" />
+                        )}
+                        {copiedTarget === activePage.id ? "Copied" : "Copy page link"}
+                      </Button>
+                      <div className="hidden rounded-[14px] border border-border/70 bg-background/70 px-3 py-2 text-xs text-muted-foreground md:block">
+                        Tip: open Split and keep this on the side.
+                      </div>
                     </div>
+                  </div>
+                </Card>
+
+                <Card className="space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                        Product Flow
+                      </p>
+                      <h3 className="mt-1 text-lg font-semibold text-foreground">
+                        Explore, structure, stabilize, decide
+                      </h3>
+                    </div>
+                    <div className="rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
+                      Docs pattern: search + answers + changelog
+                    </div>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-[repeat(5,minmax(0,1fr))]">
+                    {[
+                      ["Chat", "Explore prompts and open loops."],
+                      ["Canvas", "Keep branches and artifacts visible."],
+                      ["Wiki", "Promote stable knowledge."],
+                      ["Nody", "Query the current workspace."],
+                      ["Brief", "Land on the current recommendation."],
+                    ].map(([title, copy], index, items) => (
+                      <div key={title} className="flex items-center gap-3 md:contents">
+                        <div className="rounded-[16px] border border-border/80 bg-background/85 px-4 py-3">
+                          <p className="text-sm font-semibold text-foreground">{title}</p>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy}</p>
+                        </div>
+                        {index < items.length - 1 ? (
+                          <div className="hidden items-center justify-center md:flex">
+                            <MoveRight className="size-4 text-muted-foreground" />
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
                   </div>
                 </Card>
 
                 {activeSections.map((section) => (
                   <Card key={section.id} className="scroll-mt-24">
                     <div id={sectionAnchor(activePage.id, section.id)} className="space-y-3">
-                      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                        Section
-                      </p>
-                      <h3 className="text-xl font-semibold text-foreground">{section.title}</h3>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                            Section
+                          </p>
+                          <h3 className="text-xl font-semibold text-foreground">{section.title}</h3>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void writeLink(activePage.id, section.id)}
+                        >
+                          {copiedTarget === `${activePage.id}:${section.id}` ? (
+                            <Check className="size-4" />
+                          ) : (
+                            <Copy className="size-4" />
+                          )}
+                          {copiedTarget === `${activePage.id}:${section.id}` ? "Copied" : "Copy link"}
+                        </Button>
+                      </div>
                       <p className="text-sm leading-6 text-foreground/90">{section.body}</p>
                       {section.bullets && section.bullets.length > 0 ? (
                         <div className="mt-4 space-y-2">
@@ -470,38 +656,37 @@ export function KnowledgeCenterWorkspace() {
                   </p>
                   <div className="space-y-2">
                     {activeSections.map((section) => (
-                      <a
+                      <button
                         key={section.id}
-                        href={`#${sectionAnchor(activePage.id, section.id)}`}
-                        className="block rounded-[12px] border border-border/70 bg-background/80 px-3 py-2 text-sm text-foreground/90 transition hover:bg-muted/60"
+                        type="button"
+                        onClick={() => handleSelectSection(activePage.id, section.id)}
+                        className="block w-full rounded-[12px] border border-border/70 bg-background/80 px-3 py-2 text-left text-sm text-foreground/90 transition hover:bg-muted/60"
                       >
                         {section.title}
-                      </a>
+                      </button>
                     ))}
                   </div>
                 </Card>
 
                 <Card className="space-y-3">
                   <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                    Quick Index
+                    What&apos;s New
                   </p>
-                  <div className="space-y-2 text-sm text-foreground/90">
-                    <div className="flex items-center gap-2">
-                      <SquareKanban className="size-4 text-muted-foreground" />
-                      Chat, Canvas, Wiki, Brief, Nody
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <GitBranch className="size-4 text-muted-foreground" />
-                      Branching and comparisons
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Layers3 className="size-4 text-muted-foreground" />
-                      Semantic artifacts
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Keyboard className="size-4 text-muted-foreground" />
-                      Shortcuts and habits
-                    </div>
+                  <div className="space-y-3">
+                    {releaseNotes.map((note) => (
+                      <div
+                        key={note.title}
+                        className="rounded-[12px] border border-border/70 bg-background/80 px-3 py-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-foreground">{note.title}</p>
+                          <span className="rounded-full border border-border/70 bg-card/70 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            {note.tag}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">{note.body}</p>
+                      </div>
+                    ))}
                   </div>
                 </Card>
               </div>
@@ -511,8 +696,4 @@ export function KnowledgeCenterWorkspace() {
       </WorkspaceShell>
     </div>
   );
-}
-
-function sectionAnchor(pageId: string, sectionId: string) {
-  return `${pageId}-${sectionId}`;
 }
