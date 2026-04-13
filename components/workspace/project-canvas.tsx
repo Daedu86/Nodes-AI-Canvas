@@ -108,12 +108,14 @@ function ProjectCanvasInner({
   const [canvasFilter, setCanvasFilter] = React.useState<ProjectCanvasFilter>("all");
   const [focusSessionId, setFocusSessionId] = React.useState<string | null>(null);
   const [localSelection, setLocalSelection] = React.useState<ProjectCanvasSelection>(null);
+  const [guideOpen, setGuideOpen] = React.useState(false);
   const projectSessionIdsKey = React.useMemo(() => project.sessionIds.join("|"), [project.sessionIds]);
 
   React.useEffect(() => {
     setCanvasFilter("all");
     setFocusSessionId(null);
     setLocalSelection(null);
+    setGuideOpen(false);
   }, [project.id, projectSessionIdsKey]);
 
   const sessionTitleById = React.useMemo(
@@ -218,85 +220,104 @@ function ProjectCanvasInner({
 
   return (
     <div className="relative h-full w-full">
-      <div className="pointer-events-none absolute right-4 top-4 z-10 w-[min(360px,calc(100%-2rem))]">
-        <div className="pointer-events-none rounded-2xl border border-border/70 bg-background/90 p-3 shadow-lg backdrop-blur-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                Canvas Guide
-              </p>
-              <p className="text-sm font-medium text-foreground">
-                {focusedSessionTitle ? `Focused on ${focusedSessionTitle}` : "Reading the whole project graph"}
-              </p>
-              <p className="text-xs leading-5 text-muted-foreground">
-                Filter the canvas by structure, then focus a selected session when the graph gets dense.
-              </p>
-            </div>
-            <Button type="button" variant="outline" size="sm" className="pointer-events-auto h-8 px-2" onClick={handleResetView}>
-              <RefreshCw className="h-3.5 w-3.5" />
-              Reset view
-            </Button>
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {(Object.entries(PROJECT_CANVAS_FILTER_META) as Array<
-              [ProjectCanvasFilter, (typeof PROJECT_CANVAS_FILTER_META)[ProjectCanvasFilter]]
-            >).map(([filter, meta]) => {
-              const Icon = meta.icon;
-              const active = canvasFilter === filter;
-              return (
-                <Button
-                  key={filter}
-                  type="button"
-                  variant={active ? "default" : "outline"}
-                  size="sm"
-                  className="pointer-events-auto h-8 px-3"
-                  onClick={() => setCanvasFilter(filter)}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {meta.label}
-                  <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-[10px] leading-none text-current">
-                    {filterCounts[filter]}
-                  </span>
-                </Button>
-              );
-            })}
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-1">
-              {visibleNodes.length} nodes visible
-            </span>
-            {localSelection ? (
-              <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-1">
-                Selected: {localSelection.label}
-              </span>
-            ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="pointer-events-auto h-8 px-2"
-              onClick={handleFocusSelectedSession}
-              disabled={!selectedSessionId}
-            >
-              <Focus className="h-3.5 w-3.5" />
-              Focus selected session
-            </Button>
-            {focusSessionId ? (
+      <div className="pointer-events-none absolute left-4 top-4 z-10 flex items-start gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="pointer-events-auto h-8 px-3"
+          onClick={() => setGuideOpen((value) => !value)}
+        >
+          {guideOpen ? "Hide guide" : "Canvas guide"}
+        </Button>
+      </div>
+      {guideOpen ? (
+        <div className="pointer-events-none absolute left-4 top-14 z-10 w-[min(360px,calc(100%-2rem))]">
+          <div className="pointer-events-none rounded-2xl border border-border/70 bg-background/90 p-3 shadow-lg backdrop-blur-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                  Canvas Guide
+                </p>
+                <p className="text-sm font-medium text-foreground">
+                  {focusedSessionTitle ? `Focused on ${focusedSessionTitle}` : "Reading the whole project graph"}
+                </p>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Filter the canvas by structure, then focus a selected session when the graph gets dense.
+                </p>
+              </div>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="pointer-events-auto h-8 px-2"
-                onClick={() => setFocusSessionId(null)}
+                onClick={handleResetView}
               >
-                Show all sessions
+                <RefreshCw className="h-3.5 w-3.5" />
+                Reset view
               </Button>
-            ) : null}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(Object.entries(PROJECT_CANVAS_FILTER_META) as Array<
+                [ProjectCanvasFilter, (typeof PROJECT_CANVAS_FILTER_META)[ProjectCanvasFilter]]
+              >).map(([filter, meta]) => {
+                const Icon = meta.icon;
+                const active = canvasFilter === filter;
+                return (
+                  <Button
+                    key={filter}
+                    type="button"
+                    variant={active ? "default" : "outline"}
+                    size="sm"
+                    className="pointer-events-auto h-8 px-3"
+                    onClick={() => setCanvasFilter(filter)}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {meta.label}
+                    <span className="rounded-full bg-black/10 px-1.5 py-0.5 text-[10px] leading-none text-current">
+                      {filterCounts[filter]}
+                    </span>
+                  </Button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-1">
+                {visibleNodes.length} nodes visible
+              </span>
+              {localSelection ? (
+                <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-1">
+                  Selected: {localSelection.label}
+                </span>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="pointer-events-auto h-8 px-2"
+                onClick={handleFocusSelectedSession}
+                disabled={!selectedSessionId}
+              >
+                <Focus className="h-3.5 w-3.5" />
+                Focus selected session
+              </Button>
+              {focusSessionId ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="pointer-events-auto h-8 px-2"
+                  onClick={() => setFocusSessionId(null)}
+                >
+                  Show all sessions
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
       <ReactFlow
         key={`${project.id}:${project.sessionIds.join(",")}`}

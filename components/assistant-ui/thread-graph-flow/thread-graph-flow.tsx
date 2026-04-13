@@ -1576,8 +1576,8 @@ export function ThreadGraphFlow() {
         className="hidden"
         onChange={handleFileUploadChange}
       />
-      <header className="pointer-events-none absolute inset-x-4 top-4 z-10 flex items-start justify-between gap-4">
-        <div className="pointer-events-auto relative z-10 min-w-0 max-w-[min(440px,46vw)] rounded-[24px] border border-white/70 bg-white/80 px-4 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
+      <header className="pointer-events-none absolute inset-x-4 top-4 z-30 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="pointer-events-auto relative z-40 w-full min-w-0 max-w-none rounded-[24px] border border-white/70 bg-white/80 px-4 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70 md:w-auto md:max-w-[min(440px,46vw)]">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-200">
               Canvas
@@ -1611,7 +1611,7 @@ export function ThreadGraphFlow() {
         </div>
         <div
           ref={toolbarMenuRef}
-          className="pointer-events-auto relative z-20 flex items-center gap-2 rounded-[24px] border border-white/70 bg-white/80 px-3 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72"
+          className="pointer-events-auto relative z-40 flex w-full flex-wrap items-center justify-end gap-2 rounded-[24px] border border-white/70 bg-white/80 px-3 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72 md:w-auto"
         >
           {quickSemanticPresets.map(({ semanticType, icon: Icon }) => {
             const meta = getSemanticArtifactMeta(semanticType)!;
@@ -1794,7 +1794,7 @@ export function ThreadGraphFlow() {
           </div>
         </div>
         {selectedArtifact || (selectedFlowNode && selectedMessageNode) || linkEditMode || overrides.size > 0 ? (
-        <div className="pointer-events-auto relative z-10 mt-16 flex w-[min(320px,42vw)] min-w-0 flex-col gap-2 rounded-[24px] border border-white/70 bg-white/80 px-3 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
+        <div className="pointer-events-auto relative z-40 flex w-full min-w-0 flex-col gap-2 rounded-[24px] border border-white/70 bg-white/80 px-3 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72 md:mt-16 md:w-[min(320px,42vw)]">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -1994,7 +1994,7 @@ export function ThreadGraphFlow() {
                   <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
                     <div className="flex items-center gap-2 text-xs font-medium text-foreground/80">
                       <FileImage className="h-4 w-4 text-pink-600" />
-                      <span>Preview</span>
+                      <span>Image preview</span>
                     </div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img

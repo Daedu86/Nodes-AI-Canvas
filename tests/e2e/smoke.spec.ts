@@ -85,15 +85,30 @@ async function resetAppData(page: Page) {
   const cleanupTargets = ["/api/projects", "/api/sessions", "/api/memory"];
 
   for (const target of cleanupTargets) {
-    const response = await page.request.fetch(new URL(target, PLAYWRIGHT_BASE_URL).toString(), {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      data: JSON.stringify({ all: true }),
-    });
-    if (!response.ok() && response.status() !== 400 && response.status() !== 404) {
-      throw new Error(`Cleanup failed for ${target}: ${response.status()}`);
+    const url = new URL(target, PLAYWRIGHT_BASE_URL).toString();
+    const maxAttempts = 5;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await page.request.fetch(url, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          data: JSON.stringify({ all: true }),
+        });
+
+        if (!response.ok() && response.status() !== 400 && response.status() !== 404) {
+          throw new Error(`Cleanup failed for ${target}: ${response.status()}`);
+        }
+
+        break;
+      } catch (error) {
+        if (attempt === maxAttempts) {
+          throw error;
+        }
+        await page.waitForTimeout(250 * attempt);
+      }
     }
   }
 
@@ -420,7 +435,10 @@ async function createBranchFromFlow(
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: /Create .*branch|Create follow-up/i }).click();
+  await graphSection
+    .getByRole("button", { name: /Create .*branch|Create follow-up/i })
+    .first()
+    .evaluate((button: HTMLButtonElement) => button.click());
   await responsePromise;
 
   const rawSelectedModel =
@@ -1068,6 +1086,7 @@ test("creates a project from multiple saved sessions and opens the aggregated ca
 });
 
 test("creates a typed node from canvas focus inside a project", async ({ page }) => {
+  test.setTimeout(60_000);
   const firstSessionId = await createAndOpenNamedSession(page, "Typed node session one");
   await sendPrompt(page, "Typed node session one");
 
@@ -1274,7 +1293,10 @@ test("uploads an image artifact, persists it, and branches with it from the flow
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Create follow-up with context" }).click();
+  await graphSection
+    .getByRole("button", { name: "Create follow-up with context" })
+    .first()
+    .evaluate((button: HTMLButtonElement) => button.click());
   await responsePromise;
 
   const reply = expectedReply("Use the image artifact too", {

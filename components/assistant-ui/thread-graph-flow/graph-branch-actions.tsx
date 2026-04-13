@@ -61,12 +61,19 @@ export function GraphBranchActions({
             disabled={disabled || busy}
             className="min-h-[84px] w-full resize-y rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-sky-500/35"
           />
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={onCancelDraft} disabled={busy}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              className="pointer-events-auto w-full sm:w-auto"
+              onClick={onCancelDraft}
+              disabled={busy}
+            >
               Cancel
             </Button>
             <Button
               type="button"
+              className="pointer-events-auto w-full sm:w-auto"
               onClick={onSubmitDraft}
               disabled={disabled || busy || activeDraft.text.trim().length === 0}
             >
@@ -86,7 +93,7 @@ export function GraphBranchActions({
               type="button"
               onClick={() => onChooseOperation(detail.operation)}
               disabled={disabled || busy}
-              className="inline-flex items-center rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+              className="pointer-events-auto inline-flex items-center rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
             >
               {detail.title}
             </button>
