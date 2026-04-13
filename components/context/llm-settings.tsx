@@ -8,7 +8,6 @@ import {
   cloneDefaultLlmSettingsState,
   normalizeLlmSettingsState,
   type LlmSettingsState,
-  type ProviderWithApiKey,
 } from "@/lib/llm/user-settings";
 import {
   BUILTIN_MODEL_OPTIONS,
@@ -27,8 +26,8 @@ type LlmSettingsContextValue = {
   getSupportedModelConfig: (config?: Partial<ModelConfig> | null) => ModelConfig;
   isReady: boolean;
   settings: LlmSettingsState;
-  clearProviderApiKey: (provider: ProviderWithApiKey | "openrouter") => void;
-  setProviderApiKey: (provider: ProviderWithApiKey | "openrouter", value: string) => void;
+  clearProviderApiKey: (provider: "openrouter") => void;
+  setProviderApiKey: (provider: "openrouter", value: string) => void;
   setProviderEnabled: (provider: Exclude<LlmProviderId, "openrouter">, value: boolean) => void;
   setProviderModels: (provider: Exclude<LlmProviderId, "openrouter">, value: string) => void;
   setProviderValue: (provider: "ollama", field: "baseUrl", value: string) => void;
@@ -72,16 +71,6 @@ const buildAvailableModelOptions = (settings: LlmSettingsState) => {
   if (settings.providers.ollama.enabled) {
     options.push(...createDynamicModelOptions("ollama", settings.providers.ollama.models));
   }
-
-  const addApiProvider = (provider: ProviderWithApiKey) => {
-    const entry = settings.providers[provider];
-    if (!entry.enabled || (!entry.apiKey.trim() && !entry.hasApiKey)) return;
-    options.push(...createDynamicModelOptions(provider, entry.models));
-  };
-
-  addApiProvider("openai");
-  addApiProvider("anthropic");
-  addApiProvider("google");
 
   const deduped = dedupeModelOptions(options);
   return deduped.length > 0 ? deduped : BUILTIN_MODEL_OPTIONS;
@@ -263,7 +252,7 @@ export function LlmSettingsProvider({
   );
 
   const setProviderApiKey = React.useCallback(
-    (provider: ProviderWithApiKey | "openrouter", value: string) => {
+    (provider: "openrouter", value: string) => {
       setSettings((current) => ({
         providers: {
           ...current.providers,
@@ -284,7 +273,7 @@ export function LlmSettingsProvider({
   );
 
   const clearProviderApiKey = React.useCallback(
-    (provider: ProviderWithApiKey | "openrouter") => {
+    (provider: "openrouter") => {
       setSettings((current) => ({
         providers: {
           ...current.providers,

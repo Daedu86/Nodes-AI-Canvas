@@ -50,9 +50,6 @@ export const OPENROUTER_BASE_URL =
 export const OLLAMA_API_URL = process.env.OLLAMA_API_URL || "http://localhost:11434/api";
 
 const DEFAULT_ALLOWED_MODELS: Record<Provider, string[]> = {
-  anthropic: [],
-  google: [],
-  openai: [],
   openrouter: OPENROUTER_FREE_MODEL_OPTIONS.map((option) => option.modelId),
   ollama: ["gemma3:4b"],
 };
@@ -69,16 +66,6 @@ const isKnownProvider = (value: string | undefined): value is Provider =>
 const inferProviderFromModel = (modelId: string): Provider => {
   const normalized = modelId.toLowerCase();
   if (normalized.includes("/")) return "openrouter";
-  if (normalized.includes("claude")) return "anthropic";
-  if (normalized.includes("gemini")) return "google";
-  if (
-    normalized.startsWith("gpt") ||
-    normalized.startsWith("o1") ||
-    normalized.startsWith("o3") ||
-    normalized.startsWith("o4")
-  ) {
-    return "openai";
-  }
   return "ollama";
 };
 
@@ -86,24 +73,22 @@ export function getAllowedModels(provider: Provider) {
   const envValue =
     provider === "openrouter"
       ? process.env.ALLOWED_OPENROUTER_MODELS
-      : provider === "ollama"
-        ? process.env.ALLOWED_OLLAMA_MODELS
-        : provider === "openai"
-          ? process.env.ALLOWED_OPENAI_MODELS
-          : provider === "anthropic"
-            ? process.env.ALLOWED_ANTHROPIC_MODELS
-            : process.env.ALLOWED_GOOGLE_MODELS;
+      : process.env.ALLOWED_OLLAMA_MODELS;
   const configured = parseAllowedModels(envValue);
+
+  // Keep OpenRouter strictly limited to the curated free-only list, even if env values are set.
+  if (provider === "openrouter") {
+    const allowed = new Set(DEFAULT_ALLOWED_MODELS.openrouter);
+    const filtered = configured.filter((modelId) => allowed.has(modelId));
+    return filtered.length > 0 ? filtered : DEFAULT_ALLOWED_MODELS.openrouter;
+  }
+
   return configured.length > 0 ? configured : DEFAULT_ALLOWED_MODELS[provider];
 }
 
 export function isAllowedModelConfig(config: { modelId: string; provider: Provider }) {
   if (!config.modelId.trim()) return false;
-  if (config.provider === "openrouter") {
-    return getAllowedModels(config.provider).includes(config.modelId);
-  }
-  const allowed = getAllowedModels(config.provider);
-  return allowed.length > 0 ? allowed.includes(config.modelId) : true;
+  return getAllowedModels(config.provider).includes(config.modelId);
 }
 
 export function getRequestedModelConfig(input: ModelResolutionInput): ResolvedModelConfig {

@@ -1,9 +1,6 @@
 export const LLM_PROVIDER_IDS = [
   "openrouter",
   "ollama",
-  "openai",
-  "anthropic",
-  "google",
 ] as const;
 
 export type LlmProviderId = (typeof LLM_PROVIDER_IDS)[number];
@@ -55,33 +52,12 @@ export const DEFAULT_OLLAMA_MODELS = ["gemma3:4b"];
 export const SAFE_DEFAULT_MODEL = OPENROUTER_FREE_MODEL_OPTIONS[0]!;
 
 export const PROVIDER_DEFINITIONS: Record<LlmProviderId, ProviderDefinition> = {
-  anthropic: {
-    connectionHint: "Add your Anthropic key and the Claude models you want exposed.",
-    description: "Claude API via Anthropic.",
-    label: "Anthropic",
-    modelHint: "claude-opus-4-1, claude-sonnet-4",
-    settingsLabel: "API key",
-  },
-  google: {
-    connectionHint: "Add your Gemini key and the Gemini models you want exposed.",
-    description: "Gemini API via Google Generative AI.",
-    label: "Gemini",
-    modelHint: "gemini-2.5-flash, gemini-2.5-pro",
-    settingsLabel: "API key",
-  },
   ollama: {
     connectionHint: "Local models served by Ollama.",
     description: "Local or remote Ollama runtime.",
     label: "Ollama",
     modelHint: "gemma3:4b, llama3.2:3b",
     settingsLabel: "Base URL",
-  },
-  openai: {
-    connectionHint: "Add your OpenAI key and the OpenAI models you want exposed.",
-    description: "OpenAI API.",
-    label: "OpenAI",
-    modelHint: "gpt-5-mini, gpt-4.1-mini",
-    settingsLabel: "API key",
   },
   openrouter: {
     connectionHint: "Free OpenRouter pool already wired into Nodes.",

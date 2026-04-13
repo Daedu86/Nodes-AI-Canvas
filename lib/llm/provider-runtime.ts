@@ -1,5 +1,3 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOllama, ollama } from "ollama-ai-provider";
 import { getLlmSettings } from "@/lib/llm-settings-store";
@@ -14,11 +12,7 @@ import type { LlmSettingsState } from "@/lib/llm/user-settings";
 import { type LlmRequestOverrides } from "@/lib/llm/request-overrides";
 
 export type MissingProviderCredential = {
-  code:
-    | "missing_anthropic_key"
-    | "missing_google_key"
-    | "missing_openai_key"
-    | "missing_openrouter_key";
+  code: "missing_openrouter_key";
   message: string;
   status: number;
 };
@@ -37,10 +31,7 @@ function createOverridesFromSettings(
   settings: LlmSettingsState | null | undefined,
 ): LlmRequestOverrides {
   return {
-    anthropicApiKey: normalizeValue(settings?.providers.anthropic.apiKey),
-    googleApiKey: normalizeValue(settings?.providers.google.apiKey),
     ollamaBaseUrl: normalizeValue(settings?.providers.ollama.baseUrl),
-    openaiApiKey: normalizeValue(settings?.providers.openai.apiKey),
     openrouterApiKey: normalizeValue(settings?.providers.openrouter.apiKey),
   };
 }
@@ -63,33 +54,6 @@ export function getMissingProviderCredential(
             message: "OpenRouter is not configured on this deployment.",
             status: 503,
           };
-    case "openai":
-      return resolveApiKey(overrides.openaiApiKey, process.env.OPENAI_API_KEY)
-        ? null
-        : {
-            code: "missing_openai_key",
-            message: "OpenAI needs an API key in Profile > LLM Models.",
-            status: 400,
-          };
-    case "anthropic":
-      return resolveApiKey(overrides.anthropicApiKey, process.env.ANTHROPIC_API_KEY)
-        ? null
-        : {
-            code: "missing_anthropic_key",
-            message: "Anthropic needs an API key in Profile > LLM Models.",
-            status: 400,
-          };
-    case "google":
-      return resolveApiKey(
-        overrides.googleApiKey,
-        process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      )
-        ? null
-        : {
-            code: "missing_google_key",
-            message: "Gemini needs an API key in Profile > LLM Models.",
-            status: 400,
-          };
     case "ollama":
     default:
       return null;
@@ -108,30 +72,6 @@ export function createLanguageModel(
         baseURL: OPENROUTER_BASE_URL,
         headers: getOpenRouterMetadataHeaders(),
         name: "openrouter",
-      })(config.modelId);
-    }
-    case "openai": {
-      const apiKey = resolveApiKey(overrides.openaiApiKey, process.env.OPENAI_API_KEY);
-      return createOpenAI({
-        apiKey,
-        name: "openai",
-      })(config.modelId);
-    }
-    case "anthropic": {
-      const apiKey = resolveApiKey(overrides.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
-      return createAnthropic({
-        apiKey,
-        name: "anthropic.messages",
-      })(config.modelId);
-    }
-    case "google": {
-      const apiKey = resolveApiKey(
-        overrides.googleApiKey,
-        process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      );
-      return createGoogleGenerativeAI({
-        apiKey,
-        name: "google.generative-ai",
       })(config.modelId);
     }
     case "ollama":

@@ -206,8 +206,8 @@ const pages: DocPage[] = [
         id: "provider-setup",
         title: "Providers",
         body:
-          "Nodes supports multiple providers. Your provider configuration is saved per user and applied server-side so API keys are not exposed to the browser.",
-        bullets: ["OpenRouter (free models supported)", "Ollama (local)", "OpenAI, Anthropic, Gemini (optional)"],
+          "Nodes supports a free-only model set. Configuration is saved per user and applied server-side so API keys are not exposed to the browser.",
+        bullets: ["OpenRouter (free models only)", "Ollama (local)"],
       },
       {
         id: "fallbacks",
