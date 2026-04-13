@@ -17,6 +17,8 @@ describe("AuthScreen", () => {
         canonicalAppUrl="https://nodes-lemon.vercel.app"
         devCredentialsDefaultEmail="demo@nodes.local"
         devCredentialsEnabled={false}
+        emailConfigured={false}
+        googleConfigured={false}
         githubConfigured
       />,
     );

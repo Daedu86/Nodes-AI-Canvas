@@ -3,6 +3,8 @@ import NextAuth from "next-auth/next";
 import { getServerSession } from "next-auth/next";
 import type { Provider } from "next-auth/providers/index";
 import Credentials from "next-auth/providers/credentials";
+import Email from "next-auth/providers/email";
+import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
 import { isE2eEnvAuthAllowed } from "@/lib/server/e2e-auth";
 
@@ -14,6 +16,8 @@ const E2E_AUTH_USER_EMAIL = process.env.E2E_AUTH_USER_EMAIL?.trim() || "e2e@node
 const E2E_AUTH_USER_NAME = process.env.E2E_AUTH_USER_NAME?.trim() || "E2E User";
 
 const githubConfigured = Boolean(process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET);
+const googleConfigured = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
+const emailConfigured = Boolean(process.env.AUTH_EMAIL_SERVER && process.env.AUTH_EMAIL_FROM);
 const devCredentialsEnabled =
   process.env.AUTH_ENABLE_DEV_CREDENTIALS === "1" || process.env.NODE_ENV !== "production";
 
@@ -24,6 +28,24 @@ if (githubConfigured) {
     GitHub({
       clientId: process.env.AUTH_GITHUB_ID!,
       clientSecret: process.env.AUTH_GITHUB_SECRET!,
+    }),
+  );
+}
+
+if (googleConfigured) {
+  providers.push(
+    Google({
+      clientId: process.env.AUTH_GOOGLE_ID!,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+    }),
+  );
+}
+
+if (emailConfigured) {
+  providers.push(
+    Email({
+      server: process.env.AUTH_EMAIL_SERVER!,
+      from: process.env.AUTH_EMAIL_FROM!,
     }),
   );
 }
@@ -79,6 +101,8 @@ export const authUiConfig = {
   canonicalAppUrl: process.env.NEXTAUTH_URL?.trim() || null,
   devCredentialsDefaultEmail: DEV_AUTH_EMAIL,
   devCredentialsEnabled,
+  emailConfigured,
+  googleConfigured,
   githubConfigured,
 } as const;
 

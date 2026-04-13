@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Github, LockKeyhole, Network } from "lucide-react";
+import { Github, Globe, LockKeyhole, Mail, Network } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ type AuthScreenProps = {
   canonicalAppUrl: string | null;
   devCredentialsDefaultEmail: string;
   devCredentialsEnabled: boolean;
+  emailConfigured: boolean;
+  googleConfigured: boolean;
   githubConfigured: boolean;
 };
 
@@ -33,6 +35,8 @@ export function AuthScreen({
   canonicalAppUrl,
   devCredentialsDefaultEmail,
   devCredentialsEnabled,
+  emailConfigured,
+  googleConfigured,
   githubConfigured,
 }: AuthScreenProps) {
   const callbackUrl = useMemo(
@@ -41,7 +45,10 @@ export function AuthScreen({
   );
   const [email, setEmail] = useState(devCredentialsDefaultEmail);
   const [password, setPassword] = useState("");
+  const [magicLinkEmail, setMagicLinkEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMagicLinkSubmitting, setIsMagicLinkSubmitting] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const authErrorMessage = useMemo(() => getAuthErrorMessage(authError), [authError]);
 
@@ -70,6 +77,33 @@ export function AuthScreen({
       return;
     }
     window.location.assign(callbackUrl);
+  };
+
+  const handleMagicLink = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMagicLinkSent(false);
+    setError(null);
+
+    const normalized = magicLinkEmail.trim();
+    if (!normalized) {
+      setError("Enter an email address to receive a sign-in link.");
+      return;
+    }
+
+    setIsMagicLinkSubmitting(true);
+    const result = await signIn("email", {
+      email: normalized,
+      callbackUrl,
+      redirect: false,
+    });
+    setIsMagicLinkSubmitting(false);
+
+    if (result?.error) {
+      setError("Unable to send a sign-in link. Check the email provider configuration.");
+      return;
+    }
+
+    setMagicLinkSent(true);
   };
 
   return (
@@ -127,28 +161,77 @@ export function AuthScreen({
               </div>
             ) : null}
 
-            {githubConfigured ? (
-              <Button
-                type="button"
-                size="lg"
-                className="w-full justify-center"
-                onClick={() => void signIn("github", { callbackUrl })}
-              >
-                <Github className="size-4" />
-                Continue with GitHub
-              </Button>
-            ) : (
-              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                <div className="flex items-center gap-3 text-sm text-slate-200">
+            <div className="grid gap-3">
+              {googleConfigured ? (
+                <Button
+                  type="button"
+                  size="lg"
+                  className="w-full justify-center"
+                  onClick={() => void signIn("google", { callbackUrl })}
+                >
+                  <Globe className="size-4" />
+                  Continue with Google
+                </Button>
+              ) : null}
+
+              {githubConfigured ? (
+                <Button
+                  type="button"
+                  size="lg"
+                  className="w-full justify-center"
+                  onClick={() => void signIn("github", { callbackUrl })}
+                >
                   <Github className="size-4" />
-                  <span className="font-medium">GitHub sign-in is not configured in this environment.</span>
-                </div>
+                  Continue with GitHub
+                </Button>
+              ) : null}
+
+              {emailConfigured ? (
+                <form className="space-y-3" onSubmit={handleMagicLink}>
+                  <div className="space-y-2">
+                    <label className="text-sm text-slate-300" htmlFor="magic-email">
+                      Email magic link
+                    </label>
+                    <Input
+                      id="magic-email"
+                      value={magicLinkEmail}
+                      onChange={(event) => setMagicLinkEmail(event.target.value)}
+                      autoComplete="email"
+                      placeholder="you@example.com"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    size="lg"
+                    variant="outline"
+                    className="w-full"
+                    disabled={isMagicLinkSubmitting}
+                  >
+                    <Mail className="size-4" />
+                    {isMagicLinkSubmitting ? "Sending..." : "Send sign-in link"}
+                  </Button>
+                  {magicLinkSent ? (
+                    <p className="text-xs leading-5 text-slate-300">
+                      Check your email for a sign-in link.
+                    </p>
+                  ) : null}
+                </form>
+              ) : null}
+            </div>
+
+            {!googleConfigured && !githubConfigured && !emailConfigured ? (
+              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                <p className="text-sm font-medium text-slate-200">
+                  No public sign-in provider is configured in this environment.
+                </p>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Add <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_GITHUB_ID</code> and{" "}
-                  <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_GITHUB_SECRET</code> to enable OAuth.
+                  Configure OAuth (<code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_GITHUB_*</code>,{" "}
+                  <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_GOOGLE_*</code>) or email magic links (
+                  <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_EMAIL_SERVER</code>,{" "}
+                  <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_EMAIL_FROM</code>).
                 </p>
               </div>
-            )}
+            ) : null}
 
             {devCredentialsEnabled ? (
               <form className="space-y-4" onSubmit={handleDevLogin}>
@@ -184,7 +267,7 @@ export function AuthScreen({
               </form>
             ) : null}
 
-            {!githubConfigured && !devCredentialsEnabled ? (
+            {!googleConfigured && !githubConfigured && !emailConfigured && !devCredentialsEnabled ? (
               <p className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                 No authentication provider is configured yet. Add GitHub OAuth or enable local
                 dev credentials in your environment.
