@@ -32,11 +32,8 @@ describe("/api/llm/settings", () => {
   it("returns saved settings for the authenticated user", async () => {
     getLlmSettingsMock.mockResolvedValue({
       providers: {
-        anthropic: { apiKey: "", enabled: false, models: [] },
-        google: { apiKey: "", enabled: false, models: [] },
         ollama: { baseUrl: "http://localhost:11434/api", enabled: true, models: ["gemma3:4b"] },
-        openai: { apiKey: "sk-openai", enabled: true, models: ["gpt-5-mini"] },
-        openrouter: { apiKey: "", enabledModels: ["openrouter/free"] },
+        openrouter: { apiKey: "sk-openrouter", enabledModels: ["openrouter/free"] },
       },
     });
 
@@ -47,11 +44,10 @@ describe("/api/llm/settings", () => {
     await expect(response.json()).resolves.toEqual({
       settings: expect.objectContaining({
         providers: expect.objectContaining({
-          openai: expect.objectContaining({
+          openrouter: expect.objectContaining({
             apiKey: "",
-            enabled: true,
             hasApiKey: true,
-            models: ["gpt-5-mini"],
+            enabledModels: ["openrouter/free"],
           }),
         }),
       }),
@@ -61,11 +57,8 @@ describe("/api/llm/settings", () => {
   it("preserves an existing saved key when the client sends a masked payload", async () => {
     getLlmSettingsMock.mockResolvedValue({
       providers: {
-        anthropic: { apiKey: "", enabled: false, models: [] },
-        google: { apiKey: "", enabled: false, models: [] },
         ollama: { baseUrl: "http://localhost:11434/api", enabled: true, models: ["gemma3:4b"] },
-        openai: { apiKey: "sk-openai", enabled: true, models: ["gpt-5-mini"] },
-        openrouter: { apiKey: "", enabledModels: ["openrouter/free"] },
+        openrouter: { apiKey: "sk-openrouter", enabledModels: ["openrouter/free"] },
       },
     });
     saveLlmSettingsMock.mockImplementation(async (_ownerId: string, settings: unknown) => settings);
@@ -76,11 +69,10 @@ describe("/api/llm/settings", () => {
         body: JSON.stringify({
           settings: {
             providers: {
-              openai: {
+              openrouter: {
                 apiKey: "",
                 hasApiKey: true,
-                enabled: true,
-                models: ["gpt-5-mini", "gpt-5-mini", "gpt-4.1-mini"],
+                enabledModels: ["openrouter/free"],
               },
               ollama: {
                 baseUrl: "http://localhost:11434/api",
@@ -102,9 +94,9 @@ describe("/api/llm/settings", () => {
           ollama: expect.objectContaining({
             models: ["gemma3:4b"],
           }),
-          openai: expect.objectContaining({
-            apiKey: "sk-openai",
-            models: ["gpt-5-mini", "gpt-4.1-mini"],
+          openrouter: expect.objectContaining({
+            apiKey: "sk-openrouter",
+            enabledModels: ["openrouter/free"],
           }),
         }),
       }),
@@ -112,7 +104,7 @@ describe("/api/llm/settings", () => {
     await expect(response.json()).resolves.toEqual({
       settings: expect.objectContaining({
         providers: expect.objectContaining({
-          openai: expect.objectContaining({
+          openrouter: expect.objectContaining({
             apiKey: "",
             hasApiKey: true,
           }),
@@ -124,11 +116,8 @@ describe("/api/llm/settings", () => {
   it("clears a saved key only when clearApiKey is explicit", async () => {
     getLlmSettingsMock.mockResolvedValue({
       providers: {
-        anthropic: { apiKey: "", enabled: false, models: [] },
-        google: { apiKey: "", enabled: false, models: [] },
         ollama: { baseUrl: "http://localhost:11434/api", enabled: true, models: ["gemma3:4b"] },
-        openai: { apiKey: "sk-openai", enabled: true, models: ["gpt-5-mini"] },
-        openrouter: { apiKey: "", enabledModels: ["openrouter/free"] },
+        openrouter: { apiKey: "sk-openrouter", enabledModels: ["openrouter/free"] },
       },
     });
     saveLlmSettingsMock.mockImplementation(async (_ownerId: string, settings: unknown) => settings);
@@ -139,12 +128,11 @@ describe("/api/llm/settings", () => {
         body: JSON.stringify({
           settings: {
             providers: {
-              openai: {
+              openrouter: {
                 apiKey: "",
                 clearApiKey: true,
-                enabled: true,
                 hasApiKey: false,
-                models: ["gpt-5-mini"],
+                enabledModels: ["openrouter/free"],
               },
             },
           },
@@ -157,7 +145,7 @@ describe("/api/llm/settings", () => {
       "user-1",
       expect.objectContaining({
         providers: expect.objectContaining({
-          openai: expect.objectContaining({
+          openrouter: expect.objectContaining({
             apiKey: "",
           }),
         }),

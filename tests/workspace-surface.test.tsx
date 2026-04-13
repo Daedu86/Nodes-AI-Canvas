@@ -10,6 +10,7 @@ import {
   WorkspaceSurfaceProvider,
   useWorkspaceSurface,
 } from "../components/context/workspace-surface";
+import { SidebarProvider } from "../components/ui/sidebar";
 import { LlmModelsWorkspace } from "../components/workspace/llm-models-workspace";
 
 const fetchMock = vi.fn();
@@ -55,6 +56,18 @@ describe("WorkspaceSurfaceProvider", () => {
     localStorage.clear();
     fetchMock.mockReset();
     fetchMock.mockImplementation(async () => Response.json({ settings: null }));
+
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
   });
 
   afterEach(() => {
@@ -66,11 +79,13 @@ describe("WorkspaceSurfaceProvider", () => {
     const user = userEvent.setup();
 
     render(
-      <LlmSettingsProvider>
-        <WorkspaceSurfaceProvider>
-          <SurfaceHarness />
-        </WorkspaceSurfaceProvider>
-      </LlmSettingsProvider>,
+      <SidebarProvider>
+        <LlmSettingsProvider>
+          <WorkspaceSurfaceProvider>
+            <SurfaceHarness />
+          </WorkspaceSurfaceProvider>
+        </LlmSettingsProvider>
+      </SidebarProvider>,
     );
 
     expect(screen.getByTestId("surface").textContent).toBe("workspace");
@@ -86,11 +101,13 @@ describe("WorkspaceSurfaceProvider", () => {
     const user = userEvent.setup();
 
     render(
-      <LlmSettingsProvider>
-        <WorkspaceSurfaceProvider>
-          <SurfaceHarness />
-        </WorkspaceSurfaceProvider>
-      </LlmSettingsProvider>,
+      <SidebarProvider>
+        <LlmSettingsProvider>
+          <WorkspaceSurfaceProvider>
+            <SurfaceHarness />
+          </WorkspaceSurfaceProvider>
+        </LlmSettingsProvider>
+      </SidebarProvider>,
     );
 
     expect(screen.getByTestId("surface").textContent).toBe("workspace");
@@ -107,11 +124,13 @@ describe("WorkspaceSurfaceProvider", () => {
     window.history.replaceState({}, "", "/?handoff=chat");
 
     render(
-      <LlmSettingsProvider>
-        <WorkspaceSurfaceProvider>
-          <SurfaceHarness />
-        </WorkspaceSurfaceProvider>
-      </LlmSettingsProvider>,
+      <SidebarProvider>
+        <LlmSettingsProvider>
+          <WorkspaceSurfaceProvider>
+            <SurfaceHarness />
+          </WorkspaceSurfaceProvider>
+        </LlmSettingsProvider>
+      </SidebarProvider>,
     );
 
     expect(screen.getByTestId("surface").textContent).toBe("workspace");

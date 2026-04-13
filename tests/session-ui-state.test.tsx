@@ -47,8 +47,8 @@ describe("SessionUiStateProvider", () => {
     localStorage.setItem(
       "session-ui.modelConfig.v1:session-a",
       JSON.stringify({
-        provider: "openai",
-        modelId: "gpt-5-mini",
+        provider: "ollama",
+        modelId: "gemma3:4b",
       }),
     );
 
@@ -58,7 +58,7 @@ describe("SessionUiStateProvider", () => {
       </SessionUiStateProvider>,
     );
 
-    expect(screen.getByTestId("model-config").textContent).toBe("openai:gpt-5-mini");
+    expect(screen.getByTestId("model-config").textContent).toBe("ollama:gemma3:4b");
   });
 
   it("falls back when a persisted provider is malformed", () => {

@@ -26,7 +26,7 @@ type ReplyOptions = {
 };
 
 function normalizeSelectedModelValue(value: string) {
-  const match = value.match(/^(openrouter|ollama|openai|anthropic|google):(.+)$/);
+  const match = value.match(/^(openrouter|ollama):(.+)$/);
   if (!match) {
     return {
       model: value,
@@ -41,16 +41,6 @@ function normalizeSelectedModelValue(value: string) {
 
 function inferProviderFromModel(modelId: string) {
   if (modelId.includes("/")) return "openrouter";
-  if (modelId.toLowerCase().includes("claude")) return "anthropic";
-  if (modelId.toLowerCase().includes("gemini")) return "google";
-  if (
-    modelId.startsWith("gpt") ||
-    modelId.startsWith("o1") ||
-    modelId.startsWith("o3") ||
-    modelId.startsWith("o4")
-  ) {
-    return "openai";
-  }
   return "ollama";
 }
 

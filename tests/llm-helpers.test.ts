@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveModelConfig } from "../lib/llm/config";
+import { SAFE_DEFAULT_MODEL } from "../lib/llm/provider-catalog";
 import {
   normalizeMessages,
   selectMessagesForHistoryMode,
@@ -128,18 +129,18 @@ describe("llm helpers", () => {
     });
 
     expect(resolveModelConfig({ model: "gpt-5-mini", provider: "openai" })).toEqual({
-      modelId: "gpt-5-mini",
-      provider: "openai",
+      modelId: SAFE_DEFAULT_MODEL.modelId,
+      provider: SAFE_DEFAULT_MODEL.provider,
     });
 
     expect(resolveModelConfig({ model: "claude-sonnet-4", provider: "anthropic" })).toEqual({
-      modelId: "claude-sonnet-4",
-      provider: "anthropic",
+      modelId: SAFE_DEFAULT_MODEL.modelId,
+      provider: SAFE_DEFAULT_MODEL.provider,
     });
 
     expect(resolveModelConfig({ model: "gemini-2.5-flash", provider: "google" })).toEqual({
-      modelId: "gemini-2.5-flash",
-      provider: "google",
+      modelId: SAFE_DEFAULT_MODEL.modelId,
+      provider: SAFE_DEFAULT_MODEL.provider,
     });
 
     expect(
@@ -164,8 +165,8 @@ describe("llm helpers", () => {
         model: "openai/gpt-4.1",
       }),
     ).toEqual({
-      modelId: "nvidia/nemotron-3-nano-30b-a3b:free",
-      provider: "openrouter",
+      modelId: SAFE_DEFAULT_MODEL.modelId,
+      provider: SAFE_DEFAULT_MODEL.provider,
     });
 
     expect(
@@ -174,8 +175,8 @@ describe("llm helpers", () => {
         model: "llama3.1:8b",
       }),
     ).toEqual({
-      modelId: "nvidia/nemotron-3-nano-30b-a3b:free",
-      provider: "openrouter",
+      modelId: SAFE_DEFAULT_MODEL.modelId,
+      provider: SAFE_DEFAULT_MODEL.provider,
     });
   });
 });

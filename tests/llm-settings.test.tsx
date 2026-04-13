@@ -27,9 +27,8 @@ vi.stubGlobal("fetch", fetchMock);
 function Harness() {
   const {
     availableModelOptions,
-    setProviderApiKey,
-    setProviderEnabled,
     setProviderModels,
+    toggleOpenRouterModel,
   } = useLlmSettings();
 
   return (
@@ -37,17 +36,16 @@ function Harness() {
       <div data-testid="options">
         {availableModelOptions.map((option) => `${option.provider}:${option.modelId}`).join("|")}
       </div>
-      <button type="button" onClick={() => setProviderEnabled("openai", true)}>
-        enable-openai
-      </button>
-      <button type="button" onClick={() => setProviderApiKey("openai", "sk-test")}>
-        key-openai
-      </button>
       <button
         type="button"
-        onClick={() => setProviderModels("openai", "gpt-5-mini, gpt-4.1-mini")}
+        onClick={() =>
+          toggleOpenRouterModel("nvidia/nemotron-3-nano-30b-a3b:free")
+        }
       >
-        models-openai
+        toggle-openrouter-nano
+      </button>
+      <button type="button" onClick={() => setProviderModels("ollama", "gemma3:4b, llama3.2:3b")}>
+        models-ollama
       </button>
     </div>
   );
@@ -86,7 +84,7 @@ describe("LlmSettingsProvider", () => {
     expect(screen.getByTestId("options").textContent).toContain("ollama:gemma3:4b");
   });
 
-  it("adds configured OpenAI models to the selector pool", async () => {
+  it("updates the selector pool when the user customizes model availability", async () => {
     const user = userEvent.setup();
 
     render(
@@ -96,11 +94,13 @@ describe("LlmSettingsProvider", () => {
     );
 
     await screen.findByTestId("options");
-    await user.click(screen.getByRole("button", { name: "enable-openai" }));
-    await user.click(screen.getByRole("button", { name: "key-openai" }));
-    await user.click(screen.getByRole("button", { name: "models-openai" }));
 
-    expect(screen.getByTestId("options").textContent).toContain("openai:gpt-5-mini");
-    expect(screen.getByTestId("options").textContent).toContain("openai:gpt-4.1-mini");
+    await user.click(screen.getByRole("button", { name: "toggle-openrouter-nano" }));
+    expect(screen.getByTestId("options").textContent).not.toContain(
+      "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
+    );
+
+    await user.click(screen.getByRole("button", { name: "models-ollama" }));
+    expect(screen.getByTestId("options").textContent).toContain("ollama:llama3.2:3b");
   });
 });
