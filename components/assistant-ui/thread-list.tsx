@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { useProjects } from "@/components/context/projects";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
+import { useWorkspaceSurface } from "@/components/context/workspace-surface";
 import { forceSessionPersist } from "@/lib/session-persist-sync";
 
 const formatTitle = (title: string | null) => title?.trim() || "New Chat";
@@ -32,6 +33,7 @@ const formatUpdatedAt = (value: string) => {
 };
 
 export const ThreadList: FC = () => {
+  const { showWorkspace } = useWorkspaceSurface();
   const {
     activeSessionId,
     archiveSession,
@@ -122,13 +124,15 @@ export const ThreadList: FC = () => {
   }, [allSessionIds, deleteSessions, sessions.length]);
 
   const handleCreateEmptyProject = React.useCallback(async () => {
+    showWorkspace();
     await forceSessionPersist();
     await createProject();
-  }, [createProject]);
+  }, [createProject, showWorkspace]);
 
   const handleCreateProjectFromSelected = React.useCallback(async () => {
     const sessionIds = [...selectedSessionIds];
     if (sessionIds.length === 0) return;
+    showWorkspace();
     await forceSessionPersist();
     await createProject({
       sessionIds,
@@ -136,7 +140,7 @@ export const ThreadList: FC = () => {
     });
     setManageSessions(false);
     setSelectedSessionIds(new Set());
-  }, [buildProjectTitle, createProject, selectedSessionIds]);
+  }, [buildProjectTitle, createProject, selectedSessionIds, showWorkspace]);
 
   return (
     <div className="flex flex-col items-stretch gap-3 px-1 py-2">
@@ -169,6 +173,7 @@ export const ThreadList: FC = () => {
                 variant="outline"
                 className="h-8 px-3 text-xs"
                 onClick={() => {
+                  showWorkspace();
                   void handleCreateEmptyProject();
                 }}
               >
@@ -222,6 +227,7 @@ export const ThreadList: FC = () => {
                       type="button"
                       className="flex min-w-0 flex-grow flex-col px-3 py-2 text-start"
                       onClick={() => {
+                        showWorkspace();
                         void forceSessionPersist().then(() => selectProject(project.id));
                       }}
                     >
@@ -291,6 +297,7 @@ export const ThreadList: FC = () => {
                 variant="outline"
                 className="h-8 border-primary/20 bg-primary/12 px-3 text-xs text-primary hover:bg-primary/16 hover:text-primary"
                 onClick={() => {
+                  showWorkspace();
                   clearActiveProject();
                   void createSession();
                 }}
@@ -404,6 +411,7 @@ export const ThreadList: FC = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        showWorkspace();
                         clearActiveProject();
                         void selectSession(session.id);
                       }}
