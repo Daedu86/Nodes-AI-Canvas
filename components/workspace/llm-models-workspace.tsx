@@ -132,9 +132,10 @@ function OllamaCard() {
 }
 
 function OpenRouterCard() {
-  const { clearProviderApiKey, settings, setProviderApiKey, toggleOpenRouterModel } =
+  const { clearProviderApiKey, policy, settings, setProviderApiKey, toggleOpenRouterModel } =
     useLlmSettings();
   const openrouter = settings.providers.openrouter;
+  const requireUserKey = policy.openrouter.requireUserKey;
   const definition = getProviderDefinition("openrouter");
 
   return (
@@ -153,7 +154,9 @@ function OpenRouterCard() {
               placeholder={
                 openrouter.hasApiKey
                   ? "Saved on the server. Type a new key to replace it."
-                  : "Optional. Deployment env key still works if this is empty."
+                  : requireUserKey
+                    ? "Required on this deployment. Paste your OpenRouter API key."
+                    : "Optional. Deployment env key still works if this is empty."
               }
               onChange={(event) => setProviderApiKey("openrouter", event.currentTarget.value)}
             />
@@ -161,7 +164,9 @@ function OpenRouterCard() {
               <span>
                 {openrouter.hasApiKey
                   ? "Using a user-level OpenRouter key"
-                  : "Using the deployment env key when available"}
+                  : requireUserKey
+                    ? "This deployment requires a user API key."
+                    : "Using the deployment env key when available"}
               </span>
               {openrouter.hasApiKey ? (
                 <Button

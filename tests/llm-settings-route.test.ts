@@ -51,6 +51,12 @@ describe("/api/llm/settings", () => {
           }),
         }),
       }),
+      policy: {
+        openrouter: expect.objectContaining({
+          hasDeploymentKey: expect.any(Boolean),
+          requireUserKey: expect.any(Boolean),
+        }),
+      },
     });
   });
 
@@ -110,6 +116,12 @@ describe("/api/llm/settings", () => {
           }),
         }),
       }),
+      policy: {
+        openrouter: expect.objectContaining({
+          hasDeploymentKey: expect.any(Boolean),
+          requireUserKey: expect.any(Boolean),
+        }),
+      },
     });
   });
 

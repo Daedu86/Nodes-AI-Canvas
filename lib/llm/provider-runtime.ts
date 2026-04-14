@@ -23,10 +23,13 @@ const normalizeValue = (value?: string | null) => {
   return trimmed ? trimmed : undefined;
 };
 
-const resolveApiKey = (
-  overrideValue: string | undefined,
-  envValue: string | undefined,
-) => normalizeValue(overrideValue) ?? normalizeValue(envValue);
+const isOpenRouterUserKeyRequired = () => process.env.OPENROUTER_REQUIRE_USER_KEY === "1";
+
+const resolveOpenRouterApiKey = (overrides: LlmRequestOverrides) => {
+  const userKey = normalizeValue(overrides.openrouterApiKey);
+  if (isOpenRouterUserKeyRequired()) return userKey;
+  return userKey ?? normalizeValue(process.env.OPENROUTER_API_KEY);
+};
 
 function createOverridesFromSettings(
   settings: LlmSettingsState | null | undefined,
@@ -53,13 +56,19 @@ export function getMissingProviderCredential(
 ): MissingProviderCredential | null {
   switch (provider) {
     case "openrouter":
-      return resolveApiKey(overrides.openrouterApiKey, process.env.OPENROUTER_API_KEY)
-        ? null
-        : {
-            code: "missing_openrouter_key",
-            message: "OpenRouter is not configured on this deployment.",
-            status: 503,
-          };
+      if (resolveOpenRouterApiKey(overrides)) return null;
+      if (isOpenRouterUserKeyRequired()) {
+        return {
+          code: "missing_openrouter_key",
+          message: "OpenRouter needs your API key. Add one in Profile > LLM Models.",
+          status: 401,
+        };
+      }
+      return {
+        code: "missing_openrouter_key",
+        message: "OpenRouter is not configured on this deployment.",
+        status: 503,
+      };
     case "ollama":
     default:
       return null;
@@ -72,7 +81,10 @@ export function createLanguageModel(
 ) {
   switch (config.provider) {
     case "openrouter": {
-      const apiKey = resolveApiKey(overrides.openrouterApiKey, process.env.OPENROUTER_API_KEY);
+      const apiKey = resolveOpenRouterApiKey(overrides);
+      if (!apiKey) {
+        throw new Error("Missing OpenRouter API key");
+      }
       return createOpenAI({
         apiKey,
         baseURL: OPENROUTER_BASE_URL,

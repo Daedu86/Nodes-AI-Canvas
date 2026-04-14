@@ -11,6 +11,12 @@ export const runtime = "nodejs";
 
 type LlmSettingsResponse = {
   settings: LlmSettingsState | null;
+  policy: {
+    openrouter: {
+      hasDeploymentKey: boolean;
+      requireUserKey: boolean;
+    };
+  };
 };
 
 type PutBody = {
@@ -24,6 +30,12 @@ export async function GET(req: Request) {
   const settings = await getLlmSettings(guarded.user.id);
   return Response.json({
     settings: maskLlmSettingsState(settings),
+    policy: {
+      openrouter: {
+        hasDeploymentKey: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
+        requireUserKey: process.env.OPENROUTER_REQUIRE_USER_KEY === "1",
+      },
+    },
   } satisfies LlmSettingsResponse);
 }
 
@@ -46,5 +58,11 @@ export async function PUT(req: Request) {
   const settings = await saveLlmSettings(guarded.user.id, merged);
   return Response.json({
     settings: maskLlmSettingsState(settings),
+    policy: {
+      openrouter: {
+        hasDeploymentKey: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
+        requireUserKey: process.env.OPENROUTER_REQUIRE_USER_KEY === "1",
+      },
+    },
   } satisfies LlmSettingsResponse);
 }

@@ -19,6 +19,12 @@ import {
 
 type LlmSettingsResponse = {
   settings: LlmSettingsState | null;
+  policy?: {
+    openrouter?: {
+      hasDeploymentKey?: boolean;
+      requireUserKey?: boolean;
+    };
+  };
 };
 
 type LlmSettingsContextValue = {
@@ -26,6 +32,12 @@ type LlmSettingsContextValue = {
   getSupportedModelConfig: (config?: Partial<ModelConfig> | null) => ModelConfig;
   isReady: boolean;
   settings: LlmSettingsState;
+  policy: {
+    openrouter: {
+      hasDeploymentKey: boolean;
+      requireUserKey: boolean;
+    };
+  };
   clearProviderApiKey: (provider: "openrouter") => void;
   setProviderApiKey: (provider: "openrouter", value: string) => void;
   setProviderEnabled: (provider: Exclude<LlmProviderId, "openrouter">, value: boolean) => void;
@@ -87,7 +99,15 @@ async function fetchLlmSettings() {
     throw new Error(`Failed to load LLM settings: ${response.status}`);
   }
   const data = (await response.json()) as LlmSettingsResponse;
-  return data.settings ? normalizeLlmSettingsState(data.settings) : null;
+  return {
+    settings: data.settings ? normalizeLlmSettingsState(data.settings) : null,
+    policy: {
+      openrouter: {
+        hasDeploymentKey: Boolean(data.policy?.openrouter?.hasDeploymentKey),
+        requireUserKey: Boolean(data.policy?.openrouter?.requireUserKey),
+      },
+    },
+  };
 }
 
 async function persistLlmSettings(settings: LlmSettingsState) {
@@ -104,7 +124,15 @@ async function persistLlmSettings(settings: LlmSettingsState) {
     throw new Error(`Failed to save LLM settings: ${response.status}`);
   }
   const data = (await response.json()) as LlmSettingsResponse;
-  return normalizeLlmSettingsState(data.settings);
+  return {
+    settings: normalizeLlmSettingsState(data.settings),
+    policy: {
+      openrouter: {
+        hasDeploymentKey: Boolean(data.policy?.openrouter?.hasDeploymentKey),
+        requireUserKey: Boolean(data.policy?.openrouter?.requireUserKey),
+      },
+    },
+  };
 }
 
 export function LlmSettingsProvider({
@@ -119,6 +147,12 @@ export function LlmSettingsProvider({
     [userId],
   );
   const [settings, setSettings] = React.useState<LlmSettingsState>(cloneDefaultLlmSettingsState);
+  const [policy, setPolicy] = React.useState({
+    openrouter: {
+      hasDeploymentKey: false,
+      requireUserKey: false,
+    },
+  });
   const [isReady, setIsReady] = React.useState(false);
   const persistedSignatureRef = React.useRef<string | null>(null);
   const latestSettingsRef = React.useRef<LlmSettingsState>(settings);
@@ -142,6 +176,12 @@ export function LlmSettingsProvider({
     if (!userId) {
       const next = cloneDefaultLlmSettingsState();
       setSettings(next);
+      setPolicy({
+        openrouter: {
+          hasDeploymentKey: false,
+          requireUserKey: false,
+        },
+      });
       persistedSignatureRef.current = JSON.stringify(next);
       setIsReady(true);
       return;
@@ -156,8 +196,9 @@ export function LlmSettingsProvider({
 
       try {
         const remote = await fetchLlmSettings();
-        if (remote) {
-          next = remote;
+        if (remote.settings) {
+          next = remote.settings;
+          setPolicy(remote.policy);
         } else {
           const legacy = readLegacySettings(legacyStorageKey);
           if (legacy) {
@@ -185,9 +226,10 @@ export function LlmSettingsProvider({
         void persistLlmSettings(next)
           .then((saved) => {
             if (cancelled) return;
-            persistedSignatureRef.current = JSON.stringify(saved);
+            persistedSignatureRef.current = JSON.stringify(saved.settings);
+            setPolicy(saved.policy);
             if (JSON.stringify(latestSettingsRef.current) === signature) {
-              setSettings(saved);
+              setSettings(saved.settings);
             }
             clearLegacySettings(legacyStorageKey);
           })
@@ -225,11 +267,12 @@ export function LlmSettingsProvider({
       const pendingSignature = signature;
       void persistLlmSettings(settings)
         .then((saved) => {
-          const savedSignature = JSON.stringify(saved);
+          const savedSignature = JSON.stringify(saved.settings);
           persistedSignatureRef.current = savedSignature;
           if (JSON.stringify(latestSettingsRef.current) === pendingSignature) {
-            setSettings(saved);
+            setSettings(saved.settings);
           }
+          setPolicy(saved.policy);
           clearLegacySettings(legacyStorageKey);
         })
         .catch((error) => {
@@ -371,6 +414,7 @@ export function LlmSettingsProvider({
       getSupportedModelConfig,
       isReady,
       settings,
+      policy,
       clearProviderApiKey,
       setProviderApiKey,
       setProviderEnabled,
@@ -383,6 +427,7 @@ export function LlmSettingsProvider({
       getSupportedModelConfig,
       isReady,
       settings,
+      policy,
       clearProviderApiKey,
       setProviderApiKey,
       setProviderEnabled,
