@@ -14,12 +14,18 @@ const projectStoreDir = path.join(
   playwrightStateDir,
   `playwright-project-store-${process.pid}`,
 );
+const isCi = process.env.CI === "1" || process.env.CI === "true";
 
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
-  reporter: "list",
+  reporter: isCi
+    ? [["list"], ["junit", { outputFile: "test-results/playwright-junit.xml" }]]
+    : "list",
   timeout: 30_000,
+  // The app uses a single shared webServer per run; multi-worker E2E can fight over shared cleanup.
+  // Force determinism in CI until per-worker isolation is implemented.
+  ...(isCi ? { workers: 1 } : {}),
   use: {
     baseURL,
     browserName: "chromium",
