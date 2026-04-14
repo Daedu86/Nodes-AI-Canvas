@@ -121,8 +121,12 @@ export const Composer: FC = () => {
     // explicitly start a run. This prevents "send" from silently becoming a no-op when
     // composer state hydration or model switching causes assistant-ui to treat the draft as unchanged.
     runtime.threads.main.append({
+      // Let assistant-ui attach to the current head by default.
+      parentId: null,
+      sourceId: null,
       role: "user",
       content: [{ type: "text" as const, text }],
+      metadata: { custom: {} },
       runConfig: { custom: { historyMode, model: modelId, provider } },
       startRun: true,
     });
