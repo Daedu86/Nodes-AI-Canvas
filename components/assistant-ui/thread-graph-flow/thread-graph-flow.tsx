@@ -57,6 +57,7 @@ import {
   getArtifactStatChips,
 } from "@/components/assistant-ui/thread-graph-flow/artifact-presentation";
 import { ThreadGraphEdge } from "@/components/assistant-ui/thread-graph-flow/thread-graph-edge";
+import { ThreadGraph3D } from "@/components/assistant-ui/thread-graph-flow/thread-graph-3d";
 import { layoutThreadGraphFlow } from "@/components/assistant-ui/thread-graph-flow/thread-graph-layout";
 import { ThreadGraphNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-node";
 import type {
@@ -453,6 +454,7 @@ const semanticArtifactPresets: Array<{
 
 type FlowSpotlightMode = "all" | "assistant" | "user" | "bridge" | "edited";
 type FlowDensityMode = "overview" | "focus";
+type FlowRenderMode = "2d" | "3d";
 
 const flowFilterLabel: Record<FlowSpotlightMode, string> = {
   all: "All",
@@ -467,6 +469,16 @@ const isFlowViewport = (value: Viewport | null): value is Viewport =>
   typeof value.x === "number" &&
   typeof value.y === "number" &&
   typeof value.zoom === "number";
+
+const readFlowRenderMode = (storageKey: string): FlowRenderMode => {
+  try {
+    const value = localStorage.getItem(storageKey);
+    if (value === "3d") return "3d";
+    return "2d";
+  } catch {
+    return "2d";
+  }
+};
 
 export function ThreadGraphFlow() {
   const runtime = useAssistantRuntime();
@@ -507,6 +519,11 @@ export function ThreadGraphFlow() {
   const [toolbarMenu, setToolbarMenu] = React.useState<"add" | "tools" | null>(null);
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
   const [isSubmittingBranch, setIsSubmittingBranch] = React.useState(false);
+  const flowRenderModeKey = React.useMemo(
+    () => `nodes.canvas.render-mode.v1:${activeSessionId ?? "unknown"}`,
+    [activeSessionId],
+  );
+  const [flowRenderMode, setFlowRenderMode] = React.useState<FlowRenderMode>("2d");
   const [reactFlowInstance, setReactFlowInstance] = React.useState<
     ReactFlowInstance<ThreadGraphFlowNode, ThreadGraphFlowEdge> | null
   >(null);
@@ -519,6 +536,18 @@ export function ThreadGraphFlow() {
   const inspectorScrollRef = React.useRef<HTMLDivElement | null>(null);
   const toolbarMenuRef = React.useRef<HTMLDivElement | null>(null);
   const flowViewportRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    setFlowRenderMode(readFlowRenderMode(flowRenderModeKey));
+  }, [flowRenderModeKey]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(flowRenderModeKey, flowRenderMode);
+    } catch {
+      // ignore storage errors
+    }
+  }, [flowRenderMode, flowRenderModeKey]);
   const [storedViewport, setStoredViewport] = React.useState<Viewport | null>(() =>
     readFlowViewport(activeSessionId),
   );
@@ -1632,6 +1661,32 @@ export function ThreadGraphFlow() {
               </button>
             );
           })}
+          <div className="flex items-center rounded-full border border-border/60 bg-background/92 p-1 text-[11px] font-medium text-muted-foreground shadow-sm">
+            <button
+              type="button"
+              className={`inline-flex items-center rounded-full px-3 py-2 transition-colors ${
+                flowRenderMode === "2d"
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setFlowRenderMode("2d")}
+              aria-label="Switch canvas to 2D"
+            >
+              2D
+            </button>
+            <button
+              type="button"
+              className={`inline-flex items-center rounded-full px-3 py-2 transition-colors ${
+                flowRenderMode === "3d"
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setFlowRenderMode("3d")}
+              aria-label="Switch canvas to 3D"
+            >
+              3D
+            </button>
+          </div>
           <div className="relative">
             <button
               type="button"
@@ -2277,76 +2332,88 @@ export function ThreadGraphFlow() {
       </header>
 
       <div ref={flowViewportRef} className="relative min-h-0 flex-1 p-3">
-        <ReactFlow
-          key={`flow:${activeSessionId}:${graphStructureSignature}`}
-          nodes={decoratedFlowNodes}
-          edges={decoratedFlowEdges}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          fitView={!isFlowViewport(storedViewport)}
-          defaultViewport={storedViewport ?? { x: 0, y: 0, zoom: 1 }}
-          fitViewOptions={{ padding: 0.18 }}
-          minZoom={0.3}
-          maxZoom={1.6}
-          onlyRenderVisibleElements
-          nodesDraggable
-          elementsSelectable
-          proOptions={{ hideAttribution: true }}
-          onInit={setReactFlowInstance}
-          onMoveEnd={(_, viewport) => {
-            setStoredViewport(viewport);
-          }}
-          onNodeDragStop={(_, node) => {
-            if (node.data?.kind !== "artifact") return;
-            updateArtifact(node.id, {
-              position: {
-                x: node.position.x,
-                y: node.position.y,
-              },
-            });
-          }}
-          onSelectionChange={({ nodes: selectedNodes }) => {
-            if (selectedNodes[0]?.id) {
-              applyCanvasSelection(selectedNodes[0].id);
-            }
-          }}
-          onNodeClick={(_, node) => {
-            applyCanvasSelection(node.id);
-          }}
-          onNodeDoubleClick={(_, node) => {
-            if (node.data.kind === "artifact" || node.id === "__ROOT__") return;
-            applyCanvasSelection(node.id);
-            setViewMode("split");
-            scrollMessageIntoView(node.id);
-          }}
-          onPaneClick={() => applyCanvasSelection(null)}
-          className="overflow-hidden rounded-[32px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.06),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.88),rgba(248,250,252,0.92))] shadow-[0_30px_110px_-60px_rgba(15,23,42,0.5)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.1),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.08),transparent_18%),linear-gradient(180deg,rgba(15,23,42,0.9),rgba(2,6,23,0.92))]"
-          defaultEdgeOptions={{
-            animated: false,
-          }}
-        >
-          <Background color="rgba(148,163,184,0.18)" gap={24} size={1.15} />
-          <MiniMap
-            pannable
-            zoomable
-            className="!pointer-events-none !bottom-5 !right-5 !rounded-[20px] !border !border-white/70 !bg-white/85 !shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] dark:!border-white/10 dark:!bg-slate-950/85"
-            nodeColor={(node) =>
-              String(
-                (node.data as { accent?: string } | undefined)?.accent ?? "rgba(100,116,139,0.85)",
-              )
-            }
-            maskColor="rgba(15,23,42,0.05)"
+        {flowRenderMode === "3d" ? (
+          <ThreadGraph3D
+            nodes={decoratedFlowNodes}
+            edges={decoratedFlowEdges}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={applyCanvasSelection}
           />
-          <Controls
-            className="!bottom-5 !left-5 !right-auto !top-auto [&>button]:!border-white/70 [&>button]:!bg-white/92 [&>button]:!text-foreground [&>button]:!shadow-sm dark:[&>button]:!border-white/10 dark:[&>button]:!bg-slate-950/92"
-            showInteractive={false}
-          />
-        </ReactFlow>
-        <div className="pointer-events-none absolute bottom-5 left-20 z-10 hidden items-center gap-2 md:flex">
-          <div className="pointer-events-auto rounded-full border border-white/70 bg-white/82 px-3 py-1 text-[11px] text-muted-foreground shadow-[0_18px_48px_-36px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
-            Drag nodes directly on the stage. The canvas is the main workspace.
-          </div>
-        </div>
+        ) : (
+          <>
+            <ReactFlow
+              key={`flow:${activeSessionId}:${graphStructureSignature}`}
+              nodes={decoratedFlowNodes}
+              edges={decoratedFlowEdges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              fitView={!isFlowViewport(storedViewport)}
+              defaultViewport={storedViewport ?? { x: 0, y: 0, zoom: 1 }}
+              fitViewOptions={{ padding: 0.18 }}
+              minZoom={0.3}
+              maxZoom={1.6}
+              onlyRenderVisibleElements
+              nodesDraggable
+              elementsSelectable
+              proOptions={{ hideAttribution: true }}
+              onInit={setReactFlowInstance}
+              onMoveEnd={(_, viewport) => {
+                setStoredViewport(viewport);
+              }}
+              onNodeDragStop={(_, node) => {
+                if (node.data?.kind !== "artifact") return;
+                updateArtifact(node.id, {
+                  position: {
+                    x: node.position.x,
+                    y: node.position.y,
+                  },
+                });
+              }}
+              onSelectionChange={({ nodes: selectedNodes }) => {
+                if (selectedNodes[0]?.id) {
+                  applyCanvasSelection(selectedNodes[0].id);
+                }
+              }}
+              onNodeClick={(_, node) => {
+                applyCanvasSelection(node.id);
+              }}
+              onNodeDoubleClick={(_, node) => {
+                if (node.data.kind === "artifact" || node.id === "__ROOT__") return;
+                applyCanvasSelection(node.id);
+                setViewMode("split");
+                scrollMessageIntoView(node.id);
+              }}
+              onPaneClick={() => applyCanvasSelection(null)}
+              className="overflow-hidden rounded-[32px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.06),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.88),rgba(248,250,252,0.92))] shadow-[0_30px_110px_-60px_rgba(15,23,42,0.5)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.1),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.08),transparent_18%),linear-gradient(180deg,rgba(15,23,42,0.9),rgba(2,6,23,0.92))]"
+              defaultEdgeOptions={{
+                animated: false,
+              }}
+            >
+              <Background color="rgba(148,163,184,0.18)" gap={24} size={1.15} />
+              <MiniMap
+                pannable
+                zoomable
+                className="!pointer-events-none !bottom-5 !right-5 !rounded-[20px] !border !border-white/70 !bg-white/85 !shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] dark:!border-white/10 dark:!bg-slate-950/85"
+                nodeColor={(node) =>
+                  String(
+                    (node.data as { accent?: string } | undefined)?.accent ??
+                      "rgba(100,116,139,0.85)",
+                  )
+                }
+                maskColor="rgba(15,23,42,0.05)"
+              />
+              <Controls
+                className="!bottom-5 !left-5 !right-auto !top-auto [&>button]:!border-white/70 [&>button]:!bg-white/92 [&>button]:!text-foreground [&>button]:!shadow-sm dark:[&>button]:!border-white/10 dark:[&>button]:!bg-slate-950/92"
+                showInteractive={false}
+              />
+            </ReactFlow>
+            <div className="pointer-events-none absolute bottom-5 left-20 z-10 hidden items-center gap-2 md:flex">
+              <div className="pointer-events-auto rounded-full border border-white/70 bg-white/82 px-3 py-1 text-[11px] text-muted-foreground shadow-[0_18px_48px_-36px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
+                Drag nodes directly on the stage. The canvas is the main workspace.
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
