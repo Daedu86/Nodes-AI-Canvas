@@ -151,7 +151,7 @@ export function AgentAccessWorkspace() {
   "sessionId": "<session-id>",
   "prompt": "Ask Nemotron something…",
   "provider": "openrouter",
-  "model": "openrouter/free-router",
+  "model": "openrouter/free",
   "historyMode": "full"
 }`}
                   </pre>
