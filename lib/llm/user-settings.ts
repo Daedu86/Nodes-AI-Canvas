@@ -4,8 +4,6 @@ import {
   normalizeEditableModelList,
 } from "@/lib/llm/provider-catalog";
 
-const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
-
 const normalizeHostname = (value: string) => value.trim().replace(/^\[|\]$/g, "").toLowerCase();
 
 export type OllamaBaseUrlNormalizationResult =
