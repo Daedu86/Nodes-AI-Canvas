@@ -120,9 +120,12 @@ export const Composer: FC = () => {
     // Bypass composer.send() for reliability. We append directly to the thread runtime and
     // explicitly start a run. This prevents "send" from silently becoming a no-op when
     // composer state hydration or model switching causes assistant-ui to treat the draft as unchanged.
+    const headId =
+      (runtime.threads.main as unknown as { getState?: () => { headId?: string | null } }).getState?.()
+        ?.headId ?? null;
+
     runtime.threads.main.append({
-      // Let assistant-ui attach to the current head by default.
-      parentId: null,
+      parentId: headId,
       sourceId: null,
       role: "user",
       content: [{ type: "text" as const, text }],
