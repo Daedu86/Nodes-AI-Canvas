@@ -12,6 +12,7 @@ import {
 } from "../components/context/workspace-surface";
 import { SidebarProvider } from "../components/ui/sidebar";
 import { LlmModelsWorkspace } from "../components/workspace/llm-models-workspace";
+import { AgentAccessWorkspace } from "../components/workspace/agent-access-workspace";
 
 const fetchMock = vi.fn();
 
@@ -39,6 +40,8 @@ function SurfaceHarness() {
       <div data-testid="surface">{activeSurface}</div>
       {activeSurface === "llm-models" ? (
         <LlmModelsWorkspace />
+      ) : activeSurface === "agent-access" ? (
+        <AgentAccessWorkspace />
       ) : activeSurface === "knowledge-center" ? (
         <div>
           <h1>Knowledge Center</h1>
@@ -116,6 +119,28 @@ describe("WorkspaceSurfaceProvider", () => {
 
     expect(screen.getByTestId("surface").textContent).toBe("knowledge-center");
     expect(screen.getByRole("heading", { name: "Knowledge Center" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
+  });
+
+  it("opens the Agent Access workspace from Profile", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SidebarProvider>
+        <LlmSettingsProvider>
+          <WorkspaceSurfaceProvider>
+            <SurfaceHarness />
+          </WorkspaceSurfaceProvider>
+        </LlmSettingsProvider>
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByTestId("surface").textContent).toBe("workspace");
+
+    await user.click(screen.getByRole("button", { name: "Agent Access" }));
+
+    expect(screen.getByTestId("surface").textContent).toBe("agent-access");
+    expect(screen.getByRole("heading", { name: "Agent Access" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
   });
 

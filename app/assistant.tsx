@@ -25,6 +25,7 @@ import { AppHeader } from "@/components/workspace/app-header";
 import { ChatPanel } from "@/components/workspace/chat-panel";
 import { KnowledgeCenterWorkspace } from "@/components/workspace/knowledge-center-workspace";
 import { LlmModelsWorkspace } from "@/components/workspace/llm-models-workspace";
+import { AgentAccessWorkspace } from "@/components/workspace/agent-access-workspace";
 import { WorkspaceSplitLayout } from "@/components/workspace/workspace-split-layout";
 import {
   getRequestErrorMessageFromResponse,
@@ -333,6 +334,9 @@ function WorkspaceShell() {
   }
   if (activeSurface === "knowledge-center") {
     return <KnowledgeCenterWorkspace />;
+  }
+  if (activeSurface === "agent-access") {
+    return <AgentAccessWorkspace />;
   }
 
   return activeProjectId ? <ProjectRuntimeShell /> : <AssistantRuntimeShell />;

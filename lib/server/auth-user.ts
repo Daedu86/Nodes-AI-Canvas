@@ -3,6 +3,7 @@ import {
   isE2eEnvAuthAllowed,
   isE2eHeaderAuthAllowed,
 } from "@/lib/server/e2e-auth";
+import { verifyAgentToken } from "@/lib/server/agent-token";
 
 const JSON_HEADERS = {
   "Content-Type": "application/json",
@@ -46,6 +47,19 @@ export async function getAuthenticatedUser(req?: Request): Promise<Authenticated
   const testUser = getTestAuthenticatedUser(req);
   if (testUser) {
     return testUser;
+  }
+
+  const authHeader = req?.headers.get("authorization") ?? null;
+  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+    const token = authHeader.slice("bearer ".length).trim();
+    const verified = await verifyAgentToken(token);
+    if (verified) {
+      return {
+        email: null,
+        id: verified.userId,
+        name: "Agent",
+      };
+    }
   }
 
   const session = await auth();
