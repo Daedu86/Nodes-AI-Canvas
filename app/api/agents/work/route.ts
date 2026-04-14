@@ -59,7 +59,7 @@ export async function GET(req: Request) {
       repo.listAgentTokens(guarded.user.id),
       repo.listAgentEvents(guarded.user.id, { limit: 150, tokenId: tokenFilter }),
     ]);
-  } catch (error) {
+  } catch {
     return new Response(
       JSON.stringify({
         error:
