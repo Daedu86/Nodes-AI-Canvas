@@ -114,8 +114,11 @@ export const Composer: FC = () => {
     const text = state.text.trim();
     if (!text) return;
     clearRequestError();
-    composer.send();
-  }, [clearRequestError, composer, isRunning, llmEnabled, setRequestError]);
+    // Force starting a run even if assistant-ui decides the draft is "unchanged". This keeps
+    // send reliable across model switches and rehydration edges.
+    applyComposerRunConfig(composer, historyMode, modelId, provider);
+    composer.send({ startRun: true });
+  }, [clearRequestError, composer, historyMode, isRunning, llmEnabled, modelId, provider, setRequestError]);
 
   const handleCancel = React.useCallback(() => {
     if (!composer) return;
