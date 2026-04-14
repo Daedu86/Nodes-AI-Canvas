@@ -14,6 +14,7 @@ describe("AuthScreen", () => {
     render(
       <AuthScreen
         authError="OAuthCallback"
+        agentTokenLoginEnabled={false}
         canonicalAppUrl="https://nodes-lemon.vercel.app"
         devCredentialsDefaultEmail="demo@nodes.local"
         devCredentialsEnabled={false}

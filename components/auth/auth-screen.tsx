@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Github, Globe, LockKeyhole, Mail, Network } from "lucide-react";
+import { Github, Globe, KeyRound, LockKeyhole, Mail, Network } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { buildPostAuthCallbackUrl } from "@/lib/client/post-auth-handoff";
 
 type AuthScreenProps = {
   authError?: string | null;
+  agentTokenLoginEnabled: boolean;
   canonicalAppUrl: string | null;
   devCredentialsDefaultEmail: string;
   devCredentialsEnabled: boolean;
@@ -32,6 +33,7 @@ const getAuthErrorMessage = (error?: string | null) => {
 
 export function AuthScreen({
   authError,
+  agentTokenLoginEnabled,
   canonicalAppUrl,
   devCredentialsDefaultEmail,
   devCredentialsEnabled,
@@ -46,7 +48,9 @@ export function AuthScreen({
   const [email, setEmail] = useState(devCredentialsDefaultEmail);
   const [password, setPassword] = useState("");
   const [magicLinkEmail, setMagicLinkEmail] = useState("");
+  const [agentToken, setAgentToken] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAgentSubmitting, setIsAgentSubmitting] = useState(false);
   const [isMagicLinkSubmitting, setIsMagicLinkSubmitting] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +108,32 @@ export function AuthScreen({
     }
 
     setMagicLinkSent(true);
+  };
+
+  const handleAgentToken = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+
+    const normalized = agentToken.trim();
+    if (!normalized) {
+      setError("Paste an agent token to continue.");
+      return;
+    }
+
+    setIsAgentSubmitting(true);
+    const result = await signIn("agent-token", {
+      token: normalized,
+      callbackUrl,
+      redirect: false,
+    });
+    setIsAgentSubmitting(false);
+
+    if (result?.error) {
+      setError("Invalid agent token.");
+      return;
+    }
+
+    window.location.assign(callbackUrl);
   };
 
   return (
@@ -215,6 +245,37 @@ export function AuthScreen({
                       Check your email for a sign-in link.
                     </p>
                   ) : null}
+                </form>
+              ) : null}
+
+              {agentTokenLoginEnabled ? (
+                <form className="mt-4 space-y-3 border-t border-white/10 pt-4" onSubmit={handleAgentToken}>
+                  <div className="space-y-2">
+                    <label className="text-sm text-slate-300" htmlFor="agent-token">
+                      Agent token
+                    </label>
+                    <Input
+                      id="agent-token"
+                      type="password"
+                      value={agentToken}
+                      onChange={(event) => setAgentToken(event.target.value)}
+                      autoComplete="off"
+                      placeholder="Paste a token minted from Profile > Agent Access"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    size="lg"
+                    variant="outline"
+                    className="w-full"
+                    disabled={isAgentSubmitting}
+                  >
+                    <KeyRound className="size-4" />
+                    {isAgentSubmitting ? "Signing in..." : "Continue with agent token"}
+                  </Button>
+                  <p className="text-xs leading-5 text-slate-400">
+                    For bots and automations. Tokens expire and can be rotated in the dashboard.
+                  </p>
                 </form>
               ) : null}
             </div>

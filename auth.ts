@@ -7,6 +7,7 @@ import Email from "next-auth/providers/email";
 import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
 import { isE2eEnvAuthAllowed } from "@/lib/server/e2e-auth";
+import { verifyAgentToken } from "@/lib/server/agent-token";
 
 const DEV_AUTH_EMAIL = process.env.AUTH_DEV_EMAIL?.trim() || "demo@nodes.local";
 const DEV_AUTH_PASSWORD = process.env.AUTH_DEV_PASSWORD?.trim() || "";
@@ -18,6 +19,9 @@ const E2E_AUTH_USER_NAME = process.env.E2E_AUTH_USER_NAME?.trim() || "E2E User";
 const githubConfigured = Boolean(process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET);
 const googleConfigured = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
 const emailConfigured = Boolean(process.env.AUTH_EMAIL_SERVER && process.env.AUTH_EMAIL_FROM);
+const agentTokenLoginEnabled =
+  process.env.AUTH_ENABLE_AGENT_TOKEN_LOGIN !== "0" &&
+  Boolean(process.env.AUTH_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim());
 const devCredentialsEnabled =
   process.env.AUTH_ENABLE_DEV_CREDENTIALS === "1" &&
   process.env.NODE_ENV === "development" &&
@@ -77,6 +81,29 @@ if (devCredentialsEnabled) {
   );
 }
 
+if (agentTokenLoginEnabled) {
+  providers.push(
+    Credentials({
+      id: "agent-token",
+      name: "Agent token",
+      credentials: {
+        token: { label: "Agent token", type: "password" },
+      },
+      async authorize(credentials) {
+        const token = typeof credentials?.token === "string" ? credentials.token.trim() : "";
+        if (!token) return null;
+        const verified = await verifyAgentToken(token);
+        if (!verified) return null;
+        return {
+          id: verified.userId,
+          email: null,
+          name: "Agent",
+        };
+      },
+    }),
+  );
+}
+
 function formatAuthLoggerMetadata(metadata: unknown) {
   if (!metadata || typeof metadata !== "object") {
     return undefined;
@@ -101,6 +128,7 @@ function formatAuthLoggerMetadata(metadata: unknown) {
 
 export const authUiConfig = {
   canonicalAppUrl: process.env.NEXTAUTH_URL?.trim() || null,
+  agentTokenLoginEnabled,
   devCredentialsDefaultEmail: DEV_AUTH_EMAIL,
   devCredentialsEnabled,
   emailConfigured,
