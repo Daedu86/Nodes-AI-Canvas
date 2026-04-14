@@ -1,6 +1,7 @@
 import {
   ComposerPrimitive,
   ThreadPrimitive,
+  useAssistantRuntime,
   useComposerRuntime,
   useThread,
 } from "@assistant-ui/react";
@@ -93,6 +94,7 @@ const ComposerAction: FC<{ onSend: () => void; onCancel: () => void }> = ({
 };
 
 export const Composer: FC = () => {
+  const runtime = useAssistantRuntime();
   const composer = useComposerRuntime();
   const isRunning = useThread((state) => state.isRunning);
   const { historyMode, setHistoryMode } = useHistoryMode();
@@ -105,7 +107,7 @@ export const Composer: FC = () => {
   }, [composer, historyMode, modelId, provider]);
 
   const handleSend = React.useCallback(() => {
-    if (!composer || !llmEnabled) return;
+    if (!composer || !runtime || !llmEnabled) return;
     if (isRunning) {
       setRequestError(ACTIVE_RUN_ERROR_MESSAGE);
       return;
@@ -114,11 +116,24 @@ export const Composer: FC = () => {
     const text = state.text.trim();
     if (!text) return;
     clearRequestError();
-    // Force starting a run even if assistant-ui decides the draft is "unchanged". This keeps
-    // send reliable across model switches and rehydration edges.
-    applyComposerRunConfig(composer, historyMode, modelId, provider);
-    composer.send({ startRun: true });
-  }, [clearRequestError, composer, historyMode, isRunning, llmEnabled, modelId, provider, setRequestError]);
+
+    // Bypass composer.send() for reliability. We append directly to the thread runtime and
+    // explicitly start a run. This prevents "send" from silently becoming a no-op when
+    // composer state hydration or model switching causes assistant-ui to treat the draft as unchanged.
+    runtime.threads.main.append({
+      role: "user",
+      content: [{ type: "text" as const, text }],
+      runConfig: { custom: { historyMode, model: modelId, provider } },
+      startRun: true,
+    });
+
+    // Clear the composer draft (best-effort; internal API varies across assistant-ui versions).
+    try {
+      (composer as unknown as { setText?: (value: string) => void }).setText?.("");
+    } catch {
+      // ignore clear failures
+    }
+  }, [clearRequestError, composer, historyMode, isRunning, llmEnabled, modelId, provider, runtime, setRequestError]);
 
   const handleCancel = React.useCallback(() => {
     if (!composer) return;

@@ -11,6 +11,14 @@ const composerRuntimeMock = vi.hoisted(() => ({
   setRunConfig: vi.fn(),
 }));
 
+const assistantRuntimeMock = vi.hoisted(() => ({
+  threads: {
+    main: {
+      append: vi.fn(),
+    },
+  },
+}));
+
 const historyModeState = vi.hoisted(() => ({
   historyMode: "last",
   setHistoryMode: vi.fn(),
@@ -87,7 +95,7 @@ vi.mock("@assistant-ui/react", async () => {
       Suggestion: ({ children }: { children: React.ReactNode }) => <>{children}</>,
       Viewport: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     },
-    useAssistantRuntime: vi.fn(() => null),
+    useAssistantRuntime: vi.fn(() => assistantRuntimeMock),
     useComposerRuntime: vi.fn(() => composerRuntimeMock),
     useMessage: vi.fn(() => null),
     useThread: vi.fn((selector?: (state: { isRunning: boolean }) => unknown) =>
@@ -167,6 +175,7 @@ describe("Composer", () => {
     composerRuntimeMock.getState.mockReset();
     composerRuntimeMock.send.mockReset();
     composerRuntimeMock.setRunConfig.mockReset();
+    assistantRuntimeMock.threads.main.append.mockReset();
     requestErrorState.clearRequestError.mockReset();
     requestErrorState.requestError = null;
     requestErrorState.setRequestError.mockReset();
@@ -191,7 +200,14 @@ describe("Composer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     expect(requestErrorState.clearRequestError).toHaveBeenCalledTimes(1);
-    expect(composerRuntimeMock.send).toHaveBeenCalledTimes(1);
+    expect(assistantRuntimeMock.threads.main.append).toHaveBeenCalledTimes(1);
+    expect(assistantRuntimeMock.threads.main.append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: "user",
+        content: [{ type: "text", text: "Hola" }],
+        startRun: true,
+      }),
+    );
   });
 
   it("sends on Enter and ignores Shift+Enter", () => {
@@ -200,10 +216,10 @@ describe("Composer", () => {
     const input = screen.getByPlaceholderText("Write a message...");
 
     fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
-    expect(composerRuntimeMock.send).not.toHaveBeenCalled();
+    expect(assistantRuntimeMock.threads.main.append).not.toHaveBeenCalled();
 
     fireEvent.keyDown(input, { key: "Enter", shiftKey: false });
-    expect(composerRuntimeMock.send).toHaveBeenCalledTimes(1);
+    expect(assistantRuntimeMock.threads.main.append).toHaveBeenCalledTimes(1);
   });
 
   it("blocks submit and shows the disabled warning when AI is off", () => {
@@ -218,7 +234,7 @@ describe("Composer", () => {
     expect(sendButton.disabled).toBe(true);
 
     fireEvent.click(sendButton);
-    expect(composerRuntimeMock.send).not.toHaveBeenCalled();
+    expect(assistantRuntimeMock.threads.main.append).not.toHaveBeenCalled();
   });
 
   it("blocks duplicate sends while a run is already active", () => {
@@ -228,7 +244,7 @@ describe("Composer", () => {
     const input = screen.getByPlaceholderText("Write a message...");
     fireEvent.keyDown(input, { key: "Enter", shiftKey: false });
 
-    expect(composerRuntimeMock.send).not.toHaveBeenCalled();
+    expect(assistantRuntimeMock.threads.main.append).not.toHaveBeenCalled();
     expect(requestErrorState.setRequestError).toHaveBeenCalledWith(
       "The assistant is still responding. Wait for it to finish or cancel the current run.",
     );
