@@ -7,10 +7,13 @@ import type { LlmSettingsRepository } from "@/lib/persistence/llm-settings-repos
 import type { MemoryRepository } from "@/lib/persistence/memory-repository";
 import type { ProjectRepository } from "@/lib/persistence/project-repository";
 import type { SessionRepository } from "@/lib/persistence/session-repository";
+import type { AgentWorkRepository } from "@/lib/persistence/agent-work-repository";
 import { supabaseLlmSettingsRepository } from "@/lib/persistence/supabase/supabase-llm-settings-repository";
 import { supabaseMemoryRepository } from "@/lib/persistence/supabase/supabase-memory-repository";
 import { supabaseProjectRepository } from "@/lib/persistence/supabase/supabase-project-repository";
 import { supabaseSessionRepository } from "@/lib/persistence/supabase/supabase-session-repository";
+import { supabaseAgentWorkRepository } from "@/lib/persistence/supabase/supabase-agent-work-repository";
+import { fileAgentWorkRepository } from "@/lib/persistence/file/file-agent-work-repository";
 
 export function getSessionRepository(): SessionRepository {
   return getPersistenceBackend() === "supabase"
@@ -34,4 +37,10 @@ export function getLlmSettingsRepository(): LlmSettingsRepository {
   return getPersistenceBackend() === "supabase"
     ? supabaseLlmSettingsRepository
     : fileLlmSettingsRepository;
+}
+
+export function getAgentWorkRepository(): AgentWorkRepository {
+  return getPersistenceBackend() === "supabase"
+    ? supabaseAgentWorkRepository
+    : fileAgentWorkRepository;
 }

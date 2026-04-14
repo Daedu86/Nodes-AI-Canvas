@@ -4,11 +4,12 @@ import React from "react";
 import { useSession } from "next-auth/react";
 import { hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
-export type WorkspaceSurface = "agent-access" | "knowledge-center" | "llm-models" | "workspace";
+export type WorkspaceSurface = "agent-access" | "agent-work" | "knowledge-center" | "llm-models" | "workspace";
 
 type WorkspaceSurfaceContextValue = {
   activeSurface: WorkspaceSurface;
   showAgentAccess: () => void;
+  showAgentWork: () => void;
   showKnowledgeCenter: () => void;
   setActiveSurface: (value: WorkspaceSurface) => void;
   showLlmModels: () => void;
@@ -23,6 +24,7 @@ const readSurface = (storageKey: string) => {
   try {
     const value = localStorage.getItem(storageKey);
     if (value === "agent-access") return "agent-access";
+    if (value === "agent-work") return "agent-work";
     if (value === "llm-models") return "llm-models";
     if (value === "knowledge-center") return "knowledge-center";
     return DEFAULT_SURFACE;
@@ -63,6 +65,7 @@ export function WorkspaceSurfaceProvider({
     () => ({
       activeSurface,
       showAgentAccess: () => setActiveSurface("agent-access"),
+      showAgentWork: () => setActiveSurface("agent-work"),
       showKnowledgeCenter: () => setActiveSurface("knowledge-center"),
       setActiveSurface,
       showLlmModels: () => setActiveSurface("llm-models"),

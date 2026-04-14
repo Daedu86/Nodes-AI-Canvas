@@ -42,6 +42,11 @@ function SurfaceHarness() {
         <LlmModelsWorkspace />
       ) : activeSurface === "agent-access" ? (
         <AgentAccessWorkspace />
+      ) : activeSurface === "agent-work" ? (
+        <div>
+          <h1>Agent Work</h1>
+          <button type="button">Back</button>
+        </div>
       ) : activeSurface === "knowledge-center" ? (
         <div>
           <h1>Knowledge Center</h1>
@@ -58,7 +63,13 @@ describe("WorkspaceSurfaceProvider", () => {
   beforeEach(() => {
     localStorage.clear();
     fetchMock.mockReset();
-    fetchMock.mockImplementation(async () => Response.json({ settings: null }));
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/agents/work")) {
+        return Response.json({ agents: [], sessions: [], projects: [], events: [] });
+      }
+      return Response.json({ settings: null });
+    });
 
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -141,6 +152,28 @@ describe("WorkspaceSurfaceProvider", () => {
 
     expect(screen.getByTestId("surface").textContent).toBe("agent-access");
     expect(screen.getByRole("heading", { name: "Agent Access" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
+  });
+
+  it("opens the Agent Work workspace from Profile", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SidebarProvider>
+        <LlmSettingsProvider>
+          <WorkspaceSurfaceProvider>
+            <SurfaceHarness />
+          </WorkspaceSurfaceProvider>
+        </LlmSettingsProvider>
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByTestId("surface").textContent).toBe("workspace");
+
+    await user.click(screen.getByRole("button", { name: "Agent Work" }));
+
+    expect(screen.getByTestId("surface").textContent).toBe("agent-work");
+    expect(screen.getByRole("heading", { name: "Agent Work" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
   });
 

@@ -97,7 +97,7 @@ if (agentTokenLoginEnabled) {
         return {
           id: verified.userId,
           email: null,
-          name: "Agent",
+          name: verified.label ? `Agent (${verified.label})` : "Agent",
         };
       },
     }),

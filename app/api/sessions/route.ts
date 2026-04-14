@@ -10,6 +10,7 @@ import {
   normalizeSessionThreadExport,
 } from "@/lib/session-documents";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
+import { recordAgentEvent } from "@/lib/server/agent-work";
 
 export const runtime = "nodejs";
 
@@ -47,6 +48,20 @@ export async function POST(req: Request) {
     contextLinks: normalizeSessionContextLinksDocument(body.contextLinks),
     snapshot: body.snapshot ? normalizeSessionThreadExport(body.snapshot) : EMPTY_SESSION_THREAD_EXPORT,
   });
+
+  if (guarded.user.isAgent) {
+    await recordAgentEvent({
+      actor: {
+        ownerId: guarded.user.id,
+        tokenId: guarded.user.agentTokenId ?? null,
+        label: guarded.user.agentLabel ?? null,
+      },
+      eventType: "session.created",
+      method: "POST",
+      route: "/api/sessions",
+      sessionId: session.id,
+    });
+  }
   return Response.json({ session }, { status: 201 });
 }
 

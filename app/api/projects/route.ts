@@ -9,6 +9,7 @@ import {
 import { listMemoryItems } from "@/lib/memory-store";
 import { listSessions } from "@/lib/session-store";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
+import { recordAgentEvent } from "@/lib/server/agent-work";
 
 type CreateProjectBody = {
   memoryIds?: unknown;
@@ -57,6 +58,21 @@ export async function POST(req: Request) {
     sessionIds,
     title: body.title ?? null,
   }, guarded.user);
+
+  if (guarded.user.isAgent) {
+    await recordAgentEvent({
+      actor: {
+        ownerId: guarded.user.id,
+        tokenId: guarded.user.agentTokenId ?? null,
+        label: guarded.user.agentLabel ?? null,
+      },
+      eventType: "project.created",
+      method: "POST",
+      route: "/api/projects",
+      projectId: project.id,
+      payload: { sessionIds, memoryIds },
+    });
+  }
   return Response.json({ project }, { status: 201 });
 }
 

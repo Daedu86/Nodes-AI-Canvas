@@ -15,6 +15,8 @@ const shellInnerClassName =
 
 type MintResponse = {
   token: string;
+  tokenId: string;
+  label: string | null;
   expiresAt: string;
   ttlDays: number;
 };
@@ -22,6 +24,7 @@ type MintResponse = {
 export function AgentAccessWorkspace() {
   const { showWorkspace } = useWorkspaceSurface();
   const [busy, setBusy] = React.useState(false);
+  const [label, setLabel] = React.useState<string>("");
   const [token, setToken] = React.useState<string>("");
   const [expiresAt, setExpiresAt] = React.useState<string>("");
   const [error, setError] = React.useState<string>("");
@@ -33,7 +36,7 @@ export function AgentAccessWorkspace() {
       const res = await fetch("/api/agents/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ttlDays: 30 }),
+        body: JSON.stringify({ ttlDays: 30, label }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -47,7 +50,7 @@ export function AgentAccessWorkspace() {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [label]);
 
   const copy = React.useCallback(async () => {
     if (!token) return;
@@ -104,6 +107,17 @@ export function AgentAccessWorkspace() {
 
               <div className="mt-4 space-y-2">
                 <label className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  Label (optional)
+                </label>
+                <Input
+                  value={label}
+                  onChange={(event) => setLabel(event.target.value)}
+                  placeholder="e.g. GitHub bot, nightly agent…"
+                />
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <label className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                   Token
                 </label>
                 <div className="flex gap-2">
@@ -135,4 +149,3 @@ export function AgentAccessWorkspace() {
     </div>
   );
 }
-

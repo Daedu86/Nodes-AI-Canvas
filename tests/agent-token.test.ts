@@ -8,9 +8,11 @@ describe("agent token auth", () => {
 
     const minted = await mintAgentToken({ userId: "agent-user-1", maxAgeSeconds: 60 });
     expect(typeof minted.token).toBe("string");
+    expect(typeof minted.tokenId).toBe("string");
 
     const verified = await verifyAgentToken(minted.token);
     expect(verified?.userId).toBe("agent-user-1");
+    expect(verified?.tokenId).toBe(minted.tokenId);
   });
 
   it("authenticates requests with bearer agent tokens", async () => {
@@ -26,5 +28,6 @@ describe("agent token auth", () => {
 
     const user = await getAuthenticatedUser(req);
     expect(user?.id).toBe("agent-user-2");
+    expect(user?.isAgent).toBe(true);
   });
 });

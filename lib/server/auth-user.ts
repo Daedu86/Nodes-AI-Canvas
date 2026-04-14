@@ -13,6 +13,9 @@ export type AuthenticatedUser = {
   email: string | null;
   id: string;
   name: string | null;
+  isAgent?: boolean;
+  agentTokenId?: string | null;
+  agentLabel?: string | null;
 };
 
 function getTestAuthenticatedUser(req?: Request): AuthenticatedUser | null {
@@ -57,7 +60,10 @@ export async function getAuthenticatedUser(req?: Request): Promise<Authenticated
       return {
         email: null,
         id: verified.userId,
-        name: "Agent",
+        name: verified.label ? `Agent (${verified.label})` : "Agent",
+        isAgent: true,
+        agentTokenId: verified.tokenId,
+        agentLabel: verified.label,
       };
     }
   }

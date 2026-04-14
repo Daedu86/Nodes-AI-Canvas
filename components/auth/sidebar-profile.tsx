@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { BookOpenText, Bot, KeyRound, LogOut, UserRound } from "lucide-react";
+import { Activity, BookOpenText, Bot, KeyRound, LogOut, UserRound } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useWorkspaceSurface } from "@/components/context/workspace-surface";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export function SidebarProfile() {
   const { data: session } = useSession();
-  const { activeSurface, showAgentAccess, showKnowledgeCenter, showLlmModels } = useWorkspaceSurface();
+  const { activeSurface, showAgentAccess, showAgentWork, showKnowledgeCenter, showLlmModels } = useWorkspaceSurface();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
   const displayName =
@@ -60,6 +60,17 @@ export function SidebarProfile() {
           aria-label="Agent Access"
         >
           <KeyRound className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          variant={activeSurface === "agent-work" ? "default" : "outline"}
+          size="icon"
+          className="size-9"
+          onClick={showAgentWork}
+          title="Agent Work"
+          aria-label="Agent Work"
+        >
+          <Activity className="size-4" />
         </Button>
         <ThemeToggle
           variant="outline"
@@ -125,6 +136,16 @@ export function SidebarProfile() {
         >
           <KeyRound className="size-4" />
           Agent Access
+        </Button>
+        <Button
+          type="button"
+          variant={activeSurface === "agent-work" ? "default" : "outline"}
+          size="sm"
+          className="w-full justify-start"
+          onClick={showAgentWork}
+        >
+          <Activity className="size-4" />
+          Agent Work
         </Button>
         <ThemeToggle
           variant="outline"

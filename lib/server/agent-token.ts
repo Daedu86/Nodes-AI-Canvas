@@ -1,11 +1,14 @@
+import { randomUUID } from "node:crypto";
 import { decode, encode } from "next-auth/jwt";
 
 const AGENT_TOKEN_SALT = "nodes-agent-token:v1";
 
 type AgentTokenPayload = {
   agent?: boolean;
+  label?: string | null;
   scope?: "api";
   sub?: string;
+  tokenId?: string;
 };
 
 const resolveAuthSecret = () =>
@@ -16,16 +19,22 @@ export function isAgentTokenConfigured() {
 }
 
 export async function mintAgentToken(params: {
+  label?: string | null;
   userId: string;
   maxAgeSeconds: number;
-}): Promise<{ token: string; expiresAt: string }> {
+}): Promise<{ token: string; tokenId: string; label: string | null; expiresAt: string }> {
   const secret = resolveAuthSecret();
   if (!secret) {
     throw new Error("Missing AUTH_SECRET/NEXTAUTH_SECRET");
   }
 
+  const tokenId = randomUUID();
   const now = Date.now();
   const expiresAt = new Date(now + params.maxAgeSeconds * 1000).toISOString();
+  const label =
+    typeof params.label === "string" && params.label.trim().length > 0
+      ? params.label.trim().slice(0, 80)
+      : null;
 
   const token = await encode({
     secret,
@@ -33,15 +42,17 @@ export async function mintAgentToken(params: {
     maxAge: params.maxAgeSeconds,
     token: {
       agent: true,
+      label,
       scope: "api",
       sub: params.userId,
+      tokenId,
     } satisfies AgentTokenPayload,
   });
 
-  return { token, expiresAt };
+  return { token, tokenId, label, expiresAt };
 }
 
-export async function verifyAgentToken(token: string): Promise<{ userId: string } | null> {
+export async function verifyAgentToken(token: string): Promise<{ userId: string; tokenId: string | null; label: string | null } | null> {
   const secret = resolveAuthSecret();
   if (!secret) return null;
 
@@ -56,6 +67,12 @@ export async function verifyAgentToken(token: string): Promise<{ userId: string 
     return null;
   }
 
-  return { userId: payload.sub };
-}
+  const tokenId = typeof payload.tokenId === "string" && payload.tokenId.trim().length > 0
+    ? payload.tokenId.trim()
+    : null;
+  const label = typeof payload.label === "string" && payload.label.trim().length > 0
+    ? payload.label.trim()
+    : null;
 
+  return { userId: payload.sub, tokenId, label };
+}

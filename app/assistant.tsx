@@ -26,6 +26,7 @@ import { ChatPanel } from "@/components/workspace/chat-panel";
 import { KnowledgeCenterWorkspace } from "@/components/workspace/knowledge-center-workspace";
 import { LlmModelsWorkspace } from "@/components/workspace/llm-models-workspace";
 import { AgentAccessWorkspace } from "@/components/workspace/agent-access-workspace";
+import { AgentWorkWorkspace } from "@/components/workspace/agent-work-workspace";
 import { WorkspaceSplitLayout } from "@/components/workspace/workspace-split-layout";
 import {
   getRequestErrorMessageFromResponse,
@@ -337,6 +338,9 @@ function WorkspaceShell() {
   }
   if (activeSurface === "agent-access") {
     return <AgentAccessWorkspace />;
+  }
+  if (activeSurface === "agent-work") {
+    return <AgentWorkWorkspace />;
   }
 
   return activeProjectId ? <ProjectRuntimeShell /> : <AssistantRuntimeShell />;
