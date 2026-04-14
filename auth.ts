@@ -9,7 +9,7 @@ import GitHub from "next-auth/providers/github";
 import { isE2eEnvAuthAllowed } from "@/lib/server/e2e-auth";
 
 const DEV_AUTH_EMAIL = process.env.AUTH_DEV_EMAIL?.trim() || "demo@nodes.local";
-const DEV_AUTH_PASSWORD = process.env.AUTH_DEV_PASSWORD?.trim() || "dev-password";
+const DEV_AUTH_PASSWORD = process.env.AUTH_DEV_PASSWORD?.trim() || "";
 const DEV_AUTH_NAME = process.env.AUTH_DEV_NAME?.trim() || "Local Developer";
 const E2E_AUTH_USER_ID = process.env.E2E_AUTH_USER_ID?.trim() || null;
 const E2E_AUTH_USER_EMAIL = process.env.E2E_AUTH_USER_EMAIL?.trim() || "e2e@nodes.local";
@@ -19,7 +19,9 @@ const githubConfigured = Boolean(process.env.AUTH_GITHUB_ID && process.env.AUTH_
 const googleConfigured = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
 const emailConfigured = Boolean(process.env.AUTH_EMAIL_SERVER && process.env.AUTH_EMAIL_FROM);
 const devCredentialsEnabled =
-  process.env.AUTH_ENABLE_DEV_CREDENTIALS === "1" || process.env.NODE_ENV !== "production";
+  process.env.AUTH_ENABLE_DEV_CREDENTIALS === "1" &&
+  process.env.NODE_ENV === "development" &&
+  DEV_AUTH_PASSWORD.length > 0;
 
 const providers: Provider[] = [];
 

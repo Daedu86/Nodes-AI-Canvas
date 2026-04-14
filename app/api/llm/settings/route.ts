@@ -4,6 +4,7 @@ import {
   mergeLlmSettingsState,
   type LlmSettingsState,
 } from "@/lib/llm/user-settings";
+import { validateOllamaBaseUrl } from "@/lib/server/ollama-base-url";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 export const runtime = "nodejs";
@@ -32,10 +33,17 @@ export async function PUT(req: Request) {
 
   const body = (await req.json().catch(() => ({}))) as PutBody;
   const current = await getLlmSettings(guarded.user.id);
-  const settings = await saveLlmSettings(
-    guarded.user.id,
-    mergeLlmSettingsState(current, body.settings),
-  );
+  const merged = mergeLlmSettingsState(current, body.settings);
+
+  const ollamaValidation = validateOllamaBaseUrl(merged.providers.ollama.baseUrl);
+  if (!ollamaValidation.ok) {
+    return new Response(JSON.stringify({ error: ollamaValidation.error }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const settings = await saveLlmSettings(guarded.user.id, merged);
   return Response.json({
     settings: maskLlmSettingsState(settings),
   } satisfies LlmSettingsResponse);

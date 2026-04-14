@@ -4,6 +4,46 @@ import {
   normalizeEditableModelList,
 } from "@/lib/llm/provider-catalog";
 
+const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
+
+const normalizeHostname = (value: string) => value.trim().replace(/^\[|\]$/g, "").toLowerCase();
+
+export type OllamaBaseUrlNormalizationResult =
+  | { ok: true; normalized: string }
+  | { ok: false; error: string };
+
+// Client-safe normalization: validate URL + protocol, strip credentials.
+// Host allowlisting is enforced server-side when saving settings and when creating runtime overrides.
+export function normalizeOllamaBaseUrl(input: string): OllamaBaseUrlNormalizationResult {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return { ok: false, error: "Ollama base URL is required." };
+  }
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return { ok: false, error: "Ollama base URL must be a valid URL." };
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return { ok: false, error: "Ollama base URL must start with http:// or https://." };
+  }
+
+  // Basic sanity check to prevent obviously unsafe URLs from persisting in state.
+  // The server will apply stricter allowlisting rules.
+  const hostname = normalizeHostname(url.hostname);
+  if (!hostname) {
+    return { ok: false, error: "Ollama base URL must include a hostname." };
+  }
+
+  // Normalize: strip username/password, keep origin + path as user entered.
+  url.username = "";
+  url.password = "";
+  return { ok: true, normalized: url.toString() };
+}
+
 export type OllamaProviderSettings = {
   baseUrl: string;
   enabled: boolean;
@@ -92,6 +132,13 @@ export const normalizeLlmSettingsState = (
         : base.providers.ollama.enabled,
     models: normalizeEditableModelList(providers.ollama?.models ?? base.providers.ollama.models),
   };
+
+  const maybeValidated = normalizeOllamaBaseUrl(base.providers.ollama.baseUrl);
+  if (maybeValidated.ok) {
+    base.providers.ollama.baseUrl = maybeValidated.normalized;
+  } else {
+    base.providers.ollama.baseUrl = DEFAULT_LLM_SETTINGS_STATE.providers.ollama.baseUrl;
+  }
 
   if (base.providers.ollama.models.length === 0) {
     base.providers.ollama.models = [...DEFAULT_OLLAMA_MODELS];

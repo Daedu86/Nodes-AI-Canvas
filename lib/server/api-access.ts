@@ -99,8 +99,15 @@ export function enforceLocalApiAccess(req: Request) {
 
   const originHeader = req.headers.get("origin");
   if (originHeader) {
-    const originHost = parseHostname(originHeader);
-    if (!originHost || originHost !== requestUrl.hostname.toLowerCase()) {
+    let origin: URL | null = null;
+    try {
+      origin = new URL(originHeader);
+    } catch {
+      origin = null;
+    }
+
+    // Treat opaque origins (e.g. "null") or invalid values as cross-origin.
+    if (!origin || origin.origin === "null" || origin.origin !== requestUrl.origin) {
       return jsonError("Cross-origin requests to the API are blocked.");
     }
   }

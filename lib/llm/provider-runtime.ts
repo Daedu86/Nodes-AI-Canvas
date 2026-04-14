@@ -9,6 +9,7 @@ import {
   type ResolvedModelConfig,
 } from "@/lib/llm/config";
 import type { LlmSettingsState } from "@/lib/llm/user-settings";
+import { validateOllamaBaseUrl } from "@/lib/server/ollama-base-url";
 import { type LlmRequestOverrides } from "@/lib/llm/request-overrides";
 
 export type MissingProviderCredential = {
@@ -30,8 +31,13 @@ const resolveApiKey = (
 function createOverridesFromSettings(
   settings: LlmSettingsState | null | undefined,
 ): LlmRequestOverrides {
+  const rawOllamaBaseUrl = normalizeValue(settings?.providers.ollama.baseUrl);
+  const validatedOllamaBaseUrl = rawOllamaBaseUrl
+    ? validateOllamaBaseUrl(rawOllamaBaseUrl)
+    : null;
+
   return {
-    ollamaBaseUrl: normalizeValue(settings?.providers.ollama.baseUrl),
+    ollamaBaseUrl: validatedOllamaBaseUrl?.ok ? validatedOllamaBaseUrl.normalized : undefined,
     openrouterApiKey: normalizeValue(settings?.providers.openrouter.apiKey),
   };
 }
