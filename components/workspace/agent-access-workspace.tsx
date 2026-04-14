@@ -131,21 +131,35 @@ export function AgentAccessWorkspace() {
                 ) : null}
               </div>
 
-              <div className="mt-5 rounded-[16px] border border-border/70 bg-background/70 p-4">
-                <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                  How to use
-                </p>
-                <p className="mt-2 text-sm text-foreground/90">
-                  Send the token as a Bearer credential:
-                </p>
-                <pre className="mt-2 overflow-auto rounded-xl border border-border/70 bg-muted/40 p-3 text-xs text-foreground">
+                <div className="mt-5 rounded-[16px] border border-border/70 bg-background/70 p-4">
+                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    How to use
+                  </p>
+                  <p className="mt-2 text-sm text-foreground/90">
+                    Send the token as a Bearer credential:
+                  </p>
+                  <pre className="mt-2 overflow-auto rounded-xl border border-border/70 bg-muted/40 p-3 text-xs text-foreground">
 {`Authorization: Bearer <agent-token>`}
-                </pre>
-              </div>
-            </section>
+                  </pre>
+                  <p className="mt-3 text-sm text-foreground/90">
+                    To have agent messages show up inside Nodes sessions, call:
+                  </p>
+                  <pre className="mt-2 overflow-auto rounded-xl border border-border/70 bg-muted/40 p-3 text-xs text-foreground">
+{`POST /api/agents/chat
+
+{
+  "sessionId": "<session-id>",
+  "prompt": "Ask Nemotron something…",
+  "provider": "openrouter",
+  "model": "openrouter/free-router",
+  "historyMode": "full"
+}`}
+                  </pre>
+                </div>
+              </section>
+            </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }
