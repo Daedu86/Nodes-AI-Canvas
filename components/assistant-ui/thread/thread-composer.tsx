@@ -73,6 +73,7 @@ const ComposerAction: FC<{
         <TooltipIconButton
           tooltip="Send"
           variant="default"
+          type="button"
           disabled={!llmEnabled || Boolean(disableSend)}
           onClick={onSend}
           className="my-2.5 size-8 p-2 transition-opacity ease-in"
@@ -84,6 +85,7 @@ const ComposerAction: FC<{
         <TooltipIconButton
           tooltip="Cancel"
           variant="default"
+          type="button"
           disabled={!llmEnabled}
           onClick={onCancel}
           className="my-2.5 size-8 p-2 transition-opacity ease-in"
@@ -327,6 +329,7 @@ export const Composer: FC = () => {
         <TooltipIconButton
           tooltip="Attach image"
           variant="ghost"
+          type="button"
           disabled={!llmEnabled || isPreparingImages}
           onClick={() => imageInputRef.current?.click()}
           className="my-2.5 size-8 p-2 text-muted-foreground hover:text-foreground"

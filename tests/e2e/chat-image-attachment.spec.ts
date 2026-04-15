@@ -176,3 +176,47 @@ test("send is blocked while an image is still preparing", async ({ page }) => {
   const alert = page.getByTestId("composer-error");
   await expect(alert).toContainText(/preparing the image attachment|text-only|Could not send/i);
 });
+
+test("attaching an image does not auto-send when text is already typed", async ({ page }) => {
+  const filePath = test.info().outputPath("pixel.png");
+  await fs.writeFile(filePath, Buffer.from(PIXEL_PNG_BASE64, "base64"));
+
+  const chatRequests: Array<{ url: string; postData?: any }> = [];
+  page.on("request", (req) => {
+    if (req.method() !== "POST") return;
+    if (!req.url().includes("/api/chat")) return;
+    try {
+      chatRequests.push({ url: req.url(), postData: req.postDataJSON() });
+    } catch {
+      chatRequests.push({ url: req.url() });
+    }
+  });
+
+  // Switch to a vision-capable model so image parts are accepted.
+  await page.getByRole("combobox", { name: "Model" }).selectOption({
+    label: "OpenRouter · Nemotron Nano 12B V2 VL (free)",
+  });
+
+  const composer = page.getByPlaceholder("Write a message...");
+  await composer.fill("Describe this image, please.");
+
+  // Attach image should NOT submit the composer form automatically.
+  await page.getByRole("button", { name: "Attach image" }).click();
+  await page.getByTestId("chat-image-input").setInputFiles(filePath);
+
+  await expect(page.getByTestId("composer-image-preview")).toBeVisible();
+  await page.waitForTimeout(300);
+  expect(chatRequests.length).toBe(0);
+
+  const chatRequestPromise = page.waitForRequest(
+    (req) =>
+      req.method() === "POST" &&
+      req.url().includes("/api/chat") &&
+      (req.postData() ?? "").includes("Describe this image, please.") &&
+      (req.postData() ?? "").includes("data:image/png;base64,"),
+    { timeout: 10_000 },
+  );
+
+  await page.getByRole("button", { name: "Send" }).click();
+  await chatRequestPromise;
+});
