@@ -1586,6 +1586,7 @@ export function ThreadGraphFlow() {
         ref={imageUploadInputRef}
         type="file"
         accept="image/*"
+        data-testid="artifact-image-upload-input"
         className="hidden"
         onChange={handleImageUploadChange}
       />

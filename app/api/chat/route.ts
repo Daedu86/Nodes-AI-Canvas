@@ -53,7 +53,17 @@ export async function POST(req: Request) {
   const guarded = await requireLocalApiUser(req);
   if ("response" in guarded) return guarded.response;
 
-  const body = (await req.json()) as ChatRequestBody;
+  let body: ChatRequestBody;
+  try {
+    body = (await req.json()) as ChatRequestBody;
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  }
   const requestOverrides = await getUserModelOverrides(guarded.user.id);
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
   const messages = normalizeMessages(rawMessages);

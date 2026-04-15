@@ -24,7 +24,8 @@ export const Thread: FC = () => {
         }}
       >
         <ThreadPrimitive.Viewport
-          autoScroll={false}
+          autoScroll
+          data-testid="thread-viewport"
           className="flex h-full flex-col items-stretch overflow-y-auto bg-inherit px-5 py-7"
         >
           <ThreadWelcome />

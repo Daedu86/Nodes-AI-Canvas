@@ -49,6 +49,46 @@ import { executeBranchSpec } from "@/lib/thread-branching-runtime";
 import { executeAssistantEditBranch } from "@/lib/assistant-edit-runtime";
 import { cn } from "@/lib/utils";
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const UserMessageAttachments: FC<{
+  attachments: unknown;
+}> = ({ attachments }) => {
+  if (!Array.isArray(attachments) || attachments.length === 0) return null;
+
+  const imageParts = attachments.flatMap((attachment) => {
+    if (!isRecord(attachment)) return [];
+    const content = attachment.content;
+    if (!Array.isArray(content)) return [];
+    const fallbackName = typeof attachment.name === "string" ? attachment.name : "Image";
+
+    return content
+      .map((part) => {
+        if (!isRecord(part) || part.type !== "image" || typeof part.image !== "string") {
+          return null;
+        }
+        const filename =
+          typeof part.filename === "string" && part.filename.trim().length
+            ? part.filename
+            : fallbackName;
+        return (
+          <ChatImagePart
+            key={`${attachment.id ?? fallbackName}:${filename}`}
+            image={part.image}
+            filename={filename}
+            status={{ type: "complete" }}
+            type="image"
+          />
+        );
+      })
+      .filter(Boolean);
+  });
+
+  if (imageParts.length === 0) return null;
+  return <div className="mt-3">{imageParts}</div>;
+};
+
 const useResolvedMessagePresentation = () => {
   const message = useMessage();
   const runtime = useAssistantRuntime();
@@ -428,6 +468,7 @@ export const UserMessage: FC = () => {
           modelInfo={modelInfo}
         />
         <MessagePrimitive.Content components={{ Text: MarkdownText, Image: ChatImagePart }} />
+        <UserMessageAttachments attachments={(message as unknown as { attachments?: unknown })?.attachments} />
       </div>
 
       <BranchPicker className="col-span-full col-start-1 row-start-3 -mr-1 justify-end" />

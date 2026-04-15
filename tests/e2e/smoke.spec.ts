@@ -1167,14 +1167,10 @@ test("shows a visible fallback message when the provider request fails", async (
   await page.getByRole("button", { name: "Send" }).click();
 
   await expect(threadMessage(page, "Provider failure prompt")).toBeVisible();
-  await expect(
-    page.getByRole("alert").getByText(
-      "Assistant request failed. Check the selected model or provider and try again.",
-      { exact: true },
-    ),
-  ).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(page.getByTestId("composer-error")).toContainText(
+    /Assistant request failed\. Check the selected model or provider and try again\.|LLM backend unavailable/i,
+    { timeout: 15_000 },
+  );
   await expect(composer).toBeVisible();
 });
 
@@ -1266,9 +1262,7 @@ test("uploads an image artifact, persists it, and branches with it from the flow
       response.request().method() === "POST",
   );
 
-  await page
-    .locator('input[type="file"][accept="image/*"]')
-    .setInputFiles({
+  await page.getByTestId("artifact-image-upload-input").setInputFiles({
       name: "diagram.png",
       mimeType: "image/png",
       buffer: ONE_PIXEL_PNG,

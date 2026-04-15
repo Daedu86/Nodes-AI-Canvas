@@ -77,6 +77,18 @@ const toUiMessageParts = (value: unknown) => {
           parts.push({ type: "text", text: part.text, state: "done" as const });
         }
         return parts;
+      case "image":
+        if (typeof part.image === "string") {
+          const match = /^data:([^;,]+)?(;base64)?,/i.exec(part.image.trim());
+          const mediaType = match?.[1]?.trim() || "image/png";
+          parts.push({
+            type: "file",
+            url: part.image,
+            mediaType,
+            ...(typeof part.filename === "string" ? { filename: part.filename } : {}),
+          });
+        }
+        return parts;
       case "reasoning":
         if (typeof part.text === "string") {
           parts.push({ type: "reasoning", text: part.text, state: "done" as const });

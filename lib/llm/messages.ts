@@ -90,10 +90,23 @@ const toModelTextPart = (value: unknown): TextPart | null => {
 
 const toModelImagePart = (value: unknown): ImagePart | null => {
   if (!isRecord(value)) return null;
-  if (value.type !== "image") return null;
 
   // assistant-ui message parts: { type: "image", image: string, filename?: string }
-  const imageValue = typeof value.image === "string" ? value.image.trim() : "";
+  // AI SDK UI messages: { type: "file", url: string, mediaType: string, filename?: string }
+  const isImagePart = value.type === "image";
+  const isImageFilePart =
+    value.type === "file" &&
+    typeof getFirstNonEmptyString(value.mediaType, value.mimeType) === "string" &&
+    getFirstNonEmptyString(value.mediaType, value.mimeType)!.toLowerCase().startsWith("image/");
+
+  if (!isImagePart && !isImageFilePart) return null;
+
+  const imageValue = getFirstNonEmptyString(
+    isImagePart ? value.image : undefined,
+    value.url,
+    value.data,
+    value.content,
+  );
   if (!imageValue) return null;
 
   const parsed = parseBase64DataUrl(imageValue);
@@ -110,7 +123,9 @@ const toModelImagePart = (value: unknown): ImagePart | null => {
     return {
       type: "image",
       image: asUrl,
-      ...(typeof value.mediaType === "string" ? { mediaType: value.mediaType } : {}),
+      ...(typeof getFirstNonEmptyString(value.mediaType, value.mimeType) === "string"
+        ? { mediaType: getFirstNonEmptyString(value.mediaType, value.mimeType) }
+        : {}),
     };
   }
 
@@ -118,7 +133,9 @@ const toModelImagePart = (value: unknown): ImagePart | null => {
   return {
     type: "image",
     image: imageValue,
-    ...(typeof value.mediaType === "string" ? { mediaType: value.mediaType } : {}),
+    ...(typeof getFirstNonEmptyString(value.mediaType, value.mimeType) === "string"
+      ? { mediaType: getFirstNonEmptyString(value.mediaType, value.mimeType) }
+      : {}),
   } as unknown as ImagePart;
 };
 
@@ -129,6 +146,8 @@ const toModelFilePart = (value: unknown): FilePart | null => {
   const dataValue =
     typeof value.data === "string"
       ? value.data.trim()
+      : typeof value.url === "string"
+        ? value.url.trim()
       : typeof value.content === "string"
         ? value.content.trim()
         : "";

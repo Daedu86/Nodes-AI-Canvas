@@ -61,10 +61,11 @@ const HistoryModeControls: FC<{
   );
 };
 
-const ComposerAction: FC<{ onSend: () => void; onCancel: () => void }> = ({
-  onSend,
-  onCancel,
-}) => {
+const ComposerAction: FC<{
+  onSend: () => void;
+  onCancel: () => void;
+  disableSend?: boolean;
+}> = ({ onSend, onCancel, disableSend }) => {
   const { llmEnabled } = useLlmEnabled();
   return (
     <>
@@ -72,7 +73,7 @@ const ComposerAction: FC<{ onSend: () => void; onCancel: () => void }> = ({
         <TooltipIconButton
           tooltip="Send"
           variant="default"
-          disabled={!llmEnabled}
+          disabled={!llmEnabled || Boolean(disableSend)}
           onClick={onSend}
           className="my-2.5 size-8 p-2 transition-opacity ease-in"
         >
@@ -104,17 +105,27 @@ export const Composer: FC = () => {
   const { clearRequestError, requestError, setRequestError } = useRequestError();
   const imageInputRef = React.useRef<HTMLInputElement | null>(null);
   const [pendingImages, setPendingImages] = React.useState<
-    Array<{ id: string; dataUrl: string; filename: string; byteSize: number }>
+    Array<{
+      id: string;
+      dataUrl: string;
+      filename: string;
+      byteSize: number;
+      mediaType: string;
+    }>
   >([]);
+  const [isPreparingImages, setIsPreparingImages] = React.useState(false);
 
   React.useEffect(() => {
     applyComposerRunConfig(composer, historyMode, modelId, provider);
   }, [composer, historyMode, modelId, provider]);
 
   const addImagesFromFiles = React.useCallback(
-    async (files: FileList | File[]) => {
-      const entries = Array.from(files);
-      const imageFiles = entries.filter((file) => file.type.startsWith("image/"));
+    async (files: File[]) => {
+      const entries = [...files];
+      const isLikelyImage = (file: File) =>
+        file.type.startsWith("image/") ||
+        /\.(png|jpe?g|webp|gif|bmp|svg|avif|heic)$/i.test(file.name);
+      const imageFiles = entries.filter(isLikelyImage);
       if (imageFiles.length === 0) return;
 
       // Keep payloads small to avoid request bloat and provider limits.
@@ -126,6 +137,9 @@ export const Composer: FC = () => {
           `Image too large (max ${(MAX_IMAGE_BYTES / 1_000_000).toFixed(1)}MB). Try a smaller image.`,
         );
       }
+      if (validFiles.length === 0) {
+        return;
+      }
 
       const readAsDataUrl = (file: File) =>
         new Promise<string>((resolve, reject) => {
@@ -136,6 +150,7 @@ export const Composer: FC = () => {
         });
 
       try {
+        setIsPreparingImages(true);
         clearRequestError();
         const next = await Promise.all(
           validFiles.map(async (file) => ({
@@ -143,88 +158,110 @@ export const Composer: FC = () => {
             dataUrl: await readAsDataUrl(file),
             filename: file.name,
             byteSize: file.size,
+            mediaType: file.type || "image/png",
           })),
         );
         setPendingImages((current) => [...current, ...next].slice(0, 6));
       } catch (error) {
         console.error("Failed to add image attachment", error);
         setRequestError("Could not attach image. Try again.");
+      } finally {
+        setIsPreparingImages(false);
       }
     },
     [clearRequestError, setRequestError],
   );
 
   const handleSend = React.useCallback(() => {
-    if (!composer || !runtime || !llmEnabled) return;
-    if (isRunning) {
-      setRequestError(ACTIVE_RUN_ERROR_MESSAGE);
-      return;
-    }
-    const state = composer.getState();
-    const text = state.text.trim();
-    if (!text && pendingImages.length === 0) return;
+    void (async () => {
+      if (!composer || !runtime || !llmEnabled) return;
+      if (isRunning) {
+        setRequestError(ACTIVE_RUN_ERROR_MESSAGE);
+        return;
+      }
+      const state = composer.getState();
+      const text = state.text.trim();
+      if (!text && pendingImages.length === 0) return;
 
-    if (pendingImages.length > 0 && !isVisionCapableModel(provider, modelId)) {
-      setRequestError(
-        "This model is text-only. Switch to a vision-capable model (e.g. OpenRouter · Qwen 2.5 VL 7B or OpenRouter/free) to describe images.",
-      );
-      return;
-    }
-    clearRequestError();
+      if (isPreparingImages) {
+        setRequestError("Still preparing the image attachment. Please wait a moment and try again.");
+        return;
+      }
 
-    // Bypass composer.send() for reliability. We append directly to the thread runtime and
-    // explicitly start a run. This prevents "send" from silently becoming a no-op when
-    // composer state hydration or model switching causes assistant-ui to treat the draft as unchanged.
-    const headId =
-      (runtime.threads.main as unknown as { getState?: () => { headId?: string | null } }).getState?.()
-        ?.headId ?? null;
+      if (pendingImages.length > 0 && !isVisionCapableModel(provider, modelId)) {
+        setRequestError(
+          "This model is text-only. Switch to a vision-capable model (e.g. OpenRouter/free, Gemma 4, or Nemotron Nano VL) to describe images.",
+        );
+        return;
+      }
+      clearRequestError();
 
-    const contentParts: Array<{ type: "text"; text: string } | { type: "image"; image: string; filename?: string }> = [];
-    const derivedText =
-      text || (pendingImages.length > 0 ? "Describe the attached image." : "");
-    if (derivedText) {
-      contentParts.push({ type: "text" as const, text: derivedText });
-    }
-    pendingImages.forEach((image) => {
-      contentParts.push({
-        type: "image" as const,
-        image: image.dataUrl,
-        filename: image.filename,
-      });
-    });
-
-    try {
-      runtime.threads.main.append({
-        parentId: headId,
-        sourceId: null,
-        role: "user",
-        content: contentParts,
-        metadata: { custom: {} },
-        runConfig: { custom: { historyMode, model: modelId, provider } },
-        startRun: true,
-      });
-
-      // Clear the composer draft (best-effort; internal API varies across assistant-ui versions).
       try {
-        (composer as unknown as { setText?: (value: string) => void }).setText?.("");
-      } catch {
-        // ignore clear failures
+        // Use assistant-ui's attachment pipeline so the AI SDK runtime can serialize the request
+        // as UIMessage FileUIParts (which our backend converts into model image parts).
+        const derivedText = text || (pendingImages.length > 0 ? "Describe the attached image." : "");
+        applyComposerRunConfig(composer, historyMode, modelId, provider);
+
+        // Ensure the draft includes something when users send "image-only".
+        if (!text && derivedText) {
+          composer.setText(derivedText);
+        }
+
+        if (pendingImages.length > 0) {
+          await composer.clearAttachments();
+          for (const image of pendingImages) {
+            await composer.addAttachment({
+              type: "image",
+              name: image.filename,
+              contentType: image.mediaType,
+              content: [
+                {
+                  type: "image",
+                  image: image.dataUrl,
+                  filename: image.filename,
+                },
+              ],
+            });
+          }
+        }
+
+        composer.send({ startRun: true });
+
+        // Ensure newly-sent messages are visible even when the thread viewport virtualizes items.
+        // (ThreadPrimitive.Viewport autoScroll can be conservative when the user isn't pinned to bottom.)
+        requestAnimationFrame(() => {
+          const viewport = document.querySelector<HTMLElement>('[data-testid="thread-viewport"]');
+          if (!viewport) return;
+          viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+        });
+
+        // Clear the composer draft (best-effort; internal API varies across assistant-ui versions).
+        try {
+          (composer as unknown as { setText?: (value: string) => void }).setText?.("");
+        } catch {
+          // ignore clear failures
+        }
+        // Clear attachments after send; do it async to avoid racing send() in runtimes that snapshot late.
+        queueMicrotask(() => {
+          void composer.clearAttachments();
+        });
+        setPendingImages([]);
+        if (imageInputRef.current) {
+          imageInputRef.current.value = "";
+        }
+      } catch (error) {
+        console.error("Failed to append message to thread runtime", error);
+        setRequestError(
+          "Could not send that message. If you attached an image, try a smaller image or switch to a vision-capable model.",
+        );
       }
-      setPendingImages([]);
-      if (imageInputRef.current) {
-        imageInputRef.current.value = "";
-      }
-    } catch (error) {
-      console.error("Failed to append message to thread runtime", error);
-      setRequestError(
-        "Could not send that message. If you attached an image, try a smaller image or switch to a vision-capable model.",
-      );
-    }
+    })();
   }, [
     clearRequestError,
     composer,
     historyMode,
     isRunning,
+    isPreparingImages,
     llmEnabled,
     modelId,
     pendingImages,
@@ -245,15 +282,17 @@ export const Composer: FC = () => {
         type="file"
         accept="image/*"
         multiple
+        data-testid="chat-image-input"
         className="hidden"
         onChange={(event) => {
-          const files = event.target.files;
-          if (!files || files.length === 0) return;
+          const files = event.target.files ? Array.from(event.target.files) : [];
+          event.target.value = "";
+          if (files.length === 0) return;
           void addImagesFromFiles(files);
         }}
       />
       {pendingImages.length > 0 ? (
-        <div className="w-full px-2 pb-2 pt-3">
+        <div data-testid="composer-image-preview" className="w-full px-2 pb-2 pt-3">
           <div className="flex flex-wrap items-center gap-2">
             {pendingImages.map((image) => (
               <div
@@ -288,7 +327,7 @@ export const Composer: FC = () => {
         <TooltipIconButton
           tooltip="Attach image"
           variant="ghost"
-          disabled={!llmEnabled}
+          disabled={!llmEnabled || isPreparingImages}
           onClick={() => imageInputRef.current?.click()}
           className="my-2.5 size-8 p-2 text-muted-foreground hover:text-foreground"
         >
@@ -317,7 +356,7 @@ export const Composer: FC = () => {
           }}
           className="placeholder:text-muted-foreground max-h-40 flex-grow resize-none border-none bg-transparent px-2 py-4 text-sm outline-none focus:ring-0 disabled:cursor-not-allowed"
         />
-        <ComposerAction onSend={handleSend} onCancel={handleCancel} />
+        <ComposerAction onSend={handleSend} onCancel={handleCancel} disableSend={isPreparingImages} />
       </div>
       <HistoryModeControls
         historyMode={historyMode}
@@ -331,7 +370,11 @@ export const Composer: FC = () => {
         </div>
       ) : null}
       {requestError ? (
-        <div role="alert" className="px-2 pb-2 text-xs text-red-700 dark:text-red-300">
+        <div
+          role="alert"
+          data-testid="composer-error"
+          className="px-2 pb-2 text-xs text-red-700 dark:text-red-300"
+        >
           {requestError}
         </div>
       ) : null}
