@@ -55,6 +55,10 @@ export default defineConfig({
       E2E_AUTH_USER_EMAIL: "e2e@nodes.local",
       E2E_AUTH_USER_ID: "e2e-user",
       E2E_AUTH_USER_NAME: "E2E User",
+      // Ensure deterministic default model selection in CI runs.
+      DEFAULT_MODEL: "nvidia/nemotron-3-super-120b-a12b:free",
+      NEXT_PUBLIC_DEFAULT_MODEL: "nvidia/nemotron-3-super-120b-a12b:free",
+      NEXT_PUBLIC_DEFAULT_PROVIDER: "openrouter",
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET ?? "playwright-auth-secret",
       NEXTAUTH_URL: baseURL,
       PORT: String(port),
