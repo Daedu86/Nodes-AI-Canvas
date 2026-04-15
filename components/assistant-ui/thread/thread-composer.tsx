@@ -183,25 +183,32 @@ export const Composer: FC = () => {
       });
     });
 
-    runtime.threads.main.append({
-      parentId: headId,
-      sourceId: null,
-      role: "user",
-      content: contentParts,
-      metadata: { custom: {} },
-      runConfig: { custom: { historyMode, model: modelId, provider } },
-      startRun: true,
-    });
-
-    // Clear the composer draft (best-effort; internal API varies across assistant-ui versions).
     try {
-      (composer as unknown as { setText?: (value: string) => void }).setText?.("");
-    } catch {
-      // ignore clear failures
-    }
-    setPendingImages([]);
-    if (imageInputRef.current) {
-      imageInputRef.current.value = "";
+      runtime.threads.main.append({
+        parentId: headId,
+        sourceId: null,
+        role: "user",
+        content: contentParts,
+        metadata: { custom: {} },
+        runConfig: { custom: { historyMode, model: modelId, provider } },
+        startRun: true,
+      });
+
+      // Clear the composer draft (best-effort; internal API varies across assistant-ui versions).
+      try {
+        (composer as unknown as { setText?: (value: string) => void }).setText?.("");
+      } catch {
+        // ignore clear failures
+      }
+      setPendingImages([]);
+      if (imageInputRef.current) {
+        imageInputRef.current.value = "";
+      }
+    } catch (error) {
+      console.error("Failed to append message to thread runtime", error);
+      setRequestError(
+        "Could not send that message. If you attached an image, try a smaller image or switch to a vision-capable model.",
+      );
     }
   }, [
     clearRequestError,
@@ -262,6 +269,9 @@ export const Composer: FC = () => {
               </div>
             ))}
           </div>
+          <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+            Image input depends on the selected model/provider. Some free models are text-only and may ignore images or return an error.
+          </p>
         </div>
       ) : null}
       <div className="flex w-full items-end gap-2">
