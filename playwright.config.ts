@@ -22,7 +22,8 @@ export default defineConfig({
   reporter: isCi
     ? [["list"], ["junit", { outputFile: "test-results/playwright-junit.xml" }]]
     : "list",
-  timeout: 30_000,
+  // Next dev cold-start + route compilation can exceed 30s on GitHub runners.
+  timeout: isCi ? 60_000 : 30_000,
   // The app uses a single shared webServer per run; multi-worker E2E can fight over shared cleanup.
   // Force determinism in CI until per-worker isolation is implemented.
   ...(isCi ? { workers: 1 } : {}),
