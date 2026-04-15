@@ -1491,17 +1491,7 @@ export function ThreadGraphFlow() {
     [selectedArtifact],
   );
   const quickSemanticPresets = React.useMemo(
-    () =>
-      semanticArtifactPresets.filter(({ semanticType }) =>
-        ["decision", "evidence", "draft"].includes(semanticType),
-      ),
-    [],
-  );
-  const secondarySemanticPresets = React.useMemo(
-    () =>
-      semanticArtifactPresets.filter(
-        ({ semanticType }) => !["decision", "evidence", "draft"].includes(semanticType),
-      ),
+    () => semanticArtifactPresets,
     [],
   );
   const selectedCanvasLabel = React.useMemo(() => {
@@ -1702,10 +1692,10 @@ export function ThreadGraphFlow() {
             {toolbarMenu === "add" ? (
               <div className="absolute right-0 top-[calc(100%+0.55rem)] w-64 rounded-[22px] border border-white/70 bg-white/90 p-2 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/92">
                 <p className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Create artifact
+                  Artifact templates
                 </p>
                 <div className="space-y-1">
-                  {secondarySemanticPresets.map(({ semanticType, icon: Icon }) => {
+                  {semanticArtifactPresets.map(({ semanticType, icon: Icon }) => {
                     const meta = getSemanticArtifactMeta(semanticType)!;
                     return (
                       <button
