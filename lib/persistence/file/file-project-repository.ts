@@ -51,7 +51,10 @@ const sortProjects = (projects: ProjectSummary[]) =>
   [...projects].sort((a, b) => {
     const updatedDelta = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     if (updatedDelta !== 0) return updatedDelta;
-    return a.createdAt.localeCompare(b.createdAt);
+    const createdDelta = b.createdAt.localeCompare(a.createdAt);
+    if (createdDelta !== 0) return createdDelta;
+    // Final deterministic tiebreaker (directory iteration order differs across platforms).
+    return a.id.localeCompare(b.id);
   });
 
 const toStoredProject = (

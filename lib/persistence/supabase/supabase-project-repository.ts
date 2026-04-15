@@ -32,7 +32,9 @@ const sortProjectSummaries = (projects: ProjectSummary[]) =>
   [...projects].sort((a, b) => {
     const updatedDelta = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     if (updatedDelta !== 0) return updatedDelta;
-    return a.createdAt.localeCompare(b.createdAt);
+    const createdDelta = b.createdAt.localeCompare(a.createdAt);
+    if (createdDelta !== 0) return createdDelta;
+    return a.id.localeCompare(b.id);
   });
 
 const normalizeMemberEmail = (value: string | null | undefined) => {
