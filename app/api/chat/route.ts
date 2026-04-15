@@ -205,6 +205,9 @@ export async function POST(req: Request) {
         messages: resolvedMessages,
         system,
         tools: toolset,
+        // Avoid hanging requests (some OpenRouter free models can stall long enough
+        // for the serverless function to time out without returning a client-visible error).
+        timeout: currentModel.provider === "openrouter" ? 45_000 : 30_000,
         onError: (error) => {
           console.error(error);
           const classified = classifyRequestError(error, currentModel);
