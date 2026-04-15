@@ -14,6 +14,7 @@ import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { useModelConfig } from "@/components/context/model-config";
 import { useRequestError } from "@/components/context/request-error";
 import { Button } from "@/components/ui/button";
+import { isVisionCapableModel } from "@/lib/llm/provider-catalog";
 
 const applyComposerRunConfig = (
   composer: ReturnType<typeof useComposerRuntime>,
@@ -162,6 +163,13 @@ export const Composer: FC = () => {
     const state = composer.getState();
     const text = state.text.trim();
     if (!text && pendingImages.length === 0) return;
+
+    if (pendingImages.length > 0 && !isVisionCapableModel(provider, modelId)) {
+      setRequestError(
+        "This model is text-only. Switch to a vision-capable model (e.g. OpenRouter · Qwen 2.5 VL 7B or OpenRouter/free) to describe images.",
+      );
+      return;
+    }
     clearRequestError();
 
     // Bypass composer.send() for reliability. We append directly to the thread runtime and
@@ -172,8 +180,10 @@ export const Composer: FC = () => {
         ?.headId ?? null;
 
     const contentParts: Array<{ type: "text"; text: string } | { type: "image"; image: string; filename?: string }> = [];
-    if (text) {
-      contentParts.push({ type: "text" as const, text });
+    const derivedText =
+      text || (pendingImages.length > 0 ? "Describe the attached image." : "");
+    if (derivedText) {
+      contentParts.push({ type: "text" as const, text: derivedText });
     }
     pendingImages.forEach((image) => {
       contentParts.push({
