@@ -72,6 +72,26 @@ export function classifyRequestError(
 ): RequestErrorDetails {
   const message = getErrorMessage(error).toLowerCase();
   const status = getErrorStatus(error);
+  const errorName =
+    error && typeof error === "object" && "name" in error && typeof error.name === "string"
+      ? error.name.toLowerCase()
+      : "";
+
+  const isAbortLike =
+    errorName.includes("abort") ||
+    errorName.includes("timeout") ||
+    message.includes("aborted") ||
+    message.includes("abort") ||
+    message.includes("timeout") ||
+    message.includes("timed out");
+
+  if (status === 408 || status === 504 || isAbortLike) {
+    return {
+      code: "provider_unavailable",
+      message: "This model timed out. Try again in a moment or choose another model.",
+      status: 503,
+    };
+  }
 
   if (status === 404 || message.includes("not found") || message.includes("does not exist")) {
     return {
@@ -182,12 +202,29 @@ export function getRequestErrorMessageFromResponse(response: Pick<Response, "sta
   if (response.status === 503) {
     return "The assistant backend is temporarily unavailable. Try again in a moment.";
   }
+  if (response.status === 504) {
+    return "The assistant backend timed out. Try again or switch models.";
+  }
 
   return DEFAULT_ERROR_MESSAGE;
 }
 
 export function getRequestErrorMessageFromThrowable(error: unknown) {
   const message = getErrorMessage(error).toLowerCase();
+  const errorName =
+    error && typeof error === "object" && "name" in error && typeof error.name === "string"
+      ? error.name.toLowerCase()
+      : "";
+  if (
+    errorName.includes("abort") ||
+    errorName.includes("timeout") ||
+    message.includes("aborted") ||
+    message.includes("abort") ||
+    message.includes("timeout") ||
+    message.includes("timed out")
+  ) {
+    return "The request timed out. Try again or switch to another model.";
+  }
   if (message.includes("too many assistant runs")) {
     return ACTIVE_RUN_ERROR_MESSAGE;
   }
