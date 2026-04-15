@@ -1,5 +1,5 @@
 // "ai" is already a server dependency (used by /api/chat). We only import types here.
-import type { FilePart, ImagePart, ModelMessage, TextPart } from "ai";
+import type { FilePart, ImagePart, TextPart } from "ai";
 
 const SUPPORTED_MESSAGE_ROLES = ["system", "user", "assistant"] as const;
 
@@ -7,7 +7,9 @@ export type NormalizedLlmMessageRole = (typeof SUPPORTED_MESSAGE_ROLES)[number];
 
 type MessageContentRecord = Record<string, unknown>;
 
-type ModelContent = ModelMessage["content"];
+// We only ever send system/user/assistant messages to providers (no ToolModelMessage),
+// so keep the content type constrained to what those roles accept.
+type ModelContent = string | Array<TextPart | ImagePart | FilePart>;
 
 export type NormalizedLlmMessagePart = {
   type: string;
