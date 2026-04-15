@@ -145,11 +145,15 @@ export async function POST(req: Request) {
     const normalized = normalizeMessages(snapshotWithUser.messages.map((entry) => entry.message));
     const selected = selectMessagesForHistoryMode(normalized, body.historyMode);
     const modelMessages = selected.map(
-      (message) =>
-        ({
-          role: message.role,
-          content: message.modelContent,
-        }) satisfies ModelMessage,
+      (message) => {
+        if (message.role === "assistant") {
+          return { role: "assistant", content: message.modelContent as string } satisfies ModelMessage;
+        }
+        if (message.role === "system") {
+          return { role: "system", content: message.modelContent as string } satisfies ModelMessage;
+        }
+        return { role: "user", content: message.modelContent } satisfies ModelMessage;
+      },
     );
 
     const result = await generateText({
