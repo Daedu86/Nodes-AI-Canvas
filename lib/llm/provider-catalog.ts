@@ -26,6 +26,16 @@ export const OPENROUTER_FREE_MODEL_OPTIONS: ProviderModelOption[] = [
     provider: "openrouter",
   },
   {
+    label: "OpenRouter · Gemma 4 31B IT (free)",
+    modelId: "google/gemma-4-31b-it:free",
+    provider: "openrouter",
+  },
+  {
+    label: "OpenRouter · Gemma 4 26B A4B IT (free)",
+    modelId: "google/gemma-4-26b-a4b-it:free",
+    provider: "openrouter",
+  },
+  {
     label: "OpenRouter · Trinity Mini",
     modelId: "arcee-ai/trinity-mini:free",
     provider: "openrouter",
@@ -61,7 +71,7 @@ export const PROVIDER_DEFINITIONS: Record<LlmProviderId, ProviderDefinition> = {
   },
   openrouter: {
     connectionHint: "Free OpenRouter pool already wired into Nodes.",
-    description: "Cloud router with five free models.",
+    description: "Cloud router with free models.",
     label: "OpenRouter",
     modelHint: OPENROUTER_FREE_MODEL_OPTIONS.map((option) => option.modelId).join(", "),
     settingsLabel: "Optional API key override",
