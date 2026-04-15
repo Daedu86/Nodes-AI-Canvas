@@ -18,14 +18,14 @@ export const Thread: FC = () => {
   return (
     <ThreadBranchDraftProvider>
       <ThreadPrimitive.Root
-        className="bg-background box-border flex h-full flex-col overflow-hidden"
+        className="box-border flex h-full flex-col overflow-hidden bg-transparent"
         style={{
-          ["--thread-max-width" as string]: "42rem",
+          ["--thread-max-width" as string]: "52rem",
         }}
       >
         <ThreadPrimitive.Viewport
           autoScroll={false}
-          className="flex h-full flex-col items-stretch overflow-y-auto bg-inherit px-4 py-6"
+          className="flex h-full flex-col items-stretch overflow-y-auto bg-inherit px-5 py-7"
         >
           <ThreadWelcome />
 

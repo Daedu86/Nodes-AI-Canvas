@@ -190,10 +190,10 @@ export async function POST(req: Request) {
         provider: currentModel.provider,
       });
       const modelMessages = messagesToSend.map(
-        ({ role, content }) =>
+        ({ role, modelContent }) =>
           ({
             role,
-            content,
+            content: modelContent,
           }) satisfies ModelMessage,
       );
       const resolvedMessages = artifactContextMessage

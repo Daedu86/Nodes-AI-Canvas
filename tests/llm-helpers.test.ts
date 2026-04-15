@@ -28,6 +28,7 @@ describe("llm helpers", () => {
         id: "u1",
         role: "user",
         content: "Hola",
+        modelContent: "Hola",
         textContent: "Hola",
         parts: [{ type: "text", text: "Hola", summary: "Hola" }],
       },
@@ -35,6 +36,7 @@ describe("llm helpers", () => {
         id: "a1",
         role: "assistant",
         content: "Linea 1\nLinea 2\n[tool call]",
+        modelContent: "Linea 1\nLinea 2\n[tool call]",
         textContent: "Linea 1\nLinea 2",
         parts: [
           { type: "text", text: "Linea 1", summary: "Linea 1" },
@@ -59,6 +61,7 @@ describe("llm helpers", () => {
       {
         role: "user",
         content: "ultimo",
+        modelContent: "ultimo",
         textContent: "ultimo",
         parts: [{ type: "text", text: "ultimo", summary: "ultimo" }],
       },
@@ -89,6 +92,7 @@ describe("llm helpers", () => {
       {
         role: "user",
         content: "[image: image/png]\n[file: brief.pdf]\n[source: Doc 1]",
+        modelContent: "[image: image/png]\n[file: brief.pdf]\n[source: Doc 1]",
         textContent: "",
         parts: [
           { type: "image", mimeType: "image/png", summary: "[image: image/png]" },
@@ -104,6 +108,7 @@ describe("llm helpers", () => {
       {
         role: "assistant",
         content: "[tool call: searchDocs]\n[tool result: searchDocs]",
+        modelContent: "[tool call: searchDocs]\n[tool result: searchDocs]",
         textContent: "",
         parts: [
           { type: "tool-call", toolName: "searchDocs", summary: "[tool call: searchDocs]" },

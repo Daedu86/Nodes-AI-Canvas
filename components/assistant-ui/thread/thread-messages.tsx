@@ -17,6 +17,7 @@ import {
   RefreshCwIcon,
 } from "lucide-react";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
+import { ChatImagePart } from "@/components/assistant-ui/thread/message-image-part";
 import { MessageMetadata } from "@/components/assistant-ui/thread/message-metadata";
 import {
   resolveRuntimeParentId,
@@ -426,7 +427,7 @@ export const UserMessage: FC = () => {
           role={message?.role}
           modelInfo={modelInfo}
         />
-        <MessagePrimitive.Content />
+        <MessagePrimitive.Content components={{ Text: MarkdownText, Image: ChatImagePart }} />
       </div>
 
       <BranchPicker className="col-span-full col-start-1 row-start-3 -mr-1 justify-end" />
@@ -723,7 +724,7 @@ export const AssistantMessage: FC = () => {
           modelInfo={modelInfo}
         />
         <MessagePrimitive.Content
-          components={{ Text: MarkdownText, tools: { Fallback: ToolFallback } }}
+          components={{ Text: MarkdownText, Image: ChatImagePart, tools: { Fallback: ToolFallback } }}
         />
       </div>
 

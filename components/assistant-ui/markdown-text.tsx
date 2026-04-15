@@ -128,5 +128,16 @@ const defaultComponents = memoizeMarkdownComponents({
       />
     );
   },
+  img: ({ className, alt, ...props }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      alt={alt ?? ""}
+      className={cn(
+        "my-3 max-w-full rounded-2xl border border-border/60 bg-background/70 shadow-sm",
+        className,
+      )}
+      {...props}
+    />
+  ),
   CodeHeader,
 });

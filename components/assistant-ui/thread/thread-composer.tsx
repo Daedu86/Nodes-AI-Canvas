@@ -7,7 +7,7 @@ import {
 } from "@assistant-ui/react";
 import type { FC } from "react";
 import React from "react";
-import { SendHorizontalIcon } from "lucide-react";
+import { ImagePlus, SendHorizontalIcon, X } from "lucide-react";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { useHistoryMode } from "@/components/context/history-mode";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
@@ -101,10 +101,57 @@ export const Composer: FC = () => {
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
   const { clearRequestError, requestError, setRequestError } = useRequestError();
+  const imageInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [pendingImages, setPendingImages] = React.useState<
+    Array<{ id: string; dataUrl: string; filename: string; byteSize: number }>
+  >([]);
 
   React.useEffect(() => {
     applyComposerRunConfig(composer, historyMode, modelId, provider);
   }, [composer, historyMode, modelId, provider]);
+
+  const addImagesFromFiles = React.useCallback(
+    async (files: FileList | File[]) => {
+      const entries = Array.from(files);
+      const imageFiles = entries.filter((file) => file.type.startsWith("image/"));
+      if (imageFiles.length === 0) return;
+
+      // Keep payloads small to avoid request bloat and provider limits.
+      const MAX_IMAGE_BYTES = 1_800_000;
+      const validFiles = imageFiles.filter((file) => file.size <= MAX_IMAGE_BYTES);
+      const rejected = imageFiles.filter((file) => file.size > MAX_IMAGE_BYTES);
+      if (rejected.length > 0) {
+        setRequestError(
+          `Image too large (max ${(MAX_IMAGE_BYTES / 1_000_000).toFixed(1)}MB). Try a smaller image.`,
+        );
+      }
+
+      const readAsDataUrl = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result ?? ""));
+          reader.onerror = () => reject(new Error("Failed to read image"));
+          reader.readAsDataURL(file);
+        });
+
+      try {
+        clearRequestError();
+        const next = await Promise.all(
+          validFiles.map(async (file) => ({
+            id: crypto.randomUUID(),
+            dataUrl: await readAsDataUrl(file),
+            filename: file.name,
+            byteSize: file.size,
+          })),
+        );
+        setPendingImages((current) => [...current, ...next].slice(0, 6));
+      } catch (error) {
+        console.error("Failed to add image attachment", error);
+        setRequestError("Could not attach image. Try again.");
+      }
+    },
+    [clearRequestError, setRequestError],
+  );
 
   const handleSend = React.useCallback(() => {
     if (!composer || !runtime || !llmEnabled) return;
@@ -114,7 +161,7 @@ export const Composer: FC = () => {
     }
     const state = composer.getState();
     const text = state.text.trim();
-    if (!text) return;
+    if (!text && pendingImages.length === 0) return;
     clearRequestError();
 
     // Bypass composer.send() for reliability. We append directly to the thread runtime and
@@ -124,11 +171,23 @@ export const Composer: FC = () => {
       (runtime.threads.main as unknown as { getState?: () => { headId?: string | null } }).getState?.()
         ?.headId ?? null;
 
+    const contentParts: Array<{ type: "text"; text: string } | { type: "image"; image: string; filename?: string }> = [];
+    if (text) {
+      contentParts.push({ type: "text" as const, text });
+    }
+    pendingImages.forEach((image) => {
+      contentParts.push({
+        type: "image" as const,
+        image: image.dataUrl,
+        filename: image.filename,
+      });
+    });
+
     runtime.threads.main.append({
       parentId: headId,
       sourceId: null,
       role: "user",
-      content: [{ type: "text" as const, text }],
+      content: contentParts,
       metadata: { custom: {} },
       runConfig: { custom: { historyMode, model: modelId, provider } },
       startRun: true,
@@ -140,7 +199,22 @@ export const Composer: FC = () => {
     } catch {
       // ignore clear failures
     }
-  }, [clearRequestError, composer, historyMode, isRunning, llmEnabled, modelId, provider, runtime, setRequestError]);
+    setPendingImages([]);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
+  }, [
+    clearRequestError,
+    composer,
+    historyMode,
+    isRunning,
+    llmEnabled,
+    modelId,
+    pendingImages,
+    provider,
+    runtime,
+    setRequestError,
+  ]);
 
   const handleCancel = React.useCallback(() => {
     if (!composer) return;
@@ -149,12 +223,72 @@ export const Composer: FC = () => {
 
   return (
     <ComposerPrimitive.Root className="focus-within:border-ring/20 flex w-full flex-wrap items-end rounded-lg border bg-inherit px-2.5 shadow-sm transition-colors ease-in">
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const files = event.target.files;
+          if (!files || files.length === 0) return;
+          void addImagesFromFiles(files);
+        }}
+      />
+      {pendingImages.length > 0 ? (
+        <div className="w-full px-2 pb-2 pt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {pendingImages.map((image) => (
+              <div
+                key={image.id}
+                className="group relative overflow-hidden rounded-2xl border border-border/60 bg-background/70 shadow-sm"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image.dataUrl}
+                  alt={image.filename}
+                  className="block h-16 w-24 object-cover"
+                />
+                <button
+                  type="button"
+                  className="absolute right-1 top-1 inline-flex items-center justify-center rounded-full border border-border/60 bg-background/85 p-1 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground group-hover:opacity-100"
+                  onClick={() =>
+                    setPendingImages((current) => current.filter((entry) => entry.id !== image.id))
+                  }
+                  aria-label="Remove image"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="flex w-full items-end gap-2">
+        <TooltipIconButton
+          tooltip="Attach image"
+          variant="ghost"
+          disabled={!llmEnabled}
+          onClick={() => imageInputRef.current?.click()}
+          className="my-2.5 size-8 p-2 text-muted-foreground hover:text-foreground"
+        >
+          <ImagePlus className="h-4 w-4" />
+        </TooltipIconButton>
         <ComposerPrimitive.Input
           rows={1}
           autoFocus
           placeholder="Write a message..."
           disabled={!llmEnabled}
+          onPaste={(event) => {
+            const items = Array.from(event.clipboardData?.items ?? []);
+            const files = items
+              .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+              .map((item) => item.getAsFile())
+              .filter((file): file is File => Boolean(file));
+            if (files.length === 0) return;
+            event.preventDefault();
+            void addImagesFromFiles(files);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();

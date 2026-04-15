@@ -1,8 +1,13 @@
+// "ai" is already a server dependency (used by /api/chat). We only import types here.
+import type { FilePart, ImagePart, ModelMessage, TextPart } from "ai";
+
 const SUPPORTED_MESSAGE_ROLES = ["system", "user", "assistant"] as const;
 
 export type NormalizedLlmMessageRole = (typeof SUPPORTED_MESSAGE_ROLES)[number];
 
 type MessageContentRecord = Record<string, unknown>;
+
+type ModelContent = ModelMessage["content"];
 
 export type NormalizedLlmMessagePart = {
   type: string;
@@ -17,6 +22,7 @@ export type NormalizedMessageContent = {
   content: string;
   textContent: string;
   parts: NormalizedLlmMessagePart[];
+  modelContent: ModelContent;
 };
 
 export type NormalizedLlmMessage = {
@@ -25,6 +31,7 @@ export type NormalizedLlmMessage = {
   content: string;
   textContent: string;
   parts: NormalizedLlmMessagePart[];
+  modelContent: ModelContent;
 };
 
 type MessageLike = {
@@ -45,6 +52,97 @@ const getFirstNonEmptyString = (...values: unknown[]) => {
   }
 
   return undefined;
+};
+
+const parseBase64DataUrl = (value: string) => {
+  const match = /^data:([^;,]+)?(;base64)?,(.*)$/i.exec(value.trim());
+  if (!match) return null;
+  const mediaType = match[1]?.trim() || undefined;
+  const isBase64 = Boolean(match[2]);
+  const data = match[3] ?? "";
+  if (!isBase64) {
+    // We only support base64 data URLs for model input right now.
+    return null;
+  }
+  return {
+    data: data.trim(),
+    mediaType,
+  };
+};
+
+const coerceUrl = (value: string) => {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+};
+
+const toModelTextPart = (value: unknown): TextPart | null => {
+  if (!isRecord(value)) return null;
+  if (value.type !== "text") return null;
+  const text = typeof value.text === "string" ? value.text : "";
+  if (!text) return null;
+  return { type: "text", text };
+};
+
+const toModelImagePart = (value: unknown): ImagePart | null => {
+  if (!isRecord(value)) return null;
+  if (value.type !== "image") return null;
+
+  // assistant-ui message parts: { type: "image", image: string, filename?: string }
+  const imageValue = typeof value.image === "string" ? value.image.trim() : "";
+  if (!imageValue) return null;
+
+  const parsed = parseBase64DataUrl(imageValue);
+  if (parsed?.data) {
+    return {
+      type: "image",
+      image: parsed.data,
+      ...(parsed.mediaType ? { mediaType: parsed.mediaType } : {}),
+    };
+  }
+
+  const asUrl = coerceUrl(imageValue);
+  if (asUrl) {
+    return {
+      type: "image",
+      image: asUrl,
+      ...(typeof value.mediaType === "string" ? { mediaType: value.mediaType } : {}),
+    };
+  }
+
+  // Best-effort: pass through raw string (some providers accept data URLs directly).
+  return {
+    type: "image",
+    image: imageValue,
+    ...(typeof value.mediaType === "string" ? { mediaType: value.mediaType } : {}),
+  } as unknown as ImagePart;
+};
+
+const toModelFilePart = (value: unknown): FilePart | null => {
+  if (!isRecord(value)) return null;
+  if (value.type !== "file") return null;
+
+  const dataValue =
+    typeof value.data === "string"
+      ? value.data.trim()
+      : typeof value.content === "string"
+        ? value.content.trim()
+        : "";
+  const mediaType = getFirstNonEmptyString(value.mediaType, value.mimeType);
+  if (!dataValue || !mediaType) return null;
+
+  const parsed = parseBase64DataUrl(dataValue);
+  const data = parsed?.data ?? dataValue;
+  const filename = getFirstNonEmptyString(value.filename, value.name);
+
+  return {
+    type: "file",
+    data,
+    mediaType,
+    ...(filename ? { filename } : {}),
+  };
 };
 
 const normalizeMessageContentPart = (value: unknown): NormalizedLlmMessagePart | null => {
@@ -127,6 +225,7 @@ export const normalizeMessageContent = (content: unknown): NormalizedMessageCont
       content,
       textContent: content,
       parts: content ? [{ type: "text", text: content, summary: content }] : [],
+      modelContent: content,
     };
   }
   if (!Array.isArray(content)) return null;
@@ -134,10 +233,19 @@ export const normalizeMessageContent = (content: unknown): NormalizedMessageCont
   const parts = content
     .map((part) => normalizeMessageContentPart(part))
     .filter((part): part is NormalizedLlmMessagePart => part !== null && part.summary.length > 0);
+
+  const modelParts = content
+    .map((part) => toModelTextPart(part) ?? toModelImagePart(part) ?? toModelFilePart(part))
+    .filter((part): part is TextPart | ImagePart | FilePart => part !== null);
+
   const textContent = parts
     .flatMap((part) => (part.type === "text" && part.text ? [part.text] : []))
     .join("\n");
   const normalizedContent = parts.map((part) => part.summary).join("\n");
+  const modelContent: ModelContent =
+    modelParts.length > 0
+      ? (modelParts as Array<TextPart | ImagePart | FilePart>)
+      : normalizedContent;
 
   if (parts.length === 0 && normalizedContent.trim().length === 0) {
     return null;
@@ -147,6 +255,7 @@ export const normalizeMessageContent = (content: unknown): NormalizedMessageCont
     content: normalizedContent,
     textContent,
     parts,
+    modelContent,
   };
 };
 
@@ -182,6 +291,8 @@ export function normalizeMessages(rawMessages: unknown[]): NormalizedLlmMessage[
         content: normalizedContent.content,
         textContent: normalizedContent.textContent,
         parts: normalizedContent.parts,
+        modelContent:
+          message.role === "user" ? normalizedContent.modelContent : normalizedContent.content,
       };
     })
     .filter((message): message is NormalizedLlmMessage => message !== null);

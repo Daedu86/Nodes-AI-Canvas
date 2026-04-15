@@ -112,7 +112,15 @@ describe("/api/chat", () => {
     );
     expect(streamTextMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        messages: [{ role: "user", content: "Hola\nresponde OK" }],
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Hola" },
+              { type: "text", text: "responde OK" },
+            ],
+          },
+        ],
       }),
     );
   });

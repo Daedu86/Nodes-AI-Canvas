@@ -148,7 +148,7 @@ export async function POST(req: Request) {
       (message) =>
         ({
           role: message.role,
-          content: message.content,
+          content: message.modelContent,
         }) satisfies ModelMessage,
     );
 
@@ -210,4 +210,3 @@ export async function POST(req: Request) {
     quota.grant.release();
   }
 }
-
