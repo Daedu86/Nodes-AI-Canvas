@@ -210,7 +210,8 @@ export function getRequestErrorMessageFromResponse(response: Pick<Response, "sta
 }
 
 export function getRequestErrorMessageFromThrowable(error: unknown) {
-  const message = getErrorMessage(error).toLowerCase();
+  const rawMessage = getErrorMessage(error);
+  const message = rawMessage.toLowerCase();
   const errorName =
     error && typeof error === "object" && "name" in error && typeof error.name === "string"
       ? error.name.toLowerCase()
@@ -233,6 +234,26 @@ export function getRequestErrorMessageFromThrowable(error: unknown) {
   }
   if (message.includes("network") || message.includes("fetch") || message.includes("failed")) {
     return "The assistant request could not reach the backend. Check the connection and try again.";
+  }
+
+  // If the runtime throws a client-safe message (e.g. from the streamed `errorText`),
+  // prefer showing it instead of the generic fallback.
+  const trimmed = rawMessage.trim();
+  if (trimmed) {
+    const lower = trimmed.toLowerCase();
+    const isSafe =
+      trimmed === DEFAULT_ERROR_MESSAGE ||
+      trimmed === ACTIVE_RUN_ERROR_MESSAGE ||
+      trimmed === QUOTA_EXCEEDED_ERROR_MESSAGE ||
+      lower.includes("selected model") ||
+      lower.includes("rate limited") ||
+      lower.includes("timed out") ||
+      lower.includes("temporarily unavailable") ||
+      lower.includes("backend") ||
+      trimmed.startsWith("OpenRouter needs an API key");
+    if (isSafe && trimmed.length <= 240) {
+      return trimmed;
+    }
   }
   return DEFAULT_ERROR_MESSAGE;
 }

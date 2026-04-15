@@ -31,11 +31,6 @@ export const OPENROUTER_FREE_MODEL_OPTIONS: ProviderModelOption[] = [
     provider: "openrouter",
   },
   {
-    label: "OpenRouter · Qwen 2.5 VL 7B Instruct (free)",
-    modelId: "qwen/qwen-2.5-vl-7b-instruct:free",
-    provider: "openrouter",
-  },
-  {
     label: "OpenRouter · Gemma 4 31B IT (free)",
     modelId: "google/gemma-4-31b-it:free",
     provider: "openrouter",
@@ -74,7 +69,8 @@ export const SAFE_DEFAULT_MODEL = OPENROUTER_FREE_MODEL_OPTIONS[0]!;
 const VISION_MODEL_IDS = new Set<string>([
   "openrouter/free",
   "nvidia/nemotron-nano-12b-v2-vl:free",
-  "qwen/qwen-2.5-vl-7b-instruct:free",
+  "google/gemma-4-31b-it:free",
+  "google/gemma-4-26b-a4b-it:free",
 ]);
 
 export const PROVIDER_DEFINITIONS: Record<LlmProviderId, ProviderDefinition> = {
