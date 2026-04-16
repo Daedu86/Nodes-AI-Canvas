@@ -227,7 +227,9 @@ export function buildProjectCanvasFlow(
       );
       const isBranchWinner = project.arenaWinnerBranchKey === `${session.id}:${messageId}`;
       const messageNodeId = makeMessageNodeId(project.id, session.id, messageId);
-      const normalizedContent = normalizeMessageContent((message as { content?: unknown }).content);
+      const normalizedContent =
+        normalizeMessageContent((message as { parts?: unknown }).parts) ??
+        normalizeMessageContent((message as { content?: unknown }).content);
       const metadataCustom = getCustomMetadata(message);
 
       nodes.push({

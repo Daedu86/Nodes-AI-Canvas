@@ -3,7 +3,6 @@
 import React from "react";
 import { useAssistantRuntime } from "@assistant-ui/react";
 import type { AssistantRuntime } from "@assistant-ui/react";
-import { getExternalStoreMessages } from "@assistant-ui/core";
 import type { MessageFormatRepository } from "@assistant-ui/core";
 import type { UIMessage } from "ai";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
@@ -26,7 +25,7 @@ type ForcePersistEventDetail = {
 };
 
 type ThreadExport = ReturnType<AssistantRuntime["threads"]["main"]["export"]>;
-const PERSISTED_EXTERNAL_MESSAGES_KEY = "__assistantUiExternalMessages";
+const SESSION_SNAPSHOT_CACHE_KEY_PREFIX = "nodes.session-snapshot-cache.v1:";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -34,211 +33,115 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const toRuntimeSnapshot = (snapshot: SessionThreadExport) =>
   snapshot as unknown as ThreadExport;
 
-const cloneJsonValue = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const normalizeAssistantStatusForPersistence = (message: Record<string, unknown>) => {
+  if (message.role !== "assistant") return message;
+  const status = isRecord(message.status) ? message.status : null;
+  if (status?.type !== "running") return message;
 
-const stripPersistedExternalMessages = (message: Record<string, unknown>) => {
-  const metadata = isRecord(message.metadata) ? message.metadata : null;
-  const custom = metadata && isRecord(metadata.custom) ? metadata.custom : null;
-  if (!custom || !(PERSISTED_EXTERNAL_MESSAGES_KEY in custom)) {
-    return message;
-  }
-
-  const nextCustom = { ...custom };
-  delete nextCustom[PERSISTED_EXTERNAL_MESSAGES_KEY];
+  // We cannot resume a streaming run after reload/navigation, so persisting a "running" assistant
+  // leaves the thread stuck (Send disappears and new sends get blocked).
   return {
     ...message,
-    metadata: {
-      ...metadata,
-      custom: nextCustom,
+    status: {
+      type: "incomplete",
+      reason: "cancelled",
     },
   };
+};
+
+const sanitizePersistedSnapshot = (snapshot: SessionThreadExport): SessionThreadExport => ({
+  headId: snapshot.headId ?? null,
+  messages: snapshot.messages.map((entry) => ({
+    parentId: entry.parentId,
+    message: isRecord(entry.message)
+      ? normalizeAssistantStatusForPersistence(entry.message)
+      : entry.message,
+  })),
+});
+
+const isUiMessageLike = (value: unknown): value is UIMessage =>
+  isRecord(value) &&
+  typeof value.id === "string" &&
+  (value.role === "user" || value.role === "assistant" || value.role === "system") &&
+  Array.isArray((value as { parts?: unknown }).parts);
+
+const isExternalStateSnapshot = (snapshot: SessionThreadExport) =>
+  snapshot.messages.some((entry) => isUiMessageLike(entry.message));
+
+const toExternalStateRepository = (
+  snapshot: SessionThreadExport,
+): MessageFormatRepository<UIMessage> => ({
+  headId: snapshot.headId ?? null,
+  messages: snapshot.messages
+    .filter((entry) => isUiMessageLike(entry.message))
+    .map((entry) => ({
+      parentId: entry.parentId,
+      message: entry.message as UIMessage,
+    })),
+});
+
+const exportExternalStateAsSnapshot = (
+  thread: AssistantRuntime["threads"]["main"],
+): SessionThreadExport | null => {
+  try {
+    const exported = (thread as unknown as { exportExternalState?: () => MessageFormatRepository<UIMessage> })
+      .exportExternalState?.();
+    if (!exported || !Array.isArray(exported.messages)) {
+      return null;
+    }
+    return {
+      headId: exported.headId ?? null,
+      messages: exported.messages.map((item) => ({
+        parentId: item.parentId ?? null,
+        message: item.message as unknown as Record<string, unknown>,
+      })),
+    };
+  } catch {
+    return null;
+  }
 };
 
 const toComparableSnapshot = (snapshot: SessionThreadExport) => ({
   headId: snapshot.headId ?? null,
   messages: snapshot.messages.map((entry) => ({
     parentId: entry.parentId,
-    message: isRecord(entry.message)
-      ? stripPersistedExternalMessages(entry.message)
-      : entry.message,
+    message: entry.message,
   })),
 });
 
-const toUiMessageParts = (value: unknown) => {
-  if (!Array.isArray(value)) return [] as Array<Record<string, unknown>>;
-  return value.reduce<Array<Record<string, unknown>>>((parts, part) => {
-    if (!isRecord(part) || typeof part.type !== "string") {
-      return parts;
-    }
-
-    switch (part.type) {
-      case "text":
-        if (typeof part.text === "string") {
-          parts.push({ type: "text", text: part.text, state: "done" as const });
-        }
-        return parts;
-      case "image":
-        if (typeof part.image === "string") {
-          const match = /^data:([^;,]+)?(;base64)?,/i.exec(part.image.trim());
-          const mediaType = match?.[1]?.trim() || "image/png";
-          parts.push({
-            type: "file",
-            url: part.image,
-            mediaType,
-            ...(typeof part.filename === "string" ? { filename: part.filename } : {}),
-          });
-        }
-        return parts;
-      case "reasoning":
-        if (typeof part.text === "string") {
-          parts.push({ type: "reasoning", text: part.text, state: "done" as const });
-        }
-        return parts;
-      case "source":
-        if (part.sourceType === "url" && typeof part.url === "string") {
-          parts.push({
-              type: "source-url",
-              sourceId: typeof part.id === "string" ? part.id : undefined,
-              url: part.url,
-              title: typeof part.title === "string" ? part.title : "",
-            });
-        }
-        return parts;
-      case "file":
-        if (typeof part.data === "string" && typeof part.mimeType === "string") {
-          parts.push({
-              type: "file",
-              url: part.data,
-              mediaType: part.mimeType,
-              ...(typeof part.filename === "string" ? { filename: part.filename } : {}),
-            });
-        }
-        return parts;
-      case "data":
-        if (typeof part.name === "string") {
-          parts.push({ type: `data-${part.name}`, data: part.data });
-        }
-        return parts;
-      default:
-        return parts;
-    }
-  }, []);
+const getSnapshotMessageCount = (snapshot: unknown) => {
+  if (!snapshot || typeof snapshot !== "object") return 0;
+  const messages = (snapshot as { messages?: unknown }).messages;
+  return Array.isArray(messages) ? messages.length : 0;
 };
 
-const buildFallbackExternalMessages = (message: Record<string, unknown>): UIMessage[] => {
-  const id = typeof message.id === "string" ? message.id : null;
-  const role =
-    message.role === "user" || message.role === "assistant" || message.role === "system"
-      ? message.role
-      : null;
-
-  if (!id || !role) {
-    return [];
-  }
-
-  return [
-    {
-      id,
-      role,
-      metadata: message.metadata,
-      parts: toUiMessageParts(message.content),
-    } as UIMessage,
-  ];
-};
-
-const readPersistedExternalMessages = (message: Record<string, unknown>) => {
-  const custom = isRecord(message.metadata) && isRecord(message.metadata.custom)
-    ? message.metadata.custom
-    : null;
-  const embedded = custom?.[PERSISTED_EXTERNAL_MESSAGES_KEY];
-  if (Array.isArray(embedded)) {
-    return embedded.filter(isRecord) as unknown as UIMessage[];
-  }
-  return buildFallbackExternalMessages(message);
-};
-
-const toExternalStateSnapshot = (
-  snapshot: SessionThreadExport,
-): MessageFormatRepository<UIMessage> | null => {
-  if (!Array.isArray(snapshot.messages) || snapshot.messages.length === 0) {
-    return { messages: [], headId: snapshot.headId ?? null };
-  }
-
-  const outerToInnerHead = new Map<string, string>();
-  const messages = snapshot.messages.flatMap((entry) => {
-    if (!isRecord(entry.message)) {
-      return [];
+const writeSnapshotCacheIfNewer = (sessionId: string, next: SessionThreadExport) => {
+  try {
+    const key = `${SESSION_SNAPSHOT_CACHE_KEY_PREFIX}${sessionId}`;
+    const existingRaw = window.localStorage.getItem(key);
+    if (existingRaw) {
+      const parsed = JSON.parse(existingRaw) as { snapshot?: unknown } | null;
+      const existingCount = getSnapshotMessageCount(parsed?.snapshot);
+      const nextCount = next.messages.length;
+      if (existingCount > nextCount) {
+        return;
+      }
     }
-
-    const externalMessages = readPersistedExternalMessages(entry.message);
-    if (externalMessages.length === 0) {
-      return [];
-    }
-
-    let parentId =
-      entry.parentId && outerToInnerHead.has(entry.parentId)
-        ? outerToInnerHead.get(entry.parentId) ?? null
-        : entry.parentId;
-
-    const mapped = externalMessages.map((message) => {
-      const item = {
-        parentId,
-        message,
-      };
-      parentId = message.id;
-      return item;
-    });
-
-    const outerId = typeof entry.message.id === "string" ? entry.message.id : null;
-    const innerHeadId = externalMessages.at(-1)?.id ?? null;
-    if (outerId && innerHeadId) {
-      outerToInnerHead.set(outerId, innerHeadId);
-    }
-
-    return mapped;
-  });
-
-  return {
-    messages,
-    headId:
-      snapshot.headId && outerToInnerHead.has(snapshot.headId)
-        ? outerToInnerHead.get(snapshot.headId) ?? snapshot.headId
-        : snapshot.headId ?? null,
-  };
+    window.localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), snapshot: next }));
+  } catch {
+    // ignore cache errors
+  }
 };
 
 const toPersistedSnapshot = (snapshot: ThreadExport): SessionThreadExport => ({
   headId: snapshot.headId ?? null,
-  messages: snapshot.messages.map((entry) => {
-    const message = entry.message as Record<string, unknown>;
-    const metadata = isRecord(message.metadata) ? message.metadata : {};
-    const custom = isRecord(metadata.custom) ? metadata.custom : {};
-    const externalMessages = getExternalStoreMessages<UIMessage>(entry.message);
-
-    return {
-      parentId: entry.parentId,
-      message: {
-        ...message,
-        metadata: {
-          ...metadata,
-          custom: {
-            ...custom,
-            ...(externalMessages.length > 0
-              ? {
-                  [PERSISTED_EXTERNAL_MESSAGES_KEY]: cloneJsonValue(externalMessages),
-                }
-              : {}),
-          },
-        },
-      },
-    };
-  }),
+  messages: snapshot.messages.map((entry) => ({
+    parentId: entry.parentId,
+    message: isRecord(entry.message)
+      ? normalizeAssistantStatusForPersistence(entry.message)
+      : entry.message,
+  })),
 });
-
-const isEmptyThreadExport = (snapshot: ThreadExport) => {
-  const messages = (snapshot as { messages?: unknown }).messages;
-  return Array.isArray(messages) && messages.length === 0;
-};
 
 export function PersistedSessionRuntimeBridge() {
   const runtime = useAssistantRuntime();
@@ -261,7 +164,8 @@ export function PersistedSessionRuntimeBridge() {
     if (!runtime || !activeSessionId || !activeSessionSnapshot) return;
     let cancelled = false;
 
-    const nextSignature = JSON.stringify(toComparableSnapshot(activeSessionSnapshot));
+    const sanitizedSnapshot = sanitizePersistedSnapshot(activeSessionSnapshot);
+    const nextSignature = JSON.stringify(toComparableSnapshot(sanitizedSnapshot));
     const clearImportRetry = () => {
       if (importTimeoutRef.current !== null) {
         window.clearTimeout(importTimeoutRef.current);
@@ -284,16 +188,16 @@ export function PersistedSessionRuntimeBridge() {
       }
 
       try {
-        const runtimeSnapshot = runtime.threads.main.export();
-        const runtimeSignature = JSON.stringify(
-          toComparableSnapshot(toPersistedSnapshot(runtimeSnapshot)),
-        );
+        const currentPersisted =
+          exportExternalStateAsSnapshot(runtime.threads.main) ??
+          toPersistedSnapshot(runtime.threads.main.export());
+        const runtimeSignature = JSON.stringify(toComparableSnapshot(currentPersisted));
         const switchingSessions = importedSessionIdRef.current !== activeSessionId;
         if (runActiveRef.current && !switchingSessions) {
           scheduleImportRetry();
           return;
         }
-        const safeToHydrate = switchingSessions || isEmptyThreadExport(runtimeSnapshot);
+        const safeToHydrate = switchingSessions || currentPersisted.messages.length === 0;
 
         if (runtimeSignature === nextSignature) {
           importedSessionIdRef.current = activeSessionId;
@@ -307,16 +211,16 @@ export function PersistedSessionRuntimeBridge() {
           return;
         }
 
-        const externalState = toExternalStateSnapshot(activeSessionSnapshot);
-        if (externalState) {
-          runtime.threads.main.importExternalState(externalState);
+        if (isExternalStateSnapshot(sanitizedSnapshot)) {
+          runtime.threads.main.importExternalState(toExternalStateRepository(sanitizedSnapshot));
         } else {
-          runtime.threads.main.import(toRuntimeSnapshot(activeSessionSnapshot));
+          runtime.threads.main.import(toRuntimeSnapshot(sanitizedSnapshot));
         }
 
-        const importedSignature = JSON.stringify(
-          toComparableSnapshot(toPersistedSnapshot(runtime.threads.main.export())),
-        );
+        const importedPersisted =
+          exportExternalStateAsSnapshot(runtime.threads.main) ??
+          toPersistedSnapshot(runtime.threads.main.export());
+        const importedSignature = JSON.stringify(toComparableSnapshot(importedPersisted));
         if (importedSignature === nextSignature) {
           importedSessionIdRef.current = activeSessionId;
           lastSavedSignatureRef.current = nextSignature;
@@ -359,12 +263,17 @@ export function PersistedSessionRuntimeBridge() {
         window.clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
       }
-      const snapshot = thread.export();
-      const persistedSnapshot = toPersistedSnapshot(snapshot);
+      const persistedSnapshot =
+        exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
       const signature = JSON.stringify(toComparableSnapshot(persistedSnapshot));
+
+      // Local fallback cache: helps restore conversation state if the user closes/navigates
+      // before the server PATCH completes.
+      writeSnapshotCacheIfNewer(activeSessionId, persistedSnapshot);
+
       if (
         !allowEmptyOverride &&
-        isEmptyThreadExport(snapshot) &&
+        persistedSnapshot.messages.length === 0 &&
         lastSavedSignatureRef.current !== null &&
         signature !== lastSavedSignatureRef.current
       ) {
@@ -384,6 +293,16 @@ export function PersistedSessionRuntimeBridge() {
 
     const scheduleFlush = () => {
       markSessionPersistPending();
+
+      // Cache immediately so a fast close/reopen can restore even if the server PATCH is interrupted.
+      try {
+        const persistedSnapshot =
+          exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
+        writeSnapshotCacheIfNewer(activeSessionId, persistedSnapshot);
+      } catch {
+        // ignore cache errors
+      }
+
       if (saveTimeoutRef.current !== null) {
         window.clearTimeout(saveTimeoutRef.current);
       }
@@ -400,15 +319,21 @@ export function PersistedSessionRuntimeBridge() {
       thread.unstable_on("runStart", () => {
         runActiveRef.current = true;
         markSessionPersistPending();
+        // Persist immediately at run start so a quick close/reopen still restores the user message.
+        void flush({ allowEmptyOverride: true });
       }),
     );
     unsubscribes.push(
       thread.unstable_on("runEnd", () => {
         runActiveRef.current = false;
-        if (pendingForcePersistResolversRef.current.length === 0) {
-          return;
-        }
-        void flush().finally(resolvePendingForcePersists);
+        // Flush immediately at run end so reopening the app right after a reply
+        // still restores the latest conversation state.
+        void flush({ allowEmptyOverride: true }).finally(() => {
+          if (pendingForcePersistResolversRef.current.length === 0) {
+            return;
+          }
+          resolvePendingForcePersists();
+        });
       }),
     );
     const handleForcePersist = (event: Event) => {
@@ -425,6 +350,18 @@ export function PersistedSessionRuntimeBridge() {
     };
     window.addEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
 
+    // Best-effort persistence when the tab/app is backgrounded or closed.
+    // This addresses "messages disappeared after reopening" by using fetch keepalive on PATCH.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+      void flush({ allowEmptyOverride: true });
+    };
+    const handlePageHide = () => {
+      void flush({ allowEmptyOverride: true });
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+
     return () => {
       runActiveRef.current = false;
       resolvePendingForcePersists();
@@ -438,6 +375,8 @@ export function PersistedSessionRuntimeBridge() {
         saveTimeoutRef.current = null;
       }
       window.removeEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
       unsubscribes.forEach((unsubscribe) => {
         try {
           unsubscribe();

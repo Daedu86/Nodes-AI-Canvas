@@ -4,6 +4,7 @@ import React from "react";
 import { useSession } from "next-auth/react";
 import type { SessionArtifact, SessionContextLink } from "@/lib/session-artifacts";
 import type { SessionDocument, SessionSummary, SessionThreadExport } from "@/lib/session-documents";
+import { normalizeSessionThreadExport } from "@/lib/session-documents";
 import { hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
 type PersistedSessionsContextValue = {
@@ -32,6 +33,8 @@ type SessionsListResponse = {
 type SessionResponse = {
   session: SessionDocument;
 };
+
+const SESSION_SNAPSHOT_CACHE_KEY_PREFIX = "nodes.session-snapshot-cache.v1:";
 
 const pickSessionId = (
   sessions: SessionSummary[],
@@ -102,9 +105,35 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
 
   const loadSession = React.useCallback(async (sessionId: string) => {
     const data = await fetchJson<SessionResponse>(`/api/sessions/${sessionId}`);
-    setActiveSession(data.session);
-    writeStoredActiveSessionId(userId, data.session.id);
-    return data.session;
+    let sessionDoc = data.session;
+
+    // If the server snapshot is behind (for example, user closed the tab before PATCH completed),
+    // prefer the locally cached snapshot and sync it back in the background.
+    try {
+      const cachedRaw = localStorage.getItem(`${SESSION_SNAPSHOT_CACHE_KEY_PREFIX}${sessionId}`);
+      if (cachedRaw) {
+        const parsed = JSON.parse(cachedRaw) as { snapshot?: unknown; savedAt?: unknown };
+        const normalizedCachedSnapshot = normalizeSessionThreadExport(parsed?.snapshot);
+        if (normalizedCachedSnapshot.messages.length > (sessionDoc.snapshot?.messages?.length ?? 0)) {
+          sessionDoc = { ...sessionDoc, snapshot: normalizedCachedSnapshot };
+          // Best-effort sync; ignore failures since this is just a recovery path.
+          const body = JSON.stringify({ snapshot: normalizedCachedSnapshot });
+          const bodyBytes = new TextEncoder().encode(body).length;
+          void fetch(`/api/sessions/${sessionId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body,
+            keepalive: bodyBytes <= KEEPALIVE_SAFE_BODY_BYTES,
+          }).catch(() => {});
+        }
+      }
+    } catch {
+      // ignore cache errors
+    }
+
+    setActiveSession(sessionDoc);
+    writeStoredActiveSessionId(userId, sessionDoc.id);
+    return sessionDoc;
   }, [userId]);
 
   const refreshSessions = React.useCallback(async () => {
