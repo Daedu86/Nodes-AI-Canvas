@@ -76,7 +76,7 @@ const toExternalStateRepository = (
     .filter((entry) => isUiMessageLike(entry.message))
     .map((entry) => ({
       parentId: entry.parentId,
-      message: entry.message as UIMessage,
+      message: entry.message as unknown as UIMessage,
     })),
 });
 
