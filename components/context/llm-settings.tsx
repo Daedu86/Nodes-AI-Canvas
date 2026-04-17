@@ -142,6 +142,7 @@ async function persistLlmSettings(settings: LlmSettingsState) {
     headers: {
       "Content-Type": "application/json",
     },
+    keepalive: true,
     body: JSON.stringify({
       settings,
     }),
