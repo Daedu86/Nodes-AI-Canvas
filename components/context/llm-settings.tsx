@@ -43,6 +43,9 @@ type LlmSettingsContextValue = {
   addOpenRouterApiKey: (name: string, key: string) => void;
   removeOpenRouterApiKey: (id: string) => void;
   setActiveOpenRouterApiKey: (id: string) => void;
+  addOllamaApiKey: (name: string, key: string) => void;
+  removeOllamaApiKey: (id: string) => void;
+  setActiveOllamaApiKey: (id: string) => void;
   addOpenRouterCustomModel: (modelId: string) => void;
   deleteOpenRouterBuiltinModel: (modelId: string) => void;
   removeOpenRouterCustomModel: (modelId: string) => void;
@@ -58,11 +61,11 @@ const LlmSettingsContext = React.createContext<LlmSettingsContextValue | null>(n
 const LEGACY_STORAGE_KEY_PREFIX = "nodes.llm-settings.v1:";
 const SAVE_DEBOUNCE_MS = 450;
 
-const createOpenRouterApiKeyId = () => {
+const createProviderApiKeyId = (prefix: string) => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
-  return `or-key-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 };
 
 const readLegacySettings = (storageKey: string) => {
@@ -371,7 +374,7 @@ export function LlmSettingsProvider({
                 entry.id === nextActiveId ? { ...entry, key: value } : entry,
               );
             } else {
-              const newId = createOpenRouterApiKeyId();
+              const newId = createProviderApiKeyId("or-key");
               nextKeys = [
                 ...currentKeys,
                 {
@@ -431,7 +434,7 @@ export function LlmSettingsProvider({
         ...currentKeys,
         {
           createdAt: new Date().toISOString(),
-          id: createOpenRouterApiKeyId(),
+          id: createProviderApiKeyId("or-key"),
           key: trimmedKey,
           name: trimmedName || `OpenRouter key ${currentKeys.length + 1}`,
         },
@@ -490,6 +493,85 @@ export function LlmSettingsProvider({
           ...current.providers,
           openrouter: {
             ...current.providers.openrouter,
+            activeApiKeyId: id,
+            apiKey: active.key,
+            clearApiKey: false,
+            hasApiKey: true,
+          },
+        },
+      };
+    });
+  }, []);
+
+  const addOllamaApiKey = React.useCallback((name: string, key: string) => {
+    const trimmedKey = key.trim();
+    if (!trimmedKey) return;
+    const trimmedName = name.trim();
+    setSettings((current) => {
+      const currentKeys = current.providers.ollama.apiKeys ?? [];
+      const next = [
+        ...currentKeys,
+        {
+          createdAt: new Date().toISOString(),
+          id: createProviderApiKeyId("ollama-key"),
+          key: trimmedKey,
+          name: trimmedName || `Ollama key ${currentKeys.length + 1}`,
+        },
+      ];
+      const activeApiKeyId = current.providers.ollama.activeApiKeyId ?? next[0]?.id ?? null;
+      const activeKey =
+        next.find((entry) => entry.id === activeApiKeyId)?.key ?? next[0]?.key ?? "";
+      return {
+        providers: {
+          ...current.providers,
+          ollama: {
+            ...current.providers.ollama,
+            activeApiKeyId,
+            apiKey: activeKey,
+            apiKeys: next,
+            clearApiKey: false,
+            hasApiKey: true,
+          },
+        },
+      };
+    });
+  }, []);
+
+  const removeOllamaApiKey = React.useCallback((id: string) => {
+    setSettings((current) => {
+      const next = (current.providers.ollama.apiKeys ?? []).filter((entry) => entry.id !== id);
+      const activeApiKeyId =
+        current.providers.ollama.activeApiKeyId === id
+          ? (next[0]?.id ?? null)
+          : current.providers.ollama.activeApiKeyId ?? (next[0]?.id ?? null);
+      const activeKey =
+        next.find((entry) => entry.id === activeApiKeyId)?.key ?? next[0]?.key ?? "";
+      return {
+        providers: {
+          ...current.providers,
+          ollama: {
+            ...current.providers.ollama,
+            activeApiKeyId,
+            apiKey: activeKey,
+            apiKeys: next,
+            clearApiKey: next.length === 0,
+            hasApiKey: next.length > 0,
+          },
+        },
+      };
+    });
+  }, []);
+
+  const setActiveOllamaApiKey = React.useCallback((id: string) => {
+    setSettings((current) => {
+      const keys = current.providers.ollama.apiKeys ?? [];
+      const active = keys.find((entry) => entry.id === id);
+      if (!active) return current;
+      return {
+        providers: {
+          ...current.providers,
+          ollama: {
+            ...current.providers.ollama,
             activeApiKeyId: id,
             apiKey: active.key,
             clearApiKey: false,
@@ -663,6 +745,9 @@ export function LlmSettingsProvider({
       addOpenRouterApiKey,
       removeOpenRouterApiKey,
       setActiveOpenRouterApiKey,
+      addOllamaApiKey,
+      removeOllamaApiKey,
+      setActiveOllamaApiKey,
       addOpenRouterCustomModel,
       deleteOpenRouterBuiltinModel,
       removeOpenRouterCustomModel,
@@ -683,6 +768,9 @@ export function LlmSettingsProvider({
       addOpenRouterApiKey,
       removeOpenRouterApiKey,
       setActiveOpenRouterApiKey,
+      addOllamaApiKey,
+      removeOllamaApiKey,
+      setActiveOllamaApiKey,
       addOpenRouterCustomModel,
       deleteOpenRouterBuiltinModel,
       removeOpenRouterCustomModel,

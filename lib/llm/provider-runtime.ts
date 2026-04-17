@@ -13,7 +13,7 @@ import { validateOllamaBaseUrl } from "@/lib/server/ollama-base-url";
 import { type LlmRequestOverrides } from "@/lib/llm/request-overrides";
 
 export type MissingProviderCredential = {
-  code: "missing_openrouter_key";
+  code: "missing_ollama_key" | "missing_openrouter_key";
   message: string;
   status: number;
 };
@@ -53,12 +53,27 @@ function createOverridesFromSettings(
       ? openrouterKeys.find((entry) => entry.id === configuredActiveKeyId)
       : undefined) ?? openrouterKeys[0];
 
+  const ollamaKeys = settings?.providers.ollama.apiKeys ?? [];
+  const configuredOllamaActiveKeyId = settings?.providers.ollama.activeApiKeyId ?? null;
+  const activeOllamaEntry =
+    (configuredOllamaActiveKeyId
+      ? ollamaKeys.find((entry) => entry.id === configuredOllamaActiveKeyId)
+      : undefined) ?? ollamaKeys[0];
+
   return {
     ollamaBaseUrl: validatedOllamaBaseUrl?.ok ? validatedOllamaBaseUrl.normalized : undefined,
+    ollamaApiKey:
+      normalizeValue(activeOllamaEntry?.key) ?? normalizeValue(settings?.providers.ollama.apiKey),
     openrouterApiKey:
       normalizeValue(activeEntry?.key) ?? normalizeValue(settings?.providers.openrouter.apiKey),
   };
 }
+
+const isOllamaCloudEndpoint = (baseUrl?: string) => {
+  const value = normalizeValue(baseUrl);
+  if (!value) return false;
+  return value.includes("ollama.com");
+};
 
 export async function getUserModelOverrides(userId: string) {
   const settings = await getLlmSettings(userId);
@@ -85,6 +100,14 @@ export function getMissingProviderCredential(
         status: 503,
       };
     case "ollama":
+      if (isOllamaCloudEndpoint(overrides.ollamaBaseUrl) && !normalizeValue(overrides.ollamaApiKey)) {
+        return {
+          code: "missing_ollama_key",
+          message: "Ollama cloud endpoint needs your API key. Add one in Profile > LLM Models.",
+          status: 401,
+        };
+      }
+      return null;
     default:
       return null;
   }
@@ -110,10 +133,14 @@ export function createLanguageModel(
     case "ollama":
     default: {
       const baseURL = normalizeValue(overrides.ollamaBaseUrl) ?? OLLAMA_API_URL;
-      if (baseURL === OLLAMA_API_URL) {
+      const apiKey = normalizeValue(overrides.ollamaApiKey);
+      if (baseURL === OLLAMA_API_URL && !apiKey) {
         return ollama(config.modelId);
       }
-      return createOllama({ baseURL })(config.modelId);
+      return createOllama({
+        baseURL,
+        headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+      })(config.modelId);
     }
   }
 }

@@ -269,6 +269,106 @@ function OpenRouterKeyCard() {
   );
 }
 
+function OllamaKeyCard() {
+  const { addOllamaApiKey, removeOllamaApiKey, setActiveOllamaApiKey, settings } = useLlmSettings();
+  const ollama = settings.providers.ollama;
+  const definition = getProviderDefinition("ollama");
+  const [draftName, setDraftName] = React.useState("");
+  const [draftKey, setDraftKey] = React.useState("");
+
+  const keys = ollama.apiKeys ?? [];
+  const activeKeyId = ollama.activeApiKeyId ?? keys[0]?.id ?? null;
+  const statusLabel = keys.length > 0 ? `${keys.length} saved` : "Optional";
+  const statusTone = keys.length > 0
+    ? "border-emerald-400/30 bg-emerald-500/10 text-foreground"
+    : "border-border/80 bg-background text-muted-foreground";
+
+  return (
+    <Card className="lg:col-span-2">
+      <ProviderHeader
+        icon={<KeyRound className="size-4" />}
+        provider={`${definition.label} API key`}
+        subtitle="Only needed for protected Ollama endpoints (e.g. ollama.com/api or private gateways)."
+        action={(
+          <span
+            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-medium ${statusTone}`}
+          >
+            {keys.length > 0 ? <Check className="size-3.5" /> : null}
+            {statusLabel}
+          </span>
+        )}
+      />
+
+      <div className="mt-5 space-y-3">
+        <div className="grid gap-2 md:grid-cols-[minmax(0,0.45fr)_minmax(0,1fr)_auto]">
+          <Input
+            value={draftName}
+            placeholder="Key name (optional)"
+            onChange={(event) => setDraftName(event.currentTarget.value)}
+          />
+          <Input
+            type="password"
+            value={draftKey}
+            placeholder="Paste Ollama API key"
+            onChange={(event) => setDraftKey(event.currentTarget.value)}
+          />
+          <Button
+            type="button"
+            onClick={() => {
+              const trimmed = draftKey.trim();
+              if (!trimmed) return;
+              addOllamaApiKey(draftName, trimmed);
+              setDraftName("");
+              setDraftKey("");
+            }}
+          >
+            Add key
+          </Button>
+        </div>
+
+        {keys.length > 0 ? (
+          <div className="space-y-2">
+            {keys.map((entry) => {
+              const isActive = entry.id === activeKeyId;
+              return (
+                <div
+                  key={entry.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-background/60 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">{entry.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isActive ? "Active key for Ollama requests" : "Saved key"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={isActive ? "default" : "outline"}
+                      onClick={() => setActiveOllamaApiKey(entry.id)}
+                    >
+                      {isActive ? "Active" : "Set active"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => removeOllamaApiKey(entry.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
 function OpenRouterModelsCard() {
   const {
     addOpenRouterCustomModel,
@@ -510,7 +610,12 @@ export function LlmModelsWorkspace() {
                 </Button>
               </div>
 
-              {tab === "keys" ? <OpenRouterKeyCard /> : <OpenRouterModelsCard />}
+              {tab === "keys" ? (
+                <div className="grid gap-4">
+                  <OpenRouterKeyCard />
+                  <OllamaKeyCard />
+                </div>
+              ) : <OpenRouterModelsCard />}
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <OllamaCard />

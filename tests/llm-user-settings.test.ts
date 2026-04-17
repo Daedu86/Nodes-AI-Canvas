@@ -78,4 +78,50 @@ describe("llm user settings", () => {
     );
     expect(normalized.providers.openrouter.enabledModels).toEqual(["openrouter/free"]);
   });
+
+  it("preserves stored Ollama key material when incoming payload is masked", () => {
+    const merged = mergeLlmSettingsState(
+      {
+        providers: {
+          ollama: {
+            activeApiKeyId: "ok1",
+            apiKey: "ollama-secret",
+            apiKeys: [
+              {
+                createdAt: "2026-01-01T00:00:00.000Z",
+                id: "ok1",
+                key: "ollama-secret",
+                name: "Primary",
+              },
+            ],
+            baseUrl: "https://ollama.com/api",
+            enabled: true,
+            models: ["gemma3:4b"],
+          },
+        },
+      },
+      {
+        providers: {
+          ollama: {
+            activeApiKeyId: "ok1",
+            apiKeys: [
+              {
+                hasKey: true,
+                id: "ok1",
+                key: "",
+                name: "Primary",
+              },
+            ],
+            baseUrl: "https://ollama.com/api",
+            enabled: true,
+            models: ["gemma3:4b"],
+          },
+        },
+      },
+    );
+
+    expect(merged.providers.ollama.apiKeys?.[0]?.key).toBe("ollama-secret");
+    expect(merged.providers.ollama.apiKey).toBe("ollama-secret");
+    expect(merged.providers.ollama.activeApiKeyId).toBe("ok1");
+  });
 });

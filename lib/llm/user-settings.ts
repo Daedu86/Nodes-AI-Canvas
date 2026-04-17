@@ -43,8 +43,19 @@ export function normalizeOllamaBaseUrl(input: string): OllamaBaseUrlNormalizatio
 }
 
 export type OllamaProviderSettings = {
+  activeApiKeyId?: string | null;
+  apiKey?: string;
+  apiKeys?: Array<{
+    createdAt?: string;
+    hasKey?: boolean;
+    id: string;
+    key: string;
+    name: string;
+  }>;
   baseUrl: string;
+  clearApiKey?: boolean;
   enabled: boolean;
+  hasApiKey?: boolean;
   models: string[];
 };
 
@@ -75,8 +86,13 @@ export type LlmSettingsState = {
 export const DEFAULT_LLM_SETTINGS_STATE: LlmSettingsState = {
   providers: {
     ollama: {
+      activeApiKeyId: null,
+      apiKey: "",
+      apiKeys: [],
       baseUrl: "http://localhost:11434/api",
+      clearApiKey: false,
       enabled: true,
+      hasApiKey: false,
       models: DEFAULT_OLLAMA_MODELS,
     },
     openrouter: {
@@ -96,6 +112,9 @@ export const cloneDefaultLlmSettingsState = (): LlmSettingsState => ({
   providers: {
     ollama: {
       ...DEFAULT_LLM_SETTINGS_STATE.providers.ollama,
+      activeApiKeyId: DEFAULT_LLM_SETTINGS_STATE.providers.ollama.activeApiKeyId ?? null,
+      apiKey: DEFAULT_LLM_SETTINGS_STATE.providers.ollama.apiKey ?? "",
+      apiKeys: [...(DEFAULT_LLM_SETTINGS_STATE.providers.ollama.apiKeys ?? [])],
       models: [...DEFAULT_LLM_SETTINGS_STATE.providers.ollama.models],
     },
     openrouter: {
@@ -150,6 +169,41 @@ const normalizeOpenRouterApiKeys = (value: unknown) => {
 };
 
 const getActiveApiKeyFromList = (provider: OpenRouterProviderSettings) => {
+  const keys = provider.apiKeys ?? [];
+  if (keys.length === 0) return undefined;
+  if (provider.activeApiKeyId) {
+    const active = keys.find((entry) => entry.id === provider.activeApiKeyId);
+    if (active?.key?.trim()) return active.key;
+  }
+  return keys.find((entry) => entry.key.trim().length > 0)?.key;
+};
+
+const normalizeOllamaApiKeys = (value: unknown) => {
+  const rawEntries = Array.isArray(value) ? value : [];
+  return rawEntries
+    .map((entry): NonNullable<OllamaProviderSettings["apiKeys"]>[number] | null => {
+      if (!entry || typeof entry !== "object") return null;
+      const record = entry as Record<string, unknown>;
+      const id = typeof record.id === "string" ? record.id.trim() : "";
+      const name = typeof record.name === "string" ? record.name.trim() : "";
+      const key = typeof record.key === "string" ? record.key : "";
+      if (!id) return null;
+      return {
+        id,
+        name: name || "Ollama key",
+        key,
+        hasKey: record.hasKey === true || key.trim().length > 0,
+        createdAt:
+          typeof record.createdAt === "string" && record.createdAt.trim().length > 0
+            ? record.createdAt
+            : undefined,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+    .slice(0, 20);
+};
+
+const getActiveOllamaApiKeyFromList = (provider: OllamaProviderSettings) => {
   const keys = provider.apiKeys ?? [];
   if (keys.length === 0) return undefined;
   if (provider.activeApiKeyId) {
@@ -242,16 +296,62 @@ export const normalizeLlmSettingsState = (
   }
 
   base.providers.ollama = {
+    activeApiKeyId:
+      typeof providers.ollama?.activeApiKeyId === "string" &&
+      providers.ollama.activeApiKeyId.trim().length > 0
+        ? providers.ollama.activeApiKeyId.trim()
+        : null,
+    apiKey: typeof providers.ollama?.apiKey === "string" ? providers.ollama.apiKey : "",
+    apiKeys: normalizeOllamaApiKeys(providers.ollama?.apiKeys),
     baseUrl:
       typeof providers.ollama?.baseUrl === "string"
         ? providers.ollama.baseUrl
         : base.providers.ollama.baseUrl,
+    clearApiKey: providers.ollama?.clearApiKey === true,
     enabled:
       providers.ollama?.enabled !== undefined
         ? providers.ollama.enabled
         : base.providers.ollama.enabled,
+    hasApiKey:
+      providers.ollama?.hasApiKey !== undefined
+        ? providers.ollama.hasApiKey
+        : typeof providers.ollama?.apiKey === "string" &&
+            providers.ollama.apiKey.trim().length > 0,
     models: normalizeEditableModelList(providers.ollama?.models ?? base.providers.ollama.models),
   };
+
+  // Backward compatibility: when only a legacy single ollama apiKey exists, synthesize one key entry.
+  if ((base.providers.ollama.apiKeys?.length ?? 0) === 0) {
+    const legacyKey = base.providers.ollama.apiKey?.trim();
+    if (legacyKey) {
+      const synthesizedId = "legacy-default";
+      base.providers.ollama.apiKeys = [
+        {
+          id: synthesizedId,
+          name: "Default key",
+          key: base.providers.ollama.apiKey ?? "",
+          hasKey: true,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      base.providers.ollama.activeApiKeyId = synthesizedId;
+    }
+  }
+
+  if (base.providers.ollama.apiKeys && base.providers.ollama.apiKeys.length > 0) {
+    const hasActive = base.providers.ollama.activeApiKeyId
+      ? base.providers.ollama.apiKeys.some(
+          (entry) => entry.id === base.providers.ollama.activeApiKeyId,
+        )
+      : false;
+    if (!hasActive) {
+      base.providers.ollama.activeApiKeyId = base.providers.ollama.apiKeys[0]!.id;
+    }
+    const activeKey = getActiveOllamaApiKeyFromList(base.providers.ollama);
+    if (activeKey) {
+      base.providers.ollama.apiKey = activeKey;
+    }
+  }
 
   const maybeValidated = normalizeOllamaBaseUrl(base.providers.ollama.baseUrl);
   if (maybeValidated.ok) {
@@ -283,6 +383,20 @@ const stripOpenRouterMetadata = (
   enabledModels: [...provider.enabledModels],
 });
 
+const stripOllamaMetadata = (provider: OllamaProviderSettings): OllamaProviderSettings => ({
+  activeApiKeyId: provider.activeApiKeyId ?? null,
+  apiKey: provider.apiKey ?? "",
+  apiKeys: (provider.apiKeys ?? []).map((entry) => ({
+    createdAt: entry.createdAt,
+    id: entry.id,
+    key: entry.key,
+    name: entry.name,
+  })),
+  baseUrl: provider.baseUrl,
+  enabled: provider.enabled,
+  models: [...provider.models],
+});
+
 export const stripLlmSettingsCredentialMetadata = (
   input: Partial<LlmSettingsState> | null | undefined,
 ): LlmSettingsState => {
@@ -290,9 +404,7 @@ export const stripLlmSettingsCredentialMetadata = (
   return {
     providers: {
       ollama: {
-        baseUrl: normalized.providers.ollama.baseUrl,
-        enabled: normalized.providers.ollama.enabled,
-        models: [...normalized.providers.ollama.models],
+        ...stripOllamaMetadata(normalized.providers.ollama),
       },
       openrouter: stripOpenRouterMetadata(normalized.providers.openrouter),
     },
@@ -306,7 +418,19 @@ export const maskLlmSettingsState = (
   return {
     providers: {
       ollama: {
-        ...normalized.providers.ollama,
+        ...stripOllamaMetadata(normalized.providers.ollama),
+        apiKey: "",
+        apiKeys: (normalized.providers.ollama.apiKeys ?? []).map((entry) => ({
+          createdAt: entry.createdAt,
+          hasKey: entry.key.trim().length > 0,
+          id: entry.id,
+          key: "",
+          name: entry.name,
+        })),
+        clearApiKey: false,
+        hasApiKey:
+          (normalized.providers.ollama.apiKeys ?? []).some((entry) => entry.key.trim().length > 0) ||
+          (normalized.providers.ollama.apiKey ?? "").trim().length > 0,
       },
       openrouter: {
         ...normalized.providers.openrouter,
@@ -387,6 +511,52 @@ const resolveMergedApiKeys = (
   return current.apiKeys ?? [];
 };
 
+const resolveMergedOllamaApiKeys = (
+  current: OllamaProviderSettings,
+  incoming: OllamaProviderSettings,
+  incomingRaw: Partial<OllamaProviderSettings> | undefined,
+) => {
+  const currentById = new Map((current.apiKeys ?? []).map((entry) => [entry.id, entry]));
+  const incomingKeys = incoming.apiKeys ?? [];
+  const now = new Date().toISOString();
+
+  const mergedFromIncoming = incomingKeys
+    .map((entry, index) => {
+      const existing = currentById.get(entry.id);
+      const incomingRawEntry = Array.isArray(incomingRaw?.apiKeys)
+        ? incomingRaw?.apiKeys.find((item) => item && typeof item === "object" && item.id === entry.id)
+        : undefined;
+      const incomingKey = entry.key.trim();
+      const shouldPreserveExisting =
+        incomingKey.length === 0 &&
+        existing &&
+        ((incomingRawEntry as { hasKey?: boolean } | undefined)?.hasKey === true ||
+          incomingRawEntry !== undefined);
+
+      const key = incomingKey.length > 0 ? entry.key : shouldPreserveExisting ? existing.key : "";
+      if (key.trim().length === 0) {
+        return null;
+      }
+      return {
+        createdAt: existing?.createdAt ?? entry.createdAt ?? now,
+        id: entry.id,
+        key,
+        name: entry.name.trim() || existing?.name || `Ollama key ${index + 1}`,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  if (mergedFromIncoming.length > 0) {
+    return mergedFromIncoming;
+  }
+
+  if (incomingRaw && Object.prototype.hasOwnProperty.call(incomingRaw, "apiKeys")) {
+    return [];
+  }
+
+  return current.apiKeys ?? [];
+};
+
 export const mergeLlmSettingsState = (
   current: Partial<LlmSettingsState> | null | undefined,
   incoming: Partial<LlmSettingsState> | null | undefined,
@@ -396,7 +566,48 @@ export const mergeLlmSettingsState = (
   const incomingNormalized = normalizeLlmSettingsState(incoming);
   const hasIncomingProvider = <T extends keyof LlmSettingsState["providers"]>(provider: T) =>
     nextProviders?.[provider] !== undefined;
+  const clearOllamaApiKey = nextProviders?.ollama?.clearApiKey === true;
   const clearOpenRouterApiKey = nextProviders?.openrouter?.clearApiKey === true;
+
+  const incomingOllamaRaw = nextProviders?.ollama;
+  const mergedOllamaApiKeys = clearOllamaApiKey
+    ? []
+    : hasIncomingProvider("ollama")
+      ? resolveMergedOllamaApiKeys(
+          currentNormalized.providers.ollama,
+          incomingNormalized.providers.ollama,
+          incomingOllamaRaw,
+        )
+      : (currentNormalized.providers.ollama.apiKeys ?? []);
+
+  const mergedOllamaActiveApiKeyId = clearOllamaApiKey
+    ? null
+    : hasIncomingProvider("ollama")
+      ? (() => {
+          const candidate =
+            typeof incomingOllamaRaw?.activeApiKeyId === "string"
+              ? incomingOllamaRaw.activeApiKeyId.trim()
+              : "";
+          if (candidate && mergedOllamaApiKeys.some((entry) => entry.id === candidate)) {
+            return candidate;
+          }
+          const currentActive = currentNormalized.providers.ollama.activeApiKeyId ?? "";
+          if (currentActive && mergedOllamaApiKeys.some((entry) => entry.id === currentActive)) {
+            return currentActive;
+          }
+          return mergedOllamaApiKeys[0]?.id ?? null;
+        })()
+      : (currentNormalized.providers.ollama.activeApiKeyId ?? mergedOllamaApiKeys[0]?.id ?? null);
+
+  const mergedOllamaSingleApiKey = clearOllamaApiKey
+    ? ""
+    : mergedOllamaApiKeys.find((entry) => entry.id === mergedOllamaActiveApiKeyId)?.key ??
+      mergedOllamaApiKeys[0]?.key ??
+      resolveMergedApiKey(
+        currentNormalized.providers.ollama.apiKey ?? "",
+        nextProviders?.ollama?.apiKey,
+        nextProviders?.ollama?.clearApiKey,
+      );
 
   const incomingOpenRouterRaw = nextProviders?.openrouter;
   const mergedApiKeys = clearOpenRouterApiKey
@@ -439,12 +650,16 @@ export const mergeLlmSettingsState = (
   return stripLlmSettingsCredentialMetadata({
     providers: {
       ollama: {
+        activeApiKeyId: mergedOllamaActiveApiKeyId,
+        apiKey: mergedOllamaSingleApiKey,
+        apiKeys: mergedOllamaApiKeys,
         baseUrl: hasIncomingProvider("ollama")
           ? incomingNormalized.providers.ollama.baseUrl
           : currentNormalized.providers.ollama.baseUrl,
         enabled: hasIncomingProvider("ollama")
           ? incomingNormalized.providers.ollama.enabled
           : currentNormalized.providers.ollama.enabled,
+        hasApiKey: mergedOllamaSingleApiKey.trim().length > 0 || mergedOllamaApiKeys.length > 0,
         models: hasIncomingProvider("ollama")
           ? incomingNormalized.providers.ollama.models
           : currentNormalized.providers.ollama.models,

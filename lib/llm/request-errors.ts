@@ -9,6 +9,7 @@ export const MODEL_FALLBACK_HEADER = "x-nodes-model-fallback";
 export type RequestErrorCode =
   | "chat_concurrency_limited"
   | "chat_quota_exceeded"
+  | "missing_ollama_key"
   | "missing_openrouter_key"
   | "model_unavailable"
   | "provider_rate_limited"
@@ -189,6 +190,9 @@ export function getRequestErrorMessageFromResponse(response: Pick<Response, "sta
   if (errorCode === "missing_openrouter_key") {
     return "OpenRouter needs an API key in Profile > LLM Models.";
   }
+  if (errorCode === "missing_ollama_key") {
+    return "Ollama cloud needs an API key in Profile > LLM Models.";
+  }
   if (explicit) return explicit;
 
   if (response.status === 400) {
@@ -250,7 +254,8 @@ export function getRequestErrorMessageFromThrowable(error: unknown) {
       lower.includes("timed out") ||
       lower.includes("temporarily unavailable") ||
       lower.includes("backend") ||
-      trimmed.startsWith("OpenRouter needs an API key");
+      trimmed.startsWith("OpenRouter needs an API key") ||
+      trimmed.startsWith("Ollama cloud needs an API key");
     if (isSafe && trimmed.length <= 240) {
       return trimmed;
     }
