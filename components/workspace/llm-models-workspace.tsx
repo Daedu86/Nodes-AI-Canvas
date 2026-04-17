@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Bot, Server, Sparkles } from "lucide-react";
+import { ArrowLeft, Bot, Plus, Server, Sparkles, X } from "lucide-react";
 import React from "react";
 import { useLlmSettings } from "@/components/context/llm-settings";
 import { useWorkspaceSurface } from "@/components/context/workspace-surface";
@@ -132,12 +132,32 @@ function OllamaCard() {
 }
 
 function OpenRouterCard() {
-  const { clearProviderApiKey, policy, settings, setProviderApiKey, toggleOpenRouterModel } =
-    useLlmSettings();
+  const {
+    addOpenRouterCustomModel,
+    clearProviderApiKey,
+    policy,
+    removeOpenRouterCustomModel,
+    settings,
+    setProviderApiKey,
+    toggleOpenRouterModel,
+  } = useLlmSettings();
   const openrouter = settings.providers.openrouter;
   const requireUserKey = policy.openrouter.requireUserKey;
   const hasDeploymentKey = policy.openrouter.hasDeploymentKey;
   const definition = getProviderDefinition("openrouter");
+  const [customDraft, setCustomDraft] = React.useState("");
+
+  const addFromDraft = React.useCallback(() => {
+    const entries = customDraft
+      .split(/[\n,]+/g)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    if (entries.length === 0) return;
+    for (const entry of entries) {
+      addOpenRouterCustomModel(entry);
+    }
+    setCustomDraft("");
+  }, [addOpenRouterCustomModel, customDraft]);
 
   return (
     <Card className="lg:col-span-2">
@@ -211,6 +231,66 @@ function OpenRouterCard() {
             })}
           </div>
         </div>
+      </div>
+
+      <div className="mt-5 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Custom OpenRouter models
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Add any OpenRouter model id (paid or free). Billing is tied to your own API key.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Input
+            value={customDraft}
+            placeholder="e.g. anthropic/claude-3.5-sonnet"
+            onChange={(event) => setCustomDraft(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              addFromDraft();
+            }}
+            className="min-w-72"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={addFromDraft}
+          >
+            <Plus className="size-4" />
+            Add model
+          </Button>
+        </div>
+
+        {(openrouter.customModels ?? []).length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {(openrouter.customModels ?? []).map((modelId) => (
+              <span
+                key={modelId}
+                className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-background/85 px-3 py-1.5 text-xs font-medium text-foreground"
+              >
+                {modelId}
+                <button
+                  type="button"
+                  className="ml-1 inline-flex size-5 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  aria-label={`Remove ${modelId}`}
+                  onClick={() => removeOpenRouterCustomModel(modelId)}
+                >
+                  <X className="size-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No custom models yet. Add one to make it appear in the top model selector.
+          </p>
+        )}
       </div>
     </Card>
   );

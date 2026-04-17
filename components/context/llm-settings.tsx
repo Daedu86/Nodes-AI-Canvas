@@ -40,6 +40,8 @@ type LlmSettingsContextValue = {
   };
   clearProviderApiKey: (provider: "openrouter") => void;
   setProviderApiKey: (provider: "openrouter", value: string) => void;
+  addOpenRouterCustomModel: (modelId: string) => void;
+  removeOpenRouterCustomModel: (modelId: string) => void;
   setProviderEnabled: (provider: Exclude<LlmProviderId, "openrouter">, value: boolean) => void;
   setProviderModels: (provider: Exclude<LlmProviderId, "openrouter">, value: string) => void;
   setProviderValue: (provider: "ollama", field: "baseUrl", value: string) => void;
@@ -79,6 +81,12 @@ const buildAvailableModelOptions = (settings: LlmSettingsState) => {
         option.provider === "openrouter" && enabledOpenRouterIds.has(option.modelId),
     ),
   );
+
+  if ((settings.providers.openrouter.customModels ?? []).length > 0) {
+    options.push(
+      ...createDynamicModelOptions("openrouter", settings.providers.openrouter.customModels ?? []),
+    );
+  }
 
   if (settings.providers.ollama.enabled) {
     options.push(...createDynamicModelOptions("ollama", settings.providers.ollama.models));
@@ -385,6 +393,38 @@ export function LlmSettingsProvider({
     [],
   );
 
+  const addOpenRouterCustomModel = React.useCallback((modelId: string) => {
+    const trimmed = modelId.trim();
+    if (!trimmed) return;
+    setSettings((current) => ({
+      providers: {
+        ...current.providers,
+        openrouter: {
+          ...current.providers.openrouter,
+          customModels: [
+            ...new Set([...(current.providers.openrouter.customModels ?? []), trimmed]),
+          ],
+        },
+      },
+    }));
+  }, []);
+
+  const removeOpenRouterCustomModel = React.useCallback((modelId: string) => {
+    const trimmed = modelId.trim();
+    if (!trimmed) return;
+    setSettings((current) => ({
+      providers: {
+        ...current.providers,
+        openrouter: {
+          ...current.providers.openrouter,
+          customModels: (current.providers.openrouter.customModels ?? []).filter(
+            (entry) => entry !== trimmed,
+          ),
+        },
+      },
+    }));
+  }, []);
+
   const setProviderModels = React.useCallback(
     (provider: Exclude<LlmProviderId, "openrouter">, value: string) => {
       const nextModels = value
@@ -455,6 +495,8 @@ export function LlmSettingsProvider({
       policy,
       clearProviderApiKey,
       setProviderApiKey,
+      addOpenRouterCustomModel,
+      removeOpenRouterCustomModel,
       setProviderEnabled,
       setProviderModels,
       setProviderValue,
@@ -468,6 +510,8 @@ export function LlmSettingsProvider({
       policy,
       clearProviderApiKey,
       setProviderApiKey,
+      addOpenRouterCustomModel,
+      removeOpenRouterCustomModel,
       setProviderEnabled,
       setProviderModels,
       setProviderValue,

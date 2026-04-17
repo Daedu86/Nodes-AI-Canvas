@@ -51,6 +51,7 @@ export type OllamaProviderSettings = {
 export type OpenRouterProviderSettings = {
   apiKey: string;
   clearApiKey?: boolean;
+  customModels?: string[];
   enabledModels: string[];
   hasApiKey?: boolean;
 };
@@ -72,6 +73,7 @@ export const DEFAULT_LLM_SETTINGS_STATE: LlmSettingsState = {
     openrouter: {
       apiKey: "",
       clearApiKey: false,
+      customModels: [],
       enabledModels: OPENROUTER_FREE_MODEL_OPTIONS.map((option) => option.modelId),
       hasApiKey: false,
     },
@@ -86,10 +88,26 @@ export const cloneDefaultLlmSettingsState = (): LlmSettingsState => ({
     },
     openrouter: {
       ...DEFAULT_LLM_SETTINGS_STATE.providers.openrouter,
+      customModels: [...(DEFAULT_LLM_SETTINGS_STATE.providers.openrouter.customModels ?? [])],
       enabledModels: [...DEFAULT_LLM_SETTINGS_STATE.providers.openrouter.enabledModels],
     },
   },
 });
+
+const normalizeOpenRouterCustomModels = (value: unknown) => {
+  const entries = normalizeEditableModelList(
+    Array.isArray(value) ? (value as string[]) : typeof value === "string" ? value : [],
+  );
+
+  // Keep it simple but safe: trim/unique already handled, now enforce a reasonable size and shape.
+  return entries
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && entry.length <= 120)
+    .filter((entry) => !/\s/.test(entry))
+    // Model ids are typically `org/model[:variant]` or `openrouter/free`.
+    .filter((entry) => /^[A-Za-z0-9._\-/:]+$/.test(entry))
+    .slice(0, 50);
+};
 
 export const normalizeLlmSettingsState = (
   input: Partial<LlmSettingsState> | null | undefined,
@@ -110,6 +128,7 @@ export const normalizeLlmSettingsState = (
     apiKey:
       typeof providers.openrouter?.apiKey === "string" ? providers.openrouter.apiKey : "",
     clearApiKey: providers.openrouter?.clearApiKey === true,
+    customModels: normalizeOpenRouterCustomModels(providers.openrouter?.customModels),
     enabledModels:
       openrouterModels.length > 0 ? openrouterModels : base.providers.openrouter.enabledModels,
     hasApiKey:
@@ -149,6 +168,7 @@ const stripOpenRouterMetadata = (
   provider: OpenRouterProviderSettings,
 ): OpenRouterProviderSettings => ({
   apiKey: provider.apiKey,
+  customModels: [...(provider.customModels ?? [])],
   enabledModels: [...provider.enabledModels],
 });
 
@@ -228,6 +248,9 @@ export const mergeLlmSettingsState = (
           nextProviders?.openrouter?.apiKey,
           nextProviders?.openrouter?.clearApiKey,
         ),
+        customModels: hasIncomingProvider("openrouter")
+          ? incomingNormalized.providers.openrouter.customModels
+          : currentNormalized.providers.openrouter.customModels,
         enabledModels: hasIncomingProvider("openrouter")
           ? incomingNormalized.providers.openrouter.enabledModels
           : currentNormalized.providers.openrouter.enabledModels,

@@ -33,7 +33,11 @@ describe("/api/llm/settings", () => {
     getLlmSettingsMock.mockResolvedValue({
       providers: {
         ollama: { baseUrl: "http://localhost:11434/api", enabled: true, models: ["gemma3:4b"] },
-        openrouter: { apiKey: "sk-openrouter", enabledModels: ["openrouter/free"] },
+        openrouter: {
+          apiKey: "sk-openrouter",
+          enabledModels: ["openrouter/free"],
+          customModels: ["anthropic/claude-3.5-sonnet"],
+        },
       },
     });
 
@@ -48,6 +52,7 @@ describe("/api/llm/settings", () => {
             apiKey: "",
             hasApiKey: true,
             enabledModels: ["openrouter/free"],
+            customModels: ["anthropic/claude-3.5-sonnet"],
           }),
         }),
       }),
@@ -64,7 +69,11 @@ describe("/api/llm/settings", () => {
     getLlmSettingsMock.mockResolvedValue({
       providers: {
         ollama: { baseUrl: "http://localhost:11434/api", enabled: true, models: ["gemma3:4b"] },
-        openrouter: { apiKey: "sk-openrouter", enabledModels: ["openrouter/free"] },
+        openrouter: {
+          apiKey: "sk-openrouter",
+          enabledModels: ["openrouter/free"],
+          customModels: ["anthropic/claude-3.5-sonnet"],
+        },
       },
     });
     saveLlmSettingsMock.mockImplementation(async (_ownerId: string, settings: unknown) => settings);
@@ -79,6 +88,7 @@ describe("/api/llm/settings", () => {
                 apiKey: "",
                 hasApiKey: true,
                 enabledModels: ["openrouter/free"],
+                customModels: ["anthropic/claude-3.5-sonnet", "openai/gpt-4.1-mini"],
               },
               ollama: {
                 baseUrl: "http://localhost:11434/api",
@@ -103,6 +113,7 @@ describe("/api/llm/settings", () => {
           openrouter: expect.objectContaining({
             apiKey: "sk-openrouter",
             enabledModels: ["openrouter/free"],
+            customModels: ["anthropic/claude-3.5-sonnet", "openai/gpt-4.1-mini"],
           }),
         }),
       }),
@@ -113,6 +124,7 @@ describe("/api/llm/settings", () => {
           openrouter: expect.objectContaining({
             apiKey: "",
             hasApiKey: true,
+            customModels: ["anthropic/claude-3.5-sonnet", "openai/gpt-4.1-mini"],
           }),
         }),
       }),
@@ -129,7 +141,11 @@ describe("/api/llm/settings", () => {
     getLlmSettingsMock.mockResolvedValue({
       providers: {
         ollama: { baseUrl: "http://localhost:11434/api", enabled: true, models: ["gemma3:4b"] },
-        openrouter: { apiKey: "sk-openrouter", enabledModels: ["openrouter/free"] },
+        openrouter: {
+          apiKey: "sk-openrouter",
+          enabledModels: ["openrouter/free"],
+          customModels: ["anthropic/claude-3.5-sonnet"],
+        },
       },
     });
     saveLlmSettingsMock.mockImplementation(async (_ownerId: string, settings: unknown) => settings);
