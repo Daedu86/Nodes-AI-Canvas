@@ -353,6 +353,27 @@ export function LlmSettingsProvider({
     };
   }, [isReady, legacyStorageKey, settings, userId]);
 
+  const persistSettingsImmediately = React.useCallback(
+    (next: LlmSettingsState) => {
+      if (!isReady || !userId) return;
+      const pendingSignature = JSON.stringify(next);
+      void persistLlmSettings(next)
+        .then((saved) => {
+          const savedSignature = JSON.stringify(saved.settings);
+          persistedSignatureRef.current = savedSignature;
+          setPolicy(saved.policy);
+          if (JSON.stringify(latestSettingsRef.current) === pendingSignature) {
+            setSettings(saved.settings);
+          }
+          clearLegacySettings(legacyStorageKey);
+        })
+        .catch((error) => {
+          console.error("Failed to persist LLM settings immediately", error);
+        });
+    },
+    [isReady, legacyStorageKey, userId],
+  );
+
   const availableModelOptions = React.useMemo(
     () => buildAvailableModelOptions(settings),
     [settings],
@@ -616,21 +637,25 @@ export function LlmSettingsProvider({
   const deleteOpenRouterBuiltinModel = React.useCallback((modelId: string) => {
     const trimmed = modelId.trim();
     if (!trimmed) return;
-    setSettings((current) => ({
-      providers: {
-        ...current.providers,
-        openrouter: {
-          ...current.providers.openrouter,
-          deletedModels: [
-            ...new Set([...(current.providers.openrouter.deletedModels ?? []), trimmed]),
-          ],
-          enabledModels: current.providers.openrouter.enabledModels.filter(
-            (entry) => entry !== trimmed,
-          ),
+    setSettings((current) => {
+      const next = {
+        providers: {
+          ...current.providers,
+          openrouter: {
+            ...current.providers.openrouter,
+            deletedModels: [
+              ...new Set([...(current.providers.openrouter.deletedModels ?? []), trimmed]),
+            ],
+            enabledModels: current.providers.openrouter.enabledModels.filter(
+              (entry) => entry !== trimmed,
+            ),
+          },
         },
-      },
-    }));
-  }, []);
+      };
+      persistSettingsImmediately(next);
+      return next;
+    });
+  }, [persistSettingsImmediately]);
 
   const restoreOpenRouterBuiltinModel = React.useCallback((modelId: string) => {
     const trimmed = modelId.trim();
@@ -643,7 +668,7 @@ export function LlmSettingsProvider({
         ? current.providers.openrouter.enabledModels
         : [...current.providers.openrouter.enabledModels, trimmed];
 
-      return {
+      const next = {
         providers: {
           ...current.providers,
           openrouter: {
@@ -653,8 +678,10 @@ export function LlmSettingsProvider({
           },
         },
       };
+      persistSettingsImmediately(next);
+      return next;
     });
-  }, []);
+  }, [persistSettingsImmediately]);
 
   const removeOpenRouterCustomModel = React.useCallback((modelId: string) => {
     const trimmed = modelId.trim();
