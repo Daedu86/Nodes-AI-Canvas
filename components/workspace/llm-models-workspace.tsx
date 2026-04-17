@@ -136,6 +136,7 @@ function OpenRouterCard() {
     useLlmSettings();
   const openrouter = settings.providers.openrouter;
   const requireUserKey = policy.openrouter.requireUserKey;
+  const hasDeploymentKey = policy.openrouter.hasDeploymentKey;
   const definition = getProviderDefinition("openrouter");
 
   return (
@@ -155,18 +156,22 @@ function OpenRouterCard() {
                 openrouter.hasApiKey
                   ? "Saved on the server. Type a new key to replace it."
                   : requireUserKey
-                    ? "Required on this deployment. Paste your OpenRouter API key."
-                    : "Optional. Deployment env key still works if this is empty."
+                    ? "Paste your OpenRouter API key. It is stored on the server and never shown again."
+                    : hasDeploymentKey
+                      ? "Optional. Paste your OpenRouter API key to override the shared key."
+                      : "Paste your OpenRouter API key. It is stored on the server and never shown again."
               }
               onChange={(event) => setProviderApiKey("openrouter", event.currentTarget.value)}
             />
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>
                 {openrouter.hasApiKey
-                  ? "Using a user-level OpenRouter key"
+                  ? "Using your saved key (stored server-side)."
                   : requireUserKey
-                    ? "This deployment requires a user API key."
-                    : "Using the deployment env key when available"}
+                    ? "This deployment requires a user API key (stored server-side)."
+                    : hasDeploymentKey
+                      ? "A shared deployment key may be used when you don't add one."
+                      : "Add a key to use OpenRouter."}
               </span>
               {openrouter.hasApiKey ? (
                 <Button

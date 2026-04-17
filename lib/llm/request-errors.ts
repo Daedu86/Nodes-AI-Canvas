@@ -187,7 +187,7 @@ export function getRequestErrorMessageFromResponse(response: Pick<Response, "sta
     return "Ollama is not reachable. Start it locally or switch to an OpenRouter model.";
   }
   if (errorCode === "missing_openrouter_key") {
-    return "OpenRouter needs an API key in Profile > LLM Models or in the server environment.";
+    return "OpenRouter needs an API key in Profile > LLM Models.";
   }
   if (explicit) return explicit;
 

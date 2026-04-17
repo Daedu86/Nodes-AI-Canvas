@@ -23,7 +23,14 @@ const normalizeValue = (value?: string | null) => {
   return trimmed ? trimmed : undefined;
 };
 
-const isOpenRouterUserKeyRequired = () => process.env.OPENROUTER_REQUIRE_USER_KEY === "1";
+// Safety default for public deployments:
+// - By default, we do NOT use a shared deployment OpenRouter key for end users.
+// - Operators can explicitly opt in by setting OPENROUTER_ALLOW_DEPLOYMENT_KEY=1.
+const isOpenRouterDeploymentKeyAllowed = () =>
+  process.env.OPENROUTER_ALLOW_DEPLOYMENT_KEY === "1";
+
+const isOpenRouterUserKeyRequired = () =>
+  process.env.OPENROUTER_REQUIRE_USER_KEY === "1" || !isOpenRouterDeploymentKeyAllowed();
 
 const resolveOpenRouterApiKey = (overrides: LlmRequestOverrides) => {
   const userKey = normalizeValue(overrides.openrouterApiKey);

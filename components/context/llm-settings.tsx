@@ -193,6 +193,7 @@ export function LlmSettingsProvider({
     void (async () => {
       let next = cloneDefaultLlmSettingsState();
       let migrateLegacy = false;
+      let legacyPayload: LlmSettingsState | null = null;
 
       try {
         const remote = await fetchLlmSettings();
@@ -202,7 +203,26 @@ export function LlmSettingsProvider({
         } else {
           const legacy = readLegacySettings(legacyStorageKey);
           if (legacy) {
-            next = legacy;
+            // Never show a legacy key in the UI, but migrate it to server storage when present.
+            const legacyKey = legacy.providers.openrouter.apiKey.trim();
+            if (legacyKey) {
+              legacyPayload = legacy;
+              next = {
+                ...legacy,
+                providers: {
+                  ...legacy.providers,
+                  openrouter: {
+                    ...legacy.providers.openrouter,
+                    apiKey: "",
+                    clearApiKey: false,
+                    hasApiKey: true,
+                  },
+                },
+              };
+            } else {
+              next = legacy;
+              legacyPayload = legacy;
+            }
             migrateLegacy = true;
           }
         }
@@ -210,7 +230,25 @@ export function LlmSettingsProvider({
         console.error("Failed to load LLM settings", error);
         const legacy = readLegacySettings(legacyStorageKey);
         if (legacy) {
-          next = legacy;
+          const legacyKey = legacy.providers.openrouter.apiKey.trim();
+          if (legacyKey) {
+            legacyPayload = legacy;
+            next = {
+              ...legacy,
+              providers: {
+                ...legacy.providers,
+                openrouter: {
+                  ...legacy.providers.openrouter,
+                  apiKey: "",
+                  clearApiKey: false,
+                  hasApiKey: true,
+                },
+              },
+            };
+          } else {
+            next = legacy;
+            legacyPayload = legacy;
+          }
           migrateLegacy = true;
         }
       }
@@ -223,7 +261,7 @@ export function LlmSettingsProvider({
       setIsReady(true);
 
       if (migrateLegacy) {
-        void persistLlmSettings(next)
+        void persistLlmSettings(legacyPayload ?? next)
           .then((saved) => {
             if (cancelled) return;
             persistedSignatureRef.current = JSON.stringify(saved.settings);

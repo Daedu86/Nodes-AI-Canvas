@@ -9,6 +9,12 @@ import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 export const runtime = "nodejs";
 
+const isOpenRouterDeploymentKeyAllowed = () =>
+  process.env.OPENROUTER_ALLOW_DEPLOYMENT_KEY === "1";
+
+const isOpenRouterUserKeyRequired = () =>
+  process.env.OPENROUTER_REQUIRE_USER_KEY === "1" || !isOpenRouterDeploymentKeyAllowed();
+
 type LlmSettingsResponse = {
   settings: LlmSettingsState | null;
   policy: {
@@ -32,8 +38,9 @@ export async function GET(req: Request) {
     settings: maskLlmSettingsState(settings),
     policy: {
       openrouter: {
-        hasDeploymentKey: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
-        requireUserKey: process.env.OPENROUTER_REQUIRE_USER_KEY === "1",
+        hasDeploymentKey:
+          isOpenRouterDeploymentKeyAllowed() && Boolean(process.env.OPENROUTER_API_KEY?.trim()),
+        requireUserKey: isOpenRouterUserKeyRequired(),
       },
     },
   } satisfies LlmSettingsResponse);
@@ -60,8 +67,9 @@ export async function PUT(req: Request) {
     settings: maskLlmSettingsState(settings),
     policy: {
       openrouter: {
-        hasDeploymentKey: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
-        requireUserKey: process.env.OPENROUTER_REQUIRE_USER_KEY === "1",
+        hasDeploymentKey:
+          isOpenRouterDeploymentKeyAllowed() && Boolean(process.env.OPENROUTER_API_KEY?.trim()),
+        requireUserKey: isOpenRouterUserKeyRequired(),
       },
     },
   } satisfies LlmSettingsResponse);
