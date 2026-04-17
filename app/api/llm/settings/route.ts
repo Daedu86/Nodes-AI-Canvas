@@ -1,5 +1,6 @@
 import { getLlmSettings, saveLlmSettings } from "@/lib/llm-settings-store";
 import {
+  DEFAULT_LLM_SETTINGS_STATE,
   maskLlmSettingsState,
   mergeLlmSettingsState,
   type LlmSettingsState,
@@ -56,10 +57,9 @@ export async function PUT(req: Request) {
 
   const ollamaValidation = validateOllamaBaseUrl(merged.providers.ollama.baseUrl);
   if (!ollamaValidation.ok) {
-    return new Response(JSON.stringify({ error: ollamaValidation.error }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    // Keep settings writable even if an older/disallowed Ollama URL was stored previously.
+    // This prevents unrelated changes (e.g. OpenRouter model updates) from being blocked.
+    merged.providers.ollama.baseUrl = DEFAULT_LLM_SETTINGS_STATE.providers.ollama.baseUrl;
   }
 
   const settings = await saveLlmSettings(guarded.user.id, merged);

@@ -180,4 +180,52 @@ describe("/api/llm/settings", () => {
       }),
     );
   });
+
+  it("does not block OpenRouter settings saves when an old Ollama URL is disallowed", async () => {
+    getLlmSettingsMock.mockResolvedValue({
+      providers: {
+        ollama: {
+          baseUrl: "https://remote-ollama.example.com/api",
+          enabled: true,
+          models: ["gemma3:4b"],
+        },
+        openrouter: {
+          apiKey: "sk-openrouter",
+          enabledModels: ["openrouter/free"],
+          customModels: [],
+        },
+      },
+    });
+    saveLlmSettingsMock.mockImplementation(async (_ownerId: string, settings: unknown) => settings);
+
+    const response = await PUT(
+      new Request("http://localhost/api/llm/settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          settings: {
+            providers: {
+              openrouter: {
+                enabledModels: [],
+              },
+            },
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(saveLlmSettingsMock).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({
+        providers: expect.objectContaining({
+          ollama: expect.objectContaining({
+            baseUrl: "http://localhost:11434/api",
+          }),
+          openrouter: expect.objectContaining({
+            enabledModels: [],
+          }),
+        }),
+      }),
+    );
+  });
 });

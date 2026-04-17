@@ -145,13 +145,21 @@ async function persistLlmSettings(settings: LlmSettingsState) {
     headers: {
       "Content-Type": "application/json",
     },
-    keepalive: true,
     body: JSON.stringify({
       settings,
     }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to save LLM settings: ${response.status}`);
+    let errorMessage = `Failed to save LLM settings: ${response.status}`;
+    try {
+      const payload = (await response.json()) as { error?: unknown };
+      if (typeof payload?.error === "string" && payload.error.trim().length > 0) {
+        errorMessage = payload.error;
+      }
+    } catch {
+      // ignore malformed json responses
+    }
+    throw new Error(errorMessage);
   }
   const data = (await response.json()) as LlmSettingsResponse;
   return {
