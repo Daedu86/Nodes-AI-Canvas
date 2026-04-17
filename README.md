@@ -1,10 +1,14 @@
-# Nodes
+<p align="center">
+  <img alt="Nodes" src="docs/brand/nodes-logo.svg" width="72" />
+</p>
 
-![Nodes logo](docs/brand/nodes-logo.svg)
+<h1 align="center">Nodes</h1>
 
-Nodes is a visual workspace for thinking with AI: a chat that can branch, plus a canvas that keeps context visible.
+<p align="center">
+  A branching chat and a visual canvas for thinking with AI.
+</p>
 
-Instead of losing everything in one long thread, Nodes helps you explore multiple directions, compare them, and merge what matters.
+Nodes is a workspace for exploration, not just a single-answer chatbot. You can branch conversations, compare directions, and keep reusable context visible while you iterate.
 
 ## Product Tour
 
@@ -41,117 +45,37 @@ Users can connect their own provider credentials and control which models show u
 - Read the Knowledge Center docs inside the workspace.
 - Use hosted models (OpenRouter) or local models (Ollama) from the same UI.
 
-## Run Locally
+## Getting Started (As A User)
 
-### Requirements
+1. Create a **session** from the sidebar.
+2. Pick a model from the top selector.
+3. Chat as usual, then use **Edit** or **Follow-up** to create branches.
+4. Open **Canvas** to keep key nodes and artifacts visible while you iterate.
+5. Add artifacts (text/code/image/file) when context matters more than another message.
+6. Open **Profile → LLM Models** to connect your own API keys and control what models appear.
 
-- Node.js 20+ (recommended)
-- npm
-- One model provider:
-  - OpenRouter for hosted models
-  - Ollama for local models
+## How People Use Nodes
 
-### Install
+Nodes works best when you are exploring and deciding:
 
-```bash
-npm ci
-```
+- Product and UX iteration: branch prompts, compare outcomes, merge the best direction.
+- Technical design: keep evidence, snippets, and decisions attached to the same canvas.
+- Research: pin sources, draft summaries, and carry context forward across sessions.
 
-### Configure env
+## Key Ideas (Quick)
 
-Start from the template:
+- **Session**: a working conversation you can reopen later.
+- **Branch**: a parallel path created from any message (edit or follow-up).
+- **Artifact**: structured context (text/code/image/file) you can pin and reuse.
+- **Project**: a larger workspace grouping sessions with shared context.
+- **Arena**: compare options and promote winners into memory.
 
-```bash
-# macOS / Linux
-cp .env.example .env.local
+## Developer Setup
 
-# Windows PowerShell
-Copy-Item .env.example .env.local
-```
+If you're running this repo locally or deploying it, see:
 
-Then pick one:
-
-#### OpenRouter (hosted)
-
-```env
-OPENROUTER_API_KEY=your-key
-OPENROUTER_API_URL=https://openrouter.ai/api/v1
-OPENROUTER_REFERER=http://localhost:3000
-OPENROUTER_TITLE=Nodes
-DEFAULT_MODEL=nvidia/nemotron-3-super-120b-a12b:free
-NEXT_PUBLIC_DEFAULT_MODEL=nvidia/nemotron-3-super-120b-a12b:free
-NEXT_PUBLIC_DEFAULT_PROVIDER=openrouter
-```
-
-#### Ollama (local)
-
-```env
-OLLAMA_API_URL=http://localhost:11434/api
-DEFAULT_MODEL=gemma3:4b
-NEXT_PUBLIC_DEFAULT_MODEL=gemma3:4b
-NEXT_PUBLIC_DEFAULT_PROVIDER=ollama
-```
-
-### Run
-
-```bash
-npm run dev
-```
-
-Open `http://localhost:3000`.
-
-## Deploy (Vercel + Supabase)
-
-This repo is a Next.js app (React) that deploys cleanly to Vercel. The simplest cloud setup is:
-
-- Vercel (app hosting)
-- Supabase (Postgres + Storage)
-
-For details, see [docs/cloud-persistence.md](docs/cloud-persistence.md).
-
-### Production envs (minimum)
-
-Use `.env.example` as the full reference. At minimum you will need:
-
-```env
-AUTH_SECRET=
-NEXTAUTH_URL=https://your-deployed-url.vercel.app
-AUTH_GITHUB_ID=
-AUTH_GITHUB_SECRET=
-AUTH_ENABLE_DEV_CREDENTIALS=0
-
-ALLOW_REMOTE_API=1
-NODES_PERSISTENCE_BACKEND=supabase
-SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_SESSION_ARTIFACTS_BUCKET=session-artifacts
-```
-
-### First-time Supabase setup
-
-1. Create a Supabase project.
-2. Apply [supabase/schema.sql](supabase/schema.sql).
-3. Create (or verify) a private Storage bucket named `session-artifacts`.
-4. If you already have local data, run:
-
-```bash
-npm run setup:supabase-storage
-npm run migrate:supabase
-```
-
-### OAuth callback URL (GitHub)
-
-Set your GitHub OAuth callback URL to:
-
-```text
-https://your-deployed-url.vercel.app/api/auth/callback/github
-```
-
-## Notes For End Users
-
-- You can add your own provider API keys in **Profile → LLM Models**.
-- The model selector only shows models that are enabled and usable for your account.
-- If you are running a public deployment, prefer requiring user-provided keys for hosted providers.
+- [Development guide](docs/development.md)
+- [Deploying guide](docs/deploying.md)
 
 ## License
 
