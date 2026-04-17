@@ -1,172 +1,53 @@
 # Nodes
 
-Nodes is a visual workspace for thinking with AI.
+![Nodes logo](docs/brand/nodes-logo.svg)
 
-Instead of keeping everything inside one long chat, Nodes lets you:
+Nodes is a visual workspace for thinking with AI: a chat that can branch, plus a canvas that keeps context visible.
 
-- branch conversations
-- compare different directions
-- attach extra context like notes, code, files, and images
-- group related sessions into projects
-- keep working context visible while you iterate
+Instead of losing everything in one long thread, Nodes helps you explore multiple directions, compare them, and merge what matters.
 
-It is best for people who want to explore options before committing to one path.
+## Product Tour
 
-## License
+### Chat + branching
 
-This project is licensed under the MIT License.
+![Chat and branching](docs/readme/01-chat-branching.svg)
 
-See [LICENSE](LICENSE) for the project license and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream notice details related to `assistant-ui`.
+Branch from any message (edit or follow-up) and keep parallel paths side by side.
 
-## What Makes It Different
+### Canvas + artifacts
 
-Most AI tools are great at generating one answer.
+![Canvas and artifacts](docs/readme/02-canvas-artifacts.svg)
 
-Nodes is built for a different job:
+Artifacts (text, code, images, files) are structured context you can pin and reuse across branches and projects.
 
-- exploring multiple answers
-- keeping the reasoning visible
-- comparing branches and sessions
-- turning exploration into a reusable decision
+### Knowledge Center (built-in wiki)
 
-The product behaves more like a workspace than a chat window.
+![Knowledge Center wiki](docs/readme/03-knowledge-center.svg)
 
-## Screenshots
+A wiki-style workspace for onboarding, patterns, and “how-to” docs that ship with the product.
 
-### Main workspace
+### LLM Models (per-user connections)
 
-Chat and canvas stay side by side, so you can branch ideas without losing the thread.
+![LLM models and keys](docs/readme/04-llm-models.svg)
 
-![Nodes main workspace](docs/screenshots/workspace-hero.png)
+Users can connect their own provider credentials and control which models show up in the selector.
 
-### Project canvas
+## What You Can Do
 
-Projects pull multiple sessions and typed nodes into one larger canvas, so the most important conclusions stay visible in one place.
+- Create sessions and branch from user or assistant messages.
+- Keep a canvas open while you chat (nodes, artifacts, pinned context).
+- Group sessions into projects and keep a shared project context.
+- Compare branches or sessions (Arena) and promote winners into memory.
+- Read the Knowledge Center docs inside the workspace.
+- Use hosted models (OpenRouter) or local models (Ollama) from the same UI.
 
-![Nodes project canvas](docs/screenshots/project-canvas.png)
-
-### Project Arena
-
-Projects let you compare multiple sessions or branches and promote the best direction into shared context.
-
-![Nodes Project Arena](docs/screenshots/project-arena.png)
-
-### Project context builder
-
-Global context can be assembled from structured sources like arena synthesis, winners, typed nodes, and session summaries.
-
-![Nodes project context builder](docs/screenshots/project-context-builder.png)
-
-## Main Concepts
-
-### Session
-
-A session is a single working conversation.
-
-You can:
-
-- start a new session
-- branch from messages
-- reopen saved sessions later
-- inspect what context is being sent to the model
-
-### Branch
-
-Branches let you try different directions without losing the original path.
-
-Examples:
-
-- rewrite the same prompt a different way
-- ask a follow-up from a specific reply
-- compare multiple answers to the same idea
-
-### Artifact
-
-Artifacts are extra pieces of context you can add to the canvas.
-
-Supported artifact types include:
-
-- text
-- code
-- image
-- file
-
-You can attach an artifact to a node and create a new branch that uses that context.
-
-### Project
-
-A project groups multiple sessions into one larger workspace.
-
-Inside a project you can:
-
-- add more than one session
-- see them together on a larger canvas
-- keep a global project context
-- compare sessions or branches in Arena
-
-### Arena
-
-Arena helps you compare options.
-
-You can compare:
-
-- sessions
-- branches
-
-Then you can:
-
-- pick a winner
-- create a merge node
-- promote the result into the project context
-- save it as reusable memory
-
-### Beacon
-
-Beacon is the guide inside the canvas.
-
-It helps you understand:
-
-- the node it is standing on
-- the branch it is inspecting
-- the current focus of the workspace
-
-Beacon is there to guide exploration, not replace your main chat thread.
-
-## What You Can Do Today
-
-- chat with local or hosted models
-- switch models from the UI
-- choose `Last` or `Full` history mode
-- branch from user or assistant messages
-- manage saved sessions from the sidebar
-- attach artifacts as context
-- create projects from multiple sessions
-- compare options inside Project Arena
-- use merge nodes and reusable memory
-- inspect the context that will actually be sent to the LLM
-
-## A Good Way To Use It
-
-One practical workflow looks like this:
-
-1. Create one session for product ideas.
-2. Create another for technical architecture.
-3. Create another for risks, tradeoffs, or critiques.
-4. Add those sessions into a project.
-5. Compare them in Arena.
-6. Create a merge node from the best thinking.
-7. Apply that result to the project context.
-8. Keep iterating from there.
-
-This is where Nodes is strongest: when you need to compare, synthesize, and decide.
-
-## Quick Start
+## Run Locally
 
 ### Requirements
 
-- Node.js 18+
+- Node.js 20+ (recommended)
 - npm
-- one model provider:
+- One model provider:
   - OpenRouter for hosted models
   - Ollama for local models
 
@@ -176,27 +57,33 @@ This is where Nodes is strongest: when you need to compare, synthesize, and deci
 npm ci
 ```
 
-### Create `.env.local`
+### Configure env
 
-Use one of these setups.
+Start from the template:
 
-#### Option A: OpenRouter
+```bash
+# macOS / Linux
+cp .env.example .env.local
 
-Recommended if you want the easiest hosted setup.
+# Windows PowerShell
+Copy-Item .env.example .env.local
+```
+
+Then pick one:
+
+#### OpenRouter (hosted)
 
 ```env
 OPENROUTER_API_KEY=your-key
 OPENROUTER_API_URL=https://openrouter.ai/api/v1
 OPENROUTER_REFERER=http://localhost:3000
-OPENROUTER_TITLE=ai-canvas
+OPENROUTER_TITLE=Nodes
 DEFAULT_MODEL=nvidia/nemotron-3-super-120b-a12b:free
 NEXT_PUBLIC_DEFAULT_MODEL=nvidia/nemotron-3-super-120b-a12b:free
 NEXT_PUBLIC_DEFAULT_PROVIDER=openrouter
 ```
 
-#### Option B: Ollama
-
-Use this if you want to run local models on your own machine.
+#### Ollama (local)
 
 ```env
 OLLAMA_API_URL=http://localhost:11434/api
@@ -211,18 +98,20 @@ NEXT_PUBLIC_DEFAULT_PROVIDER=ollama
 npm run dev
 ```
 
-Then open [http://localhost:3000](http://localhost:3000).
+Open `http://localhost:3000`.
 
-## Deploying
+## Deploy (Vercel + Supabase)
 
-The simplest cloud setup for Nodes is:
+This repo is a Next.js app (React) that deploys cleanly to Vercel. The simplest cloud setup is:
 
-- Vercel Hobby
-- Supabase Free
+- Vercel (app hosting)
+- Supabase (Postgres + Storage)
 
-### Production envs
+For details, see [docs/cloud-persistence.md](docs/cloud-persistence.md).
 
-At minimum, set these in your Vercel project:
+### Production envs (minimum)
+
+Use `.env.example` as the full reference. At minimum you will need:
 
 ```env
 AUTH_SECRET=
@@ -236,106 +125,36 @@ NODES_PERSISTENCE_BACKEND=supabase
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_SESSION_ARTIFACTS_BUCKET=session-artifacts
-
-OPENROUTER_API_KEY=
-OPENROUTER_API_URL=https://openrouter.ai/api/v1
-OPENROUTER_REFERER=https://your-deployed-url.vercel.app
-OPENROUTER_TITLE=Nodes
-DEFAULT_MODEL=nvidia/nemotron-3-super-120b-a12b:free
-NEXT_PUBLIC_DEFAULT_MODEL=nvidia/nemotron-3-super-120b-a12b:free
-NEXT_PUBLIC_DEFAULT_PROVIDER=openrouter
 ```
 
-### Before the first deploy
+### First-time Supabase setup
 
-1. Create the Supabase project and apply [schema.sql](C:\Users\daedu\Documents\Playground\AI Canvas\supabase\schema.sql).
-2. Create or verify the private `session-artifacts` bucket.
-3. If you already have local data, run:
+1. Create a Supabase project.
+2. Apply [supabase/schema.sql](supabase/schema.sql).
+3. Create (or verify) a private Storage bucket named `session-artifacts`.
+4. If you already have local data, run:
 
 ```bash
 npm run setup:supabase-storage
 npm run migrate:supabase
 ```
 
-4. Update your GitHub OAuth app callback URL to:
+### OAuth callback URL (GitHub)
+
+Set your GitHub OAuth callback URL to:
 
 ```text
 https://your-deployed-url.vercel.app/api/auth/callback/github
 ```
 
-### Notes
+## Notes For End Users
 
-- Keep `ALLOW_REMOTE_API=0` for local-only development.
-- Only enable `ALLOW_REMOTE_API=1` when `NODES_PERSISTENCE_BACKEND=supabase`.
-- UI preferences can still stay in browser `localStorage`; shared app data should live in Supabase.
+- You can add your own provider API keys in **Profile → LLM Models**.
+- The model selector only shows models that are enabled and usable for your account.
+- If you are running a public deployment, prefer requiring user-provided keys for hosted providers.
 
-## Where Your Data Lives
+## License
 
-Nodes can run in two persistence modes.
+This project is licensed under the MIT License.
 
-### Local mode
-
-Typical folders:
-
-- `data/sessions`
-- `data/projects`
-- `data/session-blobs`
-
-That means:
-
-- your saved sessions persist across restarts
-- your projects persist across restarts
-- uploaded files and images are stored locally
-
-### Cloud mode
-
-When `NODES_PERSISTENCE_BACKEND=supabase`:
-
-- sessions, projects, and memory live in Supabase Postgres
-- artifact blobs live in Supabase Storage
-- browser `localStorage` keeps only UI preferences
-
-Your `.env.local` file is ignored by git and is not meant to be committed.
-
-## Notes About Context
-
-Nodes lets you inspect what the model is actually seeing.
-
-- `Last` means the model mainly sees the latest prompt
-- `Full` means the model sees the full conversation history for that path
-
-Artifacts and project context can also affect what gets sent.
-
-The app includes context budgeting so large artifacts do not overwhelm the prompt.
-
-## Notes About Images And Files
-
-Images and files can be attached as context artifacts.
-
-Whether the model truly understands the original media depends on the model you choose.
-
-In practice:
-
-- some models mainly use metadata or extracted text
-- multimodal understanding depends on provider and model support
-
-## Useful Commands
-
-```bash
-npm run dev
-npm test
-npm run test:e2e
-npm run build
-```
-
-## In Short
-
-Nodes is for people who want more than one answer from AI.
-
-It gives you a place to:
-
-- branch ideas
-- compare options
-- carry context forward
-- merge what matters
-- and turn messy exploration into clearer decisions
+See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream notices related to `assistant-ui`.

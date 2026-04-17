@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" fill="none" role="img" aria-label="LLM models and API keys">
+  <defs>
+    <linearGradient id="bg" x1="140" y1="70" x2="1060" y2="620" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFF"/>
+      <stop offset="1" stop-color="#EEF2F9"/>
+    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#0B1220" stroke-opacity=".06" stroke-width="1"/>
+    </pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#0B1220" flood-opacity=".18"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <rect width="1200" height="675" fill="url(#grid)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="90" y="70" width="1020" height="535" rx="22" fill="#fff" stroke="#0B1220" stroke-opacity=".10"/>
+  </g>
+  <rect x="90" y="70" width="1020" height="62" rx="22" fill="#FBFCFF"/>
+  <path d="M90 120H1110" stroke="#0B1220" stroke-opacity=".08"/>
+  <text x="130" y="109" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="14" font-weight="780" fill="#0B1220" fill-opacity=".90">Profile</text>
+  <text x="196" y="109" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="14" font-weight="860" fill="#0B1220" fill-opacity=".90">LLM Models</text>
+
+  <!-- Provider cards -->
+  <rect x="120" y="155" width="470" height="220" rx="18" fill="#fff" stroke="#0B1220" stroke-opacity=".10"/>
+  <text x="144" y="185" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="10" font-weight="800" fill="#0B1220" fill-opacity=".55" letter-spacing="2">OPENROUTER</text>
+  <text x="144" y="225" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="18" font-weight="840" fill="#0B1220" fill-opacity=".92">Bring your own key</text>
+  <rect x="144" y="248" width="422" height="42" rx="15" fill="#0B1220" fill-opacity=".03" stroke="#0B1220" stroke-opacity=".08"/>
+  <text x="162" y="274" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="650" fill="#0B1220" fill-opacity=".58">API key (masked)</text>
+  <circle cx="512" cy="270" r="6" fill="#22C55E"/>
+  <text x="526" y="274" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="800" fill="#0B1220" fill-opacity=".72">Saved</text>
+  <rect x="144" y="304" width="132" height="30" rx="15" fill="#0EA5E9" fill-opacity=".12" stroke="#0EA5E9" stroke-opacity=".22"/>
+  <text x="162" y="324" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="750" fill="#0B1220" fill-opacity=".82">Gemma 4</text>
+  <rect x="284" y="304" width="150" height="30" rx="15" fill="#0B1220" fill-opacity=".03" stroke="#0B1220" stroke-opacity=".06"/>
+  <text x="302" y="324" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="700" fill="#0B1220" fill-opacity=".72">Nemotron</text>
+  <rect x="442" y="304" width="124" height="30" rx="15" fill="#0B1220" fill-opacity=".03" stroke="#0B1220" stroke-opacity=".06"/>
+  <text x="460" y="324" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="700" fill="#0B1220" fill-opacity=".72">Qwen</text>
+
+  <rect x="120" y="395" width="470" height="180" rx="18" fill="#fff" stroke="#0B1220" stroke-opacity=".10"/>
+  <text x="144" y="425" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="10" font-weight="800" fill="#0B1220" fill-opacity=".55" letter-spacing="2">OLLAMA</text>
+  <text x="144" y="465" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="18" font-weight="840" fill="#0B1220" fill-opacity=".92">Local models</text>
+  <rect x="144" y="490" width="422" height="40" rx="15" fill="#0B1220" fill-opacity=".03" stroke="#0B1220" stroke-opacity=".08"/>
+  <text x="162" y="515" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="650" fill="#0B1220" fill-opacity=".60">http://localhost:11434</text>
+  <rect x="144" y="538" width="168" height="28" rx="14" fill="#22C55E" fill-opacity=".12" stroke="#22C55E" stroke-opacity=".22"/>
+  <text x="162" y="557" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="750" fill="#0B1220" fill-opacity=".82">gemma3:4b</text>
+
+  <!-- Selector -->
+  <rect x="620" y="155" width="460" height="420" rx="18" fill="#fff" stroke="#0B1220" stroke-opacity=".10"/>
+  <text x="644" y="185" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="10" font-weight="800" fill="#0B1220" fill-opacity=".55" letter-spacing="2">MODEL SELECTOR</text>
+  <text x="644" y="230" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="18" font-weight="840" fill="#0B1220" fill-opacity=".92">Only usable models show up</text>
+  <rect x="644" y="254" width="412" height="42" rx="15" fill="#0B1220" fill-opacity=".03" stroke="#0B1220" stroke-opacity=".06"/>
+  <text x="662" y="280" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="650" fill="#0B1220" fill-opacity=".78">OpenRouter</text>
+  <text x="748" y="280" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="820" fill="#0B1220" fill-opacity=".90">google/gemma-4-31b-it:free</text>
+  <rect x="644" y="304" width="412" height="42" rx="15" fill="#0B1220" fill-opacity=".03" stroke="#0B1220" stroke-opacity=".06"/>
+  <text x="662" y="330" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="650" fill="#0B1220" fill-opacity=".78">OpenRouter</text>
+  <text x="748" y="330" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="820" fill="#0B1220" fill-opacity=".90">google/gemma-4-26b-a4b-it:free</text>
+  <rect x="644" y="354" width="412" height="42" rx="15" fill="#0B1220" fill-opacity=".03" stroke="#0B1220" stroke-opacity=".06"/>
+  <text x="662" y="380" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="650" fill="#0B1220" fill-opacity=".78">Ollama</text>
+  <text x="716" y="380" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="11" font-weight="820" fill="#0B1220" fill-opacity=".90">gemma3:4b</text>
+
+  <text x="120" y="635" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="12" font-weight="650" fill="#0B1220" fill-opacity=".55">Users can connect their own keys and choose free hosted models or local Ollama.</text>
+</svg>
+
