@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Bot, Plus, Server, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Bot, Check, KeyRound, Plus, Server, Sparkles, X } from "lucide-react";
 import React from "react";
 import { useLlmSettings } from "@/components/context/llm-settings";
 import { useWorkspaceSurface } from "@/components/context/workspace-surface";
@@ -131,19 +131,126 @@ function OllamaCard() {
   );
 }
 
-function OpenRouterCard() {
+function OpenRouterKeyCard() {
+  const { clearProviderApiKey, policy, settings, setProviderApiKey } = useLlmSettings();
+  const openrouter = settings.providers.openrouter;
+  const requireUserKey = policy.openrouter.requireUserKey;
+  const hasDeploymentKey = policy.openrouter.hasDeploymentKey;
+  const definition = getProviderDefinition("openrouter");
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [draftKey, setDraftKey] = React.useState("");
+
+  const statusLabel = openrouter.hasApiKey
+    ? "Saved"
+    : requireUserKey
+      ? "Required"
+      : hasDeploymentKey
+        ? "Optional"
+        : "Missing";
+
+  const statusTone = openrouter.hasApiKey
+    ? "border-emerald-400/30 bg-emerald-500/10 text-foreground"
+    : requireUserKey
+      ? "border-amber-400/30 bg-amber-500/10 text-foreground"
+      : "border-border/80 bg-background text-muted-foreground";
+
+  return (
+    <Card className="lg:col-span-2">
+      <ProviderHeader
+        icon={<KeyRound className="size-4" />}
+        provider={`${definition.label} API key`}
+        subtitle="Stored on the server. Never shown again after saving."
+        action={
+          <span
+            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-medium ${statusTone}`}
+          >
+            {openrouter.hasApiKey ? <Check className="size-3.5" /> : null}
+            {statusLabel}
+          </span>
+        }
+      />
+
+      <div className="mt-5 space-y-3">
+        {!isEditing ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="secondary" onClick={() => setIsEditing(true)}>
+              {openrouter.hasApiKey ? "Replace key" : "Add key"}
+            </Button>
+            {openrouter.hasApiKey ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  clearProviderApiKey("openrouter");
+                  setDraftKey("");
+                  setIsEditing(false);
+                }}
+              >
+                Delete key
+              </Button>
+            ) : null}
+            <p className="text-xs text-muted-foreground">
+              {requireUserKey
+                ? "This deployment requires a user key to use OpenRouter."
+                : hasDeploymentKey
+                  ? "This deployment may use a shared key when you don't add one."
+                  : "Add a key to use OpenRouter."}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Input
+              type="password"
+              value={draftKey}
+              placeholder="Paste your OpenRouter API key"
+              onChange={(event) => setDraftKey(event.currentTarget.value)}
+              autoFocus
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => {
+                  const trimmed = draftKey.trim();
+                  if (!trimmed) return;
+                  // This is persisted server-side (debounced) and masked when reloaded.
+                  setProviderApiKey("openrouter", trimmed);
+                  setDraftKey("");
+                  setIsEditing(false);
+                }}
+              >
+                Save key
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setDraftKey("");
+                  setIsEditing(false);
+                }}
+              >
+                Cancel
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                After saving, the key is stored server-side and will not be displayed again.
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function OpenRouterModelsCard() {
   const {
     addOpenRouterCustomModel,
-    clearProviderApiKey,
     policy,
     removeOpenRouterCustomModel,
     settings,
-    setProviderApiKey,
     toggleOpenRouterModel,
   } = useLlmSettings();
   const openrouter = settings.providers.openrouter;
   const requireUserKey = policy.openrouter.requireUserKey;
-  const hasDeploymentKey = policy.openrouter.hasDeploymentKey;
   const definition = getProviderDefinition("openrouter");
   const [customDraft, setCustomDraft] = React.useState("");
 
@@ -166,46 +273,7 @@ function OpenRouterCard() {
         provider={definition.label}
         subtitle={definition.description}
       />
-      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-        <Field label={definition.settingsLabel}>
-          <div className="space-y-2">
-            <Input
-              type="password"
-              value={openrouter.apiKey}
-              placeholder={
-                openrouter.hasApiKey
-                  ? "Saved on the server. Type a new key to replace it."
-                  : requireUserKey
-                    ? "Paste your OpenRouter API key. It is stored on the server and never shown again."
-                    : hasDeploymentKey
-                      ? "Optional. Paste your OpenRouter API key to override the shared key."
-                      : "Paste your OpenRouter API key. It is stored on the server and never shown again."
-              }
-              onChange={(event) => setProviderApiKey("openrouter", event.currentTarget.value)}
-            />
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span>
-                {openrouter.hasApiKey
-                  ? "Using your saved key (stored server-side)."
-                  : requireUserKey
-                    ? "This deployment requires a user API key (stored server-side)."
-                    : hasDeploymentKey
-                      ? "A shared deployment key may be used when you don't add one."
-                      : "Add a key to use OpenRouter."}
-              </span>
-              {openrouter.hasApiKey ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => clearProviderApiKey("openrouter")}
-                >
-                  Clear saved key
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </Field>
+      <div className="mt-5">
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Free models in selector
@@ -230,6 +298,11 @@ function OpenRouterCard() {
               );
             })}
           </div>
+          {requireUserKey ? (
+            <p className="text-xs text-muted-foreground">
+              OpenRouter requests require a user API key. Add one in the API Keys tab.
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -303,6 +376,7 @@ export function LlmModelsWorkspace() {
     settings,
   } = useLlmSettings();
   const { showWorkspace } = useWorkspaceSurface();
+  const [tab, setTab] = React.useState<"models" | "keys">("models");
 
   const enabledProviderCount = React.useMemo(
     () =>
@@ -328,7 +402,7 @@ export function LlmModelsWorkspace() {
               </p>
               <h1 className="mt-1 text-2xl font-semibold text-foreground">LLM Models</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Pick the models exposed in the selector and add provider credentials per user.
+                Pick the models exposed in the selector and manage provider connections per user.
               </p>
               {!isReady ? (
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -354,7 +428,26 @@ export function LlmModelsWorkspace() {
             </Card>
           ) : (
             <>
-              <OpenRouterCard />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={tab === "models" ? "default" : "outline"}
+                  onClick={() => setTab("models")}
+                >
+                  Models
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={tab === "keys" ? "default" : "outline"}
+                  onClick={() => setTab("keys")}
+                >
+                  API Keys
+                </Button>
+              </div>
+
+              {tab === "keys" ? <OpenRouterKeyCard /> : <OpenRouterModelsCard />}
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <OllamaCard />
