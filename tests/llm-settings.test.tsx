@@ -27,6 +27,8 @@ vi.stubGlobal("fetch", fetchMock);
 function Harness() {
   const {
     availableModelOptions,
+    deleteOpenRouterBuiltinModel,
+    restoreOpenRouterBuiltinModel,
     setProviderModels,
     toggleOpenRouterModel,
   } = useLlmSettings();
@@ -43,6 +45,18 @@ function Harness() {
         }
       >
         toggle-openrouter-nano
+      </button>
+      <button
+        type="button"
+        onClick={() => deleteOpenRouterBuiltinModel("nvidia/nemotron-3-nano-30b-a3b:free")}
+      >
+        delete-openrouter-nano
+      </button>
+      <button
+        type="button"
+        onClick={() => restoreOpenRouterBuiltinModel("nvidia/nemotron-3-nano-30b-a3b:free")}
+      >
+        restore-openrouter-nano
       </button>
       <button type="button" onClick={() => setProviderModels("ollama", "gemma3:4b, llama3.2:3b")}>
         models-ollama
@@ -97,6 +111,16 @@ describe("LlmSettingsProvider", () => {
 
     await user.click(screen.getByRole("button", { name: "toggle-openrouter-nano" }));
     expect(screen.getByTestId("options").textContent).not.toContain(
+      "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
+    );
+
+    await user.click(screen.getByRole("button", { name: "delete-openrouter-nano" }));
+    expect(screen.getByTestId("options").textContent).not.toContain(
+      "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
+    );
+
+    await user.click(screen.getByRole("button", { name: "restore-openrouter-nano" }));
+    expect(screen.getByTestId("options").textContent).toContain(
       "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
     );
 

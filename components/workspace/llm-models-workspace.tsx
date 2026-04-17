@@ -272,8 +272,10 @@ function OpenRouterKeyCard() {
 function OpenRouterModelsCard() {
   const {
     addOpenRouterCustomModel,
+    deleteOpenRouterBuiltinModel,
     policy,
     removeOpenRouterCustomModel,
+    restoreOpenRouterBuiltinModel,
     settings,
     toggleOpenRouterModel,
   } = useLlmSettings();
@@ -281,6 +283,13 @@ function OpenRouterModelsCard() {
   const requireUserKey = policy.openrouter.requireUserKey;
   const definition = getProviderDefinition("openrouter");
   const [customDraft, setCustomDraft] = React.useState("");
+  const deletedModelIds = new Set(openrouter.deletedModels ?? []);
+  const visibleBuiltinModels = OPENROUTER_FREE_MODEL_OPTIONS.filter(
+    (option) => !deletedModelIds.has(option.modelId),
+  );
+  const deletedBuiltinModels = OPENROUTER_FREE_MODEL_OPTIONS.filter((option) =>
+    deletedModelIds.has(option.modelId),
+  );
 
   const addFromDraft = React.useCallback(() => {
     const entries = customDraft
@@ -307,25 +316,51 @@ function OpenRouterModelsCard() {
             Free models in selector
           </span>
           <div className="flex flex-wrap gap-2">
-            {OPENROUTER_FREE_MODEL_OPTIONS.map((option) => {
+            {visibleBuiltinModels.map((option) => {
               const active = openrouter.enabledModels.includes(option.modelId);
               return (
-                <button
+                <div
                   key={option.modelId}
-                  type="button"
-                  aria-pressed={active}
                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                     active
                       ? "border-primary/35 bg-primary/12 text-foreground"
                       : "border-border/80 bg-background text-muted-foreground hover:text-foreground"
                   }`}
-                  onClick={() => toggleOpenRouterModel(option.modelId)}
                 >
-                  {option.label.replace(/^OpenRouter · /, "")}
-                </button>
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleOpenRouterModel(option.modelId)}
+                  >
+                    {option.label.replace(/^OpenRouter · /, "")}
+                  </button>
+                  <button
+                    type="button"
+                    className="ml-1 inline-flex size-4 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    aria-label={`Delete ${option.modelId}`}
+                    onClick={() => deleteOpenRouterBuiltinModel(option.modelId)}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
               );
             })}
           </div>
+          {deletedBuiltinModels.length > 0 ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">Deleted:</span>
+              {deletedBuiltinModels.map((option) => (
+                <button
+                  key={option.modelId}
+                  type="button"
+                  className="rounded-full border border-border/80 bg-background px-2 py-1 text-[11px] text-muted-foreground transition hover:text-foreground"
+                  onClick={() => restoreOpenRouterBuiltinModel(option.modelId)}
+                >
+                  Restore {option.label.replace(/^OpenRouter · /, "")}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {requireUserKey ? (
             <p className="text-xs text-muted-foreground">
               OpenRouter requests require a user API key. Add one in the API Keys tab.

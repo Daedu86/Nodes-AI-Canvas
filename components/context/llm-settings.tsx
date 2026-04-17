@@ -44,7 +44,9 @@ type LlmSettingsContextValue = {
   removeOpenRouterApiKey: (id: string) => void;
   setActiveOpenRouterApiKey: (id: string) => void;
   addOpenRouterCustomModel: (modelId: string) => void;
+  deleteOpenRouterBuiltinModel: (modelId: string) => void;
   removeOpenRouterCustomModel: (modelId: string) => void;
+  restoreOpenRouterBuiltinModel: (modelId: string) => void;
   setProviderEnabled: (provider: Exclude<LlmProviderId, "openrouter">, value: boolean) => void;
   setProviderModels: (provider: Exclude<LlmProviderId, "openrouter">, value: string) => void;
   setProviderValue: (provider: "ollama", field: "baseUrl", value: string) => void;
@@ -85,10 +87,13 @@ const buildAvailableModelOptions = (settings: LlmSettingsState) => {
   const options: ModelOption[] = [];
 
   const enabledOpenRouterIds = new Set(settings.providers.openrouter.enabledModels);
+  const deletedOpenRouterIds = new Set(settings.providers.openrouter.deletedModels ?? []);
   options.push(
     ...BUILTIN_MODEL_OPTIONS.filter(
       (option) =>
-        option.provider === "openrouter" && enabledOpenRouterIds.has(option.modelId),
+        option.provider === "openrouter" &&
+        enabledOpenRouterIds.has(option.modelId) &&
+        !deletedOpenRouterIds.has(option.modelId),
     ),
   );
 
@@ -526,6 +531,49 @@ export function LlmSettingsProvider({
     }));
   }, []);
 
+  const deleteOpenRouterBuiltinModel = React.useCallback((modelId: string) => {
+    const trimmed = modelId.trim();
+    if (!trimmed) return;
+    setSettings((current) => ({
+      providers: {
+        ...current.providers,
+        openrouter: {
+          ...current.providers.openrouter,
+          deletedModels: [
+            ...new Set([...(current.providers.openrouter.deletedModels ?? []), trimmed]),
+          ],
+          enabledModels: current.providers.openrouter.enabledModels.filter(
+            (entry) => entry !== trimmed,
+          ),
+        },
+      },
+    }));
+  }, []);
+
+  const restoreOpenRouterBuiltinModel = React.useCallback((modelId: string) => {
+    const trimmed = modelId.trim();
+    if (!trimmed) return;
+    setSettings((current) => {
+      const deletedModels = (current.providers.openrouter.deletedModels ?? []).filter(
+        (entry) => entry !== trimmed,
+      );
+      const enabledModels = current.providers.openrouter.enabledModels.includes(trimmed)
+        ? current.providers.openrouter.enabledModels
+        : [...current.providers.openrouter.enabledModels, trimmed];
+
+      return {
+        providers: {
+          ...current.providers,
+          openrouter: {
+            ...current.providers.openrouter,
+            deletedModels,
+            enabledModels,
+          },
+        },
+      };
+    });
+  }, []);
+
   const removeOpenRouterCustomModel = React.useCallback((modelId: string) => {
     const trimmed = modelId.trim();
     if (!trimmed) return;
@@ -616,7 +664,9 @@ export function LlmSettingsProvider({
       removeOpenRouterApiKey,
       setActiveOpenRouterApiKey,
       addOpenRouterCustomModel,
+      deleteOpenRouterBuiltinModel,
       removeOpenRouterCustomModel,
+      restoreOpenRouterBuiltinModel,
       setProviderEnabled,
       setProviderModels,
       setProviderValue,
@@ -634,7 +684,9 @@ export function LlmSettingsProvider({
       removeOpenRouterApiKey,
       setActiveOpenRouterApiKey,
       addOpenRouterCustomModel,
+      deleteOpenRouterBuiltinModel,
       removeOpenRouterCustomModel,
+      restoreOpenRouterBuiltinModel,
       setProviderEnabled,
       setProviderModels,
       setProviderValue,

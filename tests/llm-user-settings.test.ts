@@ -59,5 +59,23 @@ describe("llm user settings", () => {
     expect(merged.providers.openrouter.apiKey).toBe("secret-1");
     expect(merged.providers.openrouter.activeApiKeyId).toBe("k1");
   });
-});
 
+  it("excludes deleted built-in models from enabled models", () => {
+    const normalized = normalizeLlmSettingsState({
+      providers: {
+        openrouter: {
+          deletedModels: ["nvidia/nemotron-3-nano-30b-a3b:free"],
+          enabledModels: [
+            "nvidia/nemotron-3-nano-30b-a3b:free",
+            "openrouter/free",
+          ],
+        },
+      },
+    });
+
+    expect(normalized.providers.openrouter.deletedModels).toContain(
+      "nvidia/nemotron-3-nano-30b-a3b:free",
+    );
+    expect(normalized.providers.openrouter.enabledModels).toEqual(["openrouter/free"]);
+  });
+});

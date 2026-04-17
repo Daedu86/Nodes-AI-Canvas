@@ -60,6 +60,7 @@ export type OpenRouterProviderSettings = {
   }>;
   clearApiKey?: boolean;
   customModels?: string[];
+  deletedModels?: string[];
   enabledModels: string[];
   hasApiKey?: boolean;
 };
@@ -84,6 +85,7 @@ export const DEFAULT_LLM_SETTINGS_STATE: LlmSettingsState = {
       apiKeys: [],
       clearApiKey: false,
       customModels: [],
+      deletedModels: [],
       enabledModels: OPENROUTER_FREE_MODEL_OPTIONS.map((option) => option.modelId),
       hasApiKey: false,
     },
@@ -101,6 +103,7 @@ export const cloneDefaultLlmSettingsState = (): LlmSettingsState => ({
       activeApiKeyId: DEFAULT_LLM_SETTINGS_STATE.providers.openrouter.activeApiKeyId ?? null,
       apiKeys: [...(DEFAULT_LLM_SETTINGS_STATE.providers.openrouter.apiKeys ?? [])],
       customModels: [...(DEFAULT_LLM_SETTINGS_STATE.providers.openrouter.customModels ?? [])],
+      deletedModels: [...(DEFAULT_LLM_SETTINGS_STATE.providers.openrouter.deletedModels ?? [])],
       enabledModels: [...DEFAULT_LLM_SETTINGS_STATE.providers.openrouter.enabledModels],
     },
   },
@@ -166,10 +169,24 @@ export const normalizeLlmSettingsState = (
   }
 
   const openrouterModels = Array.isArray(providers.openrouter?.enabledModels)
-    ? providers.openrouter.enabledModels.filter((modelId): modelId is string =>
+    ? providers.openrouter.enabledModels
+    : null;
+
+  const deletedOpenRouterModels = Array.isArray(providers.openrouter?.deletedModels)
+    ? providers.openrouter.deletedModels.filter((modelId): modelId is string =>
         OPENROUTER_FREE_MODEL_OPTIONS.some((option) => option.modelId === modelId),
       )
-    : base.providers.openrouter.enabledModels;
+    : [];
+  const deletedOpenRouterModelSet = new Set(deletedOpenRouterModels);
+  const defaultOpenRouterEnabledModels = OPENROUTER_FREE_MODEL_OPTIONS.map((option) => option.modelId)
+    .filter((modelId) => !deletedOpenRouterModelSet.has(modelId));
+  const normalizedOpenRouterEnabledModels = Array.isArray(openrouterModels)
+    ? openrouterModels.filter(
+        (modelId): modelId is string =>
+          OPENROUTER_FREE_MODEL_OPTIONS.some((option) => option.modelId === modelId) &&
+          !deletedOpenRouterModelSet.has(modelId),
+      )
+    : defaultOpenRouterEnabledModels;
 
   base.providers.openrouter = {
     activeApiKeyId:
@@ -182,8 +199,8 @@ export const normalizeLlmSettingsState = (
     apiKeys: normalizeOpenRouterApiKeys(providers.openrouter?.apiKeys),
     clearApiKey: providers.openrouter?.clearApiKey === true,
     customModels: normalizeOpenRouterCustomModels(providers.openrouter?.customModels),
-    enabledModels:
-      openrouterModels.length > 0 ? openrouterModels : base.providers.openrouter.enabledModels,
+    deletedModels: deletedOpenRouterModels,
+    enabledModels: normalizedOpenRouterEnabledModels,
     hasApiKey:
       providers.openrouter?.hasApiKey !== undefined
         ? providers.openrouter.hasApiKey
@@ -262,6 +279,7 @@ const stripOpenRouterMetadata = (
     name: entry.name,
   })),
   customModels: [...(provider.customModels ?? [])],
+  deletedModels: [...(provider.deletedModels ?? [])],
   enabledModels: [...provider.enabledModels],
 });
 
@@ -438,6 +456,9 @@ export const mergeLlmSettingsState = (
         customModels: hasIncomingProvider("openrouter")
           ? incomingNormalized.providers.openrouter.customModels
           : currentNormalized.providers.openrouter.customModels,
+        deletedModels: hasIncomingProvider("openrouter")
+          ? incomingNormalized.providers.openrouter.deletedModels
+          : currentNormalized.providers.openrouter.deletedModels,
         enabledModels: hasIncomingProvider("openrouter")
           ? incomingNormalized.providers.openrouter.enabledModels
           : currentNormalized.providers.openrouter.enabledModels,
