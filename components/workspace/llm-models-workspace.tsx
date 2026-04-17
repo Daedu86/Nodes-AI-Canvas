@@ -375,6 +375,7 @@ function OpenRouterModelsCard() {
     deleteOpenRouterBuiltinModel,
     hasUnsavedChanges,
     isSaving,
+    lastSaveError,
     policy,
     removeOpenRouterCustomModel,
     restoreOpenRouterBuiltinModel,
@@ -551,7 +552,9 @@ function OpenRouterModelsCard() {
         )}
         {saveStatus === "error" ? (
           <p className="text-xs text-amber-300">
-            Could not save model changes. Try again before logging out.
+            {lastSaveError?.trim()
+              ? `Could not save model changes: ${lastSaveError}`
+              : "Could not save model changes. Try again before logging out."}
           </p>
         ) : null}
       </div>

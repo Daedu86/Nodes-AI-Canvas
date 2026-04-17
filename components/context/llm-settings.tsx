@@ -33,6 +33,7 @@ type LlmSettingsContextValue = {
   hasUnsavedChanges: boolean;
   isReady: boolean;
   isSaving: boolean;
+  lastSaveError: string | null;
   settings: LlmSettingsState;
   policy: {
     openrouter: {
@@ -193,6 +194,7 @@ export function LlmSettingsProvider({
   });
   const [isReady, setIsReady] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [lastSaveError, setLastSaveError] = React.useState<string | null>(null);
   const persistedSignatureRef = React.useRef<string | null>(null);
   const latestSettingsRef = React.useRef<LlmSettingsState>(settings);
   const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -203,6 +205,7 @@ export function LlmSettingsProvider({
 
   const persistSettingsNow = React.useCallback(
     async (next: LlmSettingsState) => {
+      setLastSaveError(null);
       setIsSaving(true);
       try {
         const saved = await persistLlmSettings(next);
@@ -216,6 +219,7 @@ export function LlmSettingsProvider({
         return true;
       } catch (error) {
         console.error("Failed to persist LLM settings", error);
+        setLastSaveError(error instanceof Error ? error.message : "Failed to save settings.");
         return false;
       } finally {
         setIsSaving(false);
@@ -771,7 +775,11 @@ export function LlmSettingsProvider({
   );
 
   const saveSettingsNow = React.useCallback(async () => {
-    if (!isReady || !userId) return false;
+    if (!isReady) return false;
+    if (!userId) {
+      setLastSaveError("Authentication required. Sign in again.");
+      return false;
+    }
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
@@ -791,6 +799,7 @@ export function LlmSettingsProvider({
       hasUnsavedChanges,
       isReady,
       isSaving,
+      lastSaveError,
       settings,
       policy,
       saveSettingsNow,
@@ -817,6 +826,7 @@ export function LlmSettingsProvider({
       hasUnsavedChanges,
       isReady,
       isSaving,
+      lastSaveError,
       settings,
       policy,
       saveSettingsNow,
