@@ -373,9 +373,12 @@ function OpenRouterModelsCard() {
   const {
     addOpenRouterCustomModel,
     deleteOpenRouterBuiltinModel,
+    hasUnsavedChanges,
+    isSaving,
     policy,
     removeOpenRouterCustomModel,
     restoreOpenRouterBuiltinModel,
+    saveSettingsNow,
     settings,
     toggleOpenRouterModel,
   } = useLlmSettings();
@@ -383,6 +386,7 @@ function OpenRouterModelsCard() {
   const requireUserKey = policy.openrouter.requireUserKey;
   const definition = getProviderDefinition("openrouter");
   const [customDraft, setCustomDraft] = React.useState("");
+  const [saveStatus, setSaveStatus] = React.useState<"idle" | "saved" | "error">("idle");
   const deletedModelIds = new Set(openrouter.deletedModels ?? []);
   const visibleBuiltinModels = OPENROUTER_FREE_MODEL_OPTIONS.filter(
     (option) => !deletedModelIds.has(option.modelId),
@@ -402,6 +406,12 @@ function OpenRouterModelsCard() {
     }
     setCustomDraft("");
   }, [addOpenRouterCustomModel, customDraft]);
+
+  React.useEffect(() => {
+    if (hasUnsavedChanges) {
+      setSaveStatus("idle");
+    }
+  }, [hasUnsavedChanges]);
 
   return (
     <Card className="lg:col-span-2">
@@ -479,6 +489,18 @@ function OpenRouterModelsCard() {
               Add any OpenRouter model id (paid or free). Billing is tied to your own API key.
             </p>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            variant={hasUnsavedChanges ? "default" : "outline"}
+            disabled={isSaving || (!hasUnsavedChanges && saveStatus !== "error")}
+            onClick={async () => {
+              const ok = await saveSettingsNow();
+              setSaveStatus(ok ? "saved" : "error");
+            }}
+          >
+            {isSaving ? "Saving..." : saveStatus === "saved" ? "Saved" : "Save model changes"}
+          </Button>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -527,6 +549,11 @@ function OpenRouterModelsCard() {
             No custom models yet. Add one to make it appear in the top model selector.
           </p>
         )}
+        {saveStatus === "error" ? (
+          <p className="text-xs text-amber-300">
+            Could not save model changes. Try again before logging out.
+          </p>
+        ) : null}
       </div>
     </Card>
   );

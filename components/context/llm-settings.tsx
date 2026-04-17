@@ -30,7 +30,9 @@ type LlmSettingsResponse = {
 type LlmSettingsContextValue = {
   availableModelOptions: ModelOption[];
   getSupportedModelConfig: (config?: Partial<ModelConfig> | null) => ModelConfig;
+  hasUnsavedChanges: boolean;
   isReady: boolean;
+  isSaving: boolean;
   settings: LlmSettingsState;
   policy: {
     openrouter: {
@@ -38,6 +40,7 @@ type LlmSettingsContextValue = {
       requireUserKey: boolean;
     };
   };
+  saveSettingsNow: () => Promise<boolean>;
   clearProviderApiKey: (provider: "openrouter") => void;
   setProviderApiKey: (provider: "openrouter", value: string) => void;
   addOpenRouterApiKey: (name: string, key: string) => void;
@@ -181,6 +184,7 @@ export function LlmSettingsProvider({
     },
   });
   const [isReady, setIsReady] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
   const persistedSignatureRef = React.useRef<string | null>(null);
   const latestSettingsRef = React.useRef<LlmSettingsState>(settings);
   const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -188,6 +192,29 @@ export function LlmSettingsProvider({
   React.useEffect(() => {
     latestSettingsRef.current = settings;
   }, [settings]);
+
+  const persistSettingsNow = React.useCallback(
+    async (next: LlmSettingsState) => {
+      setIsSaving(true);
+      try {
+        const saved = await persistLlmSettings(next);
+        const savedSignature = JSON.stringify(saved.settings);
+        persistedSignatureRef.current = savedSignature;
+        setPolicy(saved.policy);
+        if (JSON.stringify(latestSettingsRef.current) === JSON.stringify(next)) {
+          setSettings(saved.settings);
+        }
+        clearLegacySettings(legacyStorageKey);
+        return true;
+      } catch (error) {
+        console.error("Failed to persist LLM settings", error);
+        return false;
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [legacyStorageKey],
+  );
 
   React.useEffect(() => {
     if (saveTimeoutRef.current) {
@@ -329,20 +356,7 @@ export function LlmSettingsProvider({
       if (saveTimeoutRef.current === timeoutId) {
         saveTimeoutRef.current = null;
       }
-      const pendingSignature = signature;
-      void persistLlmSettings(settings)
-        .then((saved) => {
-          const savedSignature = JSON.stringify(saved.settings);
-          persistedSignatureRef.current = savedSignature;
-          if (JSON.stringify(latestSettingsRef.current) === pendingSignature) {
-            setSettings(saved.settings);
-          }
-          setPolicy(saved.policy);
-          clearLegacySettings(legacyStorageKey);
-        })
-        .catch((error) => {
-          console.error("Failed to persist LLM settings", error);
-        });
+      void persistSettingsNow(settings);
     }, SAVE_DEBOUNCE_MS);
     saveTimeoutRef.current = timeoutId;
 
@@ -352,27 +366,14 @@ export function LlmSettingsProvider({
         saveTimeoutRef.current = null;
       }
     };
-  }, [isReady, legacyStorageKey, settings, userId]);
+  }, [isReady, persistSettingsNow, settings, userId]);
 
   const persistSettingsImmediately = React.useCallback(
     (next: LlmSettingsState) => {
       if (!isReady || !userId) return;
-      const pendingSignature = JSON.stringify(next);
-      void persistLlmSettings(next)
-        .then((saved) => {
-          const savedSignature = JSON.stringify(saved.settings);
-          persistedSignatureRef.current = savedSignature;
-          setPolicy(saved.policy);
-          if (JSON.stringify(latestSettingsRef.current) === pendingSignature) {
-            setSettings(saved.settings);
-          }
-          clearLegacySettings(legacyStorageKey);
-        })
-        .catch((error) => {
-          console.error("Failed to persist LLM settings immediately", error);
-        });
+      void persistSettingsNow(next);
     },
-    [isReady, legacyStorageKey, userId],
+    [isReady, persistSettingsNow, userId],
   );
 
   const availableModelOptions = React.useMemo(
@@ -761,13 +762,30 @@ export function LlmSettingsProvider({
     [availableModelOptions],
   );
 
+  const saveSettingsNow = React.useCallback(async () => {
+    if (!isReady || !userId) return false;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    return persistSettingsNow(latestSettingsRef.current);
+  }, [isReady, persistSettingsNow, userId]);
+
+  const hasUnsavedChanges = React.useMemo(
+    () => JSON.stringify(settings) !== persistedSignatureRef.current,
+    [settings],
+  );
+
   const value = React.useMemo<LlmSettingsContextValue>(
     () => ({
       availableModelOptions,
       getSupportedModelConfig,
+      hasUnsavedChanges,
       isReady,
+      isSaving,
       settings,
       policy,
+      saveSettingsNow,
       clearProviderApiKey,
       setProviderApiKey,
       addOpenRouterApiKey,
@@ -788,9 +806,12 @@ export function LlmSettingsProvider({
     [
       availableModelOptions,
       getSupportedModelConfig,
+      hasUnsavedChanges,
       isReady,
+      isSaving,
       settings,
       policy,
+      saveSettingsNow,
       clearProviderApiKey,
       setProviderApiKey,
       addOpenRouterApiKey,
