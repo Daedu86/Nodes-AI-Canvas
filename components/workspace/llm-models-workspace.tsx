@@ -132,23 +132,33 @@ function OllamaCard() {
 }
 
 function OpenRouterKeyCard() {
-  const { clearProviderApiKey, policy, settings, setProviderApiKey } = useLlmSettings();
+  const {
+    addOpenRouterApiKey,
+    clearProviderApiKey,
+    policy,
+    removeOpenRouterApiKey,
+    setActiveOpenRouterApiKey,
+    settings,
+  } = useLlmSettings();
   const openrouter = settings.providers.openrouter;
   const requireUserKey = policy.openrouter.requireUserKey;
   const hasDeploymentKey = policy.openrouter.hasDeploymentKey;
   const definition = getProviderDefinition("openrouter");
-  const [isEditing, setIsEditing] = React.useState(false);
+  const [draftName, setDraftName] = React.useState("");
   const [draftKey, setDraftKey] = React.useState("");
 
-  const statusLabel = openrouter.hasApiKey
-    ? "Saved"
+  const keys = openrouter.apiKeys ?? [];
+  const activeKeyId = openrouter.activeApiKeyId ?? keys[0]?.id ?? null;
+  const activeKey = keys.find((entry) => entry.id === activeKeyId) ?? null;
+  const statusLabel = keys.length > 0
+    ? `${keys.length} saved`
     : requireUserKey
       ? "Required"
       : hasDeploymentKey
         ? "Optional"
         : "Missing";
 
-  const statusTone = openrouter.hasApiKey
+  const statusTone = keys.length > 0
     ? "border-emerald-400/30 bg-emerald-500/10 text-foreground"
     : requireUserKey
       ? "border-amber-400/30 bg-amber-500/10 text-foreground"
@@ -164,78 +174,96 @@ function OpenRouterKeyCard() {
           <span
             className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-medium ${statusTone}`}
           >
-            {openrouter.hasApiKey ? <Check className="size-3.5" /> : null}
+            {keys.length > 0 ? <Check className="size-3.5" /> : null}
             {statusLabel}
           </span>
         }
       />
 
       <div className="mt-5 space-y-3">
-        {!isEditing ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="secondary" onClick={() => setIsEditing(true)}>
-              {openrouter.hasApiKey ? "Replace key" : "Add key"}
-            </Button>
-            {openrouter.hasApiKey ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  clearProviderApiKey("openrouter");
-                  setDraftKey("");
-                  setIsEditing(false);
-                }}
-              >
-                Delete key
-              </Button>
-            ) : null}
-            <p className="text-xs text-muted-foreground">
-              {requireUserKey
-                ? "This deployment requires a user key to use OpenRouter."
-                : hasDeploymentKey
-                  ? "This deployment may use a shared key when you don't add one."
-                  : "Add a key to use OpenRouter."}
-            </p>
-          </div>
-        ) : (
+        <div className="grid gap-2 md:grid-cols-[minmax(0,0.45fr)_minmax(0,1fr)_auto]">
+          <Input
+            value={draftName}
+            placeholder="Key name (optional)"
+            onChange={(event) => setDraftName(event.currentTarget.value)}
+          />
+          <Input
+            type="password"
+            value={draftKey}
+            placeholder="Paste OpenRouter API key"
+            onChange={(event) => setDraftKey(event.currentTarget.value)}
+          />
+          <Button
+            type="button"
+            onClick={() => {
+              const trimmed = draftKey.trim();
+              if (!trimmed) return;
+              addOpenRouterApiKey(draftName, trimmed);
+              setDraftName("");
+              setDraftKey("");
+            }}
+          >
+            Add key
+          </Button>
+        </div>
+
+        {keys.length > 0 ? (
           <div className="space-y-2">
-            <Input
-              type="password"
-              value={draftKey}
-              placeholder="Paste your OpenRouter API key"
-              onChange={(event) => setDraftKey(event.currentTarget.value)}
-              autoFocus
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                onClick={() => {
-                  const trimmed = draftKey.trim();
-                  if (!trimmed) return;
-                  // This is persisted server-side (debounced) and masked when reloaded.
-                  setProviderApiKey("openrouter", trimmed);
-                  setDraftKey("");
-                  setIsEditing(false);
-                }}
-              >
-                Save key
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setDraftKey("");
-                  setIsEditing(false);
-                }}
-              >
-                Cancel
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                After saving, the key is stored server-side and will not be displayed again.
-              </span>
-            </div>
+            {keys.map((entry) => {
+              const isActive = entry.id === activeKeyId;
+              return (
+                <div
+                  key={entry.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-background/60 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">{entry.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isActive ? "Active key for OpenRouter requests" : "Saved key"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={isActive ? "default" : "outline"}
+                      onClick={() => setActiveOpenRouterApiKey(entry.id)}
+                    >
+                      {isActive ? "Active" : "Set active"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => removeOpenRouterApiKey(entry.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        )}
+        ) : null}
+
+        {keys.length > 1 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" onClick={() => clearProviderApiKey("openrouter")}>
+              Delete all keys
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Active: {activeKey?.name ?? "none"}
+            </span>
+          </div>
+        ) : null}
+
+        <p className="text-xs text-muted-foreground">
+          {requireUserKey
+            ? "This deployment requires a user key to use OpenRouter."
+            : hasDeploymentKey
+              ? "This deployment may use a shared key when you don't add one."
+              : "Add one or more keys to use OpenRouter."}
+        </p>
       </div>
     </Card>
   );

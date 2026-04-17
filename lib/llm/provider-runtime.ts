@@ -46,9 +46,17 @@ function createOverridesFromSettings(
     ? validateOllamaBaseUrl(rawOllamaBaseUrl)
     : null;
 
+  const openrouterKeys = settings?.providers.openrouter.apiKeys ?? [];
+  const configuredActiveKeyId = settings?.providers.openrouter.activeApiKeyId ?? null;
+  const activeEntry =
+    (configuredActiveKeyId
+      ? openrouterKeys.find((entry) => entry.id === configuredActiveKeyId)
+      : undefined) ?? openrouterKeys[0];
+
   return {
     ollamaBaseUrl: validatedOllamaBaseUrl?.ok ? validatedOllamaBaseUrl.normalized : undefined,
-    openrouterApiKey: normalizeValue(settings?.providers.openrouter.apiKey),
+    openrouterApiKey:
+      normalizeValue(activeEntry?.key) ?? normalizeValue(settings?.providers.openrouter.apiKey),
   };
 }
 

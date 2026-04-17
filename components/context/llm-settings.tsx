@@ -40,6 +40,9 @@ type LlmSettingsContextValue = {
   };
   clearProviderApiKey: (provider: "openrouter") => void;
   setProviderApiKey: (provider: "openrouter", value: string) => void;
+  addOpenRouterApiKey: (name: string, key: string) => void;
+  removeOpenRouterApiKey: (id: string) => void;
+  setActiveOpenRouterApiKey: (id: string) => void;
   addOpenRouterCustomModel: (modelId: string) => void;
   removeOpenRouterCustomModel: (modelId: string) => void;
   setProviderEnabled: (provider: Exclude<LlmProviderId, "openrouter">, value: boolean) => void;
@@ -52,6 +55,13 @@ const LlmSettingsContext = React.createContext<LlmSettingsContextValue | null>(n
 
 const LEGACY_STORAGE_KEY_PREFIX = "nodes.llm-settings.v1:";
 const SAVE_DEBOUNCE_MS = 450;
+
+const createOpenRouterApiKeyId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `or-key-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+};
 
 const readLegacySettings = (storageKey: string) => {
   try {
@@ -342,20 +352,46 @@ export function LlmSettingsProvider({
 
   const setProviderApiKey = React.useCallback(
     (provider: "openrouter", value: string) => {
+      const trimmed = value.trim();
       setSettings((current) => ({
-        providers: {
-          ...current.providers,
-          [provider]: {
-            ...current.providers[provider],
-            apiKey: value,
-            clearApiKey: false,
-            hasApiKey:
-              value.trim().length > 0
-                ? true
-                : current.providers[provider].hasApiKey === true &&
-                  current.providers[provider].clearApiKey !== true,
-          },
-        },
+        providers: (() => {
+          const currentProvider = current.providers[provider];
+          const currentKeys = currentProvider.apiKeys ?? [];
+          let nextKeys = currentKeys;
+          let nextActiveId = currentProvider.activeApiKeyId ?? null;
+
+          if (trimmed.length > 0) {
+            if (nextActiveId) {
+              nextKeys = currentKeys.map((entry) =>
+                entry.id === nextActiveId ? { ...entry, key: value } : entry,
+              );
+            } else {
+              const newId = createOpenRouterApiKeyId();
+              nextKeys = [
+                ...currentKeys,
+                {
+                  createdAt: new Date().toISOString(),
+                  id: newId,
+                  key: value,
+                  name: `OpenRouter key ${currentKeys.length + 1}`,
+                },
+              ];
+              nextActiveId = newId;
+            }
+          }
+
+          return {
+            ...current.providers,
+            [provider]: {
+              ...currentProvider,
+              activeApiKeyId: nextActiveId,
+              apiKey: value,
+              apiKeys: nextKeys,
+              clearApiKey: false,
+              hasApiKey: trimmed.length > 0 || nextKeys.length > 0,
+            },
+          };
+        })(),
       }));
     },
     [],
@@ -368,7 +404,9 @@ export function LlmSettingsProvider({
           ...current.providers,
           [provider]: {
             ...current.providers[provider],
+            activeApiKeyId: null,
             apiKey: "",
+            apiKeys: [],
             clearApiKey: true,
             hasApiKey: false,
           },
@@ -377,6 +415,85 @@ export function LlmSettingsProvider({
     },
     [],
   );
+
+  const addOpenRouterApiKey = React.useCallback((name: string, key: string) => {
+    const trimmedKey = key.trim();
+    if (!trimmedKey) return;
+    const trimmedName = name.trim();
+    setSettings((current) => {
+      const currentKeys = current.providers.openrouter.apiKeys ?? [];
+      const next = [
+        ...currentKeys,
+        {
+          createdAt: new Date().toISOString(),
+          id: createOpenRouterApiKeyId(),
+          key: trimmedKey,
+          name: trimmedName || `OpenRouter key ${currentKeys.length + 1}`,
+        },
+      ];
+      const activeApiKeyId = current.providers.openrouter.activeApiKeyId ?? next[0]?.id ?? null;
+      const activeKey =
+        next.find((entry) => entry.id === activeApiKeyId)?.key ?? next[0]?.key ?? "";
+      return {
+        providers: {
+          ...current.providers,
+          openrouter: {
+            ...current.providers.openrouter,
+            activeApiKeyId,
+            apiKey: activeKey,
+            apiKeys: next,
+            clearApiKey: false,
+            hasApiKey: true,
+          },
+        },
+      };
+    });
+  }, []);
+
+  const removeOpenRouterApiKey = React.useCallback((id: string) => {
+    setSettings((current) => {
+      const next = (current.providers.openrouter.apiKeys ?? []).filter((entry) => entry.id !== id);
+      const activeApiKeyId =
+        current.providers.openrouter.activeApiKeyId === id
+          ? (next[0]?.id ?? null)
+          : current.providers.openrouter.activeApiKeyId ?? (next[0]?.id ?? null);
+      const activeKey =
+        next.find((entry) => entry.id === activeApiKeyId)?.key ?? next[0]?.key ?? "";
+      return {
+        providers: {
+          ...current.providers,
+          openrouter: {
+            ...current.providers.openrouter,
+            activeApiKeyId,
+            apiKey: activeKey,
+            apiKeys: next,
+            clearApiKey: next.length === 0,
+            hasApiKey: next.length > 0,
+          },
+        },
+      };
+    });
+  }, []);
+
+  const setActiveOpenRouterApiKey = React.useCallback((id: string) => {
+    setSettings((current) => {
+      const keys = current.providers.openrouter.apiKeys ?? [];
+      const active = keys.find((entry) => entry.id === id);
+      if (!active) return current;
+      return {
+        providers: {
+          ...current.providers,
+          openrouter: {
+            ...current.providers.openrouter,
+            activeApiKeyId: id,
+            apiKey: active.key,
+            clearApiKey: false,
+            hasApiKey: true,
+          },
+        },
+      };
+    });
+  }, []);
 
   const setProviderEnabled = React.useCallback(
     (provider: Exclude<LlmProviderId, "openrouter">, value: boolean) => {
@@ -495,6 +612,9 @@ export function LlmSettingsProvider({
       policy,
       clearProviderApiKey,
       setProviderApiKey,
+      addOpenRouterApiKey,
+      removeOpenRouterApiKey,
+      setActiveOpenRouterApiKey,
       addOpenRouterCustomModel,
       removeOpenRouterCustomModel,
       setProviderEnabled,
@@ -510,6 +630,9 @@ export function LlmSettingsProvider({
       policy,
       clearProviderApiKey,
       setProviderApiKey,
+      addOpenRouterApiKey,
+      removeOpenRouterApiKey,
+      setActiveOpenRouterApiKey,
       addOpenRouterCustomModel,
       removeOpenRouterCustomModel,
       setProviderEnabled,

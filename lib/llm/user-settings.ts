@@ -49,7 +49,15 @@ export type OllamaProviderSettings = {
 };
 
 export type OpenRouterProviderSettings = {
+  activeApiKeyId?: string | null;
   apiKey: string;
+  apiKeys?: Array<{
+    createdAt?: string;
+    hasKey?: boolean;
+    id: string;
+    key: string;
+    name: string;
+  }>;
   clearApiKey?: boolean;
   customModels?: string[];
   enabledModels: string[];
@@ -71,7 +79,9 @@ export const DEFAULT_LLM_SETTINGS_STATE: LlmSettingsState = {
       models: DEFAULT_OLLAMA_MODELS,
     },
     openrouter: {
+      activeApiKeyId: null,
       apiKey: "",
+      apiKeys: [],
       clearApiKey: false,
       customModels: [],
       enabledModels: OPENROUTER_FREE_MODEL_OPTIONS.map((option) => option.modelId),
@@ -88,6 +98,8 @@ export const cloneDefaultLlmSettingsState = (): LlmSettingsState => ({
     },
     openrouter: {
       ...DEFAULT_LLM_SETTINGS_STATE.providers.openrouter,
+      activeApiKeyId: DEFAULT_LLM_SETTINGS_STATE.providers.openrouter.activeApiKeyId ?? null,
+      apiKeys: [...(DEFAULT_LLM_SETTINGS_STATE.providers.openrouter.apiKeys ?? [])],
       customModels: [...(DEFAULT_LLM_SETTINGS_STATE.providers.openrouter.customModels ?? [])],
       enabledModels: [...DEFAULT_LLM_SETTINGS_STATE.providers.openrouter.enabledModels],
     },
@@ -109,6 +121,41 @@ const normalizeOpenRouterCustomModels = (value: unknown) => {
     .slice(0, 50);
 };
 
+const normalizeOpenRouterApiKeys = (value: unknown) => {
+  const rawEntries = Array.isArray(value) ? value : [];
+  return rawEntries
+    .map((entry): NonNullable<OpenRouterProviderSettings["apiKeys"]>[number] | null => {
+      if (!entry || typeof entry !== "object") return null;
+      const record = entry as Record<string, unknown>;
+      const id = typeof record.id === "string" ? record.id.trim() : "";
+      const name = typeof record.name === "string" ? record.name.trim() : "";
+      const key = typeof record.key === "string" ? record.key : "";
+      if (!id) return null;
+      return {
+        id,
+        name: name || "OpenRouter key",
+        key,
+        hasKey: record.hasKey === true || key.trim().length > 0,
+        createdAt:
+          typeof record.createdAt === "string" && record.createdAt.trim().length > 0
+            ? record.createdAt
+            : undefined,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+    .slice(0, 20);
+};
+
+const getActiveApiKeyFromList = (provider: OpenRouterProviderSettings) => {
+  const keys = provider.apiKeys ?? [];
+  if (keys.length === 0) return undefined;
+  if (provider.activeApiKeyId) {
+    const active = keys.find((entry) => entry.id === provider.activeApiKeyId);
+    if (active?.key?.trim()) return active.key;
+  }
+  return keys.find((entry) => entry.key.trim().length > 0)?.key;
+};
+
 export const normalizeLlmSettingsState = (
   input: Partial<LlmSettingsState> | null | undefined,
 ): LlmSettingsState => {
@@ -125,8 +172,14 @@ export const normalizeLlmSettingsState = (
     : base.providers.openrouter.enabledModels;
 
   base.providers.openrouter = {
+    activeApiKeyId:
+      typeof providers.openrouter?.activeApiKeyId === "string" &&
+      providers.openrouter.activeApiKeyId.trim().length > 0
+        ? providers.openrouter.activeApiKeyId.trim()
+        : null,
     apiKey:
       typeof providers.openrouter?.apiKey === "string" ? providers.openrouter.apiKey : "",
+    apiKeys: normalizeOpenRouterApiKeys(providers.openrouter?.apiKeys),
     clearApiKey: providers.openrouter?.clearApiKey === true,
     customModels: normalizeOpenRouterCustomModels(providers.openrouter?.customModels),
     enabledModels:
@@ -137,6 +190,39 @@ export const normalizeLlmSettingsState = (
         : typeof providers.openrouter?.apiKey === "string" &&
             providers.openrouter.apiKey.trim().length > 0,
   };
+
+  // Backward compatibility: when only a legacy single apiKey exists, synthesize one key entry.
+  if ((base.providers.openrouter.apiKeys?.length ?? 0) === 0) {
+    const legacyKey = base.providers.openrouter.apiKey.trim();
+    if (legacyKey) {
+      const synthesizedId = "legacy-default";
+      base.providers.openrouter.apiKeys = [
+        {
+          id: synthesizedId,
+          name: "Default key",
+          key: base.providers.openrouter.apiKey,
+          hasKey: true,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      base.providers.openrouter.activeApiKeyId = synthesizedId;
+    }
+  }
+
+  if (base.providers.openrouter.apiKeys && base.providers.openrouter.apiKeys.length > 0) {
+    const hasActive = base.providers.openrouter.activeApiKeyId
+      ? base.providers.openrouter.apiKeys.some(
+          (entry) => entry.id === base.providers.openrouter.activeApiKeyId,
+        )
+      : false;
+    if (!hasActive) {
+      base.providers.openrouter.activeApiKeyId = base.providers.openrouter.apiKeys[0]!.id;
+    }
+    const activeKey = getActiveApiKeyFromList(base.providers.openrouter);
+    if (activeKey) {
+      base.providers.openrouter.apiKey = activeKey;
+    }
+  }
 
   base.providers.ollama = {
     baseUrl:
@@ -167,7 +253,14 @@ export const normalizeLlmSettingsState = (
 const stripOpenRouterMetadata = (
   provider: OpenRouterProviderSettings,
 ): OpenRouterProviderSettings => ({
+  activeApiKeyId: provider.activeApiKeyId ?? null,
   apiKey: provider.apiKey,
+  apiKeys: (provider.apiKeys ?? []).map((entry) => ({
+    createdAt: entry.createdAt,
+    id: entry.id,
+    key: entry.key,
+    name: entry.name,
+  })),
   customModels: [...(provider.customModels ?? [])],
   enabledModels: [...provider.enabledModels],
 });
@@ -200,8 +293,18 @@ export const maskLlmSettingsState = (
       openrouter: {
         ...normalized.providers.openrouter,
         apiKey: "",
+        apiKeys: (normalized.providers.openrouter.apiKeys ?? []).map((entry) => ({
+          createdAt: entry.createdAt,
+          hasKey: entry.key.trim().length > 0,
+          id: entry.id,
+          key: "",
+          name: entry.name,
+        })),
         clearApiKey: false,
-        hasApiKey: normalized.providers.openrouter.apiKey.trim().length > 0,
+        hasApiKey:
+          (normalized.providers.openrouter.apiKeys ?? []).some(
+            (entry) => entry.key.trim().length > 0,
+          ) || normalized.providers.openrouter.apiKey.trim().length > 0,
       },
     },
   };
@@ -219,6 +322,53 @@ const resolveMergedApiKey = (
   return trimmed ? incomingValue ?? "" : currentValue;
 };
 
+const resolveMergedApiKeys = (
+  current: OpenRouterProviderSettings,
+  incoming: OpenRouterProviderSettings,
+  incomingRaw: Partial<OpenRouterProviderSettings> | undefined,
+) => {
+  const currentById = new Map((current.apiKeys ?? []).map((entry) => [entry.id, entry]));
+  const incomingKeys = incoming.apiKeys ?? [];
+  const now = new Date().toISOString();
+
+  const mergedFromIncoming = incomingKeys
+    .map((entry, index) => {
+      const existing = currentById.get(entry.id);
+      const incomingRawEntry = Array.isArray(incomingRaw?.apiKeys)
+        ? incomingRaw?.apiKeys.find((item) => item && typeof item === "object" && item.id === entry.id)
+        : undefined;
+      const incomingKey = entry.key.trim();
+      const shouldPreserveExisting =
+        incomingKey.length === 0 &&
+        existing &&
+        ((incomingRawEntry as { hasKey?: boolean } | undefined)?.hasKey === true ||
+          incomingRawEntry !== undefined);
+
+      const key = incomingKey.length > 0 ? entry.key : shouldPreserveExisting ? existing.key : "";
+      if (key.trim().length === 0) {
+        return null;
+      }
+      return {
+        createdAt: existing?.createdAt ?? entry.createdAt ?? now,
+        id: entry.id,
+        key,
+        name: entry.name.trim() || existing?.name || `OpenRouter key ${index + 1}`,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  if (mergedFromIncoming.length > 0) {
+    return mergedFromIncoming;
+  }
+
+  // If caller explicitly sent apiKeys but they resolved to empty, respect that as clear-all.
+  if (incomingRaw && Object.prototype.hasOwnProperty.call(incomingRaw, "apiKeys")) {
+    return [];
+  }
+
+  return current.apiKeys ?? [];
+};
+
 export const mergeLlmSettingsState = (
   current: Partial<LlmSettingsState> | null | undefined,
   incoming: Partial<LlmSettingsState> | null | undefined,
@@ -228,6 +378,45 @@ export const mergeLlmSettingsState = (
   const incomingNormalized = normalizeLlmSettingsState(incoming);
   const hasIncomingProvider = <T extends keyof LlmSettingsState["providers"]>(provider: T) =>
     nextProviders?.[provider] !== undefined;
+  const clearOpenRouterApiKey = nextProviders?.openrouter?.clearApiKey === true;
+
+  const incomingOpenRouterRaw = nextProviders?.openrouter;
+  const mergedApiKeys = clearOpenRouterApiKey
+    ? []
+    : hasIncomingProvider("openrouter")
+      ? resolveMergedApiKeys(
+          currentNormalized.providers.openrouter,
+          incomingNormalized.providers.openrouter,
+          incomingOpenRouterRaw,
+        )
+      : (currentNormalized.providers.openrouter.apiKeys ?? []);
+
+  const mergedActiveApiKeyId = clearOpenRouterApiKey
+    ? null
+    : hasIncomingProvider("openrouter")
+      ? (() => {
+          const candidate =
+            typeof incomingOpenRouterRaw?.activeApiKeyId === "string"
+              ? incomingOpenRouterRaw.activeApiKeyId.trim()
+              : "";
+          if (candidate && mergedApiKeys.some((entry) => entry.id === candidate)) return candidate;
+          const currentActive = currentNormalized.providers.openrouter.activeApiKeyId ?? "";
+          if (currentActive && mergedApiKeys.some((entry) => entry.id === currentActive)) {
+            return currentActive;
+          }
+          return mergedApiKeys[0]?.id ?? null;
+        })()
+      : (currentNormalized.providers.openrouter.activeApiKeyId ?? mergedApiKeys[0]?.id ?? null);
+
+  const mergedSingleApiKey = clearOpenRouterApiKey
+    ? ""
+    : mergedApiKeys.find((entry) => entry.id === mergedActiveApiKeyId)?.key ??
+      mergedApiKeys[0]?.key ??
+      resolveMergedApiKey(
+        currentNormalized.providers.openrouter.apiKey,
+        nextProviders?.openrouter?.apiKey,
+        nextProviders?.openrouter?.clearApiKey,
+      );
 
   return stripLlmSettingsCredentialMetadata({
     providers: {
@@ -243,11 +432,9 @@ export const mergeLlmSettingsState = (
           : currentNormalized.providers.ollama.models,
       },
       openrouter: {
-        apiKey: resolveMergedApiKey(
-          currentNormalized.providers.openrouter.apiKey,
-          nextProviders?.openrouter?.apiKey,
-          nextProviders?.openrouter?.clearApiKey,
-        ),
+        activeApiKeyId: mergedActiveApiKeyId,
+        apiKey: mergedSingleApiKey,
+        apiKeys: mergedApiKeys,
         customModels: hasIncomingProvider("openrouter")
           ? incomingNormalized.providers.openrouter.customModels
           : currentNormalized.providers.openrouter.customModels,
