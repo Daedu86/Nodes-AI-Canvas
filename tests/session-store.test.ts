@@ -165,6 +165,17 @@ describe("session-store", () => {
     await expect(getSession(third.id)).rejects.toThrow();
   });
 
+  it("ignores missing sessions during batch deletion", async () => {
+    const first = await createSession({ title: "First" });
+    const second = await createSession({ title: "Second" });
+
+    await deleteSession(first.id);
+
+    await expect(deleteSessions([first.id, second.id])).resolves.toBeUndefined();
+    expect(await listSessions()).toHaveLength(0);
+    await expect(getSession(second.id)).rejects.toThrow();
+  });
+
   it("removes stale artifact blobs when artifacts disappear from a session", async () => {
     const created = await createSession({
       artifacts: [

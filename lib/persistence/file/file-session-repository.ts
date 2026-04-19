@@ -79,6 +79,13 @@ const sortSessions = (sessions: SessionSummary[]) =>
     return a.createdAt.localeCompare(b.createdAt);
   });
 
+const isMissingSessionError = (error: unknown) =>
+  (error instanceof Error && error.message === "Session not found") ||
+  (typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ENOENT");
+
 async function ensureStoreDir() {
   await fs.mkdir(getSessionStoreDir(), { recursive: true });
 }
@@ -257,9 +264,15 @@ export const fileSessionRepository: SessionRepository = {
 
   async deleteSessions(sessionIds, ownerId) {
     const uniqueSessionIds = [...new Set(sessionIds)];
-    await Promise.all(
-      uniqueSessionIds.map((sessionId) => fileSessionRepository.deleteSession(sessionId, ownerId)),
-    );
+    await Promise.all(uniqueSessionIds.map(async (sessionId) => {
+      try {
+        await fileSessionRepository.deleteSession(sessionId, ownerId);
+      } catch (error) {
+        if (!isMissingSessionError(error)) {
+          throw error;
+        }
+      }
+    }));
   },
 
   async getSessionBlobMaintenanceSummary() {

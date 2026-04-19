@@ -21,6 +21,9 @@ import {
 const sessionSelect =
   "id,title,archived,snapshot_json,artifacts_json,context_links_json,created_at,updated_at";
 
+const isMissingSessionError = (error: unknown) =>
+  error instanceof Error && error.message === "Session not found";
+
 export const supabaseSessionRepository: SessionRepository = {
   async listSessions(options = {}) {
     const client = getSupabasePersistenceClient();
@@ -129,7 +132,15 @@ export const supabaseSessionRepository: SessionRepository = {
 
   async deleteSessions(sessionIds, ownerId) {
     const uniqueIds = [...new Set(sessionIds)];
-    await Promise.all(uniqueIds.map((sessionId) => this.deleteSession(sessionId, ownerId)));
+    await Promise.all(uniqueIds.map(async (sessionId) => {
+      try {
+        await this.deleteSession(sessionId, ownerId);
+      } catch (error) {
+        if (!isMissingSessionError(error)) {
+          throw error;
+        }
+      }
+    }));
   },
 
   async getSessionBlobMaintenanceSummary() {
