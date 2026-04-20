@@ -20,6 +20,7 @@ import { forceSessionPersist } from "@/lib/session-persist-sync";
 
 const formatTitle = (title: string | null) => title?.trim() || "New Chat";
 const formatProjectTitle = (title: string | null) => title?.trim() || "Untitled Project";
+const MANAGE_MODE_NEW_SESSION_GUARD_MS = 300;
 
 const formatUpdatedAt = (value: string) => {
   try {
@@ -56,6 +57,7 @@ export const ThreadList: FC = () => {
   const [savedSessionsOpen, setSavedSessionsOpen] = React.useState(true);
   const [manageSessions, setManageSessions] = React.useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = React.useState<Set<string>>(new Set());
+  const suppressNewSessionUntilRef = React.useRef(0);
 
   React.useEffect(() => {
     setSelectedSessionIds((prev) => {
@@ -122,6 +124,22 @@ export const ThreadList: FC = () => {
     await deleteSessions(allSessionIds);
     setSelectedSessionIds(new Set());
   }, [allSessionIds, deleteSessions, sessions.length]);
+
+  const handleExitManageSessions = React.useCallback(() => {
+    // Guard against rapid re-targeted clicks when the manage toolbar collapses.
+    suppressNewSessionUntilRef.current = Date.now() + MANAGE_MODE_NEW_SESSION_GUARD_MS;
+    setManageSessions(false);
+    setSelectedSessionIds(new Set());
+  }, []);
+
+  const handleCreateSession = React.useCallback(() => {
+    if (manageSessions || Date.now() < suppressNewSessionUntilRef.current) {
+      return;
+    }
+    showWorkspace();
+    clearActiveProject();
+    void createSession();
+  }, [clearActiveProject, createSession, manageSessions, showWorkspace]);
 
   const handleCreateEmptyProject = React.useCallback(async () => {
     showWorkspace();
@@ -296,11 +314,8 @@ export const ThreadList: FC = () => {
                 size="sm"
                 variant="outline"
                 className="h-8 border-primary/20 bg-primary/12 px-3 text-xs text-primary hover:bg-primary/16 hover:text-primary"
-                onClick={() => {
-                  showWorkspace();
-                  clearActiveProject();
-                  void createSession();
-                }}
+                onClick={handleCreateSession}
+                disabled={manageSessions}
               >
                 <PlusIcon className="h-3.5 w-3.5" />
                 New session
@@ -329,10 +344,7 @@ export const ThreadList: FC = () => {
                     size="sm"
                     variant="outline"
                     className="h-8 px-3 text-xs"
-                    onClick={() => {
-                      setManageSessions(false);
-                      setSelectedSessionIds(new Set());
-                    }}
+                    onClick={handleExitManageSessions}
                   >
                     Done
                   </Button>
