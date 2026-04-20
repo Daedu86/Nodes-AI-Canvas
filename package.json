@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "rotate:secrets": "node --env-file=.env.local scripts/rotate-secrets.mjs",
     "setup:supabase-storage": "node --env-file=.env.local scripts/setup-supabase-storage.mjs",
     "migrate:supabase": "node --env-file=.env.local scripts/migrate-to-supabase.mjs",
     "test": "vitest run",
