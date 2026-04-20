@@ -3,6 +3,7 @@ import { createOllama, ollama } from "ollama-ai-provider";
 import { getLlmSettings } from "@/lib/llm-settings-store";
 import {
   getOpenRouterMetadataHeaders,
+  getModelAttemptChain,
   OLLAMA_API_URL,
   OPENROUTER_BASE_URL,
   type Provider,
@@ -82,6 +83,47 @@ const isOllamaCloudEndpoint = (baseUrl?: string) => {
   return value.includes("ollama.com");
 };
 
+const createOpenRouterFetchWithFallbacks = (config: ResolvedModelConfig) => {
+  if (config.modelId === "openrouter/free") {
+    return fetch;
+  }
+
+  const fallbackModels = getModelAttemptChain(config)
+    .filter((candidate) => candidate.provider === "openrouter" && candidate.modelId !== config.modelId)
+    .map((candidate) => candidate.modelId);
+
+  if (fallbackModels.length === 0) {
+    return fetch;
+  }
+
+  return async (input: RequestInfo | URL, init?: RequestInit) => {
+    if ((init?.method ?? "GET").toUpperCase() !== "POST" || typeof init?.body !== "string") {
+      return fetch(input, init);
+    }
+
+    try {
+      const body = JSON.parse(init.body) as {
+        model?: unknown;
+        models?: unknown;
+      };
+
+      if (body.model !== config.modelId || Array.isArray(body.models)) {
+        return fetch(input, init);
+      }
+
+      return fetch(input, {
+        ...init,
+        body: JSON.stringify({
+          ...body,
+          models: fallbackModels,
+        }),
+      });
+    } catch {
+      return fetch(input, init);
+    }
+  };
+};
+
 export async function getUserModelOverrides(userId: string) {
   const settings = await getLlmSettings(userId);
   return createOverridesFromSettings(settings);
@@ -137,6 +179,7 @@ export function createLanguageModel(
       return createOpenAI({
         apiKey,
         baseURL: OPENROUTER_BASE_URL,
+        fetch: createOpenRouterFetchWithFallbacks(config),
         headers: getOpenRouterMetadataHeaders(),
         name: "openrouter",
       })(config.modelId);

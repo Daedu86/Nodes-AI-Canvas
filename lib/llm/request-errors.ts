@@ -39,30 +39,91 @@ const OLLAMA_UNAVAILABLE_TOKENS = [
   "ollama",
 ];
 
-const getErrorMessage = (error: unknown) => {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  if (error && typeof error === "object" && "message" in error) {
-    const maybeMessage = (error as { message?: unknown }).message;
-    if (typeof maybeMessage === "string") return maybeMessage;
+const parsePotentialJson = (value: unknown) => {
+  if (typeof value !== "string") return null;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
   }
+};
+
+const getNestedErrorCandidates = (error: unknown) => {
+  if (!error || typeof error !== "object") return [];
+
+  const record = error as Record<string, unknown>;
+  const nested: unknown[] = [];
+
+  for (const key of ["cause", "lastError", "error", "data", "metadata"]) {
+    if (record[key] != null) nested.push(record[key]);
+  }
+
+  if (Array.isArray(record.errors)) {
+    nested.push(...record.errors);
+  }
+
+  for (const key of ["responseBody", "body"]) {
+    const parsed = parsePotentialJson(record[key]);
+    if (parsed != null) nested.push(parsed);
+  }
+
+  return nested;
+};
+
+const getErrorMessage = (error: unknown, seen = new Set<unknown>()): string => {
+  if (error == null) return "";
+  if (typeof error === "string") return error;
+  if (seen.has(error)) return "";
+
+  if (typeof error === "object") {
+    seen.add(error);
+
+    if (error instanceof Error && typeof error.message === "string" && error.message.trim()) {
+      return error.message;
+    }
+
+    const record = error as Record<string, unknown>;
+    if (typeof record.message === "string" && record.message.trim()) {
+      return record.message;
+    }
+    if (typeof record.raw === "string" && record.raw.trim()) {
+      return record.raw;
+    }
+
+    for (const nested of getNestedErrorCandidates(error)) {
+      const message = getErrorMessage(nested, seen);
+      if (message) return message;
+    }
+  }
+
   return "";
 };
 
-const getErrorStatus = (error: unknown): number | null => {
-  if (error && typeof error === "object") {
+const getErrorStatus = (error: unknown, seen = new Set<unknown>()): number | null => {
+  if (error == null) return null;
+  if (seen.has(error)) return null;
+
+  if (typeof error === "object") {
+    seen.add(error);
+
     const record = error as Record<string, unknown>;
-    for (const key of ["statusCode", "status", "responseStatus"]) {
+    for (const key of ["statusCode", "status", "responseStatus", "code"]) {
       const value = record[key];
-      if (typeof value === "number") return value;
+      if (
+        typeof value === "number" &&
+        [400, 401, 403, 404, 408, 409, 422, 429, 500, 502, 503, 504].includes(value)
+      ) {
+        return value;
+      }
     }
-    if (record.cause) {
-      const nested = getErrorStatus(record.cause);
-      if (nested != null) return nested;
+
+    for (const nested of getNestedErrorCandidates(error)) {
+      const nestedStatus = getErrorStatus(nested, seen);
+      if (nestedStatus != null) return nestedStatus;
     }
   }
 
-  const message = getErrorMessage(error);
+  const message = getErrorMessage(error, seen);
   const match = message.match(/\b(400|401|403|404|408|409|422|429|500|502|503|504)\b/);
   return match ? Number(match[1]) : null;
 };
@@ -216,6 +277,7 @@ export function getRequestErrorMessageFromResponse(response: Pick<Response, "sta
 export function getRequestErrorMessageFromThrowable(error: unknown) {
   const rawMessage = getErrorMessage(error);
   const message = rawMessage.toLowerCase();
+  const status = getErrorStatus(error);
   const errorName =
     error && typeof error === "object" && "name" in error && typeof error.name === "string"
       ? error.name.toLowerCase()
@@ -232,6 +294,18 @@ export function getRequestErrorMessageFromThrowable(error: unknown) {
   }
   if (message.includes("too many assistant runs")) {
     return ACTIVE_RUN_ERROR_MESSAGE;
+  }
+  if (status === 429) {
+    return "This model is rate limited right now. Try again in a moment or choose another model.";
+  }
+  if (status === 400 || status === 404) {
+    return "The selected model is not available anymore. Choose another model and try again.";
+  }
+  if (status === 503) {
+    return "The assistant backend is temporarily unavailable. Try again in a moment.";
+  }
+  if (status === 504) {
+    return "The assistant backend timed out. Try again or switch models.";
   }
   if (message.includes("rate limit") || message.includes("too many requests")) {
     return "This model is rate limited right now. Try again in a moment or choose another model.";

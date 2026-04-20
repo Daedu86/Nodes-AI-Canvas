@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   REQUEST_ERROR_CODE_HEADER,
   REQUEST_ERROR_MESSAGE_HEADER,
+  classifyRequestError,
   getRequestErrorMessageFromResponse,
   getRequestErrorMessageFromThrowable,
 } from "../lib/llm/request-errors";
@@ -67,6 +68,38 @@ describe("request error helpers", () => {
       ),
     ).toBe("The assistant is still responding. Wait for it to finish or cancel the current run.");
     expect(getRequestErrorMessageFromThrowable(new Error("429 rate limit"))).toBe(
+      "This model is rate limited right now. Try again in a moment or choose another model.",
+    );
+  });
+
+  it("classifies AI SDK retry wrappers with nested 429 errors as provider rate limits", () => {
+    const retryError = {
+      name: "AI_RetryError",
+      message: "Failed after 3 attempts. Last error: Provider returned error",
+      lastError: {
+        statusCode: 429,
+        responseBody: JSON.stringify({
+          error: {
+            code: 429,
+            metadata: {
+              raw: "google/gemma-4-31b-it:free is temporarily rate-limited upstream.",
+            },
+          },
+        }),
+      },
+    };
+
+    expect(
+      classifyRequestError(retryError, {
+        modelId: "google/gemma-4-31b-it:free",
+        provider: "openrouter",
+      }),
+    ).toMatchObject({
+      code: "provider_rate_limited",
+      status: 429,
+    });
+
+    expect(getRequestErrorMessageFromThrowable(retryError)).toBe(
       "This model is rate limited right now. Try again in a moment or choose another model.",
     );
   });

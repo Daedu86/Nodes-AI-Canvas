@@ -241,6 +241,46 @@ describe("/api/chat", () => {
     );
   });
 
+  it("returns a rate-limit message when the stream layer surfaces an AI retry wrapper", async () => {
+    streamTextMock.mockReturnValueOnce({
+      toUIMessageStreamResponse: ({ onError }: { onError: (error: unknown) => string }) =>
+        new Response(
+          onError({
+            name: "AI_RetryError",
+            message: "Failed after 3 attempts. Last error: Provider returned error",
+            lastError: {
+              statusCode: 429,
+              responseBody: JSON.stringify({
+                error: {
+                  code: 429,
+                  metadata: {
+                    raw: "google/gemma-4-31b-it:free is temporarily rate-limited upstream.",
+                  },
+                },
+              }),
+            },
+          }),
+          { status: 429 },
+        ),
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          provider: "openrouter",
+          model: "google/gemma-4-31b-it:free",
+          messages: [{ id: "u1", role: "user", content: "hello" }],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.text()).resolves.toBe(
+      "This model is rate limited right now. Try again in a moment or choose another model.",
+    );
+  });
+
   it("retries the next allowed OpenRouter model when the selected model is unavailable", async () => {
     streamTextMock.mockImplementation(({ model }: { model: { modelId: string } }) => {
       if (model.modelId === "openrouter/free") {
