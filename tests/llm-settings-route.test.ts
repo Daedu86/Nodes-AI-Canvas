@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireLocalApiUserMock = vi.hoisted(() => vi.fn());
 const getLlmSettingsMock = vi.hoisted(() => vi.fn());
 const saveLlmSettingsMock = vi.hoisted(() => vi.fn());
+const getUserPlanMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../lib/server/request-guards", () => ({
   requireLocalApiUser: requireLocalApiUserMock,
@@ -13,6 +14,10 @@ vi.mock("../lib/llm-settings-store", () => ({
   saveLlmSettings: saveLlmSettingsMock,
 }));
 
+vi.mock("../lib/user-plan-store", () => ({
+  getUserPlan: getUserPlanMock,
+}));
+
 import { GET, PUT } from "../app/api/llm/settings/route";
 
 describe("/api/llm/settings", () => {
@@ -20,6 +25,7 @@ describe("/api/llm/settings", () => {
     requireLocalApiUserMock.mockReset();
     getLlmSettingsMock.mockReset();
     saveLlmSettingsMock.mockReset();
+    getUserPlanMock.mockReset();
     requireLocalApiUserMock.mockResolvedValue({
       user: {
         email: "test@nodes.local",
@@ -27,6 +33,7 @@ describe("/api/llm/settings", () => {
         name: "Test User",
       },
     });
+    getUserPlanMock.mockResolvedValue("free");
   });
 
   it("returns saved settings for the authenticated user", async () => {
@@ -46,6 +53,9 @@ describe("/api/llm/settings", () => {
     expect(response.status).toBe(200);
     expect(getLlmSettingsMock).toHaveBeenCalledWith("user-1");
     await expect(response.json()).resolves.toEqual({
+      plan: {
+        current: "free",
+      },
       settings: expect.objectContaining({
         providers: expect.objectContaining({
           openrouter: expect.objectContaining({
@@ -119,6 +129,9 @@ describe("/api/llm/settings", () => {
       }),
     );
     await expect(response.json()).resolves.toEqual({
+      plan: {
+        current: "free",
+      },
       settings: expect.objectContaining({
         providers: expect.objectContaining({
           openrouter: expect.objectContaining({

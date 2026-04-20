@@ -13,6 +13,7 @@ import {
 import { SidebarProvider } from "../components/ui/sidebar";
 import { LlmModelsWorkspace } from "../components/workspace/llm-models-workspace";
 import { AgentAccessWorkspace } from "../components/workspace/agent-access-workspace";
+import { PlanUsageWorkspace } from "../components/workspace/plan-usage-workspace";
 
 const fetchMock = vi.fn();
 
@@ -40,6 +41,8 @@ function SurfaceHarness() {
       <div data-testid="surface">{activeSurface}</div>
       {activeSurface === "llm-models" ? (
         <LlmModelsWorkspace />
+      ) : activeSurface === "plan-usage" ? (
+        <PlanUsageWorkspace />
       ) : activeSurface === "agent-access" ? (
         <AgentAccessWorkspace />
       ) : activeSurface === "agent-work" ? (
@@ -67,6 +70,25 @@ describe("WorkspaceSurfaceProvider", () => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/agents/work")) {
         return Response.json({ agents: [], sessions: [], projects: [], events: [] });
+      }
+      if (url.includes("/api/account/plan")) {
+        return Response.json({
+          isAdmin: false,
+          limits: { concurrent: 1, perDay: 120, perHour: 40, perMinute: 8, plan: "free" },
+          plan: { current: "free" },
+          providers: {
+            ollama: { keyCount: 0 },
+            openrouter: { hasDeploymentKey: false, keyCount: 0, requireUserKey: true },
+          },
+          usage: {
+            dayCount: 0,
+            dayWindowStart: Date.UTC(2026, 3, 20),
+            hourCount: 0,
+            hourWindowStart: Date.UTC(2026, 3, 20, 12),
+            minuteCount: 0,
+            minuteWindowStart: Date.UTC(2026, 3, 20, 12, 30),
+          },
+        });
       }
       return Response.json({ settings: null });
     });
@@ -108,6 +130,28 @@ describe("WorkspaceSurfaceProvider", () => {
 
     expect(screen.getByTestId("surface").textContent).toBe("llm-models");
     expect(screen.getByRole("heading", { name: "LLM Models" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
+  });
+
+  it("opens the Plan & Usage workspace from Profile", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SidebarProvider>
+        <LlmSettingsProvider>
+          <WorkspaceSurfaceProvider>
+            <SurfaceHarness />
+          </WorkspaceSurfaceProvider>
+        </LlmSettingsProvider>
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByTestId("surface").textContent).toBe("workspace");
+
+    await user.click(screen.getByRole("button", { name: "Plan & Usage" }));
+
+    expect(screen.getByTestId("surface").textContent).toBe("plan-usage");
+    expect(screen.getByRole("heading", { name: "Plan & Usage" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
   });
 

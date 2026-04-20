@@ -1,22 +1,50 @@
 "use client";
 
 import React from "react";
-import { Activity, BookOpenText, Bot, KeyRound, LogOut, UserRound } from "lucide-react";
+import { Activity, BarChart3, BookOpenText, Bot, KeyRound, LogOut, Shield, UserRound } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useWorkspaceSurface } from "@/components/context/workspace-surface";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { fetchAccountPlan } from "@/lib/client/account-plan";
 
 export function SidebarProfile() {
   const { data: session } = useSession();
-  const { activeSurface, showAgentAccess, showAgentWork, showKnowledgeCenter, showLlmModels } = useWorkspaceSurface();
+  const {
+    activeSurface,
+    showAdminUsers,
+    showAgentAccess,
+    showAgentWork,
+    showKnowledgeCenter,
+    showLlmModels,
+    showPlanUsage,
+  } = useWorkspaceSurface();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const [isAdmin, setIsAdmin] = React.useState(false);
   const displayName =
     session?.user?.name?.trim() ||
     session?.user?.email?.trim() ||
     "Signed in";
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void fetchAccountPlan()
+      .then((data) => {
+        if (!cancelled) {
+          setIsAdmin(Boolean(data.isAdmin));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsAdmin(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (isCollapsed) {
     return (
@@ -28,6 +56,17 @@ export function SidebarProfile() {
           <UserRound className="size-4" />
         </div>
 
+        <Button
+          type="button"
+          variant={activeSurface === "plan-usage" ? "default" : "outline"}
+          size="icon"
+          className="size-9"
+          onClick={showPlanUsage}
+          title="Plan & Usage"
+          aria-label="Plan & Usage"
+        >
+          <BarChart3 className="size-4" />
+        </Button>
         <Button
           type="button"
           variant={activeSurface === "knowledge-center" ? "default" : "outline"}
@@ -72,6 +111,19 @@ export function SidebarProfile() {
         >
           <Activity className="size-4" />
         </Button>
+        {isAdmin ? (
+          <Button
+            type="button"
+            variant={activeSurface === "admin-users" ? "default" : "outline"}
+            size="icon"
+            className="size-9"
+            onClick={showAdminUsers}
+            title="Admin Users"
+            aria-label="Admin Users"
+          >
+            <Shield className="size-4" />
+          </Button>
+        ) : null}
         <ThemeToggle
           variant="outline"
           size="icon"
@@ -107,6 +159,16 @@ export function SidebarProfile() {
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
+        <Button
+          type="button"
+          variant={activeSurface === "plan-usage" ? "default" : "outline"}
+          size="sm"
+          className="w-full justify-start"
+          onClick={showPlanUsage}
+        >
+          <BarChart3 className="size-4" />
+          Plan &amp; Usage
+        </Button>
         <Button
           type="button"
           variant={activeSurface === "knowledge-center" ? "default" : "outline"}
@@ -147,6 +209,18 @@ export function SidebarProfile() {
           <Activity className="size-4" />
           Agent Work
         </Button>
+        {isAdmin ? (
+          <Button
+            type="button"
+            variant={activeSurface === "admin-users" ? "default" : "outline"}
+            size="sm"
+            className="w-full justify-start"
+            onClick={showAdminUsers}
+          >
+            <Shield className="size-4" />
+            Admin Users
+          </Button>
+        ) : null}
         <ThemeToggle
           variant="outline"
           size="sm"

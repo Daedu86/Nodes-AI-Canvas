@@ -3,17 +3,23 @@ import { fileMemoryRepository } from "@/lib/persistence/file/file-memory-reposit
 import { fileLlmSettingsRepository } from "@/lib/persistence/file/file-llm-settings-repository";
 import { fileProjectRepository } from "@/lib/persistence/file/file-project-repository";
 import { fileSessionRepository } from "@/lib/persistence/file/file-session-repository";
+import { fileUserPlanRepository } from "@/lib/persistence/file/file-user-plan-repository";
 import type { LlmSettingsRepository } from "@/lib/persistence/llm-settings-repository";
 import type { MemoryRepository } from "@/lib/persistence/memory-repository";
 import type { ProjectRepository } from "@/lib/persistence/project-repository";
 import type { SessionRepository } from "@/lib/persistence/session-repository";
 import type { AgentWorkRepository } from "@/lib/persistence/agent-work-repository";
+import type { ChatUsageRepository } from "@/lib/persistence/chat-usage-repository";
+import type { UserPlanRepository } from "@/lib/persistence/user-plan-repository";
 import { supabaseLlmSettingsRepository } from "@/lib/persistence/supabase/supabase-llm-settings-repository";
 import { supabaseMemoryRepository } from "@/lib/persistence/supabase/supabase-memory-repository";
 import { supabaseProjectRepository } from "@/lib/persistence/supabase/supabase-project-repository";
 import { supabaseSessionRepository } from "@/lib/persistence/supabase/supabase-session-repository";
 import { supabaseAgentWorkRepository } from "@/lib/persistence/supabase/supabase-agent-work-repository";
 import { fileAgentWorkRepository } from "@/lib/persistence/file/file-agent-work-repository";
+import { fileChatUsageRepository } from "@/lib/persistence/file/file-chat-usage-repository";
+import { supabaseChatUsageRepository } from "@/lib/persistence/supabase/supabase-chat-usage-repository";
+import { supabaseUserPlanRepository } from "@/lib/persistence/supabase/supabase-user-plan-repository";
 
 export function getSessionRepository(): SessionRepository {
   return getPersistenceBackend() === "supabase"
@@ -43,4 +49,16 @@ export function getAgentWorkRepository(): AgentWorkRepository {
   return getPersistenceBackend() === "supabase"
     ? supabaseAgentWorkRepository
     : fileAgentWorkRepository;
+}
+
+export function getUserPlanRepository(): UserPlanRepository {
+  return getPersistenceBackend() === "supabase"
+    ? supabaseUserPlanRepository
+    : fileUserPlanRepository;
+}
+
+export function getChatUsageRepository(): ChatUsageRepository {
+  return getPersistenceBackend() === "supabase"
+    ? supabaseChatUsageRepository
+    : fileChatUsageRepository;
 }

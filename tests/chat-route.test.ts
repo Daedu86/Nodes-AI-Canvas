@@ -36,12 +36,16 @@ vi.mock("@/lib/llm/provider-runtime", () => ({
 import { POST } from "../app/api/chat/route";
 
 describe("/api/chat", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.OPENROUTER_API_KEY = "test-openrouter-key";
     delete process.env.NODES_CHAT_LIMIT_PER_MINUTE;
     delete process.env.NODES_CHAT_LIMIT_PER_HOUR;
     delete process.env.NODES_CHAT_LIMIT_CONCURRENT;
-    __resetChatGovernorForTests();
+    delete process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_MINUTE;
+    delete process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_HOUR;
+    delete process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_DAY;
+    delete process.env.NODES_PLAN_FREE_CHAT_LIMIT_CONCURRENT;
+    await __resetChatGovernorForTests();
 
     createUIMessageStreamMock.mockReturnValue("mock-ui-stream");
     createUIMessageStreamResponseMock.mockImplementation(() => new Response(null, { status: 200 }));
@@ -56,12 +60,16 @@ describe("/api/chat", () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.NODES_CHAT_LIMIT_PER_MINUTE;
     delete process.env.NODES_CHAT_LIMIT_PER_HOUR;
     delete process.env.NODES_CHAT_LIMIT_CONCURRENT;
-    __resetChatGovernorForTests();
+    delete process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_MINUTE;
+    delete process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_HOUR;
+    delete process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_DAY;
+    delete process.env.NODES_PLAN_FREE_CHAT_LIMIT_CONCURRENT;
+    await __resetChatGovernorForTests();
     vi.clearAllMocks();
   });
 
@@ -109,6 +117,7 @@ describe("/api/chat", () => {
         provider: "openrouter",
       },
       {},
+      { userPlan: "free" },
     );
     expect(streamTextMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -262,6 +271,7 @@ describe("/api/chat", () => {
         provider: "openrouter",
       },
       {},
+      { userPlan: "free" },
     );
     expect(createLanguageModelMock).toHaveBeenNthCalledWith(
       2,
@@ -270,6 +280,7 @@ describe("/api/chat", () => {
         provider: "openrouter",
       },
       {},
+      { userPlan: "free" },
     );
     expect(response.headers.get("x-nodes-model-fallback")).toBe("1");
     expect(response.headers.get("x-nodes-resolved-model")).toBe(
@@ -324,7 +335,8 @@ describe("/api/chat", () => {
   });
 
   it("rejects chat requests once the per-minute quota is exhausted", async () => {
-    process.env.NODES_CHAT_LIMIT_PER_MINUTE = "1";
+    process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_MINUTE = "1";
+    process.env.NODES_PLAN_FREE_CHAT_LIMIT_CONCURRENT = "2";
 
     const first = await POST(
       new Request("http://localhost/api/chat", {
@@ -359,7 +371,7 @@ describe("/api/chat", () => {
   });
 
   it("rejects overlapping requests with a specific concurrency error", async () => {
-    process.env.NODES_CHAT_LIMIT_CONCURRENT = "1";
+    process.env.NODES_PLAN_FREE_CHAT_LIMIT_CONCURRENT = "1";
 
     streamTextMock.mockReturnValue({
       toUIMessageStreamResponse: ({ headers }: { headers?: HeadersInit }) =>

@@ -33,6 +33,7 @@ import {
 } from "@/lib/server/llm-audit";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 import { normalizeLlmContextArtifacts } from "@/lib/session-artifacts";
+import { getUserPlan } from "@/lib/user-plan-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -65,6 +66,7 @@ export async function POST(req: Request) {
     });
   }
   const requestOverrides = await getUserModelOverrides(guarded.user.id);
+  const userPlan = await getUserPlan(guarded.user.id);
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
   const messages = normalizeMessages(rawMessages);
   const system = body.system;
@@ -95,7 +97,7 @@ export async function POST(req: Request) {
     return createUIMessageStreamResponse({ stream });
   }
 
-  const quota = reserveChatQuota(guarded.user.id);
+  const quota = await reserveChatQuota(guarded.user.id, userPlan);
   if (!quota.ok) {
     logLlmAuditRejected(
       auditContext,
@@ -147,7 +149,9 @@ export async function POST(req: Request) {
       currentModel.modelId !== requestedModel.modelId ||
       currentModel.provider !== requestedModel.provider;
 
-    const missingCredential = getMissingProviderCredential(currentModel.provider, requestOverrides);
+    const missingCredential = getMissingProviderCredential(currentModel.provider, requestOverrides, {
+      userPlan,
+    });
     if (missingCredential) {
       console.error(`Missing provider credential for ${currentModel.provider}`);
       quota.grant.release();
@@ -193,6 +197,7 @@ export async function POST(req: Request) {
       const model = createLanguageModel(
         currentModel,
         requestOverrides,
+        { userPlan },
       ) as Parameters<typeof streamText>[0]["model"];
 
       const artifactContextMessage = buildContextArtifactsUserMessage(contextArtifacts, {

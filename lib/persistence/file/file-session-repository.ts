@@ -34,7 +34,7 @@ const ensureSafeSessionId = (sessionId: string) => {
   }
 };
 
-const getSessionStoreDir = () =>
+export const getSessionStoreDir = () =>
   process.env.SESSION_STORE_DIR
     ? path.resolve(process.env.SESSION_STORE_DIR)
     : path.join(process.cwd(), "data", "sessions");

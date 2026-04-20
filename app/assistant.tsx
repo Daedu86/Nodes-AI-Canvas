@@ -27,6 +27,8 @@ import { KnowledgeCenterWorkspace } from "@/components/workspace/knowledge-cente
 import { LlmModelsWorkspace } from "@/components/workspace/llm-models-workspace";
 import { AgentAccessWorkspace } from "@/components/workspace/agent-access-workspace";
 import { AgentWorkWorkspace } from "@/components/workspace/agent-work-workspace";
+import { PlanUsageWorkspace } from "@/components/workspace/plan-usage-workspace";
+import { AdminUsersWorkspace } from "@/components/workspace/admin-users-workspace";
 import { WorkspaceSplitLayout } from "@/components/workspace/workspace-split-layout";
 import {
   getRequestErrorMessageFromResponse,
@@ -333,6 +335,9 @@ function WorkspaceShell() {
   if (activeSurface === "llm-models") {
     return <LlmModelsWorkspace />;
   }
+  if (activeSurface === "plan-usage") {
+    return <PlanUsageWorkspace />;
+  }
   if (activeSurface === "knowledge-center") {
     return <KnowledgeCenterWorkspace />;
   }
@@ -341,6 +346,9 @@ function WorkspaceShell() {
   }
   if (activeSurface === "agent-work") {
     return <AgentWorkWorkspace />;
+  }
+  if (activeSurface === "admin-users") {
+    return <AdminUsersWorkspace />;
   }
 
   return activeProjectId ? <ProjectRuntimeShell /> : <AssistantRuntimeShell />;

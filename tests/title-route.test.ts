@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { __resetChatGovernorForTests } from "../lib/server/chat-governor";
 
 const { createLanguageModelMock, generateTextMock, getMissingProviderCredentialMock } = vi.hoisted(
   () => ({
@@ -21,7 +22,8 @@ vi.mock("@/lib/llm/provider-runtime", () => ({
 import { POST } from "../app/api/title/route";
 
 describe("/api/title", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await __resetChatGovernorForTests();
     createLanguageModelMock.mockImplementation((config: { provider: string; modelId: string }) => ({
       provider: config.provider,
       modelId: config.modelId,
@@ -30,7 +32,8 @@ describe("/api/title", () => {
     getMissingProviderCredentialMock.mockReturnValue(null);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await __resetChatGovernorForTests();
     vi.clearAllMocks();
   });
 

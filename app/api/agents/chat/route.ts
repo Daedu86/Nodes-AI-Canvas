@@ -10,6 +10,7 @@ import { requireLocalApiUser } from "@/lib/server/request-guards";
 import { recordAgentEvent } from "@/lib/server/agent-work";
 import { getSession, patchSession } from "@/lib/session-store";
 import { normalizeSessionThreadExport, type SessionThreadExport } from "@/lib/session-documents";
+import { getUserPlan } from "@/lib/user-plan-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -82,7 +83,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Session not found." }, { status: 404 });
   }
 
-  const quota = reserveChatQuota(guarded.user.id);
+  const userPlan = await getUserPlan(guarded.user.id);
+  const quota = await reserveChatQuota(guarded.user.id, userPlan);
   if (!quota.ok) {
     await recordAgentEvent({
       actor,
@@ -98,7 +100,7 @@ export async function POST(req: Request) {
 
   const requestOverrides = await getUserModelOverrides(guarded.user.id);
   const { modelId, provider } = resolveModelConfig({ model: body.model, provider: body.provider });
-  const missingCredential = getMissingProviderCredential(provider, requestOverrides);
+  const missingCredential = getMissingProviderCredential(provider, requestOverrides, { userPlan });
   if (missingCredential) {
     quota.grant.release();
     await recordAgentEvent({
@@ -112,7 +114,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: missingCredential.message, code: missingCredential.code }, { status: missingCredential.status });
   }
 
-  const model = createLanguageModel({ modelId, provider }, requestOverrides) as Parameters<typeof generateText>[0]["model"];
+  const model = createLanguageModel({ modelId, provider }, requestOverrides, {
+    userPlan,
+  }) as Parameters<typeof generateText>[0]["model"];
 
   const baseSnapshot = normalizeSessionThreadExport(session.snapshot);
   const userMessage = buildTextMessage("user", prompt, {

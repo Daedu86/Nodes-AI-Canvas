@@ -17,7 +17,9 @@ import {
   getMissingProviderCredential,
   getUserModelOverrides,
 } from "@/lib/llm/provider-runtime";
+import { reserveChatQuota } from "@/lib/server/chat-governor";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
+import { getUserPlan } from "@/lib/user-plan-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -40,6 +42,7 @@ export async function POST(req: Request) {
 
   try {
     const requestOverrides = await getUserModelOverrides(guarded.user.id);
+    const userPlan = await getUserPlan(guarded.user.id);
     const body = (await req.json()) as CanvasAgentRequestBody;
     const action = body.action;
     const payload = body.payload;
@@ -58,22 +61,33 @@ export async function POST(req: Request) {
       model: body.model,
       provider: body.provider,
     });
-    const missingCredential = getMissingProviderCredential(provider, requestOverrides);
+    const quota = await reserveChatQuota(guarded.user.id, userPlan);
+    if (!quota.ok) {
+      return NextResponse.json({ error: quota.rejection.message }, { status: quota.rejection.status });
+    }
+
+    const missingCredential = getMissingProviderCredential(provider, requestOverrides, { userPlan });
     if (missingCredential) {
+      quota.grant.release();
       return NextResponse.json({ error: missingCredential.message }, { status: missingCredential.status });
     }
-    const model = createLanguageModel(
-      { modelId, provider },
-      requestOverrides,
-    ) as Parameters<typeof generateText>[0]["model"];
 
-    const result = await generateText({
-      model,
-      system: buildCanvasGuideSystemPrompt(),
-      prompt: buildCanvasGuideUserPrompt(payload),
-    });
+    try {
+      const model = createLanguageModel(
+        { modelId, provider },
+        requestOverrides,
+        { userPlan },
+      ) as Parameters<typeof generateText>[0]["model"];
+      const result = await generateText({
+        model,
+        system: buildCanvasGuideSystemPrompt(),
+        prompt: buildCanvasGuideUserPrompt(payload),
+      });
 
-    return NextResponse.json({ text: result.text });
+      return NextResponse.json({ text: result.text });
+    } finally {
+      quota.grant.release();
+    }
   } catch (error) {
     console.error("/api/canvas-agent error:", error);
     return NextResponse.json({ error: "Unable to reach the canvas guide right now." }, { status: 500 });

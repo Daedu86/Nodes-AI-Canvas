@@ -4,13 +4,22 @@ import React from "react";
 import { useSession } from "next-auth/react";
 import { hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
-export type WorkspaceSurface = "agent-access" | "agent-work" | "knowledge-center" | "llm-models" | "workspace";
+export type WorkspaceSurface =
+  | "admin-users"
+  | "agent-access"
+  | "agent-work"
+  | "knowledge-center"
+  | "llm-models"
+  | "plan-usage"
+  | "workspace";
 
 type WorkspaceSurfaceContextValue = {
   activeSurface: WorkspaceSurface;
+  showAdminUsers: () => void;
   showAgentAccess: () => void;
   showAgentWork: () => void;
   showKnowledgeCenter: () => void;
+  showPlanUsage: () => void;
   setActiveSurface: (value: WorkspaceSurface) => void;
   showLlmModels: () => void;
   showWorkspace: () => void;
@@ -23,10 +32,12 @@ const DEFAULT_SURFACE: WorkspaceSurface = "workspace";
 const readSurface = (storageKey: string) => {
   try {
     const value = localStorage.getItem(storageKey);
+    if (value === "admin-users") return "admin-users";
     if (value === "agent-access") return "agent-access";
     if (value === "agent-work") return "agent-work";
     if (value === "llm-models") return "llm-models";
     if (value === "knowledge-center") return "knowledge-center";
+    if (value === "plan-usage") return "plan-usage";
     return DEFAULT_SURFACE;
   } catch {
     return DEFAULT_SURFACE;
@@ -64,9 +75,11 @@ export function WorkspaceSurfaceProvider({
   const value = React.useMemo<WorkspaceSurfaceContextValue>(
     () => ({
       activeSurface,
+      showAdminUsers: () => setActiveSurface("admin-users"),
       showAgentAccess: () => setActiveSurface("agent-access"),
       showAgentWork: () => setActiveSurface("agent-work"),
       showKnowledgeCenter: () => setActiveSurface("knowledge-center"),
+      showPlanUsage: () => setActiveSurface("plan-usage"),
       setActiveSurface,
       showLlmModels: () => setActiveSurface("llm-models"),
       showWorkspace: () => setActiveSurface("workspace"),

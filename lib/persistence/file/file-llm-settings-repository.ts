@@ -16,7 +16,7 @@ type StoredLlmSettings = {
 
 const SETTINGS_FILE_EXTENSION = ".json";
 
-const getLlmSettingsStoreDir = () =>
+export const getLlmSettingsStoreDir = () =>
   process.env.LLM_SETTINGS_STORE_DIR
     ? path.resolve(process.env.LLM_SETTINGS_STORE_DIR)
     : path.join(process.cwd(), "data", "llm-settings");

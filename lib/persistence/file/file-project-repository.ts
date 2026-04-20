@@ -28,7 +28,7 @@ const ensureSafeProjectId = (projectId: string) => {
   }
 };
 
-const getProjectStoreDir = () =>
+export const getProjectStoreDir = () =>
   process.env.PROJECT_STORE_DIR
     ? path.resolve(process.env.PROJECT_STORE_DIR)
     : path.join(process.cwd(), "data", "projects");

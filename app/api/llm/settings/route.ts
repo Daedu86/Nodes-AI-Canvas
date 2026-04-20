@@ -5,18 +5,17 @@ import {
   mergeLlmSettingsState,
   type LlmSettingsState,
 } from "@/lib/llm/user-settings";
+import { getOpenRouterCredentialPolicy } from "@/lib/user-plan";
+import { getUserPlan } from "@/lib/user-plan-store";
 import { validateOllamaBaseUrl } from "@/lib/server/ollama-base-url";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 export const runtime = "nodejs";
 
-const isOpenRouterDeploymentKeyAllowed = () =>
-  process.env.OPENROUTER_ALLOW_DEPLOYMENT_KEY === "1";
-
-const isOpenRouterUserKeyRequired = () =>
-  process.env.OPENROUTER_REQUIRE_USER_KEY === "1" || !isOpenRouterDeploymentKeyAllowed();
-
 type LlmSettingsResponse = {
+  plan: {
+    current: "free" | "paid";
+  };
   settings: LlmSettingsState | null;
   policy: {
     openrouter: {
@@ -35,14 +34,14 @@ export async function GET(req: Request) {
   if ("response" in guarded) return guarded.response;
 
   const settings = await getLlmSettings(guarded.user.id);
+  const userPlan = await getUserPlan(guarded.user.id);
   return Response.json({
+    plan: {
+      current: userPlan,
+    },
     settings: maskLlmSettingsState(settings),
     policy: {
-      openrouter: {
-        hasDeploymentKey:
-          isOpenRouterDeploymentKeyAllowed() && Boolean(process.env.OPENROUTER_API_KEY?.trim()),
-        requireUserKey: isOpenRouterUserKeyRequired(),
-      },
+      openrouter: getOpenRouterCredentialPolicy(userPlan),
     },
   } satisfies LlmSettingsResponse);
 }
@@ -53,6 +52,7 @@ export async function PUT(req: Request) {
 
   const body = (await req.json().catch(() => ({}))) as PutBody;
   const current = await getLlmSettings(guarded.user.id);
+  const userPlan = await getUserPlan(guarded.user.id);
   const merged = mergeLlmSettingsState(current, body.settings);
 
   const ollamaValidation = validateOllamaBaseUrl(merged.providers.ollama.baseUrl);
@@ -64,13 +64,12 @@ export async function PUT(req: Request) {
 
   const settings = await saveLlmSettings(guarded.user.id, merged);
   return Response.json({
+    plan: {
+      current: userPlan,
+    },
     settings: maskLlmSettingsState(settings),
     policy: {
-      openrouter: {
-        hasDeploymentKey:
-          isOpenRouterDeploymentKeyAllowed() && Boolean(process.env.OPENROUTER_API_KEY?.trim()),
-        requireUserKey: isOpenRouterUserKeyRequired(),
-      },
+      openrouter: getOpenRouterCredentialPolicy(userPlan),
     },
   } satisfies LlmSettingsResponse);
 }

@@ -13,7 +13,9 @@ import {
   getMissingProviderCredential,
   getUserModelOverrides,
 } from "@/lib/llm/provider-runtime";
+import { reserveChatQuota } from "@/lib/server/chat-governor";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
+import { getUserPlan } from "@/lib/user-plan-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -40,6 +42,7 @@ export async function POST(req: Request) {
 
   try {
     const requestOverrides = await getUserModelOverrides(guarded.user.id);
+    const userPlan = await getUserPlan(guarded.user.id);
     const { messages: maybeMessages, model, provider: maybeProvider }: TitleRequestBody = await req.json();
     const messages = normalizeMessages(Array.isArray(maybeMessages) ? maybeMessages : []);
 
@@ -48,23 +51,34 @@ export async function POST(req: Request) {
     }
 
     const { modelId, provider } = resolveModelConfig({ model, provider: maybeProvider });
-    const missingCredential = getMissingProviderCredential(provider, requestOverrides);
+    const quota = await reserveChatQuota(guarded.user.id, userPlan);
+    if (!quota.ok) {
+      return NextResponse.json({ error: quota.rejection.message }, { status: quota.rejection.status });
+    }
+
+    const missingCredential = getMissingProviderCredential(provider, requestOverrides, { userPlan });
     if (missingCredential) {
+      quota.grant.release();
       return NextResponse.json({ error: missingCredential.message }, { status: missingCredential.status });
     }
 
     const convo = toPlainTextTranscript(messages);
-    const modelInstance = createLanguageModel(
-      { modelId, provider },
-      requestOverrides,
-    ) as Parameters<typeof generateText>[0]["model"];
-    const result = await generateText({
-      model: modelInstance,
-      prompt: `Conversation:\n${convo}\n\nTitle:`,
-      system:
-        "Write a short descriptive chat title. Return only 2 to 5 words without quotes or trailing punctuation.",
-    });
-    return NextResponse.json({ title: sanitizeTitle(result.text) });
+    try {
+      const modelInstance = createLanguageModel(
+        { modelId, provider },
+        requestOverrides,
+        { userPlan },
+      ) as Parameters<typeof generateText>[0]["model"];
+      const result = await generateText({
+        model: modelInstance,
+        prompt: `Conversation:\n${convo}\n\nTitle:`,
+        system:
+          "Write a short descriptive chat title. Return only 2 to 5 words without quotes or trailing punctuation.",
+      });
+      return NextResponse.json({ title: sanitizeTitle(result.text) });
+    } finally {
+      quota.grant.release();
+    }
   } catch (error) {
     console.error("/api/title error:", error);
     return NextResponse.json({ error: "Unable to generate a title right now." }, { status: 500 });
