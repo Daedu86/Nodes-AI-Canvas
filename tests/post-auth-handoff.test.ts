@@ -22,6 +22,12 @@ describe("post-auth handoff helpers", () => {
     );
   });
 
+  it("falls back to the current origin when the canonical override is malformed", () => {
+    expect(buildPostAuthCallbackUrl("/", "nodes-lemon.vercel.app")).toBe(
+      `${window.location.origin}/?handoff=chat`,
+    );
+  });
+
   it("detects and clears the chat handoff query param", () => {
     window.history.replaceState({}, "", "/?handoff=chat");
 

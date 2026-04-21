@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Github, Globe, KeyRound, LockKeyhole, Mail, Network } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { getCanonicalAppOrigin } from "@/lib/auth/canonical-app-url";
 import { Input } from "@/components/ui/input";
 import { buildPostAuthCallbackUrl } from "@/lib/client/post-auth-handoff";
 
@@ -57,8 +58,8 @@ export function AuthScreen({
   const authErrorMessage = useMemo(() => getAuthErrorMessage(authError), [authError]);
 
   useEffect(() => {
-    if (!canonicalAppUrl) return;
-    const canonicalOrigin = new URL(canonicalAppUrl).origin;
+    const canonicalOrigin = getCanonicalAppOrigin(canonicalAppUrl);
+    if (!canonicalOrigin) return;
     if (window.location.origin === canonicalOrigin) return;
     const current = new URL(window.location.href);
     const target = new URL(`${current.pathname}${current.search}${current.hash}`, canonicalOrigin);

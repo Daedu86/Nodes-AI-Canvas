@@ -1,6 +1,7 @@
 "use client";
 
-import { BookCopy, Bot, Columns2, FileText, MessageSquareText, Workflow } from "lucide-react";
+import React from "react";
+import { BookCopy, Bot, Columns2, FileText, MessageSquareText, Workflow, X } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -18,7 +19,7 @@ import { SessionContextSheet } from "@/components/workspace/session-context-shee
 
 export const AppHeader = () => {
   const { llmEnabled } = useLlmEnabled();
-  const { viewMode, setViewMode } = useSessionUiState();
+  const { viewMode, setViewMode, toggleSplitView } = useSessionUiState();
 
   const viewOptions: Array<{
     icon: typeof MessageSquareText;
@@ -32,6 +33,17 @@ export const AppHeader = () => {
     { icon: Bot, label: "Nody", value: "nody" },
     { icon: Columns2, label: "Split", value: "split" },
   ];
+
+  const handleViewModeSelect = React.useCallback(
+    (value: SessionViewMode) => {
+      if (value === "split") {
+        toggleSplitView();
+        return;
+      }
+      setViewMode(value);
+    },
+    [setViewMode, toggleSplitView],
+  );
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border/80 bg-card/88 px-4 backdrop-blur-md">
@@ -47,20 +59,28 @@ export const AppHeader = () => {
         </BreadcrumbList>
       </Breadcrumb>
       <div className="ml-1 flex items-center rounded-[12px] border border-border/80 bg-muted/55 p-1">
-        {viewOptions.map(({ icon: Icon, label, value }) => {
+        {viewOptions.map(({ icon: BaseIcon, label, value }) => {
           const isActive = viewMode === value;
+          const isSplitOption = value === "split";
+          const Icon = isSplitOption && isActive ? X : BaseIcon;
+          const ariaLabel = isSplitOption
+            ? isActive
+              ? "Exit split workspace"
+              : "Open split workspace"
+            : `Show ${label.toLowerCase()} panel`;
           return (
             <button
               key={value}
               type="button"
               aria-pressed={isActive}
-              aria-label={`Show ${label.toLowerCase()} panel`}
+              aria-label={ariaLabel}
+              title={ariaLabel}
               className={`inline-flex items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-[11px] font-medium transition ${
                 isActive
                   ? "border border-border/80 bg-card text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                   : "text-muted-foreground hover:bg-card/70 hover:text-foreground"
               }`}
-              onClick={() => setViewMode(value)}
+              onClick={() => handleViewModeSelect(value)}
             >
               <Icon className="h-3.5 w-3.5" />
               <span>{label}</span>

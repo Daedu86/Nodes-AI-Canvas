@@ -8,6 +8,7 @@ import { hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 export type HistoryMode = "last" | "full";
 export type ModelProvider = LlmProviderId;
 export type SessionViewMode = "chat" | "split" | "canvas" | "wiki" | "brief" | "nody";
+export type StandaloneSessionViewMode = Exclude<SessionViewMode, "split">;
 export type SplitWorkspacePane = "chat" | "canvas" | "wiki" | "brief" | "nody";
 
 export const SPLIT_WORKSPACE_PANES: SplitWorkspacePane[] = [
@@ -43,6 +44,7 @@ type SessionUiStateContextValue = {
   setModelConfig: (value: ModelConfig) => void;
   viewMode: SessionViewMode;
   setViewMode: (value: SessionViewMode) => void;
+  toggleSplitView: () => void;
   splitPaneVisibility: SplitPaneVisibility;
   setSplitPaneOpen: (pane: SplitWorkspacePane, open: boolean) => void;
   toggleSplitPane: (pane: SplitWorkspacePane) => void;
@@ -65,6 +67,7 @@ const OLD_DEFAULT_SECONDARY_SPLIT_RATIO = 0.5;
 const DEFAULT_SPLIT_RATIO = 0.28;
 const DEFAULT_SECONDARY_SPLIT_RATIO = 0.58;
 const DEFAULT_VIEW_MODE: SessionViewMode = "split";
+const DEFAULT_STANDALONE_VIEW_MODE: StandaloneSessionViewMode = "canvas";
 const DEFAULT_SPLIT_PANE_VISIBILITY: SplitPaneVisibility = {
   chat: true,
   canvas: true,
@@ -220,6 +223,30 @@ const readViewMode = (sessionId: string): SessionViewMode => {
   return DEFAULT_VIEW_MODE;
 };
 
+const isStandaloneViewMode = (value: string | null): value is StandaloneSessionViewMode => {
+  return (
+    value === "chat" ||
+    value === "canvas" ||
+    value === "wiki" ||
+    value === "brief" ||
+    value === "nody"
+  );
+};
+
+const readLastStandaloneViewMode = (
+  sessionId: string,
+  viewMode: SessionViewMode,
+): StandaloneSessionViewMode => {
+  if (viewMode !== "split") {
+    return viewMode;
+  }
+  const value = readStorageValue(getScopedStorageKey(sessionId, "lastStandaloneViewMode"));
+  if (isStandaloneViewMode(value)) {
+    return value;
+  }
+  return DEFAULT_STANDALONE_VIEW_MODE;
+};
+
 const readLinkOverrides = (sessionId: string) => {
   const raw = readStorageValue(
     getScopedStorageKey(sessionId, "linkOverrides"),
@@ -255,7 +282,11 @@ export function SessionUiStateProvider({
   const [canvasSelectionId, setCanvasSelectionId] = React.useState<string | null>(null);
   const [llmEnabled, setLlmEnabled] = React.useState<boolean>(() => readLlmEnabled(sessionId));
   const [modelConfig, setModelConfig] = React.useState<ModelConfig>(() => readModelConfig(sessionId));
-  const [viewMode, setViewMode] = React.useState<SessionViewMode>(() => readViewMode(sessionId));
+  const [viewMode, setViewModeState] = React.useState<SessionViewMode>(() => readViewMode(sessionId));
+  const [lastStandaloneViewMode, setLastStandaloneViewMode] =
+    React.useState<StandaloneSessionViewMode>(() =>
+      readLastStandaloneViewMode(sessionId, readViewMode(sessionId)),
+    );
   const [splitPaneVisibility, setSplitPaneVisibility] = React.useState<SplitPaneVisibility>(() =>
     readSplitPaneVisibility(sessionId),
   );
@@ -266,6 +297,16 @@ export function SessionUiStateProvider({
   const [linkOverrides, setLinkOverrides] = React.useState<Map<string, LinkOverrideEntry>>(
     () => readLinkOverrides(sessionId),
   );
+  const viewModeRef = React.useRef(viewMode);
+  const lastStandaloneViewModeRef = React.useRef(lastStandaloneViewMode);
+
+  React.useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
+
+  React.useEffect(() => {
+    lastStandaloneViewModeRef.current = lastStandaloneViewMode;
+  }, [lastStandaloneViewMode]);
 
   React.useEffect(() => {
     try {
@@ -301,6 +342,17 @@ export function SessionUiStateProvider({
       // ignore storage errors
     }
   }, [sessionId, viewMode]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(
+        getScopedStorageKey(sessionId, "lastStandaloneViewMode"),
+        lastStandaloneViewMode,
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [lastStandaloneViewMode, sessionId]);
 
   React.useEffect(() => {
     try {
@@ -375,6 +427,29 @@ export function SessionUiStateProvider({
     });
   }, []);
 
+  const setViewMode = React.useCallback((value: SessionViewMode) => {
+    const currentViewMode = viewModeRef.current;
+    if (value === "split") {
+      if (currentViewMode !== "split") {
+        setLastStandaloneViewMode(currentViewMode);
+      }
+    } else {
+      setLastStandaloneViewMode(value);
+    }
+    setViewModeState((prev) => (prev === value ? prev : value));
+  }, []);
+
+  const toggleSplitView = React.useCallback(() => {
+    if (viewModeRef.current === "split") {
+      const nextViewMode = lastStandaloneViewModeRef.current;
+      setViewModeState((prev) => (prev === nextViewMode ? prev : nextViewMode));
+      return;
+    }
+    const currentViewMode = viewModeRef.current;
+    setLastStandaloneViewMode(currentViewMode);
+    setViewModeState("split");
+  }, []);
+
   const value = React.useMemo<SessionUiStateContextValue>(
     () => ({
       historyMode,
@@ -389,6 +464,7 @@ export function SessionUiStateProvider({
       setModelConfig,
       viewMode,
       setViewMode,
+      toggleSplitView,
       splitPaneVisibility,
       setSplitPaneOpen,
       toggleSplitPane,
@@ -407,7 +483,9 @@ export function SessionUiStateProvider({
       llmEnabled,
       modelConfig,
       viewMode,
+      setViewMode,
       splitPaneVisibility,
+      toggleSplitView,
       setSplitPaneOpen,
       toggleSplitPane,
       splitRatio,
@@ -440,6 +518,7 @@ export function useWorkspaceSplitState() {
     setSecondarySplitRatio,
     viewMode,
     setViewMode,
+    toggleSplitView,
     splitPaneVisibility,
     setSplitPaneOpen,
     toggleSplitPane,
@@ -451,6 +530,7 @@ export function useWorkspaceSplitState() {
     setSecondarySplitRatio,
     viewMode,
     setViewMode,
+    toggleSplitView,
     splitPaneVisibility,
     setSplitPaneOpen,
     toggleSplitPane,

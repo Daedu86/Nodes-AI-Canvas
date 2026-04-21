@@ -2,7 +2,7 @@
 
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
   SPLIT_WORKSPACE_PANES,
   SessionUiStateProvider,
@@ -33,14 +33,35 @@ function ViewModeHarness() {
   return <div data-testid="view-mode">{viewMode}</div>;
 }
 
+function SplitToggleHarness() {
+  const { setViewMode, toggleSplitView, viewMode } = useSessionUiState();
+
+  return (
+    <div>
+      <div data-testid="toggle-view-mode">{viewMode}</div>
+      <button type="button" onClick={() => setViewMode("nody")}>
+        Set nody
+      </button>
+      <button type="button" onClick={() => setViewMode("split")}>
+        Enter split directly
+      </button>
+      <button type="button" onClick={toggleSplitView}>
+        Toggle split
+      </button>
+    </div>
+  );
+}
+
 describe("SessionUiStateProvider", () => {
   beforeEach(() => {
     localStorage.clear();
+    window.history.replaceState({}, "", "/");
   });
 
   afterEach(() => {
     cleanup();
     localStorage.clear();
+    window.history.replaceState({}, "", "/");
   });
 
   it("preserves known custom provider model configs from storage", () => {
@@ -127,5 +148,37 @@ describe("SessionUiStateProvider", () => {
     );
 
     expect(screen.getByTestId("view-mode").textContent).toBe("chat");
+  });
+
+  it("remembers the last standalone view when split is opened directly and toggled off later", () => {
+    const { unmount } = render(
+      <SessionUiStateProvider sessionId="session-a">
+        <SplitToggleHarness />
+      </SessionUiStateProvider>,
+    );
+
+    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("split");
+
+    fireEvent.click(screen.getByRole("button", { name: "Toggle split" }));
+    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("canvas");
+
+    fireEvent.click(screen.getByRole("button", { name: "Set nody" }));
+    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("nody");
+
+    fireEvent.click(screen.getByRole("button", { name: "Enter split directly" }));
+    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("split");
+
+    unmount();
+
+    render(
+      <SessionUiStateProvider sessionId="session-a">
+        <SplitToggleHarness />
+      </SessionUiStateProvider>,
+    );
+
+    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("split");
+
+    fireEvent.click(screen.getByRole("button", { name: "Toggle split" }));
+    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("nody");
   });
 });

@@ -34,6 +34,10 @@ type DocSection = {
   title: string;
   body: string;
   bullets?: string[];
+  snippets?: Array<{
+    title: string;
+    code: string;
+  }>;
 };
 
 type DocPage = {
@@ -218,6 +222,89 @@ const pages: DocPage[] = [
     ],
   },
   {
+    id: "agent-access",
+    title: "Agent Access",
+    description: "Mint agent tokens, call Nodes APIs, and inspect automation activity.",
+    icon: KeyRound,
+    sections: [
+      {
+        id: "token-setup",
+        title: "Token Setup",
+        body:
+          "Create tokens from Profile > Agent Access. Tokens are encrypted, expire automatically, and are meant for automations that need to call Nodes APIs as you.",
+        bullets: [
+          "Minting requires a signed-in user session plus AUTH_SECRET or NEXTAUTH_SECRET on the server.",
+          "Choose an optional label and an expiry in the future. Tokens can expire up to 90 days ahead.",
+          "Send the token as `Authorization: Bearer <agent-token>` on agent API requests.",
+          "If Agent Work storage is available, the new token is saved there automatically for audit and revocation.",
+        ],
+      },
+      {
+        id: "endpoint-usage",
+        title: "Endpoint Usage",
+        body:
+          "Use token management endpoints as the signed-in user, then use the bearer token against the agent chat route to append messages inside an existing Nodes session.",
+        bullets: [
+          "`POST /api/agents/token` creates a token with `expiresAt` and optional `label`.",
+          "`DELETE /api/agents/token?tokenId=<id>` revokes a saved token by id.",
+          "`POST /api/agents/chat` requires `sessionId` and `prompt`, and accepts optional `system`, `provider`, `model`, and `historyMode`.",
+          "`GET /api/agents/work?tokenId=<id>` returns recent token usage, sessions, projects, and audit events for debugging.",
+        ],
+        snippets: [
+          {
+            title: "Bearer header",
+            code: "Authorization: Bearer <agent-token>",
+          },
+        ],
+      },
+      {
+        id: "examples",
+        title: "Examples",
+        body:
+          "A minimal chat call sends the bearer token, points at an existing session, and lets the server resolve the provider and model unless you override them.",
+        snippets: [
+          {
+            title: "Minimal agent chat request",
+            code: `curl -X POST http://localhost:3000/api/agents/chat \\
+  -H "Authorization: Bearer <agent-token>" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "sessionId": "<session-id>",
+    "prompt": "Summarize the latest blockers in this thread.",
+    "historyMode": "full",
+    "provider": "openrouter",
+    "model": "openrouter/free"
+  }'`,
+          },
+          {
+            title: "JSON payload shape",
+            code: `{
+  "sessionId": "<session-id>",
+  "prompt": "Ask the agent to continue the work.",
+  "system": "Optional extra instruction",
+  "historyMode": "full",
+  "provider": "openrouter",
+  "model": "openrouter/free"
+}`,
+          },
+        ],
+      },
+      {
+        id: "troubleshooting",
+        title: "Troubleshooting",
+        body:
+          "Most failures come from token lifecycle setup, missing storage, or invalid chat inputs. The routes already return structured HTTP errors, so check the response body first.",
+        bullets: [
+          "If token creation returns a 503, configure `AUTH_SECRET` or `NEXTAUTH_SECRET` first.",
+          "If Agent Work says storage is unavailable, apply the Supabase migration `20260414190000_add_agent_work.sql` and redeploy.",
+          "If chat returns 400, make sure both `sessionId` and `prompt` are present.",
+          "If chat returns 404, the referenced session does not exist for the token owner.",
+          "If chat returns provider or quota errors, fix the user's model credentials or wait for usage limits to reset.",
+        ],
+      },
+    ],
+  },
+  {
     id: "auth",
     title: "Authentication",
     description: "Sign-in methods and user scoping.",
@@ -361,21 +448,35 @@ export function KnowledgeCenterWorkspace() {
     [activePageId],
   );
 
-  const filteredPages = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return pages;
+  const normalizedQuery = query.trim().toLowerCase();
+  const hasQuery = normalizedQuery.length > 0;
 
-    return pages.filter((page) => {
-      if (page.title.toLowerCase().includes(normalized)) return true;
-      if (page.description.toLowerCase().includes(normalized)) return true;
-      return page.sections.some(
+  const filteredPages = useMemo(() => {
+    const matchesText = (value: string) => value.toLowerCase().includes(normalizedQuery);
+    if (!normalizedQuery) {
+      return pages.map((page) => ({
+        page,
+        pageMatches: false,
+        matchingSections: [] as DocSection[],
+      }));
+    }
+
+    return pages.flatMap((page) => {
+      const pageMatches = matchesText(page.title) || matchesText(page.description);
+      const matchingSections = page.sections.filter(
         (section) =>
-          section.title.toLowerCase().includes(normalized) ||
-          section.body.toLowerCase().includes(normalized) ||
-          (section.bullets ?? []).some((bullet) => bullet.toLowerCase().includes(normalized)),
+          matchesText(section.title) ||
+          matchesText(section.body) ||
+          (section.bullets ?? []).some(matchesText) ||
+          (section.snippets ?? []).some(
+            (snippet) => matchesText(snippet.title) || matchesText(snippet.code),
+          ),
       );
+
+      if (!pageMatches && matchingSections.length === 0) return [];
+      return [{ page, pageMatches, matchingSections }];
     });
-  }, [query]);
+  }, [normalizedQuery]);
 
   const activeSections = activePage.sections;
 
@@ -494,38 +595,59 @@ export function KnowledgeCenterWorkspace() {
                       No docs match that search yet.
                     </div>
                   ) : null}
-                  {filteredPages.map((page) => {
+                  {filteredPages.map(({ page, pageMatches, matchingSections }) => {
                     const Icon = page.icon;
                     const isActive = page.id === activePage.id;
+                    const searchSections = hasQuery
+                      ? pageMatches
+                        ? page.sections
+                        : matchingSections
+                      : [];
                     return (
-                      <button
-                        key={page.id}
-                        type="button"
-                        onClick={() => handleSelectPage(page.id)}
-                        className={`w-full rounded-[14px] border px-3 py-2 text-left transition ${
-                          isActive
-                            ? "border-border/90 bg-background/85 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
-                            : "border-border/70 bg-card/40 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-[12px] border ${
-                              isActive
-                                ? "border-border/80 bg-muted/60 text-foreground"
-                                : "border-border/60 bg-card/60 text-muted-foreground"
-                            }`}
-                          >
-                            <Icon className="size-4" />
+                      <div key={page.id} className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectPage(page.id)}
+                          className={`w-full rounded-[14px] border px-3 py-2 text-left transition ${
+                            isActive
+                              ? "border-border/90 bg-background/85 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                              : "border-border/70 bg-card/40 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-[12px] border ${
+                                isActive
+                                  ? "border-border/80 bg-muted/60 text-foreground"
+                                  : "border-border/60 bg-card/60 text-muted-foreground"
+                              }`}
+                            >
+                              <Icon className="size-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold">{page.title}</p>
+                              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                {page.description}
+                              </p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold">{page.title}</p>
-                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                              {page.description}
-                            </p>
+                        </button>
+
+                        {searchSections.length > 0 ? (
+                          <div className="space-y-1 pl-11">
+                            {searchSections.map((section) => (
+                              <button
+                                key={section.id}
+                                type="button"
+                                onClick={() => handleSelectSection(page.id, section.id)}
+                                className="block w-full rounded-[12px] border border-border/60 bg-background/75 px-3 py-2 text-left text-xs font-medium text-foreground/85 transition hover:bg-muted/55"
+                              >
+                                {section.title}
+                              </button>
+                            ))}
                           </div>
-                        </div>
-                      </button>
+                        ) : null}
+                      </div>
                     );
                   })}
                 </nav>
@@ -638,6 +760,23 @@ export function KnowledgeCenterWorkspace() {
                               className="rounded-[12px] border border-border/80 bg-background/80 px-3 py-2.5 text-sm text-foreground/90"
                             >
                               {bullet}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      {section.snippets && section.snippets.length > 0 ? (
+                        <div className="mt-4 space-y-3">
+                          {section.snippets.map((snippet) => (
+                            <div
+                              key={snippet.title}
+                              className="rounded-[14px] border border-border/80 bg-background/78 p-3"
+                            >
+                              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                                {snippet.title}
+                              </p>
+                              <pre className="mt-2 overflow-auto rounded-xl border border-border/70 bg-muted/35 p-3 text-xs text-foreground">
+                                {snippet.code}
+                              </pre>
                             </div>
                           ))}
                         </div>

@@ -1,5 +1,7 @@
 "use client";
 
+import { getCanonicalAppOrigin } from "@/lib/auth/canonical-app-url";
+
 const POST_AUTH_HANDOFF_PARAM = "handoff";
 const POST_AUTH_HANDOFF_VALUE = "chat";
 
@@ -19,7 +21,7 @@ export const buildPostAuthCallbackUrl = (
   originOverride?: string | null,
 ) => {
   const baseOrigin =
-    originOverride?.trim() ||
+    getCanonicalAppOrigin(originOverride) ||
     (canUseWindow() ? window.location.origin : "http://localhost");
   const url = new URL(pathname, baseOrigin);
   url.searchParams.set(POST_AUTH_HANDOFF_PARAM, POST_AUTH_HANDOFF_VALUE);

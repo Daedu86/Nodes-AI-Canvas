@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth, authUiConfig } from "@/auth";
 import { AuthScreen } from "@/components/auth/auth-screen";
+import { parseCanonicalAppUrl } from "@/lib/auth/canonical-app-url";
 import { Assistant } from "./assistant";
 
 type PageProps = {
@@ -10,7 +11,7 @@ type PageProps = {
 
 export default async function Page({ searchParams }: PageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
-  const canonicalAppUrl = authUiConfig.canonicalAppUrl;
+  const canonicalAppUrl = parseCanonicalAppUrl(authUiConfig.canonicalAppUrl);
   if (canonicalAppUrl) {
     const requestHeaders = await headers();
     const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
@@ -18,7 +19,7 @@ export default async function Page({ searchParams }: PageProps) {
       requestHeaders.get("x-forwarded-proto") ?? (host?.includes("localhost") ? "http" : "https");
     if (host) {
       const currentOrigin = `${protocol}://${host}`;
-      const canonicalOrigin = new URL(canonicalAppUrl).origin;
+      const canonicalOrigin = canonicalAppUrl.origin;
       if (currentOrigin !== canonicalOrigin) {
         const target = new URL(canonicalAppUrl);
         for (const [key, value] of Object.entries(resolvedSearchParams)) {
