@@ -41,10 +41,11 @@ export type AgentWorkListOptions = {
 };
 
 export type AgentWorkRepository = {
+  getAgentToken: (ownerId: string, tokenId: string) => Promise<AgentTokenRecord | null>;
   listAgentTokens: (ownerId: string) => Promise<AgentTokenRecord[]>;
+  revokeAgentToken: (ownerId: string, tokenId: string) => Promise<AgentTokenRecord | null>;
   upsertAgentToken: (input: AgentTokenUpsertInput) => Promise<AgentTokenRecord>;
   markAgentTokenUsed: (ownerId: string, tokenId: string, usedAt?: string) => Promise<void>;
   recordAgentEvent: (ownerId: string, input: AgentEventCreateInput) => Promise<void>;
   listAgentEvents: (ownerId: string, options?: AgentWorkListOptions) => Promise<AgentEventRecord[]>;
 };
-

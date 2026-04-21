@@ -64,6 +64,21 @@ const toEventRecord = (row: AgentEventRow): AgentEventRecord => ({
 });
 
 export const supabaseAgentWorkRepository: AgentWorkRepository = {
+  async getAgentToken(ownerId, tokenId) {
+    requireOwnerId(ownerId);
+    const client = getSupabasePersistenceClient();
+    const { data, error } = await client
+      .from("agent_tokens")
+      .select("*")
+      .eq("owner_id", ownerId)
+      .eq("token_id", tokenId)
+      .maybeSingle();
+    if (error) {
+      throw new Error(error.message || "Failed to load agent token");
+    }
+    return data ? toTokenRecord(data as AgentTokenRow) : null;
+  },
+
   async listAgentTokens(ownerId) {
     requireOwnerId(ownerId);
     const client = getSupabasePersistenceClient();
@@ -97,6 +112,22 @@ export const supabaseAgentWorkRepository: AgentWorkRepository = {
       .single();
     const saved = ensureData(data, error, "Failed to upsert agent token") as AgentTokenRow;
     return toTokenRecord(saved);
+  },
+
+  async revokeAgentToken(ownerId, tokenId) {
+    requireOwnerId(ownerId);
+    const client = getSupabasePersistenceClient();
+    const { data, error } = await client
+      .from("agent_tokens")
+      .update({ revoked: true })
+      .eq("owner_id", ownerId)
+      .eq("token_id", tokenId)
+      .select("*")
+      .maybeSingle();
+    if (error) {
+      throw new Error(error.message || "Failed to revoke agent token");
+    }
+    return data ? toTokenRecord(data as AgentTokenRow) : null;
   },
 
   async markAgentTokenUsed(ownerId, tokenId, usedAt) {
@@ -157,4 +188,3 @@ export const supabaseAgentWorkRepository: AgentWorkRepository = {
     return rows.map(toEventRecord);
   },
 };
-

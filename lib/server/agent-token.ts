@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { decode, encode } from "next-auth/jwt";
+import { getAgentWorkRepository } from "@/lib/persistence/repositories";
 
 const AGENT_TOKEN_SALT = "nodes-agent-token:v1";
 
@@ -73,6 +74,20 @@ export async function verifyAgentToken(token: string): Promise<{ userId: string;
   const label = typeof payload.label === "string" && payload.label.trim().length > 0
     ? payload.label.trim()
     : null;
+
+  if (tokenId) {
+    try {
+      const record = await getAgentWorkRepository().getAgentToken(payload.sub, tokenId);
+      if (!record || record.revoked) {
+        return null;
+      }
+      if (record.expiresAt && new Date(record.expiresAt).getTime() <= Date.now()) {
+        return null;
+      }
+    } catch {
+      // If token state storage is temporarily unavailable, fall back to the signed token itself.
+    }
+  }
 
   return { userId: payload.sub, tokenId, label };
 }

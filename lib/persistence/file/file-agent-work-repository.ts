@@ -78,6 +78,14 @@ const sortByDateDesc = <T extends { createdAt: string }>(items: T[]) =>
   [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
 export const fileAgentWorkRepository: AgentWorkRepository = {
+  async getAgentToken(ownerId, tokenId) {
+    const token = await safeReadJson<StoredAgentToken>(tokenPath(ownerId, tokenId));
+    if (!token || token.ownerId !== ownerId) {
+      return null;
+    }
+    return token;
+  },
+
   async listAgentTokens(ownerId) {
     const dir = getTokenDir(ownerId);
     const files = await listJsonFiles(dir);
@@ -105,6 +113,19 @@ export const fileAgentWorkRepository: AgentWorkRepository = {
     };
     await writeJson(tokenPath(input.ownerId, input.tokenId), record);
     return record;
+  },
+
+  async revokeAgentToken(ownerId, tokenId) {
+    const existing = await safeReadJson<StoredAgentToken>(tokenPath(ownerId, tokenId));
+    if (!existing || existing.ownerId !== ownerId) {
+      return null;
+    }
+    const next: StoredAgentToken = {
+      ...existing,
+      revoked: true,
+    };
+    await writeJson(tokenPath(ownerId, tokenId), next);
+    return next;
   },
 
   async markAgentTokenUsed(ownerId, tokenId, usedAt) {
@@ -151,4 +172,3 @@ export const fileAgentWorkRepository: AgentWorkRepository = {
     return sorted.slice(0, limit);
   },
 };
-

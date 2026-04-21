@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Activity, ArrowLeft, FolderKanban, MessageSquareText, RefreshCw } from "lucide-react";
+import { Activity, ArrowLeft, FolderKanban, MessageSquareText, RefreshCw, Trash2 } from "lucide-react";
 import { useWorkspaceSurface } from "@/components/context/workspace-surface";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
 import { useProjects } from "@/components/context/projects";
@@ -87,15 +87,38 @@ export function AgentWorkWorkspace() {
       }
       const data = (await res.json()) as AgentWorkResponse;
       setPayload(data);
-      if (!selectedTokenId && data.agents[0]?.tokenId) {
-        setSelectedTokenId(data.agents[0].tokenId);
-      }
+      setSelectedTokenId((currentSelected) => {
+        const preferred = tokenId === undefined ? currentSelected : tokenId;
+        if (preferred && data.agents.some((agent) => agent.tokenId === preferred)) {
+          return preferred;
+        }
+        return data.agents[0]?.tokenId ?? null;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load agent work.");
     } finally {
       setBusy(false);
     }
   }, [selectedTokenId]);
+
+  const deleteToken = React.useCallback(async (tokenId: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/agents/token?tokenId=${encodeURIComponent(tokenId)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error || `Request failed: ${res.status}`);
+      }
+      await refresh(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete agent token.");
+    } finally {
+      setBusy(false);
+    }
+  }, [refresh]);
 
   React.useEffect(() => {
     void refresh(null);
@@ -192,6 +215,49 @@ export function AgentWorkWorkspace() {
                   </p>
                 ) : (
                   <>
+                    <div className="mt-3 rounded-[16px] border border-border/70 bg-background/70 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {selectedAgent.label?.trim() ? selectedAgent.label : "Unnamed agent"}
+                          </p>
+                          <p className="mt-1 break-all text-xs text-muted-foreground">
+                            token id {selectedAgent.tokenId}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => void deleteToken(selectedAgent.tokenId)}
+                        >
+                          <Trash2 className="size-4" />
+                          Delete token
+                        </Button>
+                      </div>
+                      <div className="mt-3 grid gap-3 md:grid-cols-3">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            Created
+                          </p>
+                          <p className="mt-1 text-sm text-foreground">{formatDate(selectedAgent.createdAt)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            Expires
+                          </p>
+                          <p className="mt-1 text-sm text-foreground">{formatDate(selectedAgent.expiresAt)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                            Last used
+                          </p>
+                          <p className="mt-1 text-sm text-foreground">{formatDate(selectedAgent.lastUsedAt)}</p>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <div className="rounded-[16px] border border-border/70 bg-background/70 p-4">
                         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -300,4 +366,3 @@ export function AgentWorkWorkspace() {
     </div>
   );
 }
-

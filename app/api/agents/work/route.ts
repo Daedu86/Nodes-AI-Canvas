@@ -85,6 +85,9 @@ export async function GET(req: Request) {
   });
 
   const agents = tokens.map((token) => {
+    if (token.revoked) {
+      return null;
+    }
     const tokenEvents = events.filter((event) => event.tokenId === token.tokenId);
     const tokenSessionIds = [...new Set(tokenEvents.flatMap((event) => (event.sessionId ? [event.sessionId] : [])))];
     const tokenProjectIds = [...new Set(tokenEvents.flatMap((event) => (event.projectId ? [event.projectId] : [])))];
@@ -98,7 +101,7 @@ export async function GET(req: Request) {
       sessionIds: tokenSessionIds,
       projectIds: tokenProjectIds,
     };
-  });
+  }).filter(Boolean) as AgentWorkResponse["agents"];
 
   const response: AgentWorkResponse = {
     agents,

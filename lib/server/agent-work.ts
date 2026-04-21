@@ -20,10 +20,20 @@ export async function upsertAgentTokenRecord(params: {
       label: params.label,
       expiresAt: params.expiresAt,
     });
+    return true;
   } catch (error) {
     // Don't break token minting if the schema isn't installed yet.
     console.warn("[agent-work] failed to upsert agent token record", error);
+    return false;
   }
+}
+
+export async function revokeAgentTokenRecord(params: {
+  ownerId: string;
+  tokenId: string;
+}) {
+  const repo = getAgentWorkRepository();
+  return repo.revokeAgentToken(params.ownerId, params.tokenId);
 }
 
 export async function recordAgentEvent(params: {
