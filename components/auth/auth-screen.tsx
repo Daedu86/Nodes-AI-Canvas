@@ -148,7 +148,7 @@ export function AuthScreen({
             <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
               Sign in to work with branches, projects, and shared AI context.
             </h1>
-            <p className="max-w-2xl text-base leading-7 text-slate-300">
+            <p className="max-w-2xl text-base leading-7 text-slate-200/88">
               Nodes is a decision workspace for exploring multiple AI paths before
               you commit. Authentication now scopes sessions, projects, memory,
               and artifacts to the current user.
@@ -157,19 +157,19 @@ export function AuthScreen({
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <p className="text-sm font-medium text-white">Branch with intent</p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
+              <p className="mt-2 text-sm leading-6 text-slate-200/88">
                 Explore multiple directions without losing the thread.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <p className="text-sm font-medium text-white">Compare in Arena</p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
+              <p className="mt-2 text-sm leading-6 text-slate-200/88">
                 Review sessions, branches, and merge nodes in one place.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <p className="text-sm font-medium text-white">Keep ownership clear</p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
+              <p className="mt-2 text-sm leading-6 text-slate-200/88">
                 Your sessions, projects, memory, and artifacts stay scoped to your account.
               </p>
             </div>
@@ -179,7 +179,7 @@ export function AuthScreen({
         <section className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-2xl backdrop-blur">
           <div className="space-y-5">
             <div>
-              <p className="text-sm font-medium uppercase tracking-[0.22em] text-slate-400">
+              <p className="text-sm font-medium uppercase tracking-[0.22em] text-slate-300/90">
                 Authentication
               </p>
               <h2 className="mt-2 text-2xl font-semibold text-white">Access Nodes</h2>
@@ -219,7 +219,7 @@ export function AuthScreen({
               {emailConfigured ? (
                 <form className="space-y-3" onSubmit={handleMagicLink}>
                   <div className="space-y-2">
-                    <label className="text-sm text-slate-300" htmlFor="magic-email">
+                    <label className="text-sm text-slate-200/90" htmlFor="magic-email">
                       Email magic link
                     </label>
                     <Input
@@ -241,7 +241,7 @@ export function AuthScreen({
                     {isMagicLinkSubmitting ? "Sending..." : "Send sign-in link"}
                   </Button>
                   {magicLinkSent ? (
-                    <p className="text-xs leading-5 text-slate-300">
+                    <p className="text-xs leading-5 text-slate-200/88">
                       Check your email for a sign-in link.
                     </p>
                   ) : null}
@@ -251,7 +251,7 @@ export function AuthScreen({
               {agentTokenLoginEnabled ? (
                 <form className="mt-4 space-y-3 border-t border-white/10 pt-4" onSubmit={handleAgentToken}>
                   <div className="space-y-2">
-                    <label className="text-sm text-slate-300" htmlFor="agent-token">
+                    <label className="text-sm text-slate-200/90" htmlFor="agent-token">
                       Agent token
                     </label>
                     <Input
@@ -273,7 +273,7 @@ export function AuthScreen({
                     <KeyRound className="size-4" />
                     {isAgentSubmitting ? "Signing in..." : "Continue with agent token"}
                   </Button>
-                  <p className="text-xs leading-5 text-slate-400">
+                  <p className="text-xs leading-5 text-slate-300/90">
                     For bots and automations. Tokens expire and can be rotated in the dashboard.
                   </p>
                 </form>
@@ -285,7 +285,7 @@ export function AuthScreen({
                 <p className="text-sm font-medium text-slate-200">
                   No public sign-in provider is configured in this environment.
                 </p>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
+                <p className="mt-2 text-sm leading-6 text-slate-200/84">
                   Configure OAuth (<code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_GITHUB_*</code>,{" "}
                   <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_GOOGLE_*</code>) or email magic links (
                   <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_EMAIL_SERVER</code>,{" "}
@@ -297,7 +297,7 @@ export function AuthScreen({
             {devCredentialsEnabled ? (
               <form className="space-y-4" onSubmit={handleDevLogin}>
                 <div className="space-y-2">
-                  <label className="text-sm text-slate-300" htmlFor="dev-email">
+                  <label className="text-sm text-slate-200/90" htmlFor="dev-email">
                     Local dev email
                   </label>
                   <Input
@@ -308,7 +308,7 @@ export function AuthScreen({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm text-slate-300" htmlFor="dev-password">
+                  <label className="text-sm text-slate-200/90" htmlFor="dev-password">
                     Local dev password
                   </label>
                   <Input

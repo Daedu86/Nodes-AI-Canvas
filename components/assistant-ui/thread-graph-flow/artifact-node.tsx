@@ -106,12 +106,12 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
                   </span>
                 </span>
                 {data.language ? (
-                  <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-300">
+                  <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-200/90">
                     {data.language}
                   </span>
                 ) : null}
                 {data.fileName ? (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-slate-300">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-slate-200/90">
                     {isImage ? <FileImage className="h-3 w-3" /> : <File className="h-3 w-3" />}
                     <span>{data.fileName}</span>
                   </span>
@@ -122,10 +122,10 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
                 <p className="text-[11px] uppercase tracking-[0.16em]" style={{ color: accent }}>
                   {readableRole}
                 </p>
-                <p className="text-xs text-slate-300/78">{intentLabel}</p>
+                <p className="text-xs text-slate-200/86">{intentLabel}</p>
               </div>
             </div>
-            <div className="flex flex-col items-end gap-1 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+            <div className="flex flex-col items-end gap-1 text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
               <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5">
                 <Move className="h-3 w-3" />
                 <span>Draggable</span>
@@ -152,7 +152,7 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
                   {highlights.length > 0 ? (
                     <div className="space-y-1">
                       {highlights.slice(0, 2).map((line) => (
-                        <p key={line} className="line-clamp-2 text-xs leading-5 text-slate-300/78">
+                        <p key={line} className="line-clamp-2 text-xs leading-5 text-slate-200/86">
                           {line}
                         </p>
                       ))}
@@ -200,7 +200,7 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300/80">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-200/88">
             <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5">
               <Link2 className="h-3 w-3" />
               <span>{linkedCount} linked target{linkedCount === 1 ? "" : "s"}</span>

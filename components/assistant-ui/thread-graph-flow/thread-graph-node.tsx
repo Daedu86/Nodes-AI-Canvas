@@ -168,7 +168,7 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
                 </span>
               ) : null}
               {branchLabel ? (
-                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-300">
+                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-200/90">
                   {branchLabel}
                 </span>
               ) : null}
@@ -184,7 +184,7 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300/80">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-200/88">
               {modelLabel ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5">
                   <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent }} />
@@ -204,7 +204,7 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
             </div>
           </div>
 
-            <div className="flex flex-col items-end gap-1 text-[10px] uppercase tracking-[0.18em] text-slate-400">
+            <div className="flex flex-col items-end gap-1 text-[10px] uppercase tracking-[0.18em] text-slate-300/90">
               <span>{tone.toneLabel}</span>
               {typeof data.idx === "number" ? <span>#{String(data.idx).padStart(2, "0")}</span> : null}
               {isSelected ? (
@@ -219,7 +219,7 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
           <p className="line-clamp-3 text-sm leading-5 text-slate-100">{preview}</p>
         </div>
 
-        <div className="relative mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-300/80">
+        <div className="relative mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-200/88">
           {isRoot ? (
             <span className="rounded-full border border-sky-400/25 bg-sky-400/12 px-2 py-0.5 text-sky-200">
               Conversation entry
