@@ -76,6 +76,13 @@ const formatUpdatedAt = (value: string) => {
   }
 };
 
+const summarizePreviewText = (value: string, maxLength = 220) => {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return "";
+  if (compact.length <= maxLength) return compact;
+  return `${compact.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+};
+
 const summarizeSelectionForTypedNode = (selection: ProjectCanvasSelection) => {
   if (!selection) return "";
   const prefix = selection.kind === "edge" ? `Canvas branch: ${selection.label}` : `Canvas focus: ${selection.label}`;
@@ -112,6 +119,7 @@ export function ProjectWorkspace() {
   const { activeSessionId, sessions: sessionSummaries } = usePersistedSessions();
   const { createMemoryItem, deleteMemoryItem, isReady: isMemoryReady, items: memoryItems } = useReusableMemory();
   const [selectedCanvasItem, setSelectedCanvasItem] = React.useState<ProjectCanvasSelection>(null);
+  const globalContextEditorRef = React.useRef<HTMLTextAreaElement | null>(null);
   const [titleDraft, setTitleDraft] = React.useState(activeProject?.title ?? "");
   const [globalContextDraft, setGlobalContextDraft] = React.useState(activeProject?.globalContext ?? "");
   const [contextSaveState, setContextSaveState] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -180,6 +188,25 @@ export function ProjectWorkspace() {
   );
   const currentUserEmail = session?.user?.email?.trim().toLowerCase() ?? null;
 
+  const focusGlobalContextEditor = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.setTimeout(() => {
+      const editor = globalContextEditorRef.current;
+      if (!editor) return;
+      editor.scrollIntoView?.({
+        behavior: "smooth",
+        block: "center",
+      });
+      editor.focus();
+      try {
+        const cursorPosition = editor.value.length;
+        editor.setSelectionRange(cursorPosition, cursorPosition);
+      } catch {
+        // Ignore selection sync failures in read-only or unsupported environments.
+      }
+    }, 0);
+  }, []);
+
   React.useEffect(() => {
     if (!activeProject) return;
     if (!canEditProject) return;
@@ -197,8 +224,13 @@ export function ProjectWorkspace() {
 
   React.useEffect(() => {
     if (!selectedCanvasItem) return;
+    if (selectedCanvasItem.kind === "node" && selectedCanvasItem.role === "global-context") {
+      setInspectorTab("context");
+      focusGlobalContextEditor();
+      return;
+    }
     setInspectorTab("focus");
-  }, [selectedCanvasItem]);
+  }, [focusGlobalContextEditor, selectedCanvasItem]);
 
   const handleCommitTitle = React.useCallback(async () => {
     if (!activeProject) return;
@@ -364,6 +396,13 @@ export function ProjectWorkspace() {
       text: aggregateText,
     };
   }, [activeProject?.title, globalContextDraft, memberSessions]);
+
+  const globalContextPreview = React.useMemo(() => {
+    const preview = summarizePreviewText(globalContextDraft, 240);
+    return preview.length > 0
+      ? preview
+      : "No shared project guidance yet. Add reusable goals, constraints, or synthesis notes for every attached session.";
+  }, [globalContextDraft]);
 
   const projectView = React.useMemo(() => {
     if (!activeProject) return null;
@@ -764,6 +803,11 @@ export function ProjectWorkspace() {
     setInspectorTab("context");
   }, [canEditProject, projectContextBuilderDraft.text]);
 
+  const handleEditGlobalContext = React.useCallback(() => {
+    setInspectorTab("context");
+    focusGlobalContextEditor();
+  }, [focusGlobalContextEditor]);
+
   const handleSaveProjectMember = React.useCallback(async () => {
     if (!activeProject || !canManageProject) return;
     const email = memberEmailDraft.trim().toLowerCase();
@@ -858,6 +902,30 @@ export function ProjectWorkspace() {
                 }}
                 placeholder="Name this project"
               />
+            </div>
+            <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                    Shared context
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-foreground/85">
+                    {globalContextPreview}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 shrink-0 px-3"
+                  onClick={handleEditGlobalContext}
+                >
+                  {canEditProject ? "Edit context" : "View context"}
+                </Button>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                Reusable guidance that flows into every session attached to this project.
+              </p>
             </div>
             <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1086,7 +1154,25 @@ export function ProjectWorkspace() {
           description="Shared guidance that applies across every session inside this project."
         >
           <div className="space-y-4">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <label
+                  htmlFor="project-global-context"
+                  className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground"
+                >
+                  Shared narrative
+                </label>
+                <span className="text-[11px] text-muted-foreground">
+                  {canEditProject ? "Editable across the whole project" : "Read-only in viewer mode"}
+                </span>
+              </div>
+              <p className="text-xs leading-5 text-muted-foreground">
+                Add durable goals, constraints, terminology, or synthesis notes that should apply across every session in this project.
+              </p>
+            </div>
             <textarea
+              id="project-global-context"
+              ref={globalContextEditorRef}
               value={globalContextDraft}
               readOnly={!canEditProject}
               onChange={(event) => setGlobalContextDraft(event.currentTarget.value)}
