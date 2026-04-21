@@ -95,6 +95,9 @@ describe("LlmSettingsProvider", () => {
     expect((await screen.findByTestId("options")).textContent).toContain(
       "openrouter:nvidia/nemotron-3-super-120b-a12b:free",
     );
+    expect(screen.getByTestId("options").textContent).not.toContain(
+      "openrouter:arcee-ai/trinity-mini:free",
+    );
     expect(screen.getByTestId("options").textContent).toContain("ollama:gemma3:4b");
   });
 

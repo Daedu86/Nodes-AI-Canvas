@@ -10,6 +10,7 @@ import {
   type ResolvedModelConfig,
 } from "@/lib/llm/config";
 import type { LlmSettingsState } from "@/lib/llm/user-settings";
+import { isVisionCapableModel } from "@/lib/llm/provider-catalog";
 import { validateOllamaBaseUrl } from "@/lib/server/ollama-base-url";
 import { type LlmRequestOverrides } from "@/lib/llm/request-overrides";
 import {
@@ -28,6 +29,25 @@ const normalizeValue = (value?: string | null) => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
 };
+
+const MAX_OPENROUTER_FALLBACK_MODELS = 3;
+const OPENROUTER_ROUTER_MODEL = "openrouter/free";
+const OPENROUTER_TEXT_FIRST_FALLBACKS = [
+  "nvidia/nemotron-3-nano-30b-a3b:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "arcee-ai/trinity-large-preview:free",
+  "nvidia/nemotron-nano-12b-v2-vl:free",
+  "google/gemma-4-31b-it:free",
+  "google/gemma-4-26b-a4b-it:free",
+] as const;
+const OPENROUTER_VISION_FIRST_FALLBACKS = [
+  "nvidia/nemotron-nano-12b-v2-vl:free",
+  "nvidia/nemotron-3-nano-30b-a3b:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "arcee-ai/trinity-large-preview:free",
+  "google/gemma-4-31b-it:free",
+  "google/gemma-4-26b-a4b-it:free",
+] as const;
 
 export type ProviderRuntimeOptions = {
   userPlan?: UserPlan;
@@ -83,14 +103,59 @@ const isOllamaCloudEndpoint = (baseUrl?: string) => {
   return value.includes("ollama.com");
 };
 
+function pickOpenRouterFallbackModels(config: ResolvedModelConfig) {
+  const candidates = getModelAttemptChain(config)
+    .filter((candidate) => candidate.provider === "openrouter" && candidate.modelId !== config.modelId)
+    .map((candidate) => candidate.modelId);
+
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  const preferredOrder = isVisionCapableModel(config.provider, config.modelId)
+    ? OPENROUTER_VISION_FIRST_FALLBACKS
+    : OPENROUTER_TEXT_FIRST_FALLBACKS;
+  const candidateSet = new Set(candidates);
+  const ordered: string[] = [];
+
+  for (const modelId of preferredOrder) {
+    if (candidateSet.has(modelId) && !ordered.includes(modelId)) {
+      ordered.push(modelId);
+    }
+  }
+
+  for (const modelId of candidates) {
+    if (!ordered.includes(modelId)) {
+      ordered.push(modelId);
+    }
+  }
+
+  // OpenRouter currently rejects `models` arrays longer than 3 items.
+  // Always reserve one slot for the free router if it is available.
+  if (candidateSet.has(OPENROUTER_ROUTER_MODEL) && !ordered.includes(OPENROUTER_ROUTER_MODEL)) {
+    ordered.push(OPENROUTER_ROUTER_MODEL);
+  }
+
+  let selected = ordered.slice(0, MAX_OPENROUTER_FALLBACK_MODELS);
+  if (
+    candidateSet.has(OPENROUTER_ROUTER_MODEL) &&
+    !selected.includes(OPENROUTER_ROUTER_MODEL)
+  ) {
+    selected = [
+      ...selected.slice(0, MAX_OPENROUTER_FALLBACK_MODELS - 1),
+      OPENROUTER_ROUTER_MODEL,
+    ];
+  }
+
+  return selected;
+}
+
 const createOpenRouterFetchWithFallbacks = (config: ResolvedModelConfig) => {
   if (config.modelId === "openrouter/free") {
     return fetch;
   }
 
-  const fallbackModels = getModelAttemptChain(config)
-    .filter((candidate) => candidate.provider === "openrouter" && candidate.modelId !== config.modelId)
-    .map((candidate) => candidate.modelId);
+  const fallbackModels = pickOpenRouterFallbackModels(config);
 
   if (fallbackModels.length === 0) {
     return fetch;
