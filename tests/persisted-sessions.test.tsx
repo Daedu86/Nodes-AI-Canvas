@@ -160,7 +160,7 @@ describe("PersistedSessionsProvider", () => {
     expect(localStorage.getItem(ACTIVE_SESSION_KEY)).toBe("session-b");
   });
 
-  it("creates a fresh session during post-auth handoff instead of reopening the stored one", async () => {
+  it("reopens the stored session during post-auth handoff instead of creating a fresh one", async () => {
     localStorage.setItem(ACTIVE_SESSION_KEY, "session-a");
     window.history.replaceState({}, "", "/?handoff=chat");
 
@@ -172,6 +172,52 @@ describe("PersistedSessionsProvider", () => {
         return createJsonResponse({
           sessions: [createSessionSummary("session-a", "Session A")],
         });
+      }
+
+      if (url === "/api/sessions/session-a" && method === "GET") {
+        return createJsonResponse({
+          session: createSessionDocument("session-a", "Session A"),
+        });
+      }
+
+      if (url === "/api/sessions/session-a" && method === "PATCH") {
+        return createJsonResponse({
+          session: createSessionDocument("session-a", "Session A"),
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithSession(
+      <PersistedSessionsProvider>
+        <RenameRecoveryProbe />
+      </PersistedSessionsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ready").textContent).toBe("true");
+      expect(screen.getByTestId("active-session").textContent).toBe("session-a");
+    });
+
+    expect(localStorage.getItem(ACTIVE_SESSION_KEY)).toBe("session-a");
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/sessions",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("creates a fresh session during post-auth handoff when the user has no existing sessions", async () => {
+    window.history.replaceState({}, "", "/?handoff=chat");
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+
+      if (url === "/api/sessions?includeArchived=1") {
+        return createJsonResponse({ sessions: [] });
       }
 
       if (url === "/api/sessions" && method === "POST") {
