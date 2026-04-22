@@ -13,7 +13,6 @@ import {
   ChevronRightIcon,
   CopyIcon,
   GitBranchPlusIcon,
-  PencilIcon,
   RefreshCwIcon,
 } from "lucide-react";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
@@ -47,6 +46,7 @@ import {
 } from "@/lib/thread-branching";
 import { executeBranchSpec } from "@/lib/thread-branching-runtime";
 import { executeAssistantEditBranch } from "@/lib/assistant-edit-runtime";
+import { ensureThreadIdle } from "@/lib/thread-run-control";
 import { cn } from "@/lib/utils";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -140,9 +140,11 @@ const InlineBranchComposer: FC<{
   disabled: boolean;
   busy: boolean;
   onCancel: () => void;
+  onCancelRun?: () => void;
   onChange: (value: string) => void;
   onSelectAction?: (key: string) => void;
   onSubmit: () => void;
+  runInterruptionNote?: string | null;
 }> = ({
   activeActionKey,
   detail,
@@ -151,9 +153,11 @@ const InlineBranchComposer: FC<{
   disabled,
   busy,
   onCancel,
+  onCancelRun,
   onChange,
   onSelectAction,
   onSubmit,
+  runInterruptionNote,
 }) => {
   return (
     <div className="col-span-full rounded-2xl border border-border/60 bg-background/95 px-3 py-3 shadow-sm">
@@ -183,6 +187,9 @@ const InlineBranchComposer: FC<{
       <div className="space-y-1">
         <p className="text-xs font-medium text-foreground/80">{detail.title}</p>
         <p className="text-xs text-muted-foreground">{detail.description}</p>
+        {runInterruptionNote ? (
+          <p className="text-xs text-amber-700 dark:text-amber-300">{runInterruptionNote}</p>
+        ) : null}
       </div>
       <textarea
         rows={3}
@@ -201,6 +208,16 @@ const InlineBranchComposer: FC<{
         >
           Cancel
         </button>
+        {onCancelRun ? (
+          <button
+            type="button"
+            className="inline-flex items-center rounded-md border border-amber-500/35 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-50 dark:text-amber-300"
+            onClick={onCancelRun}
+            disabled={busy}
+          >
+            Cancel run
+          </button>
+        ) : null}
         <button
           type="button"
           className="inline-flex items-center rounded-md border border-sky-500/35 bg-sky-500/10 px-2.5 py-1.5 text-xs font-medium text-sky-700 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-50"
@@ -221,15 +238,9 @@ const UserActionBar: FC<{
 }> = ({ disabled, isDrafting, onBranch }) => {
   return (
     <ActionBarPrimitive.Root
-      hideWhenRunning
       autohide="not-last"
       className="flex flex-col items-end col-start-1 row-start-2 mr-3 mt-2.5"
     >
-      <ActionBarPrimitive.Edit asChild>
-        <TooltipIconButton tooltip="Edit">
-          <PencilIcon />
-        </TooltipIconButton>
-      </ActionBarPrimitive.Edit>
       <TooltipIconButton
         tooltip="Branch"
         onClick={onBranch}
@@ -249,7 +260,6 @@ const AssistantActionBar: FC<{
 }> = ({ disabled, isBranching, onBranch }) => {
   return (
     <ActionBarPrimitive.Root
-      hideWhenRunning
       autohide="not-last"
       autohideFloat="single-branch"
       className="text-muted-foreground flex gap-1 col-start-3 row-start-2 -ml-1 data-[floating]:bg-background data-[floating]:absolute data-[floating]:rounded-md data-[floating]:border data-[floating]:p-1 data-[floating]:shadow-sm"
@@ -326,6 +336,15 @@ const eventTargetsInteractiveControl = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
   Boolean(target.closest("button,a,input,textarea,select,[role='button'],[data-ignore-message-focus='true']"));
 
+const RUN_CANCEL_FAILURE_MESSAGE =
+  "The current assistant run could not be cancelled. Wait for it to finish, then try again.";
+const USER_BRANCH_RUN_NOTICE =
+  "Submitting will stop the current run before creating the branch.";
+const ASSISTANT_EDIT_RUN_NOTICE =
+  "Submitting will stop the current run before revising the reply.";
+const FOLLOW_UP_RUN_NOTICE =
+  "Submitting will stop the current run before sending the follow-up.";
+
 const SyntheticAssistantEditBranchBadge: FC<{
   activeBranchCount: number;
   activeBranchNumber: number;
@@ -363,63 +382,89 @@ export const UserMessage: FC = () => {
   const branchOperation: BranchOperation = isRootUser ? "new-root-prompt" : "create-sibling-prompt";
   const activeDraft =
     draft && draft.anchorId === message?.id && draft.operation === branchOperation ? draft : null;
-  const branchDetail = React.useMemo<BranchOperationDetail>(
-    () => getBranchOperationDetail(branchOperation),
-    [branchOperation],
+  const branchDetail = React.useMemo<BranchOperationDetail & { key: BranchOperation }>(
+    () => ({
+      ...getBranchOperationDetail(branchOperation),
+      key: branchOperation,
+      title: "Create sibling branch",
+      description: isRootUser
+        ? "Edit this prompt to create a new top-level branch while preserving the original."
+        : "Edit this prompt to create a sibling branch while preserving the original.",
+      submitLabel: "Create branch",
+    }),
+    [branchOperation, isRootUser],
   );
 
   const handleChooseBranch = React.useCallback(() => {
     if (!message?.id) return;
-    beginDraft(message.id, branchOperation);
-  }, [beginDraft, branchOperation, message?.id]);
+    clearRequestError();
+    beginDraft(message.id, branchOperation, getMessageText(message as MessageLike));
+  }, [beginDraft, branchOperation, clearRequestError, message]);
+
+  const handleCancelRun = React.useCallback(() => {
+    clearRequestError();
+    try {
+      runtime.threads.main.cancelRun();
+    } catch {
+      setRequestError("Unable to cancel the current run.");
+    }
+  }, [clearRequestError, runtime.threads.main, setRequestError]);
 
   const handleSubmitBranch = React.useCallback(() => {
     if (!message?.id || !activeDraft) return;
-    const spec = buildBranchSpec(
-      isRootUser
-        ? {
-            id: ROOT_NODE_ID,
-            parentId: null,
-            role: "ROOT",
-            isBridge: false,
-          }
-        : {
-            id: message.id,
-            parentId: resolvedParentId,
-            role: "user",
-            isBridge: false,
-          },
-      branchOperation,
-    );
+    void (async () => {
+      const spec = buildBranchSpec(
+        isRootUser
+          ? {
+              id: ROOT_NODE_ID,
+              parentId: null,
+              role: "ROOT",
+              isBridge: false,
+            }
+          : {
+              id: message.id,
+              parentId: resolvedParentId,
+              role: "user",
+              isBridge: false,
+            },
+        branchOperation,
+      );
 
-    if (!spec) {
-      setRequestError("Unable to branch from this message.");
-      return;
-    }
-
-    clearRequestError();
-    setIsSubmittingBranch(true);
-    try {
-      const executed = executeBranchSpec(runtime.threads.main, spec, {
-        historyMode,
-        modelId,
-        provider,
-        text: activeDraft.text,
-      });
-
-      if (!executed) {
+      if (!spec) {
         setRequestError("Unable to branch from this message.");
         return;
       }
 
-      cancelDraft();
-    } catch (error) {
-      const messageText =
-        error instanceof Error ? error.message : "Unable to branch from this message.";
-      setRequestError(messageText);
-    } finally {
-      setIsSubmittingBranch(false);
-    }
+      clearRequestError();
+      setIsSubmittingBranch(true);
+      try {
+        const threadReady = await ensureThreadIdle(runtime.threads.main);
+        if (!threadReady) {
+          setRequestError(RUN_CANCEL_FAILURE_MESSAGE);
+          return;
+        }
+
+        const executed = executeBranchSpec(runtime.threads.main, spec, {
+          historyMode,
+          modelId,
+          provider,
+          text: activeDraft.text,
+        });
+
+        if (!executed) {
+          setRequestError("Unable to branch from this message.");
+          return;
+        }
+
+        cancelDraft();
+      } catch (error) {
+        const messageText =
+          error instanceof Error ? error.message : "Unable to branch from this message.";
+        setRequestError(messageText);
+      } finally {
+        setIsSubmittingBranch(false);
+      }
+    })();
   }, [
     activeDraft,
     branchOperation,
@@ -453,7 +498,7 @@ export const UserMessage: FC = () => {
       }}
     >
       <UserActionBar
-        disabled={!llmEnabled || isThreadRunning}
+        disabled={!llmEnabled}
         isDrafting={Boolean(activeDraft)}
         onBranch={handleChooseBranch}
       />
@@ -476,19 +521,15 @@ export const UserMessage: FC = () => {
         <div className="col-start-2 row-start-4 w-full max-w-[calc(var(--thread-max-width)*0.8)]">
           <InlineBranchComposer
             activeActionKey={branchOperation}
-            detail={{
-              key: branchOperation,
-              title: branchDetail.title,
-              description: branchDetail.description,
-              placeholder: branchDetail.placeholder,
-              submitLabel: branchDetail.submitLabel,
-            }}
+            detail={branchDetail}
             text={activeDraft.text}
-            disabled={!llmEnabled || isThreadRunning}
+            disabled={!llmEnabled}
             busy={isSubmittingBranch}
             onCancel={cancelDraft}
+            onCancelRun={isThreadRunning ? handleCancelRun : undefined}
             onChange={setDraftText}
             onSubmit={handleSubmitBranch}
+            runInterruptionNote={isThreadRunning ? USER_BRANCH_RUN_NOTICE : null}
           />
         </div>
       ) : null}
@@ -519,10 +560,10 @@ export const AssistantMessage: FC = () => {
     () => [
       {
         key: "edit-assistant-branch",
-        title: "Edit branch",
-        description: "Create an alternate assistant branch from this reply.",
-        placeholder: "Write the edited branch prompt...",
-        submitLabel: "Create edited branch",
+        title: "Revise assistant reply",
+        description: "Create a revised assistant branch while preserving the original reply.",
+        placeholder: "Revise this assistant reply...",
+        submitLabel: "Create branch",
       },
       {
         key: branchOperation,
@@ -593,14 +634,16 @@ export const AssistantMessage: FC = () => {
 
   const handleChooseBranch = React.useCallback(() => {
     if (!message?.id) return;
+    clearRequestError();
     setAssistantEditText("");
     setIsEditingAssistant(false);
     beginDraft(message.id, branchOperation);
-  }, [beginDraft, branchOperation, message?.id]);
+  }, [beginDraft, branchOperation, clearRequestError, message?.id]);
 
   const handleSelectAssistantAction = React.useCallback(
     (actionKey: string) => {
       if (!message?.id) return;
+      clearRequestError();
       if (actionKey === "edit-assistant-branch") {
         cancelDraft();
         setAssistantEditText((current) => current || getMessageText(message as MessageLike));
@@ -612,13 +655,22 @@ export const AssistantMessage: FC = () => {
         beginDraft(message.id, branchOperation);
       }
     },
-    [activeDraft, beginDraft, branchOperation, cancelDraft, message],
+    [activeDraft, beginDraft, branchOperation, cancelDraft, clearRequestError, message],
   );
 
   const handleCancelEdit = React.useCallback(() => {
     setAssistantEditText("");
     setIsEditingAssistant(false);
   }, []);
+
+  const handleCancelRun = React.useCallback(() => {
+    clearRequestError();
+    try {
+      runtime.threads.main.cancelRun();
+    } catch {
+      setRequestError("Unable to cancel the current run.");
+    }
+  }, [clearRequestError, runtime.threads.main, setRequestError]);
 
   const handleSubmitEdit = React.useCallback(async () => {
     if (!message?.id) return;
@@ -662,44 +714,52 @@ export const AssistantMessage: FC = () => {
 
   const handleSubmitBranch = React.useCallback(() => {
     if (!message?.id || !activeDraft) return;
-    const spec = buildBranchSpec(
-      {
-        id: message.id,
-        parentId: message.parentId ?? null,
-        role: "assistant",
-        isBridge: false,
-      },
-      branchOperation,
-    );
+    void (async () => {
+      const spec = buildBranchSpec(
+        {
+          id: message.id,
+          parentId: message.parentId ?? null,
+          role: "assistant",
+          isBridge: false,
+        },
+        branchOperation,
+      );
 
-    if (!spec) {
-      setRequestError("Unable to branch from this message.");
-      return;
-    }
-
-    clearRequestError();
-    setIsSubmittingBranch(true);
-    try {
-      const executed = executeBranchSpec(runtime.threads.main, spec, {
-        historyMode,
-        modelId,
-        provider,
-        text: activeDraft.text,
-      });
-
-      if (!executed) {
+      if (!spec) {
         setRequestError("Unable to branch from this message.");
         return;
       }
 
-      cancelDraft();
-    } catch (error) {
-      const messageText =
-        error instanceof Error ? error.message : "Unable to branch from this message.";
-      setRequestError(messageText);
-    } finally {
-      setIsSubmittingBranch(false);
-    }
+      clearRequestError();
+      setIsSubmittingBranch(true);
+      try {
+        const threadReady = await ensureThreadIdle(runtime.threads.main);
+        if (!threadReady) {
+          setRequestError(RUN_CANCEL_FAILURE_MESSAGE);
+          return;
+        }
+
+        const executed = executeBranchSpec(runtime.threads.main, spec, {
+          historyMode,
+          modelId,
+          provider,
+          text: activeDraft.text,
+        });
+
+        if (!executed) {
+          setRequestError("Unable to branch from this message.");
+          return;
+        }
+
+        cancelDraft();
+      } catch (error) {
+        const messageText =
+          error instanceof Error ? error.message : "Unable to branch from this message.";
+        setRequestError(messageText);
+      } finally {
+        setIsSubmittingBranch(false);
+      }
+    })();
   }, [
     activeDraft,
     branchOperation,
@@ -770,7 +830,7 @@ export const AssistantMessage: FC = () => {
       </div>
 
       <AssistantActionBar
-        disabled={!llmEnabled || isThreadRunning}
+        disabled={!llmEnabled}
         isBranching={Boolean(activeDraft) || isEditingAssistant}
         onBranch={handleChooseBranch}
       />
@@ -789,12 +849,20 @@ export const AssistantMessage: FC = () => {
             actions={assistantBranchActions.map(({ key, title }) => ({ key, title }))}
             detail={activeAssistantAction}
             text={isEditingAssistant ? assistantEditText : activeDraft?.text ?? ""}
-            disabled={!llmEnabled || isThreadRunning}
+            disabled={!llmEnabled}
             busy={isEditingAssistant ? isSubmittingAssistantEdit : isSubmittingBranch}
             onCancel={handleCancelAssistantBranch}
+            onCancelRun={isThreadRunning ? handleCancelRun : undefined}
             onChange={handleAssistantBranchTextChange}
             onSelectAction={handleSelectAssistantAction}
             onSubmit={handleSubmitAssistantBranch}
+            runInterruptionNote={
+              isThreadRunning
+                ? isEditingAssistant
+                  ? ASSISTANT_EDIT_RUN_NOTICE
+                  : FOLLOW_UP_RUN_NOTICE
+                : null
+            }
           />
         </div>
       ) : null}

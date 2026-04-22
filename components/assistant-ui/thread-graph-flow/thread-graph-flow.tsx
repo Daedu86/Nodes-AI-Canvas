@@ -81,6 +81,7 @@ import {
   getBranchOperationDetail,
 } from "@/lib/thread-branching";
 import { executeBranchSpec } from "@/lib/thread-branching-runtime";
+import { ensureThreadIdle } from "@/lib/thread-run-control";
 import { formatBytes, getContextBudgetPolicy } from "@/lib/context-budget";
 import {
   type SessionArtifact,
@@ -463,6 +464,11 @@ const flowFilterLabel: Record<FlowSpotlightMode, string> = {
   bridge: "Bridge",
   edited: "Edited",
 };
+
+const CANVAS_BRANCH_RUN_NOTICE =
+  "Submitting will stop the current run before creating the branch.";
+const CANVAS_BRANCH_CANCEL_FAILURE =
+  "The current assistant run could not be cancelled. Wait for it to finish, then try again.";
 
 const isFlowViewport = (value: Viewport | null): value is Viewport =>
   !!value &&
@@ -1274,45 +1280,69 @@ export function ThreadGraphFlow() {
   const handleChooseBranchOperation = React.useCallback(
     (operation: Parameters<typeof beginDraft>[1]) => {
       if (!selectedMessageNode) return;
-      beginDraft(selectedMessageNode.id, operation);
+      clearRequestError();
+      const initialText =
+        selectedMessageNode.role === "user" && operation !== "create-follow-up-prompt"
+          ? selectedMessageNode.text
+          : "";
+      beginDraft(selectedMessageNode.id, operation, initialText);
     },
-    [beginDraft, selectedMessageNode],
+    [beginDraft, clearRequestError, selectedMessageNode],
   );
 
-  const handleSubmitBranchDraft = React.useCallback(() => {
-    if (!selectedBranchSpec || !draft || !llmEnabled || isThreadRunning) return;
-
+  const handleCancelRun = React.useCallback(() => {
+    clearRequestError();
     try {
-      setIsSubmittingBranch(true);
-      clearRequestError();
-      const executed = executeBranchSpec(runtime.threads.main, selectedBranchSpec, {
-        contextArtifacts:
-          selectedContextArtifacts.length > 0 ? toLlmContextArtifacts(selectedContextArtifacts) : undefined,
-        contextNodeIds:
-          selectedContextArtifacts.length > 0
-            ? selectedContextArtifacts.map((artifact) => artifact.id)
-            : undefined,
-        historyMode,
-        modelId,
-        provider,
-        text: draft.text,
-      });
-      if (!executed) {
-        setRequestError("Branch draft is empty. Add a prompt before creating the branch.");
-        return;
-      }
-      cancelDraft();
+      runtime.threads.main.cancelRun();
     } catch {
-      setRequestError("Canvas branching failed. Try again from the selected node.");
-    } finally {
-      setIsSubmittingBranch(false);
+      setRequestError("Unable to cancel the current run.");
     }
+  }, [clearRequestError, runtime.threads.main, setRequestError]);
+
+  const handleSubmitBranchDraft = React.useCallback(() => {
+    if (!selectedBranchSpec || !draft || !llmEnabled) return;
+
+    void (async () => {
+      try {
+        setIsSubmittingBranch(true);
+        clearRequestError();
+
+        const threadReady = await ensureThreadIdle(runtime.threads.main);
+        if (!threadReady) {
+          setRequestError(CANVAS_BRANCH_CANCEL_FAILURE);
+          return;
+        }
+
+        const executed = executeBranchSpec(runtime.threads.main, selectedBranchSpec, {
+          contextArtifacts:
+            selectedContextArtifacts.length > 0
+              ? toLlmContextArtifacts(selectedContextArtifacts)
+              : undefined,
+          contextNodeIds:
+            selectedContextArtifacts.length > 0
+              ? selectedContextArtifacts.map((artifact) => artifact.id)
+              : undefined,
+          historyMode,
+          modelId,
+          provider,
+          text: draft.text,
+        });
+        if (!executed) {
+          setRequestError("Branch draft is empty. Add a prompt before creating the branch.");
+          return;
+        }
+        cancelDraft();
+      } catch {
+        setRequestError("Canvas branching failed. Try again from the selected node.");
+      } finally {
+        setIsSubmittingBranch(false);
+      }
+    })();
   }, [
     cancelDraft,
     clearRequestError,
     draft,
     historyMode,
-    isThreadRunning,
     llmEnabled,
     modelId,
     provider,
@@ -1475,6 +1505,38 @@ export function ThreadGraphFlow() {
     [isArtifactLinkedToTarget, linkArtifactToTarget, unlinkArtifactFromTarget],
   );
 
+  const selectedBranchTrail = React.useMemo(() => {
+    if (!selectedMessageNode) return [];
+
+    const formatTrailLabel = (node: (typeof nodes)[number]) => {
+      if (node.id === "__ROOT__") return "root";
+      const preview = node.text.replace(/\s+/g, " ").trim();
+      if (!preview) {
+        return node.role === "assistant" ? "assistant reply" : "user prompt";
+      }
+      return preview.length > 28 ? `${preview.slice(0, 25)}...` : preview;
+    };
+
+    const trail: string[] = [];
+    const visited = new Set<string>();
+    let currentId: string | null = selectedMessageNode.id;
+
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      const node = nodeIndex.get(currentId);
+      if (!node) break;
+      trail.unshift(formatTrailLabel(node));
+      currentId = node.parentId;
+    }
+
+    return trail;
+  }, [nodeIndex, selectedMessageNode]);
+
+  const selectedBranchPathLabel = React.useMemo(
+    () => selectedBranchTrail.join(" > "),
+    [selectedBranchTrail],
+  );
+
   const selectedPreview = selectedFlowNode?.data.preview?.replace(/\s+/g, " ").trim() ?? "";
   const visibleCanvasNodeCount = decoratedFlowNodes.length;
   const hiddenCanvasNodeCount = Math.max(0, flowNodes.length - visibleCanvasNodeCount);
@@ -1615,6 +1677,11 @@ export function ThreadGraphFlow() {
           </div>
           <p className="mt-2 line-clamp-2 text-sm font-medium text-foreground">{selectedCanvasLabel}</p>
           <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{selectedCanvasPreview}</p>
+          {selectedBranchPathLabel ? (
+            <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-muted-foreground">
+              <span className="font-medium text-foreground/80">Path:</span> {selectedBranchPathLabel}
+            </p>
+          ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
               {visibleCanvasNodeCount} / {flowNodes.length} nodes
@@ -2173,6 +2240,11 @@ export function ThreadGraphFlow() {
                 <p className="line-clamp-2 text-sm text-foreground/90">
                   {selectedPreview || "No preview available"}
                 </p>
+                {selectedBranchPathLabel ? (
+                  <p className="rounded-2xl border border-border/60 bg-background/85 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
+                    <span className="font-medium text-foreground/80">Path:</span> {selectedBranchPathLabel}
+                  </p>
+                ) : null}
                 <div className="flex flex-wrap items-center gap-2">
                   {selectedNodeId !== "__ROOT__" ? (
                     <button
@@ -2235,12 +2307,14 @@ export function ThreadGraphFlow() {
                   }
                   busy={isSubmittingBranch}
                   contextCount={selectedContextArtifacts.length}
-                  disabled={!llmEnabled || isThreadRunning}
+                  disabled={!llmEnabled}
                   details={selectedBranchOptions}
                   onCancelDraft={cancelDraft}
+                  onCancelRun={isThreadRunning ? handleCancelRun : undefined}
                   onChooseOperation={handleChooseBranchOperation}
                   onDraftTextChange={setDraftText}
                   onSubmitDraft={handleSubmitBranchDraft}
+                  runInterruptionNote={isThreadRunning ? CANVAS_BRANCH_RUN_NOTICE : null}
                 />
                 <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
                   <div className="space-y-1">

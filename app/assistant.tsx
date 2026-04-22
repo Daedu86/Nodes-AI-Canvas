@@ -200,6 +200,7 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
     if (!rawRuntime) return;
     const thread = rawRuntime.threads.main;
     const onRunStart = thread.unstable_on("runStart", () => {
+      setRequestError(null);
       pendingLatencyRef.current = {
         startedAt: performance.now(),
         responseStartedAt: null,
@@ -220,8 +221,10 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
             ? ((lastAssistant?.message as { id: string }).id)
             : null;
         recordPendingLatency(messageId);
+        setRequestError(null);
       } catch {
         pendingLatencyRef.current = null;
+        setRequestError(null);
       }
     });
     return () => {

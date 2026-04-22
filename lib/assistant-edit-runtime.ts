@@ -7,8 +7,12 @@ import {
   EDIT_PARENT_KEY,
   EDIT_SOURCE_KEY,
 } from "@/lib/assistant-edit-branching";
+import { ensureThreadIdle } from "@/lib/thread-run-control";
 
-type AssistantEditRuntime = Pick<ThreadRuntime, "append" | "export" | "import" | "unstable_on">;
+type AssistantEditRuntime = Pick<
+  ThreadRuntime,
+  "append" | "cancelRun" | "export" | "import" | "unstable_on"
+>;
 type InternalAssistantEditRuntime = ThreadRuntime & {
   __internal_threadBinding?: {
     getState?: () => {
@@ -67,6 +71,11 @@ export const executeAssistantEditBranch = async (
 ) => {
   const trimmedText = options.text.trim();
   if (!trimmedText || !options.parentId) {
+    return false;
+  }
+
+  const threadReady = await ensureThreadIdle(threadRuntime);
+  if (!threadReady) {
     return false;
   }
 

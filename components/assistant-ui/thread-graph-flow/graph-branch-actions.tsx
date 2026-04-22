@@ -11,9 +11,11 @@ type GraphBranchActionsProps = {
   disabled?: boolean;
   details: BranchOperationDetail[];
   onCancelDraft: () => void;
+  onCancelRun?: () => void;
   onChooseOperation: (operation: BranchOperation) => void;
   onDraftTextChange: (value: string) => void;
   onSubmitDraft: () => void;
+  runInterruptionNote?: string | null;
 };
 
 export function GraphBranchActions({
@@ -23,9 +25,11 @@ export function GraphBranchActions({
   disabled = false,
   details,
   onCancelDraft,
+  onCancelRun,
   onChooseOperation,
   onDraftTextChange,
   onSubmitDraft,
+  runInterruptionNote,
 }: GraphBranchActionsProps) {
   if (details.length === 0 && !activeDraft) return null;
 
@@ -40,6 +44,9 @@ export function GraphBranchActions({
         <p className="text-xs text-muted-foreground">
           Create a new branch on the same thread structure used by the chat.
         </p>
+        {runInterruptionNote ? (
+          <p className="text-xs text-amber-700 dark:text-amber-300">{runInterruptionNote}</p>
+        ) : null}
         {contextCount > 0 ? (
           <p className="text-xs text-violet-700">
             Using {contextCount} linked context artifact{contextCount === 1 ? "" : "s"} for the next branch.
@@ -71,6 +78,17 @@ export function GraphBranchActions({
             >
               Cancel
             </Button>
+            {onCancelRun ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="pointer-events-auto w-full border-amber-500/35 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 hover:text-amber-700 dark:text-amber-300 sm:w-auto"
+                onClick={onCancelRun}
+                disabled={busy}
+              >
+                Cancel run
+              </Button>
+            ) : null}
             <Button
               type="button"
               className="pointer-events-auto w-full sm:w-auto"

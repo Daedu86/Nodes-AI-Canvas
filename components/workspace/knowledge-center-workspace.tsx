@@ -141,8 +141,8 @@ const pages: DocPage[] = [
         bullets: [
           "Root branch: start a new direction from the same entry.",
           "User branch: try an alternate user prompt at the same point.",
-          "Edit branch: rewrite an assistant reply as an alternative.",
-          "Follow-up: continue from a chosen assistant state.",
+          "Revise assistant reply: create an alternate assistant answer while preserving the original.",
+          "Add follow-up question: continue from a chosen assistant state.",
         ],
       },
       {

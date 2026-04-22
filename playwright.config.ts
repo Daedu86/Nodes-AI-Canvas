@@ -56,6 +56,12 @@ export default defineConfig({
       E2E_AUTH_USER_EMAIL: "e2e@nodes.local",
       E2E_AUTH_USER_ID: "e2e-user",
       E2E_AUTH_USER_NAME: "E2E User",
+      NODES_PLAN_FREE_CHAT_LIMIT_PER_MINUTE:
+        process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_MINUTE ?? "60",
+      NODES_PLAN_FREE_CHAT_LIMIT_PER_HOUR:
+        process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_HOUR ?? "240",
+      NODES_PLAN_FREE_CHAT_LIMIT_PER_DAY:
+        process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_DAY ?? "1440",
       // Ensure deterministic default model selection in CI runs.
       DEFAULT_MODEL: "nvidia/nemotron-3-super-120b-a12b:free",
       NEXT_PUBLIC_DEFAULT_MODEL: "nvidia/nemotron-3-super-120b-a12b:free",

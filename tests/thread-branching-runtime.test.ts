@@ -12,7 +12,7 @@ const baseSpec: BranchSpec = {
   targetRole: "user",
   startRun: true,
   placeholder: "Start another top-level branch...",
-  title: "New root prompt",
+  title: "Create root branch",
 };
 
 describe("thread branching runtime", () => {

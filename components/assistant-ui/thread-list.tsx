@@ -165,6 +165,8 @@ export const ThreadList: FC = () => {
       <div className="overflow-hidden rounded-[16px] border border-border/80 bg-card/70">
         <button
           type="button"
+          aria-controls="projects-panel"
+          aria-expanded={projectsOpen}
           className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-muted/60"
           onClick={() => setProjectsOpen((prev) => !prev)}
         >
@@ -183,7 +185,7 @@ export const ThreadList: FC = () => {
         </button>
 
         {projectsOpen ? (
-          <div className="border-t border-border/80">
+          <div id="projects-panel" className="border-t border-border/80">
             <div className="flex flex-wrap items-center gap-2 px-3 py-2">
               <Button
                 type="button"
@@ -289,6 +291,8 @@ export const ThreadList: FC = () => {
       <div className="overflow-hidden rounded-[16px] border border-border/80 bg-card/70">
         <button
           type="button"
+          aria-controls="sessions-panel"
+          aria-expanded={savedSessionsOpen}
           className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-muted/60"
           onClick={() => setSavedSessionsOpen((prev) => !prev)}
         >
@@ -307,7 +311,7 @@ export const ThreadList: FC = () => {
         </button>
 
         {savedSessionsOpen ? (
-          <div className="border-t border-border/80">
+          <div id="sessions-panel" className="border-t border-border/80">
             <div className="flex flex-wrap items-center gap-2 px-3 py-2">
               <Button
                 type="button"

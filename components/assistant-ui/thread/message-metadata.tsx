@@ -1,4 +1,4 @@
-import type { FC } from "react";
+import React, { type FC } from "react";
 import type { ResolvedLatencyInfo, ResolvedModelInfo } from "./message-utils";
 
 type MessageMetadataProps = {
@@ -16,6 +16,26 @@ const formatLatencyMs = (value: number | null) => {
   return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)} s`;
 };
 
+const DEBUG_METADATA_STORAGE_KEY = "nodes.debug.message-metadata";
+
+const readDebugMetadataFlag = () => {
+  if (typeof window === "undefined") return false;
+
+  const searchParams = new URLSearchParams(window.location.search);
+  if (
+    searchParams.get("debugMessages") === "1" ||
+    searchParams.get("debug") === "messages"
+  ) {
+    return true;
+  }
+
+  try {
+    return window.localStorage.getItem(DEBUG_METADATA_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
 export const MessageMetadata: FC<MessageMetadataProps> = ({
   messageId,
   parentIdDisplay,
@@ -24,28 +44,40 @@ export const MessageMetadata: FC<MessageMetadataProps> = ({
   role,
   modelInfo,
 }) => {
+  const [showDebugMetadata, setShowDebugMetadata] = React.useState(false);
+
+  React.useEffect(() => {
+    setShowDebugMetadata(readDebugMetadataFlag());
+  }, []);
+
   return (
-    <div className="text-xs text-muted-foreground mb-1">
-      <div>
-        <b>id:</b> {messageId ?? "-"}
-      </div>
-      <div>
-        <b>parentId:</b> {parentIdDisplay ?? "-"}
-      </div>
-      <div>
-        <b>branchId:</b> {branchIdValue ?? "-"}
-      </div>
-      <div>
-        <b>type:</b> {role ?? "-"}
-      </div>
-      <div>
+    <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+      {role ? (
+        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/80 px-2 py-0.5 uppercase tracking-[0.14em]">
+          {role}
+        </span>
+      ) : null}
+      <span>
         <b>Model:</b> {modelInfo.provider ?? "-"} · {modelInfo.model ?? "-"}
-      </div>
+      </span>
       {latencyInfo ? (
-        <div>
+        <span>
           <b>Latency:</b> start {formatLatencyMs(latencyInfo.responseStartMs)} · total{" "}
           {formatLatencyMs(latencyInfo.totalMs)}
-        </div>
+        </span>
+      ) : null}
+      {showDebugMetadata ? (
+        <>
+          <span>
+            <b>id:</b> {messageId ?? "-"}
+          </span>
+          <span>
+            <b>parentId:</b> {parentIdDisplay ?? "-"}
+          </span>
+          <span>
+            <b>branchId:</b> {branchIdValue ?? "-"}
+          </span>
+        </>
       ) : null}
     </div>
   );

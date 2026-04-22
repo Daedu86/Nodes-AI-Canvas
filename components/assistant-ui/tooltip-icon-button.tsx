@@ -21,14 +21,15 @@ export const TooltipIconButton = forwardRef<
   TooltipIconButtonProps
 >(({ children, tooltip, side = "bottom", className, ...rest }, ref) => {
   return (
-    <TooltipProvider>
+    <TooltipProvider delayDuration={120}>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
             {...rest}
-            className={cn("size-6 p-1", className)}
+            title={tooltip}
+            className={cn("size-8 p-1.5 sm:size-9", className)}
             ref={ref}
           >
             {children}

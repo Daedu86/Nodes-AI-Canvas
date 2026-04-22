@@ -338,7 +338,7 @@ async function editAssistantReply(
 
   await assistantMessage.hover();
   await assistantMessage.getByRole("button", { name: "Branch" }).click();
-  await assistantMessage.getByRole("button", { name: "Edit branch" }).click();
+  await assistantMessage.getByRole("button", { name: "Revise assistant reply" }).click();
 
   const editComposer = page
     .locator("div")
@@ -352,7 +352,7 @@ async function editAssistantReply(
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
-  await assistantMessage.getByRole("button", { name: /Create .*branch|Create follow-up/i }).click();
+  await editComposer.getByRole("button", { name: "Create branch", exact: true }).click();
   await responsePromise;
 
   await expect(threadMessage(page, editedPrompt)).toBeVisible();
@@ -372,7 +372,7 @@ async function editUserPrompt(
   }).first();
 
   await userMessage.hover();
-  await userMessage.getByRole("button", { name: "Edit" }).click();
+  await userMessage.getByRole("button", { name: "Branch" }).click();
 
   const editComposer = page
     .locator("div")
@@ -386,10 +386,7 @@ async function editUserPrompt(
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
-  await page
-    .getByRole("button", { name: "Cancel" })
-    .locator("xpath=following-sibling::button[normalize-space()='Send'][1]")
-    .click();
+  await editComposer.getByRole("button", { name: "Create branch", exact: true }).click();
   await responsePromise;
 
   const editedReply = expectedReply(editedPrompt, options);
@@ -404,11 +401,13 @@ async function createBranchFromFlow(
   {
     nodeId,
     actionName,
+    submitActionName,
     prompt,
     options,
   }: {
     nodeId: string;
     actionName: string;
+    submitActionName?: string;
     prompt: string;
     options?: ReplyOptions;
   },
@@ -436,8 +435,12 @@ async function createBranchFromFlow(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
   await graphSection
-    .getByRole("button", { name: /Create .*branch|Create follow-up/i })
-    .first()
+    .getByRole("button", {
+      name:
+        submitActionName ??
+        (actionName.toLowerCase().includes("follow-up") ? "Add follow-up" : "Create branch"),
+      exact: true,
+    })
     .evaluate((button: HTMLButtonElement) => button.click());
   await responsePromise;
 
@@ -544,12 +547,14 @@ async function createBranchFromChat(
     messageText,
     actionName,
     panelActionName,
+    submitActionName,
     prompt,
     options,
   }: {
     messageText: string;
     actionName: string;
     panelActionName?: string;
+    submitActionName?: string;
     prompt: string;
     options?: ReplyOptions;
   },
@@ -564,14 +569,26 @@ async function createBranchFromChat(
     await message.getByRole("button", { name: panelActionName }).click();
   }
 
-  const branchTextarea = message.getByRole("textbox").last();
+  const branchComposer = page
+    .locator("div")
+    .filter({ has: page.getByRole("button", { name: "Cancel" }) })
+    .filter({ has: page.getByRole("textbox") })
+    .last();
+  const branchTextarea = branchComposer.getByRole("textbox").last();
   await expect(branchTextarea).toBeVisible();
   await branchTextarea.fill(prompt);
 
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
-  await message.getByRole("button", { name: /Create .*branch|Create follow-up/i }).click();
+  await branchComposer
+    .getByRole("button", {
+      name:
+        submitActionName ??
+        (panelActionName?.toLowerCase().includes("follow-up") ? "Add follow-up" : "Create branch"),
+      exact: true,
+    })
+    .evaluate((button: HTMLButtonElement) => button.click());
   await responsePromise;
 
   const reply = expectedReply(prompt, options);
@@ -788,7 +805,7 @@ test("creates a new root branch from the flow canvas", async ({ page }) => {
 
   await createBranchFromFlow(page, {
     nodeId: "__ROOT__",
-    actionName: "New root prompt",
+    actionName: "Create root branch",
     prompt: "Flow-created root branch",
   });
 
@@ -827,7 +844,7 @@ test("creates a sibling user branch from a flow user node", async ({ page }) => 
 
   await createBranchFromFlow(page, {
     nodeId: laterUserNodeId,
-    actionName: "Alternative prompt",
+    actionName: "Create sibling branch",
     prompt: "Flow user sibling alternative",
   });
 
@@ -873,7 +890,7 @@ test("creates a follow-up user branch from a flow assistant node", async ({ page
 
   await createBranchFromFlow(page, {
     nodeId: assistantNodeId,
-    actionName: "Follow-up prompt",
+    actionName: "Add follow-up question",
     prompt: "Flow assistant follow-up prompt",
   });
 
@@ -891,7 +908,7 @@ test("creates a follow-up user branch from a chat assistant node", async ({ page
   await createBranchFromChat(page, {
     messageText: assistantReply,
     actionName: "Branch",
-    panelActionName: "Follow-up prompt",
+    panelActionName: "Add follow-up question",
     prompt: "Chat assistant follow-up prompt",
   });
 
@@ -1202,14 +1219,14 @@ test("creates a semantic text artifact, attaches it as context, and branches wit
     .locator("section")
     .filter({ has: page.getByText("Branch from canvas", { exact: true }) })
     .first();
-  await graphSection.getByRole("button", { name: "Follow-up prompt" }).click();
+  await graphSection.getByRole("button", { name: "Add follow-up question" }).click();
   await graphSection.getByRole("textbox").fill("Follow-up with artifact context");
 
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
   await graphSection
-    .getByRole("button", { name: "Create follow-up with context" })
+    .getByRole("button", { name: "Add follow-up with context" })
     .evaluate((button: HTMLButtonElement) => button.click());
   await responsePromise;
 
@@ -1281,14 +1298,14 @@ test("uploads an image artifact, persists it, and branches with it from the flow
     .locator("section")
     .filter({ has: page.getByText("Branch from canvas", { exact: true }) })
     .first();
-  await graphSection.getByRole("button", { name: "Follow-up prompt" }).click();
+  await graphSection.getByRole("button", { name: "Add follow-up question" }).click();
   await graphSection.getByRole("textbox").fill("Use the image artifact too");
 
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
   await graphSection
-    .getByRole("button", { name: "Create follow-up with context" })
+    .getByRole("button", { name: "Add follow-up with context" })
     .first()
     .evaluate((button: HTMLButtonElement) => button.click());
   await responsePromise;

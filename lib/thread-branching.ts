@@ -31,24 +31,24 @@ export type BranchSpec = {
 export const BRANCH_OPERATION_DETAILS: Record<BranchOperation, BranchOperationDetail> = {
   "new-root-prompt": {
     operation: "new-root-prompt",
-    title: "New root prompt",
-    description: "Create a new top-level user branch from the conversation root.",
-    placeholder: "Start another top-level branch...",
-    submitLabel: "Create root branch",
+    title: "Create root branch",
+    description: "Create a new top-level branch from the conversation root.",
+    placeholder: "Start another root branch...",
+    submitLabel: "Create branch",
   },
   "create-sibling-prompt": {
     operation: "create-sibling-prompt",
-    title: "Alternative prompt",
-    description: "Create a sibling user prompt under the same parent branch.",
-    placeholder: "Write an alternative user prompt...",
-    submitLabel: "Create sibling branch",
+    title: "Create sibling branch",
+    description: "Create a sibling branch from the same parent while preserving the original prompt.",
+    placeholder: "Revise this prompt for a sibling branch...",
+    submitLabel: "Create branch",
   },
   "create-follow-up-prompt": {
     operation: "create-follow-up-prompt",
-    title: "Follow-up prompt",
-    description: "Create a follow-up user prompt beneath this assistant reply.",
-    placeholder: "Write a follow-up prompt...",
-    submitLabel: "Create follow-up",
+    title: "Add follow-up question",
+    description: "Ask a new follow-up question beneath this assistant reply.",
+    placeholder: "Write a follow-up question...",
+    submitLabel: "Add follow-up",
   },
 };
 
