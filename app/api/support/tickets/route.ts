@@ -5,11 +5,18 @@ import {
   listSupportTicketsForUser,
 } from "@/lib/support-ticket-store";
 import type { SupportTicketKind } from "@/lib/support-ticket-documents";
+import {
+  SUPPORT_TICKET_ATTACHMENT_MESSAGE,
+  SUPPORT_TICKET_MAX_BODY_CHARS,
+  SUPPORT_TICKET_MAX_PER_USER,
+  SUPPORT_TICKET_MAX_TITLE_CHARS,
+} from "@/lib/support-ticket-guardrails";
 
 type CreateTicketBody = {
   title?: unknown;
   body?: unknown;
   kind?: unknown;
+  attachments?: unknown;
 };
 
 const normalizeKind = (value: unknown): SupportTicketKind =>
@@ -30,8 +37,21 @@ export async function POST(req: Request) {
   if ("response" in guarded) return guarded.response;
 
   const body = (await req.json().catch(() => ({}))) as CreateTicketBody;
-  const title = typeof body.title === "string" ? body.title : "";
-  const description = typeof body.body === "string" ? body.body : "";
+  if (Array.isArray(body.attachments) && body.attachments.length > 0) {
+    return new Response(SUPPORT_TICKET_ATTACHMENT_MESSAGE, { status: 400 });
+  }
+
+  const existingTickets = await listSupportTicketsForUser(guarded.user.id);
+  if (existingTickets.length >= SUPPORT_TICKET_MAX_PER_USER) {
+    return new Response(
+      `Free-tier limit reached: you can create up to ${SUPPORT_TICKET_MAX_PER_USER} support tickets.`,
+      { status: 400 },
+    );
+  }
+
+  const title = typeof body.title === "string" ? body.title.slice(0, SUPPORT_TICKET_MAX_TITLE_CHARS) : "";
+  const description =
+    typeof body.body === "string" ? body.body.slice(0, SUPPORT_TICKET_MAX_BODY_CHARS) : "";
 
   try {
     const ticket = await createSupportTicketForUser({
@@ -49,4 +69,3 @@ export async function POST(req: Request) {
     return new Response(message, { status: 400 });
   }
 }
-

@@ -3,6 +3,12 @@
 import React from "react";
 import { LifeBuoy, MessageSquareText, Plus } from "lucide-react";
 import type { SupportTicket, SupportTicketKind } from "@/lib/support-ticket-documents";
+import {
+  SUPPORT_TICKET_MAX_BODY_CHARS,
+  SUPPORT_TICKET_MAX_COMMENT_CHARS,
+  SUPPORT_TICKET_MAX_PER_USER,
+  SUPPORT_TICKET_MAX_TITLE_CHARS,
+} from "@/lib/support-ticket-guardrails";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -38,6 +44,7 @@ export function SupportWorkspace() {
     () => tickets.find((ticket) => ticket.id === selectedTicketId) ?? null,
     [selectedTicketId, tickets],
   );
+  const isTicketLimitReached = tickets.length >= SUPPORT_TICKET_MAX_PER_USER;
 
   const loadTickets = React.useCallback(async () => {
     const response = await fetch("/api/support/tickets", { cache: "no-store" });
@@ -61,6 +68,10 @@ export function SupportWorkspace() {
   }, [loadTickets]);
 
   const handleCreateTicket = React.useCallback(async () => {
+    if (isTicketLimitReached) {
+      setError(`Free-tier limit reached: max ${SUPPORT_TICKET_MAX_PER_USER} tickets per account.`);
+      return;
+    }
     if (!draft.title.trim() || !draft.body.trim()) {
       setError("Ticket title and description are required.");
       return;
@@ -92,7 +103,7 @@ export function SupportWorkspace() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [draft, loadTickets]);
+  }, [draft, isTicketLimitReached, loadTickets]);
 
   const handleReply = React.useCallback(async () => {
     if (!selectedTicket || !replyDraft.trim()) {
@@ -147,7 +158,12 @@ export function SupportWorkspace() {
           <div className="space-y-3 p-3">
             <Input
               value={draft.title}
-              onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  title: event.target.value.slice(0, SUPPORT_TICKET_MAX_TITLE_CHARS),
+                }))
+              }
               placeholder="Ticket title"
               aria-label="Ticket title"
             />
@@ -165,17 +181,25 @@ export function SupportWorkspace() {
             </select>
             <textarea
               value={draft.body}
-              onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  body: event.target.value.slice(0, SUPPORT_TICKET_MAX_BODY_CHARS),
+                }))
+              }
               placeholder="Describe what happened or what you need help with"
               aria-label="Ticket description"
               rows={5}
               className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm"
             />
+            <p className="text-xs text-muted-foreground">
+              Free-tier limits: max {SUPPORT_TICKET_MAX_PER_USER} tickets, no attachments.
+            </p>
             <Button
               type="button"
               className="w-full justify-center"
               onClick={handleCreateTicket}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isTicketLimitReached}
             >
               <Plus className="h-4 w-4" />
               {isSubmitting ? "Creating..." : "Create ticket"}
@@ -238,7 +262,9 @@ export function SupportWorkspace() {
               <div className="border-t border-border/70 p-3">
                 <textarea
                   value={replyDraft}
-                  onChange={(event) => setReplyDraft(event.target.value)}
+                  onChange={(event) =>
+                    setReplyDraft(event.target.value.slice(0, SUPPORT_TICKET_MAX_COMMENT_CHARS))
+                  }
                   placeholder="Write a reply for this ticket thread"
                   aria-label="Reply to support ticket"
                   rows={3}
@@ -271,4 +297,3 @@ export function SupportWorkspace() {
     </div>
   );
 }
-
