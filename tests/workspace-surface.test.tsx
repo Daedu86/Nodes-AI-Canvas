@@ -221,6 +221,35 @@ describe("WorkspaceSurfaceProvider", () => {
     expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
   });
 
+  it("collapses and reopens the Profile section", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SidebarProvider>
+        <LlmSettingsProvider>
+          <WorkspaceSurfaceProvider>
+            <SurfaceHarness />
+          </WorkspaceSurfaceProvider>
+        </LlmSettingsProvider>
+      </SidebarProvider>,
+    );
+
+    const profileToggle = screen.getByRole("button", { name: /profile/i });
+
+    expect(screen.getByRole("button", { name: "LLM Models" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Plan & Usage" })).not.toBeNull();
+
+    await user.click(profileToggle);
+
+    expect(screen.queryByRole("button", { name: "LLM Models" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Plan & Usage" })).toBeNull();
+
+    await user.click(profileToggle);
+
+    expect(screen.getByRole("button", { name: "LLM Models" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Plan & Usage" })).not.toBeNull();
+  });
+
   it("forces the main workspace during post-auth handoff", () => {
     localStorage.setItem("nodes.workspace-surface.v1:user-1", "llm-models");
     window.history.replaceState({}, "", "/?handoff=chat");
