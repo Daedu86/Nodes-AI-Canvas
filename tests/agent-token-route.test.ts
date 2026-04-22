@@ -5,6 +5,8 @@ const isAgentTokenConfiguredMock = vi.hoisted(() => vi.fn());
 const mintAgentTokenMock = vi.hoisted(() => vi.fn());
 const revokeAgentTokenRecordMock = vi.hoisted(() => vi.fn());
 const upsertAgentTokenRecordMock = vi.hoisted(() => vi.fn());
+const countActiveAgentTokensMock = vi.hoisted(() => vi.fn());
+const getUserPlanMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../lib/server/request-guards", () => ({
   requireLocalApiUser: requireLocalApiUserMock,
@@ -16,8 +18,13 @@ vi.mock("../lib/server/agent-token", () => ({
 }));
 
 vi.mock("../lib/server/agent-work", () => ({
+  countActiveAgentTokens: countActiveAgentTokensMock,
   revokeAgentTokenRecord: revokeAgentTokenRecordMock,
   upsertAgentTokenRecord: upsertAgentTokenRecordMock,
+}));
+
+vi.mock("../lib/user-plan-store", () => ({
+  getUserPlan: getUserPlanMock,
 }));
 
 import { DELETE, POST } from "../app/api/agents/token/route";
@@ -29,6 +36,8 @@ describe("/api/agents/token", () => {
     mintAgentTokenMock.mockReset();
     revokeAgentTokenRecordMock.mockReset();
     upsertAgentTokenRecordMock.mockReset();
+    countActiveAgentTokensMock.mockReset();
+    getUserPlanMock.mockReset();
 
     requireLocalApiUserMock.mockResolvedValue({
       user: {
@@ -39,6 +48,8 @@ describe("/api/agents/token", () => {
       },
     });
     isAgentTokenConfiguredMock.mockReturnValue(true);
+    getUserPlanMock.mockResolvedValue("paid");
+    countActiveAgentTokensMock.mockResolvedValue(0);
     mintAgentTokenMock.mockResolvedValue({
       token: "token-value",
       tokenId: "token-1",
@@ -127,5 +138,28 @@ describe("/api/agents/token", () => {
       }),
     );
     expect(deleteResponse.status).toBe(403);
+  });
+
+  it("enforces one active agent token on free tier", async () => {
+    getUserPlanMock.mockResolvedValue("free");
+    countActiveAgentTokensMock.mockResolvedValue(1);
+
+    const response = await POST(
+      new Request("http://localhost/api/agents/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          label: "Second agent",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Free tier allows only one active agent.",
+    });
+    expect(mintAgentTokenMock).not.toHaveBeenCalled();
   });
 });

@@ -6,6 +6,7 @@ import {
 import { listMemoryItems } from "@/lib/memory-store";
 import { listSessions } from "@/lib/session-store";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
+import { notifyProjectAccessed } from "@/lib/server/project-notifications";
 
 type RouteParams = {
   params: Promise<{
@@ -31,6 +32,10 @@ export async function GET(_: Request, context: RouteParams) {
   const { projectId } = await context.params;
   try {
     const project = await getProjectForUser(projectId, guarded.user);
+    await notifyProjectAccessed({
+      project,
+      accessor: guarded.user,
+    });
     return Response.json({ project });
   } catch (error) {
     if (error instanceof ProjectAccessError) {

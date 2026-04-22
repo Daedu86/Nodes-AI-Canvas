@@ -36,6 +36,19 @@ export async function revokeAgentTokenRecord(params: {
   return repo.revokeAgentToken(params.ownerId, params.tokenId);
 }
 
+export async function countActiveAgentTokens(ownerId: string) {
+  const repo = getAgentWorkRepository();
+  const tokens = await repo.listAgentTokens(ownerId);
+  const now = Date.now();
+  return tokens.filter((token) => {
+    if (token.revoked) return false;
+    if (!token.expiresAt) return true;
+    const expiresAt = new Date(token.expiresAt).getTime();
+    if (Number.isNaN(expiresAt)) return true;
+    return expiresAt > now;
+  }).length;
+}
+
 export async function recordAgentEvent(params: {
   actor: AgentActorInfo;
   eventType: string;

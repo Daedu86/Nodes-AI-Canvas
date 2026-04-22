@@ -4,6 +4,7 @@ import {
   upsertProjectMemberForUser,
 } from "@/lib/project-collaboration";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
+import { notifyProjectMemberAdded } from "@/lib/server/project-notifications";
 
 type RouteParams = {
   params: Promise<{
@@ -40,6 +41,13 @@ export async function POST(req: Request, context: RouteParams) {
 
   try {
     const project = await upsertProjectMemberForUser(projectId, { email, role }, guarded.user);
+    await notifyProjectMemberAdded({
+      projectId: project.id,
+      projectTitle: project.title,
+      actor: guarded.user,
+      memberEmail: email,
+      memberRole: role,
+    });
     return Response.json({ project });
   } catch (error) {
     if (error instanceof ProjectAccessError) {

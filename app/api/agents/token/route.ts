@@ -1,10 +1,15 @@
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 import { isAgentTokenConfigured, mintAgentToken } from "@/lib/server/agent-token";
-import { revokeAgentTokenRecord, upsertAgentTokenRecord } from "@/lib/server/agent-work";
+import {
+  countActiveAgentTokens,
+  revokeAgentTokenRecord,
+  upsertAgentTokenRecord,
+} from "@/lib/server/agent-work";
 import {
   DEFAULT_AGENT_TOKEN_LIFETIME_DAYS,
   MAX_AGENT_TOKEN_LIFETIME_DAYS,
 } from "@/lib/agent-tokens";
+import { getUserPlan } from "@/lib/user-plan-store";
 
 export const runtime = "nodejs";
 
@@ -29,6 +34,22 @@ export async function POST(req: Request) {
       status: 503,
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  const userPlan = await getUserPlan(guarded.user.id);
+  if (userPlan === "free") {
+    const activeTokenCount = await countActiveAgentTokens(guarded.user.id);
+    if (activeTokenCount >= 1) {
+      return new Response(
+        JSON.stringify({
+          error: "Free tier allows only one active agent.",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
   }
 
   const body = (await req.json().catch(() => ({}))) as PostBody;
