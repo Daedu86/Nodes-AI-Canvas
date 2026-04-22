@@ -8,6 +8,7 @@ import {
   Bot,
   ChevronDownIcon,
   ChevronRightIcon,
+  LifeBuoy,
   KeyRound,
   LogOut,
   Shield,
@@ -30,6 +31,7 @@ export function SidebarProfile() {
     showKnowledgeCenter,
     showLlmModels,
     showPlanUsage,
+    showSupport,
   } = useWorkspaceSurface();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
@@ -100,6 +102,17 @@ export function SidebarProfile() {
           aria-label="LLM Models"
         >
           <Bot className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          variant={activeSurface === "support" ? "default" : "outline"}
+          size="icon"
+          className="size-9"
+          onClick={showSupport}
+          title="Support"
+          aria-label="Support"
+        >
+          <LifeBuoy className="size-4" />
         </Button>
         <Button
           type="button"
@@ -215,6 +228,16 @@ export function SidebarProfile() {
           >
             <Bot className="size-4" />
             LLM Models
+          </Button>
+          <Button
+            type="button"
+            variant={activeSurface === "support" ? "default" : "outline"}
+            size="sm"
+            className="w-full justify-start"
+            onClick={showSupport}
+          >
+            <LifeBuoy className="size-4" />
+            Support
           </Button>
           <Button
             type="button"

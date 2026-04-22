@@ -29,6 +29,7 @@ import { AgentAccessWorkspace } from "@/components/workspace/agent-access-worksp
 import { AgentWorkWorkspace } from "@/components/workspace/agent-work-workspace";
 import { PlanUsageWorkspace } from "@/components/workspace/plan-usage-workspace";
 import { AdminUsersWorkspace } from "@/components/workspace/admin-users-workspace";
+import { SupportWorkspace } from "@/components/workspace/support-workspace";
 import { WorkspaceSplitLayout } from "@/components/workspace/workspace-split-layout";
 import {
   getRequestErrorMessageFromResponse,
@@ -352,6 +353,9 @@ function WorkspaceShell() {
   }
   if (activeSurface === "admin-users") {
     return <AdminUsersWorkspace />;
+  }
+  if (activeSurface === "support") {
+    return <SupportWorkspace />;
   }
 
   return activeProjectId ? <ProjectRuntimeShell /> : <AssistantRuntimeShell />;

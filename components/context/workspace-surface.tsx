@@ -11,6 +11,7 @@ export type WorkspaceSurface =
   | "knowledge-center"
   | "llm-models"
   | "plan-usage"
+  | "support"
   | "workspace";
 
 type WorkspaceSurfaceContextValue = {
@@ -20,6 +21,7 @@ type WorkspaceSurfaceContextValue = {
   showAgentWork: () => void;
   showKnowledgeCenter: () => void;
   showPlanUsage: () => void;
+  showSupport: () => void;
   setActiveSurface: (value: WorkspaceSurface) => void;
   showLlmModels: () => void;
   showWorkspace: () => void;
@@ -38,6 +40,7 @@ const readSurface = (storageKey: string) => {
     if (value === "llm-models") return "llm-models";
     if (value === "knowledge-center") return "knowledge-center";
     if (value === "plan-usage") return "plan-usage";
+    if (value === "support") return "support";
     return DEFAULT_SURFACE;
   } catch {
     return DEFAULT_SURFACE;
@@ -80,6 +83,7 @@ export function WorkspaceSurfaceProvider({
       showAgentWork: () => setActiveSurface("agent-work"),
       showKnowledgeCenter: () => setActiveSurface("knowledge-center"),
       showPlanUsage: () => setActiveSurface("plan-usage"),
+      showSupport: () => setActiveSurface("support"),
       setActiveSurface,
       showLlmModels: () => setActiveSurface("llm-models"),
       showWorkspace: () => setActiveSurface("workspace"),
