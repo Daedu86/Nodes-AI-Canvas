@@ -8,7 +8,29 @@
   A branching chat and a visual canvas for thinking with AI.
 </p>
 
-Nodes is a workspace for exploration, not just a single-answer chatbot. You can branch conversations, compare directions, and keep reusable context visible while you iterate.
+<p align="center">
+  <img alt="Nodes workspace screenshot" src="docs/screenshots/workspace-hero.png" width="960" />
+</p>
+
+Nodes is a workspace for exploration, not just a single-answer chatbot.
+
+Instead of forcing everything into one linear chat, Nodes helps you:
+
+- Branch and compare different prompt directions.
+- Keep a canvas open for reusable context (artifacts, decisions, drafts, evidence).
+- Promote the best result into shared memory (session or project) so you can keep moving.
+
+### What is the Canvas?
+
+The Canvas is a visual, persistent space that lives alongside chat. It’s designed for the parts of AI work that *shouldn’t* disappear in scrollback: key decisions, constraints, evidence, and outputs you want to reuse.
+
+### What is Nody?
+
+Nody is the built-in guide that can read your current session tree + canvas context and help you:
+
+- Summarize a branch or the whole session.
+- Explain what you’re looking at (selected node / edge / artifact).
+- Suggest next steps when you’re stuck.
 
 ## Product Tour
 
@@ -24,11 +46,31 @@ Branch from any message (edit or follow-up) and keep parallel paths side by side
 
 Artifacts (text, code, images, files) are structured context you can pin and reuse across branches and projects.
 
+<p>
+  <img alt="Project canvas screenshot" src="docs/screenshots/project-canvas.png" width="960" />
+</p>
+
+### Arena (compare sessions/branches)
+
+Arena is where you compare directions side-by-side and promote the best result into memory.
+
+<p>
+  <img alt="Project arena screenshot" src="docs/screenshots/project-arena.png" width="960" />
+</p>
+
 ### Knowledge Center (built-in wiki)
 
 ![Knowledge Center wiki](docs/readme/03-knowledge-center.svg)
 
 A wiki-style workspace for onboarding, patterns, and “how-to” docs that ship with the product.
+
+### Project Context Builder
+
+Projects can accumulate shared context over time. The Context Builder helps you compose project-wide guidance from the best outcomes (Arena), typed canvas nodes, and session summaries.
+
+<p>
+  <img alt="Project context builder screenshot" src="docs/screenshots/project-context-builder.png" width="420" />
+</p>
 
 ### LLM Models (per-user connections)
 
@@ -52,7 +94,8 @@ Users can connect their own provider credentials and control which models show u
 3. Chat as usual, then use **Edit** or **Follow-up** to create branches.
 4. Open **Canvas** to keep key nodes and artifacts visible while you iterate.
 5. Add artifacts (text/code/image/file) when context matters more than another message.
-6. Open **Profile → LLM Models** to connect your own API keys and control what models appear.
+6. Use **Nody** when you want a quick summary, an explanation of what’s selected, or next-step guidance.
+7. Open **Profile → LLM Models** to connect your own API keys and control what models appear.
 
 ## How People Use Nodes
 
@@ -69,6 +112,7 @@ Nodes works best when you are exploring and deciding:
 - **Artifact**: structured context (text/code/image/file) you can pin and reuse.
 - **Project**: a larger workspace grouping sessions with shared context.
 - **Arena**: compare options and promote winners into memory.
+- **Nody**: an in-product guide that summarizes and explains your workspace.
 
 ## Developer Setup
 
