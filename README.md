@@ -37,9 +37,9 @@ Nody is the built-in guide that can read your current session tree + canvas cont
 ### Chat + branching
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/01-chat-branching-dark.svg" />
-  <source media="(prefers-color-scheme: light)" srcset="docs/readme/01-chat-branching.svg" />
-  <img alt="Chat and branching" src="docs/readme/01-chat-branching.svg" />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/01-chat-branching-dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/readme/01-chat-branching.png" />
+  <img alt="Chat and branching" src="docs/readme/01-chat-branching.png" />
 </picture>
 
 Branch from any message (edit or follow-up) and keep parallel paths side by side.
@@ -47,9 +47,9 @@ Branch from any message (edit or follow-up) and keep parallel paths side by side
 ### Canvas + artifacts
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/02-canvas-artifacts-dark.svg" />
-  <source media="(prefers-color-scheme: light)" srcset="docs/readme/02-canvas-artifacts.svg" />
-  <img alt="Canvas and artifacts" src="docs/readme/02-canvas-artifacts.svg" />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/02-canvas-artifacts-dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/readme/02-canvas-artifacts.png" />
+  <img alt="Canvas and artifacts" src="docs/readme/02-canvas-artifacts.png" />
 </picture>
 
 Artifacts (text, code, images, files) are structured context you can pin and reuse across branches and projects.
@@ -69,9 +69,9 @@ Arena is where you compare directions side-by-side and promote the best result i
 ### Knowledge Center (built-in wiki)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/03-knowledge-center-dark.svg" />
-  <source media="(prefers-color-scheme: light)" srcset="docs/readme/03-knowledge-center.svg" />
-  <img alt="Knowledge Center wiki" src="docs/readme/03-knowledge-center.svg" />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/03-knowledge-center-dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/readme/03-knowledge-center.png" />
+  <img alt="Knowledge Center wiki" src="docs/readme/03-knowledge-center.png" />
 </picture>
 
 A wiki-style workspace for onboarding, patterns, and “how-to” docs that ship with the product.
@@ -87,9 +87,9 @@ Projects can accumulate shared context over time. The Context Builder helps you 
 ### LLM Models (per-user connections)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/04-llm-models-dark.svg" />
-  <source media="(prefers-color-scheme: light)" srcset="docs/readme/04-llm-models.svg" />
-  <img alt="LLM models and keys" src="docs/readme/04-llm-models.svg" />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/04-llm-models-dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/readme/04-llm-models.png" />
+  <img alt="LLM models and keys" src="docs/readme/04-llm-models.png" />
 </picture>
 
 Users can connect their own provider credentials and control which models show up in the selector.
