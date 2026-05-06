@@ -36,13 +36,21 @@ Nody is the built-in guide that can read your current session tree + canvas cont
 
 ### Chat + branching
 
-![Chat and branching](docs/readme/01-chat-branching.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/01-chat-branching-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/readme/01-chat-branching.svg" />
+  <img alt="Chat and branching" src="docs/readme/01-chat-branching.svg" />
+</picture>
 
 Branch from any message (edit or follow-up) and keep parallel paths side by side.
 
 ### Canvas + artifacts
 
-![Canvas and artifacts](docs/readme/02-canvas-artifacts.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/02-canvas-artifacts-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/readme/02-canvas-artifacts.svg" />
+  <img alt="Canvas and artifacts" src="docs/readme/02-canvas-artifacts.svg" />
+</picture>
 
 Artifacts (text, code, images, files) are structured context you can pin and reuse across branches and projects.
 
@@ -60,7 +68,11 @@ Arena is where you compare directions side-by-side and promote the best result i
 
 ### Knowledge Center (built-in wiki)
 
-![Knowledge Center wiki](docs/readme/03-knowledge-center.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/03-knowledge-center-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/readme/03-knowledge-center.svg" />
+  <img alt="Knowledge Center wiki" src="docs/readme/03-knowledge-center.svg" />
+</picture>
 
 A wiki-style workspace for onboarding, patterns, and “how-to” docs that ship with the product.
 
@@ -74,7 +86,11 @@ Projects can accumulate shared context over time. The Context Builder helps you 
 
 ### LLM Models (per-user connections)
 
-![LLM models and keys](docs/readme/04-llm-models.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/04-llm-models-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/readme/04-llm-models.svg" />
+  <img alt="LLM models and keys" src="docs/readme/04-llm-models.svg" />
+</picture>
 
 Users can connect their own provider credentials and control which models show up in the selector.
 
