@@ -46,7 +46,7 @@ const hasTextOutput = (model: OpenRouterRawModel) => {
   return modalities.includes("text");
 };
 
-const isZeroPrice = (value: unknown) => Number(asString(value)) === 0;
+const isZeroPrice = (value: unknown) => typeof value === "string" && Number(value) === 0;
 
 const isFreeTextModel = (model: OpenRouterRawModel) => {
   const id = asString(model.id);
