@@ -425,22 +425,18 @@ async function createBranchFromFlow(
     .filter({ has: page.getByText("Branch from canvas", { exact: true }) })
     .first();
   await graphSection.getByRole("button", { name: actionName }).click();
-  const branchTextarea = graphSection
-    .getByRole("textbox")
-    .first();
+  const draftNode = page.locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]');
+  await expect(draftNode).toBeVisible({ timeout: 15_000 });
+  const branchTextarea = draftNode.getByRole("textbox", { name: "Draft prompt" });
   await expect(branchTextarea).toBeVisible();
   await branchTextarea.fill(prompt);
 
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
-  await graphSection
-    .getByRole("button", {
-      name:
-        submitActionName ??
-        (actionName.toLowerCase().includes("follow-up") ? "Add follow-up" : "Create branch"),
-      exact: true,
-    })
+  void submitActionName;
+  await draftNode
+    .getByRole("button", { name: "Send prompt node" })
     .evaluate((button: HTMLButtonElement) => button.click());
   await responsePromise;
 
@@ -717,6 +713,49 @@ test("sends full history when Full mode is selected", async ({ page }) => {
     history: "full",
     count: 3,
   });
+});
+
+test("creates the first prompt directly from an empty flow canvas", async ({ page }) => {
+  await gotoChat(page);
+  await page.getByRole("button", { name: "Show canvas panel" }).click();
+  await expect(page.getByRole("button", { name: "Create prompt node" })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await page.getByRole("button", { name: "Create prompt node" }).click();
+  const draftNode = page.locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]');
+  await expect(draftNode).toBeVisible({ timeout: 15_000 });
+  await draftNode.getByRole("textbox", { name: "Draft prompt" }).fill("Canvas first prompt");
+
+  const responsePromise = page.waitForResponse(
+    (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
+  );
+  await draftNode
+    .getByRole("button", { name: "Send prompt node" })
+    .evaluate((button: HTMLButtonElement) => button.click());
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
+
+  const rawSelectedModel = await page.getByRole("combobox", { name: "Model" }).evaluate((element) => {
+    if (element instanceof HTMLSelectElement) {
+      return element.value;
+    }
+    return element.getAttribute("value") ?? "";
+  });
+  const normalizedSelection = rawSelectedModel
+    ? normalizeSelectedModelValue(rawSelectedModel)
+    : null;
+  const reply = expectedReply("Canvas first prompt", {
+    model: normalizedSelection?.model,
+    provider: normalizedSelection?.provider ?? "openrouter",
+  });
+  await page.getByRole("button", { name: "Show chat panel" }).click();
+  await expect(threadMessage(page, "Canvas first prompt")).toBeVisible({ timeout: 15_000 });
+  await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole("button", { name: "Show canvas panel" }).click();
+  const graph = await copyGraphJson(page);
+  expect(graph.nodes.map((node) => node.role)).toEqual(["user", "assistant"]);
 });
 
 test("creates an assistant branch when reloading a reply", async ({ page }) => {
@@ -1220,13 +1259,15 @@ test("creates a semantic text artifact, attaches it as context, and branches wit
     .filter({ has: page.getByText("Branch from canvas", { exact: true }) })
     .first();
   await graphSection.getByRole("button", { name: "Add follow-up question" }).click();
-  await graphSection.getByRole("textbox").fill("Follow-up with artifact context");
+  const draftNode = page.locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]');
+  await expect(draftNode).toBeVisible({ timeout: 15_000 });
+  await draftNode.getByRole("textbox", { name: "Draft prompt" }).fill("Follow-up with artifact context");
 
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
-  await graphSection
-    .getByRole("button", { name: "Add follow-up with context" })
+  await draftNode
+    .getByRole("button", { name: "Send prompt node" })
     .evaluate((button: HTMLButtonElement) => button.click());
   await responsePromise;
 
@@ -1299,13 +1340,15 @@ test("uploads an image artifact, persists it, and branches with it from the flow
     .filter({ has: page.getByText("Branch from canvas", { exact: true }) })
     .first();
   await graphSection.getByRole("button", { name: "Add follow-up question" }).click();
-  await graphSection.getByRole("textbox").fill("Use the image artifact too");
+  const draftNode = page.locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]');
+  await expect(draftNode).toBeVisible({ timeout: 15_000 });
+  await draftNode.getByRole("textbox", { name: "Draft prompt" }).fill("Use the image artifact too");
 
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
-  await graphSection
-    .getByRole("button", { name: "Add follow-up with context" })
+  await draftNode
+    .getByRole("button", { name: "Send prompt node" })
     .first()
     .evaluate((button: HTMLButtonElement) => button.click());
   await responsePromise;

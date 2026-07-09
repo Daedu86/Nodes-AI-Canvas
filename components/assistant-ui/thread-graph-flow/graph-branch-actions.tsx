@@ -27,8 +27,6 @@ export function GraphBranchActions({
   onCancelDraft,
   onCancelRun,
   onChooseOperation,
-  onDraftTextChange,
-  onSubmitDraft,
   runInterruptionNote,
 }: GraphBranchActionsProps) {
   if (details.length === 0 && !activeDraft) return null;
@@ -58,16 +56,10 @@ export function GraphBranchActions({
         <div className="space-y-2">
           <div className="space-y-1">
             <p className="text-xs font-medium text-foreground/80">{activeDetail.title}</p>
-            <p className="text-xs text-muted-foreground">{activeDetail.description}</p>
+            <p className="text-xs text-muted-foreground">
+              A draft prompt node is open on the canvas. Edit and send it directly from the node.
+            </p>
           </div>
-          <textarea
-            rows={3}
-            value={activeDraft.text}
-            onChange={(event) => onDraftTextChange(event.target.value)}
-            placeholder={activeDetail.placeholder}
-            disabled={disabled || busy}
-            className="min-h-[84px] w-full resize-y rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-sky-500/35"
-          />
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
             <Button
               type="button"
@@ -89,18 +81,6 @@ export function GraphBranchActions({
                 Cancel run
               </Button>
             ) : null}
-            <Button
-              type="button"
-              className="pointer-events-auto w-full sm:w-auto"
-              onClick={onSubmitDraft}
-              disabled={disabled || busy || activeDraft.text.trim().length === 0}
-            >
-              {busy
-                ? "Creating..."
-                : contextCount > 0
-                  ? `${activeDetail.submitLabel} with context`
-                  : activeDetail.submitLabel}
-            </Button>
           </div>
         </div>
       ) : (
