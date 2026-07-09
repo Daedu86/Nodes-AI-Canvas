@@ -174,7 +174,31 @@ export const normalizeLlmSettingsState = (
   input: Partial<LlmSettingsState> | null | undefined,
 ): LlmSettingsState => {
   const base = cloneDefaultLlmSettingsState();
-  const providers = input?.providers ?? {};
+  const providers: Partial<LlmSettingsState["providers"]> = input?.providers ?? {};
+
+  const hasIncomingOpenRouterEnabledModels = Boolean(
+    providers.openrouter &&
+      Object.prototype.hasOwnProperty.call(providers.openrouter, "enabledModels"),
+  );
+  const openRouterDeletedModels = normalizeEditableModelListValue(
+    providers.openrouter?.deletedModels,
+    [],
+  );
+  const openRouterEnabledModelsSource =
+    Array.isArray(providers.openrouter?.enabledModels)
+      ? providers.openrouter.enabledModels.filter((entry): entry is string => typeof entry === "string")
+      : typeof providers.openrouter?.enabledModels === "string"
+        ? providers.openrouter.enabledModels
+        : base.providers.openrouter.enabledModels;
+  const openRouterEnabledModelsRaw = normalizeEditableModelList(openRouterEnabledModelsSource);
+  const openRouterEnabledModels = (
+    openRouterEnabledModelsRaw.length > 0
+      ? openRouterEnabledModelsRaw
+      : hasIncomingOpenRouterEnabledModels
+        ? []
+        : [...base.providers.openrouter.enabledModels]
+  ).filter((modelId) => !openRouterDeletedModels.includes(modelId));
+
 
   base.providers.openrouter = {
     activeApiKeyId:
@@ -186,11 +210,8 @@ export const normalizeLlmSettingsState = (
     apiKeys: normalizeOpenRouterApiKeys(providers.openrouter?.apiKeys),
     clearApiKey: providers.openrouter?.clearApiKey === true,
     customModels: normalizeEditableModelListValue(providers.openrouter?.customModels, []),
-    deletedModels: normalizeEditableModelListValue(providers.openrouter?.deletedModels, []),
-    enabledModels: normalizeEditableModelListValue(
-      providers.openrouter?.enabledModels,
-      base.providers.openrouter.enabledModels,
-    ).filter((modelId) => !base.providers.openrouter.deletedModels.includes(modelId)),
+    deletedModels: openRouterDeletedModels,
+    enabledModels: openRouterEnabledModels,
     hasApiKey:
       providers.openrouter?.hasApiKey !== undefined
         ? providers.openrouter.hasApiKey

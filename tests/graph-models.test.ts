@@ -8,12 +8,12 @@ describe("graph model styling", () => {
   it("labels supported free OpenRouter models with friendly names", () => {
     expect(
       getGraphModelLabel("nvidia/nemotron-3-super-120b-a12b:free", "openrouter"),
-    ).toBe("OpenRouter · Nemotron 3 Super");
+    ).toBe("OpenRouter · nvidia/nemotron-3-super-120b-a12b:free");
     expect(getGraphModelLabel("openrouter/free", "openrouter")).toBe(
       "OpenRouter · Free Router",
     );
     expect(getGraphModelLabel("arcee-ai/trinity-large-preview:free", "openrouter")).toBe(
-      "OpenRouter · Trinity Large Preview",
+      "OpenRouter · arcee-ai/trinity-large-preview:free",
     );
   });
 

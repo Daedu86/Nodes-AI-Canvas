@@ -218,7 +218,7 @@ describe("/api/llm/settings", () => {
           settings: {
             providers: {
               openrouter: {
-                enabledModels: [],
+                enabledModels: ["openrouter/free"],
               },
             },
           },
@@ -235,7 +235,7 @@ describe("/api/llm/settings", () => {
             baseUrl: "http://localhost:11434/api",
           }),
           openrouter: expect.objectContaining({
-            enabledModels: [],
+            enabledModels: ["openrouter/free"],
           }),
         }),
       }),

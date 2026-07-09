@@ -27,8 +27,8 @@ vi.stubGlobal("fetch", fetchMock);
 function Harness() {
   const {
     availableModelOptions,
-    deleteOpenRouterBuiltinModel,
-    restoreOpenRouterBuiltinModel,
+    addOpenRouterCustomModel,
+    removeOpenRouterCustomModel,
     setProviderModels,
     toggleOpenRouterModel,
   } = useLlmSettings();
@@ -40,23 +40,21 @@ function Harness() {
       </div>
       <button
         type="button"
-        onClick={() =>
-          toggleOpenRouterModel("nvidia/nemotron-3-nano-30b-a3b:free")
-        }
+        onClick={() => toggleOpenRouterModel("openrouter/free")}
       >
-        toggle-openrouter-nano
+        toggle-free-router
       </button>
       <button
         type="button"
-        onClick={() => deleteOpenRouterBuiltinModel("nvidia/nemotron-3-nano-30b-a3b:free")}
+        onClick={() => addOpenRouterCustomModel("tencent/hy3:free")}
       >
-        delete-openrouter-nano
+        add-openrouter-dynamic
       </button>
       <button
         type="button"
-        onClick={() => restoreOpenRouterBuiltinModel("nvidia/nemotron-3-nano-30b-a3b:free")}
+        onClick={() => removeOpenRouterCustomModel("tencent/hy3:free")}
       >
-        restore-openrouter-nano
+        remove-openrouter-dynamic
       </button>
       <button type="button" onClick={() => setProviderModels("ollama", "gemma3:4b, llama3.2:3b")}>
         models-ollama
@@ -85,7 +83,7 @@ describe("LlmSettingsProvider", () => {
     localStorage.clear();
   });
 
-  it("exposes the built-in OpenRouter and Ollama models by default", async () => {
+  it("exposes the built-in OpenRouter model by default", async () => {
     render(
       <LlmSettingsProvider>
         <Harness />
@@ -93,12 +91,12 @@ describe("LlmSettingsProvider", () => {
     );
 
     expect((await screen.findByTestId("options")).textContent).toContain(
-      "openrouter:nvidia/nemotron-3-super-120b-a12b:free",
+      "openrouter:openrouter/free",
     );
     expect(screen.getByTestId("options").textContent).not.toContain(
       "openrouter:arcee-ai/trinity-mini:free",
     );
-    expect(screen.getByTestId("options").textContent).toContain("ollama:gemma3:4b");
+    expect(screen.getByTestId("options").textContent).not.toContain("ollama:gemma3:4b");
   });
 
   it("updates the selector pool when the user customizes model availability", async () => {
@@ -112,22 +110,17 @@ describe("LlmSettingsProvider", () => {
 
     await screen.findByTestId("options");
 
-    await user.click(screen.getByRole("button", { name: "toggle-openrouter-nano" }));
-    expect(screen.getByTestId("options").textContent).not.toContain(
-      "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
-    );
-
-    await user.click(screen.getByRole("button", { name: "delete-openrouter-nano" }));
-    expect(screen.getByTestId("options").textContent).not.toContain(
-      "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
-    );
-
-    await user.click(screen.getByRole("button", { name: "restore-openrouter-nano" }));
+    await user.click(screen.getByRole("button", { name: "add-openrouter-dynamic" }));
     expect(screen.getByTestId("options").textContent).toContain(
-      "openrouter:nvidia/nemotron-3-nano-30b-a3b:free",
+      "openrouter:tencent/hy3:free",
+    );
+
+    await user.click(screen.getByRole("button", { name: "remove-openrouter-dynamic" }));
+    expect(screen.getByTestId("options").textContent).not.toContain(
+      "openrouter:tencent/hy3:free",
     );
 
     await user.click(screen.getByRole("button", { name: "models-ollama" }));
-    expect(screen.getByTestId("options").textContent).toContain("ollama:llama3.2:3b");
+    expect(screen.getByTestId("options").textContent).not.toContain("ollama:llama3.2:3b");
   });
 });

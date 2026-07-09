@@ -5,6 +5,12 @@ import { dirname, resolve } from "node:path";
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  oxc: {
+    jsx: {
+      importSource: "react",
+      runtime: "automatic",
+    },
+  },
   test: {
     environment: "node",
     include: ["tests/**/*.{test,spec}.{ts,tsx,js,jsx}"],
