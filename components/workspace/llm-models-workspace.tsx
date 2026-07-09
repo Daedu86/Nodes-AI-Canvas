@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Bot, Check, KeyRound, Plus, Server, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Bot, Check, KeyRound, Plus, RefreshCw, Server, Sparkles, X } from "lucide-react";
 import React from "react";
 import { useLlmSettings } from "@/components/context/llm-settings";
 import { useWorkspaceSurface } from "@/components/context/workspace-surface";
@@ -18,6 +18,20 @@ const shellClassName =
   "h-full min-h-0 overflow-hidden rounded-[20px] border border-border/80 bg-card/94 shadow-[0_20px_54px_-38px_rgba(0,0,0,0.7)] backdrop-blur-md";
 const shellInnerClassName =
   "h-full min-h-0 overflow-auto rounded-[18px] bg-background/92 p-5 md:p-6";
+
+type OpenRouterCatalogModel = {
+  contextLength: number | null;
+  created: number | null;
+  description: string;
+  id: string;
+  name: string;
+};
+
+type OpenRouterCatalogResponse = {
+  error?: string;
+  fetchedAt?: string;
+  models?: OpenRouterCatalogModel[];
+};
 
 function WorkspaceShell({ children }: { children: React.ReactNode }) {
   return (
@@ -388,6 +402,10 @@ function OpenRouterModelsCard() {
   const definition = getProviderDefinition("openrouter");
   const [customDraft, setCustomDraft] = React.useState("");
   const [saveStatus, setSaveStatus] = React.useState<"idle" | "saved" | "error">("idle");
+  const [catalogModels, setCatalogModels] = React.useState<OpenRouterCatalogModel[]>([]);
+  const [catalogError, setCatalogError] = React.useState<string | null>(null);
+  const [isCatalogLoading, setIsCatalogLoading] = React.useState(false);
+  const [selectedFreeModelId, setSelectedFreeModelId] = React.useState("");
   const deletedModelIds = new Set(openrouter.deletedModels ?? []);
   const visibleBuiltinModels = OPENROUTER_FREE_MODEL_OPTIONS.filter(
     (option) => !deletedModelIds.has(option.modelId),
@@ -395,6 +413,53 @@ function OpenRouterModelsCard() {
   const deletedBuiltinModels = OPENROUTER_FREE_MODEL_OPTIONS.filter((option) =>
     deletedModelIds.has(option.modelId),
   );
+
+  const knownOpenRouterModelIds = React.useMemo(
+    () =>
+      new Set([
+        ...OPENROUTER_FREE_MODEL_OPTIONS.map((option) => option.modelId),
+        ...(openrouter.customModels ?? []),
+      ]),
+    [openrouter.customModels],
+  );
+
+  const selectableFreeModels = React.useMemo(
+    () => catalogModels.filter((model) => !knownOpenRouterModelIds.has(model.id)),
+    [catalogModels, knownOpenRouterModelIds],
+  );
+
+  const selectedFreeModel = React.useMemo(
+    () => selectableFreeModels.find((model) => model.id === selectedFreeModelId) ?? null,
+    [selectableFreeModels, selectedFreeModelId],
+  );
+
+  const loadOpenRouterFreeModels = React.useCallback(async () => {
+    setIsCatalogLoading(true);
+    setCatalogError(null);
+    try {
+      const response = await fetch("/api/llm/openrouter/free-models", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const payload = (await response.json().catch(() => ({}))) as OpenRouterCatalogResponse;
+      if (!response.ok) {
+        throw new Error(
+          typeof payload.error === "string" && payload.error.trim()
+            ? payload.error
+            : `Failed to load OpenRouter models: ${response.status}`,
+        );
+      }
+      setCatalogModels(Array.isArray(payload.models) ? payload.models : []);
+    } catch (error) {
+      setCatalogError(
+        error instanceof Error ? error.message : "Could not load OpenRouter free models.",
+      );
+    } finally {
+      setIsCatalogLoading(false);
+    }
+  }, []);
 
   const addFromDraft = React.useCallback(() => {
     const entries = customDraft
@@ -408,11 +473,28 @@ function OpenRouterModelsCard() {
     setCustomDraft("");
   }, [addOpenRouterCustomModel, customDraft]);
 
+  const addSelectedFreeModel = React.useCallback(() => {
+    if (!selectedFreeModel) return;
+    addOpenRouterCustomModel(selectedFreeModel.id);
+    setSelectedFreeModelId("");
+  }, [addOpenRouterCustomModel, selectedFreeModel]);
+
+  React.useEffect(() => {
+    void loadOpenRouterFreeModels();
+  }, [loadOpenRouterFreeModels]);
+
   React.useEffect(() => {
     if (hasUnsavedChanges) {
       setSaveStatus("idle");
     }
   }, [hasUnsavedChanges]);
+
+  React.useEffect(() => {
+    if (!selectedFreeModelId) return;
+    if (!selectableFreeModels.some((model) => model.id === selectedFreeModelId)) {
+      setSelectedFreeModelId("");
+    }
+  }, [selectableFreeModels, selectedFreeModelId]);
 
   return (
     <Card className="lg:col-span-2">
@@ -424,7 +506,7 @@ function OpenRouterModelsCard() {
       <div className="mt-5">
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Free models in selector
+            Built-in free model
           </span>
           <div className="flex flex-wrap gap-2">
             {visibleBuiltinModels.map((option) => {
@@ -480,6 +562,64 @@ function OpenRouterModelsCard() {
         </div>
       </div>
 
+      <div className="mt-5 space-y-3 rounded-2xl border border-border/70 bg-background/45 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Add free model from OpenRouter
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Loads the current free text models from OpenRouter. Pick one to expose it in your selector.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isCatalogLoading}
+            onClick={() => void loadOpenRouterFreeModels()}
+          >
+            <RefreshCw className={`size-4 ${isCatalogLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+          <select
+            className="bg-background text-foreground focus-visible:ring-ring min-h-10 rounded-md border border-input px-3 py-2 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            value={selectedFreeModelId}
+            disabled={isCatalogLoading || selectableFreeModels.length === 0}
+            onChange={(event) => setSelectedFreeModelId(event.currentTarget.value)}
+          >
+            <option value="">
+              {isCatalogLoading
+                ? "Loading OpenRouter free models..."
+                : selectableFreeModels.length > 0
+                  ? "Select a free model to add"
+                  : "No new free models available"}
+            </option>
+            {selectableFreeModels.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.name} · {model.id}
+              </option>
+            ))}
+          </select>
+          <Button type="button" variant="secondary" disabled={!selectedFreeModel} onClick={addSelectedFreeModel}>
+            <Plus className="size-4" />
+            Add selected
+          </Button>
+        </div>
+
+        {selectedFreeModel ? (
+          <p className="text-xs text-muted-foreground">
+            {selectedFreeModel.contextLength
+              ? `${selectedFreeModel.id} · ${selectedFreeModel.contextLength.toLocaleString()} context tokens`
+              : selectedFreeModel.id}
+          </p>
+        ) : null}
+        {catalogError ? <p className="text-xs text-amber-300">{catalogError}</p> : null}
+      </div>
+
       <div className="mt-5 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -487,7 +627,7 @@ function OpenRouterModelsCard() {
               Custom OpenRouter models
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Add any OpenRouter model id (paid or free). Billing is tied to your own API key.
+              Add another OpenRouter model id manually. Free models selected above are stored here too.
             </p>
           </div>
           <Button
@@ -507,7 +647,7 @@ function OpenRouterModelsCard() {
         <div className="flex flex-wrap gap-2">
           <Input
             value={customDraft}
-            placeholder="e.g. anthropic/claude-3.5-sonnet"
+            placeholder="e.g. tencent/hy3:free"
             onChange={(event) => setCustomDraft(event.currentTarget.value)}
             onKeyDown={(event) => {
               if (event.key !== "Enter") return;
@@ -574,7 +714,8 @@ export function LlmModelsWorkspace() {
   const enabledProviderCount = React.useMemo(
     () =>
       [
-        settings.providers.openrouter.enabledModels.length > 0,
+        settings.providers.openrouter.enabledModels.length > 0 ||
+          (settings.providers.openrouter.customModels ?? []).length > 0,
         settings.providers.ollama.enabled,
       ].filter(Boolean).length,
     [settings],
