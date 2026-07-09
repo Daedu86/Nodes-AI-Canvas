@@ -69,6 +69,9 @@ const inferProviderFromModel = (modelId: string): Provider => {
   return "ollama";
 };
 
+const isOpenRouterFreeModelId = (modelId: string) =>
+  modelId === "openrouter/free" || modelId.endsWith(":free");
+
 export function getAllowedModels(provider: Provider) {
   const envValue =
     provider === "openrouter"
@@ -76,11 +79,10 @@ export function getAllowedModels(provider: Provider) {
       : process.env.ALLOWED_OLLAMA_MODELS;
   const configured = parseAllowedModels(envValue);
 
-  // Keep OpenRouter strictly limited to the curated free-only list, even if env values are set.
+  // Keep the deployment-level OpenRouter fallback list free-only by default.
   if (provider === "openrouter") {
-    const allowed = new Set(DEFAULT_ALLOWED_MODELS.openrouter);
-    const filtered = configured.filter((modelId) => allowed.has(modelId));
-    return filtered.length > 0 ? filtered : DEFAULT_ALLOWED_MODELS.openrouter;
+    const freeConfigured = configured.filter(isOpenRouterFreeModelId);
+    return freeConfigured.length > 0 ? freeConfigured : DEFAULT_ALLOWED_MODELS.openrouter;
   }
 
   return configured.length > 0 ? configured : DEFAULT_ALLOWED_MODELS[provider];
@@ -88,6 +90,7 @@ export function getAllowedModels(provider: Provider) {
 
 export function isAllowedModelConfig(config: { modelId: string; provider: Provider }) {
   if (!config.modelId.trim()) return false;
+  if (config.provider === "openrouter" && isOpenRouterFreeModelId(config.modelId)) return true;
   return getAllowedModels(config.provider).includes(config.modelId);
 }
 
