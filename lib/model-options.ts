@@ -1,7 +1,6 @@
 import type { ModelConfig } from "@/components/context/model-config";
 import {
   createProviderModelLabel,
-  DEFAULT_OLLAMA_MODELS,
   OPENROUTER_FREE_MODEL_OPTIONS,
   SAFE_DEFAULT_MODEL,
   type LlmProviderId,
@@ -16,11 +15,6 @@ export const SAFE_DEFAULT_MODEL_CONFIG: ModelConfig = {
 
 export const BUILTIN_MODEL_OPTIONS: ModelOption[] = [
   ...OPENROUTER_FREE_MODEL_OPTIONS,
-  {
-    label: createProviderModelLabel("ollama", DEFAULT_OLLAMA_MODELS[0]!),
-    modelId: DEFAULT_OLLAMA_MODELS[0]!,
-    provider: "ollama",
-  },
 ];
 
 export const MODEL_OPTIONS = BUILTIN_MODEL_OPTIONS;
