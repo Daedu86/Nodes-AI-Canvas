@@ -33,20 +33,10 @@ const normalizeValue = (value?: string | null) => {
 const MAX_OPENROUTER_FALLBACK_MODELS = 3;
 const OPENROUTER_ROUTER_MODEL = "openrouter/free";
 const OPENROUTER_TEXT_FIRST_FALLBACKS = [
-  "nvidia/nemotron-3-nano-30b-a3b:free",
-  "nvidia/nemotron-3-super-120b-a12b:free",
-  "arcee-ai/trinity-large-preview:free",
-  "nvidia/nemotron-nano-12b-v2-vl:free",
-  "google/gemma-4-31b-it:free",
-  "google/gemma-4-26b-a4b-it:free",
+  OPENROUTER_ROUTER_MODEL,
 ] as const;
 const OPENROUTER_VISION_FIRST_FALLBACKS = [
-  "nvidia/nemotron-nano-12b-v2-vl:free",
-  "nvidia/nemotron-3-nano-30b-a3b:free",
-  "nvidia/nemotron-3-super-120b-a12b:free",
-  "arcee-ai/trinity-large-preview:free",
-  "google/gemma-4-31b-it:free",
-  "google/gemma-4-26b-a4b-it:free",
+  OPENROUTER_ROUTER_MODEL,
 ] as const;
 
 export type ProviderRuntimeOptions = {
