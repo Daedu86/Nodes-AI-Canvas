@@ -3,7 +3,6 @@ import NextAuth from "next-auth/next";
 import { getServerSession } from "next-auth/next";
 import type { Provider } from "next-auth/providers/index";
 import Credentials from "next-auth/providers/credentials";
-import Email from "next-auth/providers/email";
 import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
 import { isE2eEnvAuthAllowed } from "@/lib/server/e2e-auth";
@@ -18,7 +17,7 @@ const E2E_AUTH_USER_NAME = process.env.E2E_AUTH_USER_NAME?.trim() || "E2E User";
 
 const githubConfigured = Boolean(process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET);
 const googleConfigured = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
-const emailConfigured = Boolean(process.env.AUTH_EMAIL_SERVER && process.env.AUTH_EMAIL_FROM);
+const emailConfigured = false;
 const agentTokenLoginEnabled =
   process.env.AUTH_ENABLE_AGENT_TOKEN_LOGIN !== "0" &&
   Boolean(process.env.AUTH_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim());
@@ -43,15 +42,6 @@ if (googleConfigured) {
     Google({
       clientId: process.env.AUTH_GOOGLE_ID!,
       clientSecret: process.env.AUTH_GOOGLE_SECRET!,
-    }),
-  );
-}
-
-if (emailConfigured) {
-  providers.push(
-    Email({
-      server: process.env.AUTH_EMAIL_SERVER!,
-      from: process.env.AUTH_EMAIL_FROM!,
     }),
   );
 }
