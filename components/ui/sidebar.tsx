@@ -244,7 +244,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="bg-sidebar/96 flex h-full w-full flex-col border border-sidebar-border/80 shadow-[0_22px_60px_-40px_rgba(0,0,0,0.7)] backdrop-blur-md group-data-[variant=floating]:rounded-[20px] group-data-[variant=inset]:rounded-[20px]"
+          className="bg-sidebar/96 flex h-full w-full flex-col overflow-hidden border border-sidebar-border/80 shadow-[0_22px_60px_-40px_rgba(0,0,0,0.7)] backdrop-blur-md group-data-[variant=floating]:rounded-[20px] group-data-[variant=inset]:rounded-[20px]"
         >
           {children}
         </div>
@@ -356,13 +356,25 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
 
 function SidebarSeparator({
   className,
+  orientation = "horizontal",
+  style,
   ...props
 }: React.ComponentProps<typeof Separator>) {
   return (
     <Separator
       data-slot="sidebar-separator"
       data-sidebar="separator"
-      className={cn("bg-sidebar-border/90 mx-3 w-auto", className)}
+      orientation={orientation}
+      className={cn(
+        "bg-sidebar-border/90",
+        orientation === "horizontal" && "self-center",
+        className
+      )}
+      style={
+        orientation === "horizontal"
+          ? ({ width: "calc(100% - 1.5rem)", ...style } as React.CSSProperties)
+          : style
+      }
       {...props}
     />
   )
