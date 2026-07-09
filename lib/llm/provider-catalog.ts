@@ -21,36 +21,6 @@ export type ProviderModelOption = {
 
 export const OPENROUTER_FREE_MODEL_OPTIONS: ProviderModelOption[] = [
   {
-    label: "OpenRouter · Nemotron 3 Nano",
-    modelId: "nvidia/nemotron-3-nano-30b-a3b:free",
-    provider: "openrouter",
-  },
-  {
-    label: "OpenRouter · Nemotron Nano 12B V2 VL (free)",
-    modelId: "nvidia/nemotron-nano-12b-v2-vl:free",
-    provider: "openrouter",
-  },
-  {
-    label: "OpenRouter · Gemma 4 31B IT (free)",
-    modelId: "google/gemma-4-31b-it:free",
-    provider: "openrouter",
-  },
-  {
-    label: "OpenRouter · Gemma 4 26B A4B IT (free)",
-    modelId: "google/gemma-4-26b-a4b-it:free",
-    provider: "openrouter",
-  },
-  {
-    label: "OpenRouter · Nemotron 3 Super (free)",
-    modelId: "nvidia/nemotron-3-super-120b-a12b:free",
-    provider: "openrouter",
-  },
-  {
-    label: "OpenRouter · Trinity Large Preview",
-    modelId: "arcee-ai/trinity-large-preview:free",
-    provider: "openrouter",
-  },
-  {
     label: "OpenRouter · Free Router",
     modelId: "openrouter/free",
     provider: "openrouter",
@@ -63,9 +33,6 @@ export const SAFE_DEFAULT_MODEL = OPENROUTER_FREE_MODEL_OPTIONS[0]!;
 
 const VISION_MODEL_IDS = new Set<string>([
   "openrouter/free",
-  "nvidia/nemotron-nano-12b-v2-vl:free",
-  "google/gemma-4-31b-it:free",
-  "google/gemma-4-26b-a4b-it:free",
 ]);
 
 export const PROVIDER_DEFINITIONS: Record<LlmProviderId, ProviderDefinition> = {
