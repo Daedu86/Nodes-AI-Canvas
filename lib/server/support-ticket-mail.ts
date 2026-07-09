@@ -1,4 +1,3 @@
-import nodemailer from "nodemailer";
 import type { SupportTicket, SupportTicketComment } from "@/lib/support-ticket-documents";
 
 const parseCsv = (value: string | undefined) =>
@@ -9,30 +8,12 @@ const parseCsv = (value: string | undefined) =>
 
 const getAdminRecipients = () => parseCsv(process.env.SUPPORT_ADMIN_EMAILS);
 
-const getMailFrom = () =>
-  process.env.SUPPORT_EMAIL_FROM?.trim() ||
-  process.env.AUTH_EMAIL_FROM?.trim() ||
-  "support@nodes.local";
-
-function getTransport() {
-  const server = process.env.AUTH_EMAIL_SERVER?.trim();
-  if (!server) {
-    return null;
-  }
-  return nodemailer.createTransport(server);
-}
-
 async function sendMail(input: { subject: string; text: string }) {
   const recipients = getAdminRecipients();
   if (recipients.length === 0) return;
-  const transport = getTransport();
-  if (!transport) return;
-
-  await transport.sendMail({
-    from: getMailFrom(),
-    to: recipients.join(", "),
+  console.info("[support-ticket-mail] email notification skipped because nodemailer is not installed", {
+    recipients: recipients.length,
     subject: input.subject,
-    text: input.text,
   });
 }
 
@@ -92,4 +73,3 @@ export async function notifyAdminOnTicketComment(
     console.error("[support-ticket-mail] comment notification failed", error);
   }
 }
-
