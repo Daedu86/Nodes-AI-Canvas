@@ -56,8 +56,6 @@ describe("provider runtime", () => {
     expect(JSON.parse(String(forwardedInit.body))).toMatchObject({
       model: "google/gemma-4-31b-it:free",
       models: [
-        "nvidia/nemotron-nano-12b-v2-vl:free",
-        "nvidia/nemotron-3-nano-30b-a3b:free",
         "openrouter/free",
       ],
     });

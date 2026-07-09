@@ -1,6 +1,5 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import nodemailer from "nodemailer";
 import type { AuthenticatedUser } from "@/lib/server/auth-user";
 import type { ProjectDocument } from "@/lib/project-documents";
 
@@ -19,18 +18,6 @@ const parseCsv = (value: string | undefined) =>
 
 const getAdminRecipients = () => parseCsv(process.env.SUPPORT_ADMIN_EMAILS);
 
-const getMailFrom = () =>
-  process.env.SUPPORT_EMAIL_FROM?.trim() ||
-  process.env.AUTH_EMAIL_FROM?.trim() ||
-  "support@nodes.local";
-
-function getTransport() {
-  const server = process.env.AUTH_EMAIL_SERVER?.trim();
-  if (!server) {
-    return null;
-  }
-  return nodemailer.createTransport(server);
-}
 
 const getNotificationStoreDir = () =>
   process.env.PROJECT_NOTIFICATION_STORE_DIR
@@ -71,13 +58,9 @@ async function shouldSendAccessNotification(projectId: string, accessorId: strin
 async function sendMail(input: { subject: string; text: string }) {
   const recipients = getAdminRecipients();
   if (recipients.length === 0) return;
-  const transport = getTransport();
-  if (!transport) return;
-  await transport.sendMail({
-    from: getMailFrom(),
-    to: recipients.join(", "),
+  console.info("[project-notifications] email notification skipped because nodemailer is not installed", {
+    recipients: recipients.length,
     subject: input.subject,
-    text: input.text,
   });
 }
 

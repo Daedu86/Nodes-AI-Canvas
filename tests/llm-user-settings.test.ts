@@ -60,13 +60,12 @@ describe("llm user settings", () => {
     expect(merged.providers.openrouter.activeApiKeyId).toBe("k1");
   });
 
-  it("excludes deleted built-in models from enabled models", () => {
+  it("excludes the deleted built-in free router from enabled models", () => {
     const normalized = normalizeLlmSettingsState({
       providers: {
         openrouter: {
-          deletedModels: ["nvidia/nemotron-3-nano-30b-a3b:free"],
+          deletedModels: ["openrouter/free"],
           enabledModels: [
-            "nvidia/nemotron-3-nano-30b-a3b:free",
             "openrouter/free",
           ],
         },
@@ -74,9 +73,9 @@ describe("llm user settings", () => {
     });
 
     expect(normalized.providers.openrouter.deletedModels).toContain(
-      "nvidia/nemotron-3-nano-30b-a3b:free",
+      "openrouter/free",
     );
-    expect(normalized.providers.openrouter.enabledModels).toEqual(["openrouter/free"]);
+    expect(normalized.providers.openrouter.enabledModels).toEqual([]);
   });
 
   it("preserves stored Ollama key material when incoming payload is masked", () => {

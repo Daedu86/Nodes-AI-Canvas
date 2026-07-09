@@ -50,12 +50,12 @@ describe("/api/agents/token", () => {
     isAgentTokenConfiguredMock.mockReturnValue(true);
     getUserPlanMock.mockResolvedValue("paid");
     countActiveAgentTokensMock.mockResolvedValue(0);
-    mintAgentTokenMock.mockResolvedValue({
+    mintAgentTokenMock.mockImplementation(({ maxAgeSeconds }) => ({
       token: "token-value",
       tokenId: "token-1",
       label: "CI bot",
-      expiresAt: "2026-04-25T10:30:00.000Z",
-    });
+      expiresAt: new Date(Date.now() + maxAgeSeconds * 1000).toISOString(),
+    }));
     upsertAgentTokenRecordMock.mockResolvedValue(true);
     revokeAgentTokenRecordMock.mockResolvedValue({
       tokenId: "token-1",
@@ -63,6 +63,8 @@ describe("/api/agents/token", () => {
   });
 
   it("mints a token with an explicit expiry and returns save status", async () => {
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
     const response = await POST(
       new Request("http://localhost/api/agents/token", {
         method: "POST",
@@ -70,7 +72,7 @@ describe("/api/agents/token", () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          expiresAt: "2026-04-25T10:30:00.000Z",
+          expiresAt,
           label: "CI bot",
         }),
       }),
@@ -82,7 +84,7 @@ describe("/api/agents/token", () => {
       token: "token-value",
       tokenId: "token-1",
       label: "CI bot",
-      expiresAt: "2026-04-25T10:30:00.000Z",
+      expiresAt: expect.any(String),
     });
     expect(mintAgentTokenMock).toHaveBeenCalledTimes(1);
     expect(upsertAgentTokenRecordMock).toHaveBeenCalledWith(

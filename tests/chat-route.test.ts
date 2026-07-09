@@ -281,9 +281,9 @@ describe("/api/chat", () => {
     );
   });
 
-  it("retries the next allowed OpenRouter model when the selected model is unavailable", async () => {
+  it("retries the OpenRouter free router when a selected free model is unavailable", async () => {
     streamTextMock.mockImplementation(({ model }: { model: { modelId: string } }) => {
-      if (model.modelId === "openrouter/free") {
+      if (model.modelId === "google/gemma-4-31b-it:free") {
         throw new Error("404 Not Found");
       }
       return {
@@ -297,7 +297,7 @@ describe("/api/chat", () => {
         method: "POST",
         body: JSON.stringify({
           provider: "openrouter",
-          model: "openrouter/free",
+          model: "google/gemma-4-31b-it:free",
           messages: [{ id: "u1", role: "user", content: "hello" }],
         }),
       }),
@@ -307,7 +307,7 @@ describe("/api/chat", () => {
     expect(createLanguageModelMock).toHaveBeenNthCalledWith(
       1,
       {
-        modelId: "openrouter/free",
+        modelId: "google/gemma-4-31b-it:free",
         provider: "openrouter",
       },
       {},
@@ -316,16 +316,14 @@ describe("/api/chat", () => {
     expect(createLanguageModelMock).toHaveBeenNthCalledWith(
       2,
       {
-        modelId: "nvidia/nemotron-3-nano-30b-a3b:free",
+        modelId: "openrouter/free",
         provider: "openrouter",
       },
       {},
       { userPlan: "free" },
     );
     expect(response.headers.get("x-nodes-model-fallback")).toBe("1");
-    expect(response.headers.get("x-nodes-resolved-model")).toBe(
-      "nvidia/nemotron-3-nano-30b-a3b:free",
-    );
+    expect(response.headers.get("x-nodes-resolved-model")).toBe("openrouter/free");
   });
 
   it("returns a specific configuration error when the OpenRouter key is missing", async () => {
