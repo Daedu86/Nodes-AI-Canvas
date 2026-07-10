@@ -18,22 +18,22 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
-      - name: Inventory Wiki references
+      - name: Inventory Wiki dependencies
         shell: bash
         run: |
-          grep -RniE 'wiki|knowledge-center|session-wiki|project-wiki' . \
+          grep -RniE 'wiki|knowledge-center|session-wiki|project-wiki|SessionKnowledge|useSessionKnowledge|publishSnapshot' . \
             --exclude-dir=.git \
             --exclude-dir=node_modules \
             --exclude-dir=.next \
             --exclude='remove-wiki.yml' \
             --exclude='remove-wiki.py' \
             --exclude='wiki-*.log' \
-            > wiki-inventory.log || true
+            > wiki-dependency-inventory.log || true
 
       - name: Publish inventory
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add wiki-inventory.log
-          git commit -m "chore: inventory wiki references"
+          git add wiki-dependency-inventory.log
+          git commit -m "chore: inventory wiki dependencies"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
