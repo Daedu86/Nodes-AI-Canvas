@@ -16,7 +16,6 @@ import {
 import {
   BadgeHelp,
   Code2,
-  Bot,
   Copy as CopyIcon,
   Crosshair,
   FileImage,
@@ -2172,16 +2171,6 @@ export function ThreadGraphFlow() {
                   ? "Inspector for the current node or artifact."
                   : "Select a node or artifact to inspect and branch from it."}
               </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1.5 text-[11px] text-sky-700 transition-colors hover:bg-sky-500/15"
-                onClick={() => setViewMode("nody")}
-              >
-                <Bot className="h-3.5 w-3.5" />
-                <span>Open Nody</span>
-              </button>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
