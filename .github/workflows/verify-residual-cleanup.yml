@@ -1,0 +1,57 @@
+name: Verify residual cleanup
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Apply cleanup patch
+        run: |
+          python scripts/apply-feature-cleanup.py
+          rm scripts/apply-feature-cleanup.py .github/workflows/verify-residual-cleanup.yml
+
+      - name: Verify functional references are gone
+        shell: bash
+        run: |
+          matches="$(git grep -n -i brief -- . || true)"
+          unexpected="$(printf '%s\n' "$matches" | grep -vE 'components/workspace/project-wiki\.tsx:.*BriefcaseBusiness|tests/(chat-route|llm-helpers|title-route)\.test\.ts:.*brief\.pdf' || true)"
+          if [ -n "$unexpected" ]; then
+            printf '%s\n' "$unexpected"
+            exit 1
+          fi
+
+      - name: Upload verified patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-residual-cleanup
+          path: |
+            components/workspace/wiki-panel.tsx
+            components/workspace/knowledge-center-workspace.tsx
+            components/assistant-ui/thread-graph-flow/artifact-presentation.ts
+            tests/artifact-presentation.test.ts
+          if-no-files-found: error
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build production application
+        run: npm run build
