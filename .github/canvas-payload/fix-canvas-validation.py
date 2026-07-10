@@ -57,3 +57,18 @@ replace_once(
     ".filter((link) => Boolean(link.targetMessageId && subtreeIds.has(link.targetMessageId)))",
     "optional context link target",
 )
+
+prompt_node = Path("components/assistant-ui/thread-graph-flow/canvas-prompt-node.tsx")
+replace_once(prompt_node, "                 Prompt\n", "                 Draft prompt\n", "prompt badge label")
+replace_once(
+    prompt_node,
+    '<Trash2 className="mr-1.5 h-4 w-4" /> Delete',
+    '<Trash2 className="mr-1.5 h-4 w-4" /> Delete draft',
+    "prompt delete label",
+)
+replace_once(
+    prompt_node,
+    'aria-label="Run prompt block"',
+    'aria-label="Send prompt node"',
+    "prompt submit accessible label",
+)
