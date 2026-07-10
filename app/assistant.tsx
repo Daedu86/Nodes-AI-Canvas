@@ -63,18 +63,6 @@ const WikiPanel = dynamic(
   },
 );
 
-const BriefPanel = dynamic(
-  () => import("@/components/workspace/brief-panel").then((mod) => mod.BriefPanel),
-  {
-    loading: () => (
-      <div className="flex h-full min-h-0 items-center justify-center rounded-lg border border-border/60 bg-background p-4 text-sm text-muted-foreground">
-        Loading brief…
-      </div>
-    ),
-    ssr: false,
-  },
-);
-
 const ProjectHeader = dynamic(
   () => import("@/components/workspace/project-header").then((mod) => mod.ProjectHeader),
   {
@@ -252,7 +240,6 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
                       chatPanel={<ChatPanel />}
                       canvasPanel={<GraphPanel />}
                       wikiPanel={<WikiPanel />}
-                      briefPanel={<BriefPanel />}
                     />
                   </>
                 </LinkEditorProvider>
@@ -368,9 +355,3 @@ export const Assistant = () => {
     </PersistedSessionsProvider>
   );
 };
-
-
-
-
-
-

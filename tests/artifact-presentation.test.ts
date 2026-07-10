@@ -18,7 +18,7 @@ describe("artifact presentation helpers", () => {
       fileName: null,
       language: null,
       mimeType: null,
-      title: "Decision Brief",
+      title: "Decision Context",
     };
 
     expect(getArtifactHeadline(artifact)).toBe("Decision");

@@ -53,7 +53,7 @@ export const getArtifactReadableRole = (artifactType: ArtifactDescriptor) => {
       case "draft":
         return "Working draft";
       default:
-        return "Reusable brief";
+        return "Reusable context";
     }
   }
   switch (descriptor.artifactType) {
@@ -64,7 +64,7 @@ export const getArtifactReadableRole = (artifactType: ArtifactDescriptor) => {
     case "file":
       return "Attached source";
     default:
-      return "Reusable brief";
+      return "Reusable context";
   }
 };
 

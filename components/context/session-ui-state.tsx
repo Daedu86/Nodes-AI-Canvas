@@ -7,15 +7,14 @@ import { hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
 export type HistoryMode = "last" | "full";
 export type ModelProvider = LlmProviderId;
-export type SessionViewMode = "chat" | "split" | "canvas" | "wiki" | "brief";
+export type SessionViewMode = "chat" | "split" | "canvas" | "wiki";
 export type StandaloneSessionViewMode = Exclude<SessionViewMode, "split">;
-export type SplitWorkspacePane = "chat" | "canvas" | "wiki" | "brief";
+export type SplitWorkspacePane = "chat" | "canvas" | "wiki";
 
 export const SPLIT_WORKSPACE_PANES: SplitWorkspacePane[] = [
   "chat",
   "canvas",
   "wiki",
-  "brief",
 ];
 
 export type SplitPaneVisibility = Record<SplitWorkspacePane, boolean>;
@@ -71,7 +70,6 @@ const DEFAULT_SPLIT_PANE_VISIBILITY: SplitPaneVisibility = {
   chat: true,
   canvas: true,
   wiki: true,
-  brief: true,
 };
 
 const DEFAULT_MODEL_CONFIG: ModelConfig = getSupportedModelConfig({
@@ -192,7 +190,6 @@ const readSplitPaneVisibility = (sessionId: string): SplitPaneVisibility => {
       chat: parsed.chat ?? DEFAULT_SPLIT_PANE_VISIBILITY.chat,
       canvas: parsed.canvas ?? DEFAULT_SPLIT_PANE_VISIBILITY.canvas,
       wiki: parsed.wiki ?? DEFAULT_SPLIT_PANE_VISIBILITY.wiki,
-      brief: parsed.brief ?? DEFAULT_SPLIT_PANE_VISIBILITY.brief,
     });
   } catch {
     return DEFAULT_SPLIT_PANE_VISIBILITY;
@@ -208,7 +205,6 @@ const readViewMode = (sessionId: string): SessionViewMode => {
     value === "chat" ||
     value === "canvas" ||
     value === "wiki" ||
-    value === "brief" ||
     value === "split"
   ) {
     return value;
@@ -223,8 +219,7 @@ const isStandaloneViewMode = (value: string | null): value is StandaloneSessionV
   return (
     value === "chat" ||
     value === "canvas" ||
-    value === "wiki" ||
-    value === "brief"
+    value === "wiki"
   );
 };
 
@@ -531,4 +526,3 @@ export function useWorkspaceSplitState() {
     toggleSplitPane,
   };
 }
-

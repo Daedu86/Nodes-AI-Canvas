@@ -65,12 +65,11 @@ const pages: DocPage[] = [
         id: "what-is-nodes",
         title: "What Nodes Is",
         body:
-          "Nodes is a decision workspace. You explore in chat, structure in canvas, stabilize in wiki, and then produce a brief. The core idea is that exploration should remain inspectable and reusable, not flattened into a single transcript.",
+          "Nodes is a decision workspace. You explore in chat, structure in canvas, and stabilize durable knowledge in wiki. The core idea is that exploration should remain inspectable and reusable, not flattened into a single transcript.",
         bullets: [
           "Chat for fast exploration.",
           "Canvas for branching structure and reusable artifacts.",
           "Wiki as canonical knowledge.",
-          "Brief as the current answer snapshot.",
           "Nody as query and synthesis over the workspace.",
         ],
       },
@@ -84,7 +83,6 @@ const pages: DocPage[] = [
           "2. Branch and pin artifacts in Canvas.",
           "3. Consolidate stable facts into Wiki.",
           "4. Use Nody to synthesize and cite sources.",
-          "5. Use Brief for the final summary.",
         ],
       },
     ],
@@ -112,12 +110,6 @@ const pages: DocPage[] = [
         title: "Wiki",
         body:
           "Wiki is the memory layer. It holds the stable facts, decisions, and open questions you want to carry forward.",
-      },
-      {
-        id: "brief",
-        title: "Brief",
-        body:
-          "Brief is the canonical output snapshot: recommendation, evidence, risks, and next steps. It should be the thing you can share or paste into a doc.",
       },
       {
         id: "nody",
@@ -190,7 +182,7 @@ const pages: DocPage[] = [
         id: "sessions-vs-projects",
         title: "Sessions vs Projects",
         body:
-          "Sessions are the working units. Projects group sessions and consolidate the wiki and brief into longer-lived context.",
+          "Sessions are the working units. Projects group sessions and consolidate wiki knowledge and reusable artifacts into longer-lived context.",
       },
       {
         id: "memory",
@@ -355,12 +347,6 @@ const pages: DocPage[] = [
         title: "Why a Wiki?",
         body:
           "Because chat is not memory. The wiki is the stable layer that remains useful after exploration ends.",
-      },
-      {
-        id: "why-brief",
-        title: "Why a Brief?",
-        body:
-          "Because you need a canonical output. Brief is the product’s landing format for decisions and next steps.",
       },
       {
         id: "why-nody",
@@ -704,13 +690,12 @@ export function KnowledgeCenterWorkspace() {
                       Docs pattern: search + answers + changelog
                     </div>
                   </div>
-                  <div className="grid gap-3 md:grid-cols-[repeat(5,minmax(0,1fr))]">
+                  <div className="grid gap-3 md:grid-cols-[repeat(4,minmax(0,1fr))]">
                     {[
                       ["Chat", "Explore prompts and open loops."],
                       ["Canvas", "Keep branches and artifacts visible."],
                       ["Wiki", "Promote stable knowledge."],
                       ["Nody", "Query the current workspace."],
-                      ["Brief", "Land on the current recommendation."],
                     ].map(([title, copy], index, items) => (
                       <div key={title} className="flex items-center gap-3 md:contents">
                         <div className="rounded-[16px] border border-border/80 bg-background/85 px-4 py-3">

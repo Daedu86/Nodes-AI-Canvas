@@ -1,9 +1,7 @@
 "use client";
 
 import { BookCopy, ChevronRight, FileQuestion, GitBranchPlus, Network, Paperclip, Scale } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useSessionKnowledge } from "@/components/context/session-knowledge";
-import { useSessionUiState } from "@/components/context/session-ui-state";
 import type { SessionWikiPageId } from "@/lib/session-wiki";
 
 const pageIcon: Record<SessionWikiPageId, typeof BookCopy> = {
@@ -95,8 +93,6 @@ const renderWikiBlocks = (lines: string[]) => {
 
 export function WikiPanel() {
   const { selectedWikiPageId, setSelectedWikiPageId, wiki } = useSessionKnowledge();
-  const { setViewMode } = useSessionUiState();
-
   const activePage = wiki?.pages.find((page) => page.id === selectedWikiPageId) ?? wiki?.pages[0] ?? null;
   const activeSections = activePage ? parseWikiSections(activePage.body) : [];
 
@@ -112,11 +108,6 @@ export function WikiPanel() {
               <p className="text-base font-semibold tracking-[-0.02em] text-foreground">Wiki</p>
               <p className="text-xs text-muted-foreground">Canonical layer generated from canvas context.</p>
             </div>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("brief")}>
-              Brief
-            </Button>
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { BookCopy, Columns2, FileText, MessageSquareText, Workflow, X } from "lucide-react";
+import { BookCopy, Columns2, MessageSquareText, Workflow, X } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -29,7 +29,6 @@ export const AppHeader = () => {
     { icon: MessageSquareText, label: "Chat", value: "chat" },
     { icon: Workflow, label: "Canvas", value: "canvas" },
     { icon: BookCopy, label: "Wiki", value: "wiki" },
-    { icon: FileText, label: "Brief", value: "brief" },
     { icon: Columns2, label: "Split", value: "split" },
   ];
 
