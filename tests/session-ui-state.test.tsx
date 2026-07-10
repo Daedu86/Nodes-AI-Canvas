@@ -115,14 +115,13 @@ describe("SessionUiStateProvider", () => {
     expect(screen.getByTestId("split-ratios").textContent).toBe("0.28:0.58");
   });
 
-  it("defaults split mode to all four workspace panes and guards against empty persisted state", () => {
+  it("defaults split mode to all three workspace panes and guards against empty persisted state", () => {
     localStorage.setItem(
       "session-ui.splitPaneVisibility.v1:session-a",
       JSON.stringify({
         chat: false,
         canvas: false,
         wiki: false,
-        brief: false,
       }),
     );
 
@@ -133,7 +132,7 @@ describe("SessionUiStateProvider", () => {
     );
 
     expect(screen.getByTestId("split-panes").textContent).toBe(
-      "chat:closed|canvas:open|wiki:closed|brief:closed",
+      "chat:closed|canvas:open|wiki:closed",
     );
   });
 
