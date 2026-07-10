@@ -1919,8 +1919,12 @@ export function ThreadGraphFlow() {
         className="hidden"
         onChange={handleFileUploadChange}
       />
-      <header className="pointer-events-none absolute inset-x-4 top-4 z-30 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="pointer-events-auto relative z-40 w-full min-w-0 max-w-none rounded-[24px] border border-white/70 bg-white/80 px-4 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70 md:w-auto md:max-w-[min(440px,46vw)]">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 lg:flex-row">
+        <aside
+          ref={toolbarMenuRef}
+          className="flex min-h-0 w-full shrink-0 flex-col gap-3 overflow-y-auto rounded-[24px] border border-white/70 bg-white/84 p-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/78 lg:w-[18rem] lg:max-w-[22rem]"
+        >
+        <div className="min-w-0 border-b border-border/60 pb-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-200">
               Canvas
@@ -1958,16 +1962,27 @@ export function ThreadGraphFlow() {
           </div>
         </div>
         <div
-          ref={toolbarMenuRef}
-          className="pointer-events-auto relative z-40 flex w-full flex-wrap items-center justify-end gap-2 rounded-[24px] border border-white/70 bg-white/80 px-3 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72 md:w-auto"
+          className="flex flex-col gap-3 border-b border-border/60 pb-3"
         >
+          {showCanvasPromptCta ? (
+            <button
+              type="button"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55"
+              onClick={handleCreatePromptNode}
+              disabled={!llmEnabled || isSubmittingBranch}
+            >
+              <Plus className="h-4 w-4 text-emerald-600" />
+              <span>Create prompt node</span>
+            </button>
+          ) : null}
+          <div className="grid grid-cols-2 gap-2">
           {quickSemanticPresets.map(({ semanticType, icon: Icon }) => {
             const meta = getSemanticArtifactMeta(semanticType)!;
             return (
               <button
                 key={semanticType}
                 type="button"
-                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-medium transition-colors"
+                className="inline-flex w-full items-center justify-start gap-1.5 rounded-xl border px-2.5 py-2 text-[11px] font-medium transition-colors"
                 style={{
                   borderColor: `${meta.accent}4d`,
                   backgroundColor: `${meta.accent}14`,
@@ -1976,10 +1991,11 @@ export function ThreadGraphFlow() {
                 onClick={() => handleToolbarArtifactCreate("text", { semanticType })}
               >
                 <Icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{meta.label}</span>
+                <span>{meta.label}</span>
               </button>
             );
           })}
+          </div>
           <div className="flex items-center rounded-full border border-border/60 bg-background/92 p-1 text-[11px] font-medium text-muted-foreground shadow-sm">
             <button
               type="button"
@@ -2006,20 +2022,20 @@ export function ThreadGraphFlow() {
               3D
             </button>
           </div>
-          <div className="relative">
+          <div className="relative w-full">
             <button
               type="button"
               aria-expanded={toolbarMenu === "add"}
               aria-haspopup="menu"
               aria-label="Add artifact"
-              className={canvasToolbarButtonClassName}
+              className={`${canvasToolbarButtonClassName} w-full justify-center`}
               onClick={() => toggleToolbarMenu("add")}
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Add</span>
             </button>
             {toolbarMenu === "add" ? (
-              <div className="absolute right-0 top-[calc(100%+0.55rem)] w-64 rounded-[22px] border border-white/70 bg-white/90 p-2 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/92">
+              <div className="mt-2 w-full rounded-[18px] border border-white/70 bg-white/90 p-2 shadow-sm dark:border-white/10 dark:bg-slate-950/92">
                 <p className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Artifact templates
                 </p>
@@ -2096,20 +2112,20 @@ export function ThreadGraphFlow() {
               </div>
             ) : null}
           </div>
-          <div className="relative">
+          <div className="relative w-full">
             <button
               type="button"
               aria-expanded={toolbarMenu === "tools"}
               aria-haspopup="menu"
               aria-label="Canvas tools"
-              className={canvasToolbarIconButtonClassName}
+              className={`${canvasToolbarIconButtonClassName} w-full justify-center`}
               onClick={() => toggleToolbarMenu("tools")}
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Tools</span>
             </button>
             {toolbarMenu === "tools" ? (
-              <div className="absolute right-0 top-[calc(100%+0.55rem)] w-64 rounded-[22px] border border-white/70 bg-white/90 p-2 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/92">
+              <div className="mt-2 w-full rounded-[18px] border border-white/70 bg-white/90 p-2 shadow-sm dark:border-white/10 dark:bg-slate-950/92">
                 <p className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Canvas tools
                 </p>
@@ -2168,7 +2184,7 @@ export function ThreadGraphFlow() {
           </div>
         </div>
         {selectedArtifact || (selectedFlowNode && selectedMessageNode) || linkEditMode || overrides.size > 0 ? (
-        <div className="pointer-events-auto relative z-40 flex w-full min-w-0 flex-col gap-2 rounded-[24px] border border-white/70 bg-white/80 px-3 py-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72 md:mt-16 md:w-[min(320px,42vw)]">
+        <div className="flex min-w-0 flex-col gap-2">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -2655,9 +2671,8 @@ export function ThreadGraphFlow() {
           </div>
         </div>
         ) : null}
-      </header>
-
-      <div ref={flowViewportRef} className="relative min-h-0 flex-1 p-3">
+        </aside>
+        <div ref={flowViewportRef} className="relative min-h-[28rem] flex-1 lg:min-h-0">
         {flowRenderMode === "3d" ? (
           <ThreadGraph3D
             nodes={decoratedFlowNodes}
@@ -2733,22 +2748,6 @@ export function ThreadGraphFlow() {
                 showInteractive={false}
               />
             </ReactFlow>
-            {showCanvasPromptCta ? (
-              <div className="pointer-events-none absolute left-1/2 top-32 z-20 flex -translate-x-1/2 flex-col items-center gap-2">
-                <button
-                  type="button"
-                  className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-background/92 px-4 py-2 text-sm font-medium text-foreground shadow-[0_24px_70px_-45px_rgba(15,23,42,0.55)] backdrop-blur transition-colors hover:bg-background disabled:cursor-not-allowed disabled:opacity-55"
-                  onClick={handleCreatePromptNode}
-                  disabled={!llmEnabled || isSubmittingBranch}
-                >
-                  <Plus className="h-4 w-4 text-emerald-600" />
-                  <span>Create prompt node</span>
-                </button>
-                <span className="pointer-events-none rounded-full border border-white/70 bg-white/82 px-3 py-1 text-[11px] text-muted-foreground shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
-                  Start from canvas
-                </span>
-              </div>
-            ) : null}
             <div className="pointer-events-none absolute bottom-5 left-20 z-10 hidden items-center gap-2 md:flex">
               <div className="pointer-events-auto rounded-full border border-white/70 bg-white/82 px-3 py-1 text-[11px] text-muted-foreground shadow-[0_18px_48px_-36px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
                 Drag nodes directly on the stage. The canvas is the main workspace.
@@ -2756,6 +2755,7 @@ export function ThreadGraphFlow() {
             </div>
           </>
         )}
+        </div>
       </div>
     </section>
   );
