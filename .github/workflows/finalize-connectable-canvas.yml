@@ -65,6 +65,7 @@ jobs:
             cp .github/canvas-payload/provider.b64 components/context/session-artifacts.tsx
             cp .github/canvas-payload/artifact-node.b64 components/assistant-ui/thread-graph-flow/artifact-node.tsx
             cat .github/canvas-payload/patch-thread-flow.part*.b64 > /tmp/patch-thread-flow.py
+            sed -i '/if "quickSemanticPresets" in text or "semanticArtifactPresets" in text:/,+1d' /tmp/patch-thread-flow.py
             python /tmp/patch-thread-flow.py
 
             rm -rf .github/canvas-payload
