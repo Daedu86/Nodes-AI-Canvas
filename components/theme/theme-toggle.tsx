@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "theme";
+const DEFAULT_THEME: Theme = "dark";
 
 type Theme = "dark" | "light";
 
-function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
+function getStoredTheme(): Theme {
   const stored = localStorage.getItem(STORAGE_KEY);
-  return stored === "light" || stored === "dark" ? (stored as Theme) : "dark";
+  return stored === "light" || stored === "dark" ? (stored as Theme) : DEFAULT_THEME;
 }
 
 export function ThemeToggle({
@@ -24,14 +24,22 @@ export function ThemeToggle({
   size?: React.ComponentProps<typeof Button>["size"];
   variant?: React.ComponentProps<typeof Button>["variant"];
 }) {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [theme, setTheme] = useState<Theme>(DEFAULT_THEME);
+  const [themeReady, setThemeReady] = useState(false);
 
   useEffect(() => {
+    setTheme(getStoredTheme());
+    setThemeReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!themeReady) return;
+
     const root = document.documentElement;
     if (theme === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
     localStorage.setItem(STORAGE_KEY, theme);
-  }, [theme]);
+  }, [theme, themeReady]);
 
   const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
   const nextTheme = theme === "dark" ? "light" : "dark";
