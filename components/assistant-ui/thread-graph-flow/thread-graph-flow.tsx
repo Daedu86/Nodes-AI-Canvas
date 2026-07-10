@@ -77,7 +77,7 @@ import { useHistoryMode } from "@/components/context/history-mode";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { useLinkEditor } from "@/components/context/link-editor";
 import { useModelConfig } from "@/components/context/model-config";
-import { useNodyPanel } from "@/components/context/nody-panel";
+import { useSessionKnowledge } from "@/components/context/session-knowledge";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
 import { useRequestError } from "@/components/context/request-error";
 import { useSessionArtifacts } from "@/components/context/session-artifacts";
@@ -501,7 +501,7 @@ export function ThreadGraphFlow() {
   const { historyMode } = useHistoryMode();
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
-  const { publishSnapshot } = useNodyPanel();
+  const { publishSnapshot } = useSessionKnowledge();
   const { clearRequestError, requestError, setRequestError } = useRequestError();
   const { activeSession, activeSessionId } = usePersistedSessions();
   const {
@@ -1847,43 +1847,25 @@ export function ThreadGraphFlow() {
       })),
     [canvasConversationNodes],
   );
-  const canvasGuideNodes = React.useMemo(
+  const sessionKnowledgeNodes = React.useMemo(
     () =>
       canvasConversationNodes.map((node) => ({
-        ...node,
         branchId:
           typeof node.branchId === "string" || typeof node.branchId === "number"
             ? node.branchId
             : null,
+        id: node.id,
+        parentId: node.parentId,
+        role: node.role,
+        text: node.text,
       })),
     [canvasConversationNodes],
-  );
-  const canvasGuideEdges = React.useMemo(
-    () =>
-      decoratedFlowEdges.flatMap((edge) => {
-        const tone = edge.data?.tone ?? "default";
-        if (tone === "draft") return [];
-        return [{
-          id: edge.id,
-          label: edge.data?.label ?? null,
-          source: edge.source,
-          target: edge.target,
-          tone,
-        }];
-      }),
-    [decoratedFlowEdges],
   );
   React.useEffect(() => {
     publishSnapshot({
       artifacts,
       contextLinks,
-      edges: canvasGuideEdges,
-      historyMode,
-      llmEnabled,
-      modelId,
-      nodes: canvasGuideNodes,
-      provider,
-      selectedEdgeId: null,
+      nodes: sessionKnowledgeNodes,
       selectedNodeId,
       sessionId: activeSessionId,
       sessionTitle: activeSession?.title ?? null,
@@ -1892,15 +1874,10 @@ export function ThreadGraphFlow() {
     activeSession?.title,
     activeSessionId,
     artifacts,
-    canvasGuideEdges,
-    canvasGuideNodes,
     contextLinks,
-    historyMode,
-    llmEnabled,
-    modelId,
-    provider,
     publishSnapshot,
     selectedNodeId,
+    sessionKnowledgeNodes,
   ]);
 
   return (

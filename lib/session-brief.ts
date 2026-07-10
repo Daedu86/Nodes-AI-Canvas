@@ -1,26 +1,31 @@
-import type { ParsedNodyInsight, NodySourceCatalogEntry } from "@/lib/nody-insight";
 import {
   getSemanticArtifactLabel,
   getSessionArtifactPreview,
   type SessionArtifact,
 } from "@/lib/session-artifacts";
-import type { SessionWiki } from "@/lib/session-wiki";
+import type { SessionWiki, SessionWikiPageId } from "@/lib/session-wiki";
+
+export type SessionBriefSource = {
+  kind: "wiki" | "node" | "artifact";
+  label: string;
+  preview: string | null;
+  ref: string;
+  targetId: SessionWikiPageId | string;
+};
 
 export type SessionBrief = {
   title: string;
   summary: string;
   recommendation: string;
   next: string | null;
-  evidence: NodySourceCatalogEntry[];
+  evidence: SessionBriefSource[];
   openQuestions: string[];
   signals: string[];
 };
 
 type BuildSessionBriefArgs = {
   artifacts: SessionArtifact[];
-  insight: ParsedNodyInsight | null;
   sessionTitle: string | null;
-  sources: NodySourceCatalogEntry[];
   wiki: SessionWiki | null;
 };
 
@@ -28,7 +33,8 @@ const parseOpenQuestions = (wiki: SessionWiki | null) => {
   const page = wiki?.pages.find((entry) => entry.id === "open-questions");
   if (!page) return [];
   return page.body
-    .split(/\r?\n/)
+    .split(/?
+/)
     .map((line) => line.trim())
     .filter((line) => /^-\s+/.test(line))
     .map((line) => line.replace(/^-\s+/, "").trim())
@@ -43,9 +49,7 @@ const getSemanticArtifacts = (
     (artifact) => artifact.artifactType === "text" && artifact.semanticType === semanticType,
   );
 
-const buildArtifactSourceEntry = (
-  artifact: SessionArtifact,
-): NodySourceCatalogEntry => ({
+const buildArtifactSourceEntry = (artifact: SessionArtifact): SessionBriefSource => ({
   kind: "artifact",
   label: `${getSemanticArtifactLabel(artifact.semanticType) ?? "Artifact"} · ${artifact.title}`,
   preview: getSessionArtifactPreview(artifact, 160),
@@ -78,33 +82,25 @@ const buildSignalSummary = (artifacts: SessionArtifact[], wiki: SessionWiki | nu
 
 export const buildSessionBrief = ({
   artifacts,
-  insight,
   sessionTitle,
-  sources,
   wiki,
 }: BuildSessionBriefArgs): SessionBrief => {
   const overview = wiki?.pages.find((page) => page.id === "overview");
   const focus = wiki?.pages.find((page) => page.id === "focus");
   const decisionArtifacts = getSemanticArtifacts(artifacts, "decision");
   const evidenceArtifacts = getSemanticArtifacts(artifacts, "evidence");
+  const planArtifacts = getSemanticArtifacts(artifacts, "plan");
   const questionArtifacts = getSemanticArtifacts(artifacts, "question");
   const summary =
     overview?.summary ??
     `${sessionTitle?.trim() || "Untitled session"} is ready for a canonical brief.`;
 
   const recommendation =
-    insight?.answer?.trim() ||
     decisionArtifacts[0]?.content?.trim() ||
     focus?.summary ||
-    "Ask Nody a concrete question to generate a current recommendation.";
-  const next =
-    insight?.next && insight.next.trim().length > 0 && !/^none$/i.test(insight.next.trim())
-      ? insight.next.trim()
-      : null;
-  const evidence =
-    sources.length > 0
-      ? sources.slice(0, 4)
-      : evidenceArtifacts.slice(0, 4).map(buildArtifactSourceEntry);
+    "Pin a decision artifact in the canvas to establish the current recommendation.";
+  const next = planArtifacts[0]?.content?.trim() || null;
+  const evidence = evidenceArtifacts.slice(0, 4).map(buildArtifactSourceEntry);
   const openQuestions = [
     ...questionArtifacts.map(
       (artifact) => `${artifact.title}: ${getSessionArtifactPreview(artifact, 180)}`,

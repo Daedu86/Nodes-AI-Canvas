@@ -7,16 +7,15 @@ import { hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
 export type HistoryMode = "last" | "full";
 export type ModelProvider = LlmProviderId;
-export type SessionViewMode = "chat" | "split" | "canvas" | "wiki" | "brief" | "nody";
+export type SessionViewMode = "chat" | "split" | "canvas" | "wiki" | "brief";
 export type StandaloneSessionViewMode = Exclude<SessionViewMode, "split">;
-export type SplitWorkspacePane = "chat" | "canvas" | "wiki" | "brief" | "nody";
+export type SplitWorkspacePane = "chat" | "canvas" | "wiki" | "brief";
 
 export const SPLIT_WORKSPACE_PANES: SplitWorkspacePane[] = [
   "chat",
   "canvas",
   "wiki",
   "brief",
-  "nody",
 ];
 
 export type SplitPaneVisibility = Record<SplitWorkspacePane, boolean>;
@@ -73,7 +72,6 @@ const DEFAULT_SPLIT_PANE_VISIBILITY: SplitPaneVisibility = {
   canvas: true,
   wiki: true,
   brief: true,
-  nody: true,
 };
 
 const DEFAULT_MODEL_CONFIG: ModelConfig = getSupportedModelConfig({
@@ -195,7 +193,6 @@ const readSplitPaneVisibility = (sessionId: string): SplitPaneVisibility => {
       canvas: parsed.canvas ?? DEFAULT_SPLIT_PANE_VISIBILITY.canvas,
       wiki: parsed.wiki ?? DEFAULT_SPLIT_PANE_VISIBILITY.wiki,
       brief: parsed.brief ?? DEFAULT_SPLIT_PANE_VISIBILITY.brief,
-      nody: parsed.nody ?? DEFAULT_SPLIT_PANE_VISIBILITY.nody,
     });
   } catch {
     return DEFAULT_SPLIT_PANE_VISIBILITY;
@@ -212,8 +209,7 @@ const readViewMode = (sessionId: string): SessionViewMode => {
     value === "canvas" ||
     value === "wiki" ||
     value === "brief" ||
-    value === "split" ||
-    value === "nody"
+    value === "split"
   ) {
     return value;
   }
@@ -228,8 +224,7 @@ const isStandaloneViewMode = (value: string | null): value is StandaloneSessionV
     value === "chat" ||
     value === "canvas" ||
     value === "wiki" ||
-    value === "brief" ||
-    value === "nody"
+    value === "brief"
   );
 };
 

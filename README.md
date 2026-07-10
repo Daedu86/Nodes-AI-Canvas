@@ -24,14 +24,6 @@ Instead of forcing everything into one linear chat, Nodes helps you:
 
 The Canvas is a visual, persistent space that lives alongside chat. It’s designed for the parts of AI work that *shouldn’t* disappear in scrollback: key decisions, constraints, evidence, and outputs you want to reuse.
 
-### What is Nody?
-
-Nody is the built-in guide that can read your current session tree + canvas context and help you:
-
-- Summarize a branch or the whole session.
-- Explain what you’re looking at (selected node / edge / artifact).
-- Suggest next steps when you’re stuck.
-
 ## Product Tour
 
 ### Chat + branching
@@ -110,8 +102,7 @@ Users can connect their own provider credentials and control which models show u
 3. Chat as usual, then use **Edit** or **Follow-up** to create branches.
 4. Open **Canvas** to keep key nodes and artifacts visible while you iterate.
 5. Add artifacts (text/code/image/file) when context matters more than another message.
-6. Use **Nody** when you want a quick summary, an explanation of what’s selected, or next-step guidance.
-7. Open **Profile → LLM Models** to connect your own API keys and control what models appear.
+6. Open **Profile → LLM Models** to connect your own API keys and control what models appear.
 
 ## How People Use Nodes
 
@@ -128,7 +119,6 @@ Nodes works best when you are exploring and deciding:
 - **Artifact**: structured context (text/code/image/file) you can pin and reuse.
 - **Project**: a larger workspace grouping sessions with shared context.
 - **Arena**: compare options and promote winners into memory.
-- **Nody**: an in-product guide that summarizes and explains your workspace.
 
 ## Developer Setup
 

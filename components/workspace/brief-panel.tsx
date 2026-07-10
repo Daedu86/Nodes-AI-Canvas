@@ -1,17 +1,17 @@
 "use client";
 
-import { BookCopy, FileText, Lightbulb, Telescope, Waypoints } from "lucide-react";
+import { BookCopy, FileText, Lightbulb, Waypoints } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNodyPanel } from "@/components/context/nody-panel";
+import { useSessionKnowledge } from "@/components/context/session-knowledge";
 import { useSessionUiState } from "@/components/context/session-ui-state";
-import type { NodySourceCatalogEntry } from "@/lib/nody-insight";
+import type { SessionBriefSource } from "@/lib/session-brief";
 import type { SessionWikiPageId } from "@/lib/session-wiki";
 
 export function BriefPanel() {
-  const { brief, setSelectedWikiPageId } = useNodyPanel();
+  const { brief, setSelectedWikiPageId } = useSessionKnowledge();
   const { setCanvasSelectionId, setViewMode } = useSessionUiState();
 
-  const handleOpenSource = (source: NodySourceCatalogEntry) => {
+  const handleOpenSource = (source: SessionBriefSource) => {
     if (source.kind === "wiki") {
       setSelectedWikiPageId(source.targetId as SessionWikiPageId);
       setViewMode("wiki");
@@ -26,7 +26,7 @@ export function BriefPanel() {
       <div className="flex h-full min-h-0 items-center justify-center bg-background px-6 py-6">
         <div className="max-w-xl rounded-[18px] border border-border/80 bg-card/88 px-6 py-6 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
           <p className="text-sm text-muted-foreground">
-            Ask Nody a concrete question and the workspace will compile a brief here.
+            Open the canvas and add semantic artifacts to compile a session brief here.
           </p>
         </div>
       </div>
@@ -63,10 +63,6 @@ export function BriefPanel() {
                 <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("canvas")}>
                   <Waypoints className="mr-1.5 h-3.5 w-3.5" />
                   Canvas
-                </Button>
-                <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("nody")}>
-                  <Telescope className="mr-1.5 h-3.5 w-3.5" />
-                  Ask Nody
                 </Button>
               </div>
             </div>
@@ -132,7 +128,7 @@ export function BriefPanel() {
                   </div>
                 ) : (
                   <p className="mt-3 text-sm text-muted-foreground">
-                    Ask Nody a focused question to attach explicit evidence anchors here.
+                    Add evidence artifacts to the canvas to attach evidence anchors here.
                   </p>
                 )}
               </div>

@@ -17,7 +17,7 @@ import {
 import { PersistedSessionRuntimeBridge } from "@/components/context/persisted-session-runtime-bridge";
 import React, { useMemo } from "react";
 import { SessionUiStateProvider, useSessionUiState } from "@/components/context/session-ui-state";
-import { NodyPanelProvider } from "@/components/context/nody-panel";
+import { SessionKnowledgeProvider } from "@/components/context/session-knowledge";
 import { WorkspaceSurfaceProvider, useWorkspaceSurface } from "@/components/context/workspace-surface";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -45,18 +45,6 @@ const GraphPanel = dynamic(
     loading: () => (
       <div className="flex h-full min-h-0 items-center justify-center rounded-lg border border-border/60 bg-background p-4 text-sm text-muted-foreground">
         Loading graph…
-      </div>
-    ),
-    ssr: false,
-  },
-);
-
-const NodyPanel = dynamic(
-  () => import("@/components/workspace/nody-panel").then((mod) => mod.NodyPanel),
-  {
-    loading: () => (
-      <div className="flex h-full min-h-0 items-center justify-center rounded-lg border border-border/60 bg-background p-4 text-sm text-muted-foreground">
-        Loading Nody…
       </div>
     ),
     ssr: false,
@@ -254,7 +242,7 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
             latencyVersion,
           }}
         >
-          <NodyPanelProvider>
+          <SessionKnowledgeProvider>
             <SessionArtifactsProvider>
               <GraphBranchIntentProvider>
                 <LinkEditorProvider>
@@ -265,13 +253,12 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
                       canvasPanel={<GraphPanel />}
                       wikiPanel={<WikiPanel />}
                       briefPanel={<BriefPanel />}
-                      nodyPanel={<NodyPanel />}
                     />
                   </>
                 </LinkEditorProvider>
               </GraphBranchIntentProvider>
             </SessionArtifactsProvider>
-          </NodyPanelProvider>
+          </SessionKnowledgeProvider>
         </MessageLatencyProvider>
       </RequestErrorProvider>
     </AssistantRuntimeProvider>

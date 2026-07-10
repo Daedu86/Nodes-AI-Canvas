@@ -1,4 +1,3 @@
-import type { CanvasGuideGraphNode } from "@/lib/canvas-agent/canvas-agent-context";
 import {
   getSemanticArtifactLabel,
   getSemanticArtifactRole,
@@ -7,6 +6,14 @@ import {
   type SessionArtifact,
   type SessionContextLink,
 } from "@/lib/session-artifacts";
+
+export type SessionWikiNode = {
+  branchId?: string | number | null;
+  id: string;
+  parentId: string | null;
+  role: string;
+  text: string;
+};
 
 export type SessionWikiPageId =
   | "overview"
@@ -31,7 +38,7 @@ export type SessionWiki = {
 type BuildSessionWikiArgs = {
   artifacts: SessionArtifact[];
   contextLinks: SessionContextLink[];
-  nodes: CanvasGuideGraphNode[];
+  nodes: SessionWikiNode[];
   selectedNodeId: string | null;
   sessionTitle: string | null;
 };
@@ -53,7 +60,7 @@ const buildSemanticArtifactSummary = (artifacts: SessionArtifact[]) => {
   return [...counts.entries()].map(([label, count]) => `${count} ${label.toLowerCase()}${count === 1 ? "" : "s"}`);
 };
 
-const getBranchNodes = (nodes: CanvasGuideGraphNode[], anchorId: string) => {
+const getBranchNodes = (nodes: SessionWikiNode[], anchorId: string) => {
   const branchIds = new Set<string>([anchorId]);
   const queue = [anchorId];
 
