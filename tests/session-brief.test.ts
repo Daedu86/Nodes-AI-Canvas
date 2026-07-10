@@ -35,8 +35,7 @@ describe("session brief builder", () => {
             title: "Overview",
           },
           {
-            body: "- Q1: Should the brief be the final export?
-- Q2: How strict should citations be?",
+            body: "- Q1: Should the brief be the final export?\n- Q2: How strict should citations be?",
             id: "open-questions",
             summary: "Two open questions remain.",
             title: "Open Questions",
