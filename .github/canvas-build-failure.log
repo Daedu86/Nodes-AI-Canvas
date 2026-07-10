@@ -1,1 +1,3 @@
-Validation failed before logs were initialized.
+node=v22.23.1
+npm=10.9.8
+python=Python 3.12.3
