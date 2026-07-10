@@ -38,6 +38,10 @@ const projectsContext = {
   selectProject: vi.fn(),
 };
 
+type TooltipIconButtonMockProps = React.PropsWithChildren<
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { tooltip: string }
+>;
+
 vi.mock("@/components/context/persisted-sessions", () => ({
   usePersistedSessions: () => persistedSessionsContext,
 }));
@@ -55,7 +59,7 @@ vi.mock("@/components/context/workspace-surface", () => ({
 vi.mock("@/components/assistant-ui/tooltip-icon-button", async () => {
   const ReactModule = await import("react");
   return {
-    TooltipIconButton: ({ children, tooltip, ...props }: any) =>
+    TooltipIconButton: ({ children, tooltip, ...props }: TooltipIconButtonMockProps) =>
       ReactModule.createElement(
         "button",
         {
