@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 def replace_once(path: Path, old: str, new: str, label: str) -> None:
@@ -6,6 +7,15 @@ def replace_once(path: Path, old: str, new: str, label: str) -> None:
     if old not in text:
         raise SystemExit(f"missing fix anchor: {label}")
     path.write_text(text.replace(old, new, 1))
+    print("fixed", label)
+
+
+def regex_once(path: Path, pattern: str, replacement: str, label: str) -> None:
+    text = path.read_text()
+    updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+    if count != 1:
+        raise SystemExit(f"missing regex fix anchor: {label}")
+    path.write_text(updated)
     print("fixed", label)
 
 
@@ -59,7 +69,12 @@ replace_once(
 )
 
 prompt_node = Path("components/assistant-ui/thread-graph-flow/canvas-prompt-node.tsx")
-replace_once(prompt_node, "                 Prompt\n", "                 Draft prompt\n", "prompt badge label")
+regex_once(
+    prompt_node,
+    r'(<span className="rounded-full border border-emerald-300/35[^\"]*">\s*)Prompt(\s*</span>)',
+    r'\1Draft prompt\2',
+    "prompt badge label",
+)
 replace_once(
     prompt_node,
     '<Trash2 className="mr-1.5 h-4 w-4" /> Delete',
