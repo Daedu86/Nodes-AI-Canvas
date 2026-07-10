@@ -16,50 +16,35 @@ import type {
 
 const getBadgeTone = (data?: ThreadGraphFlowEdgeData) => {
   if (data?.isEdited || data?.tone === "edited") {
-    return {
-      border: "border-sky-500/35",
-      bg: "bg-sky-500/10",
-      text: "text-sky-700",
-      label: data?.label ?? "edited",
-    };
+    return { border: "border-sky-500/35", bg: "bg-sky-500/10", text: "text-sky-700", label: data?.label ?? "edited" };
   }
-
   if (data?.isBridge || data?.tone === "bridge") {
-    return {
-      border: "border-amber-500/35",
-      bg: "bg-amber-500/10",
-      text: "text-amber-700",
-      label: data?.label ?? "bridge",
-    };
+    return { border: "border-amber-500/35", bg: "bg-amber-500/10", text: "text-amber-700", label: data?.label ?? "bridge" };
   }
-
   if (data?.tone === "context") {
-    return {
-      border: "border-violet-500/35",
-      bg: "bg-violet-500/10",
-      text: "text-violet-700",
-      label: data?.label ?? "context",
-    };
+    return { border: "border-violet-500/35", bg: "bg-violet-500/10", text: "text-violet-700", label: data?.label ?? "context" };
   }
-
+  if (data?.tone === "pending-output") {
+    return { border: "border-cyan-500/35", bg: "bg-cyan-500/10", text: "text-cyan-700", label: data?.label ?? "pending output" };
+  }
+  if (data?.tone === "output") {
+    return { border: "border-cyan-500/35", bg: "bg-cyan-500/10", text: "text-cyan-700", label: data?.label ?? "output" };
+  }
   if (data?.tone === "draft") {
-    return {
-      border: "border-emerald-500/35",
-      bg: "bg-emerald-500/10",
-      text: "text-emerald-700",
-      label: data?.label ?? "draft",
-    };
+    return { border: "border-emerald-500/35", bg: "bg-emerald-500/10", text: "text-emerald-700", label: data?.label ?? "draft" };
   }
-
   return data?.label
-    ? {
-        border: "border-border/60",
-        bg: "bg-background/85",
-        text: "text-muted-foreground",
-        label: data.label,
-      }
+    ? { border: "border-border/60", bg: "bg-background/85", text: "text-muted-foreground", label: data.label }
     : null;
 };
+
+const isDashed = (data?: ThreadGraphFlowEdgeData) =>
+  Boolean(
+    data?.linkEditMode ||
+      data?.tone === "context" ||
+      data?.tone === "draft" ||
+      data?.tone === "pending-output",
+  );
 
 export const ThreadGraphEdge = memo(
   ({
@@ -86,9 +71,8 @@ export const ThreadGraphEdge = memo(
       borderRadius: 18,
       offset: 16,
     });
-
     const accent = data?.accent ?? "#64748b";
-    const tone = getBadgeTone(data);
+    const badge = getBadgeTone(data);
     const emphasis = data?.emphasis ?? "normal";
     const isMuted = emphasis === "muted";
     const isLineage = emphasis === "lineage";
@@ -120,10 +104,7 @@ export const ThreadGraphEdge = memo(
             stroke: accent,
             strokeOpacity: isMuted ? 0.08 : isSelected ? 0.98 : isLineage ? 0.85 : 0.72,
             strokeWidth: outerWidth,
-            strokeDasharray:
-              isEditMode || data?.tone === "context" || data?.tone === "draft"
-                ? "10 8"
-                : undefined,
+            strokeDasharray: isDashed(data) ? "10 8" : undefined,
             filter: isMuted ? "none" : `drop-shadow(0 0 8px ${accent}33)`,
           }}
         />
@@ -135,34 +116,35 @@ export const ThreadGraphEdge = memo(
             stroke: "rgba(255,255,255,0.78)",
             strokeOpacity: isMuted ? 0.04 : isSelected ? 0.92 : isLineage ? 0.7 : 0.55,
             strokeWidth: innerWidth,
-            strokeDasharray: isEditMode
-              ? "4 8"
-              : data?.tone === "context"
-                ? "7 7"
-              : data?.tone === "draft"
-                ? "6 7"
-              : data?.isEdited
-                ? "8 6"
-                : data?.isBridge
-                  ? "3 6"
-                  : undefined,
+            strokeDasharray:
+              isEditMode
+                ? "4 8"
+                : data?.tone === "context"
+                  ? "7 7"
+                  : data?.tone === "pending-output"
+                    ? "5 7"
+                    : data?.tone === "draft"
+                      ? "6 7"
+                      : data?.isEdited
+                        ? "8 6"
+                        : data?.isBridge
+                          ? "3 6"
+                          : undefined,
           }}
         />
-        {tone ? (
+        {badge ? (
           <EdgeLabelRenderer>
             <div
               className={[
                 "pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] shadow-sm backdrop-blur",
-                tone.border,
-                tone.bg,
-                tone.text,
+                badge.border,
+                badge.bg,
+                badge.text,
               ].join(" ")}
-              style={{
-                transform: `translate(${labelX}px, ${labelY}px) translate(-50%, -50%)`,
-              }}
+              style={{ transform: `translate(${labelX}px, ${labelY}px) translate(-50%, -50%)` }}
             >
               <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent }} />
-              <span>{tone.label}</span>
+              <span>{badge.label}</span>
             </div>
           </EdgeLabelRenderer>
         ) : null}
@@ -171,9 +153,7 @@ export const ThreadGraphEdge = memo(
             <button
               type="button"
               className="pointer-events-auto absolute z-[60] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border border-rose-500/35 bg-background/95 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-700 shadow-sm backdrop-blur hover:bg-rose-500/10"
-              style={{
-                transform: `translate(${labelX}px, ${labelY + (tone ? 22 : 0)}px) translate(-50%, -50%)`,
-              }}
+              style={{ transform: `translate(${labelX}px, ${labelY + (badge ? 22 : 0)}px) translate(-50%, -50%)` }}
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();

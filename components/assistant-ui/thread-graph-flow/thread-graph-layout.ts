@@ -23,13 +23,18 @@ const getNodeSize = (node: ThreadGraphFlowNode) => {
   return { ...MESSAGE_NODE_SIZE };
 };
 
+const isConversationTreeEdge = (edge: ThreadGraphFlowEdge) =>
+  edge.data?.tone !== "context" &&
+  edge.data?.tone !== "output" &&
+  edge.data?.tone !== "pending-output";
+
 export const layoutThreadGraphFlow = (
   sourceNodes: ThreadGraphFlowNode[],
   sourceEdges: ThreadGraphFlowEdge[],
 ) => {
   const conversationNodes = sourceNodes.filter((node) => node.data.kind !== "artifact");
   const artifactNodes = sourceNodes.filter((node) => node.data.kind === "artifact");
-  const treeEdges = sourceEdges.filter((edge) => edge.data?.tone !== "context");
+  const treeEdges = sourceEdges.filter(isConversationTreeEdge);
   const graph = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
   graph.setGraph({
     rankdir: "LR",
@@ -39,51 +44,44 @@ export const layoutThreadGraphFlow = (
     marginy: 48,
   });
 
-  conversationNodes.forEach((node) => {
-    const size = getNodeSize(node);
-    graph.setNode(node.id, size);
-  });
-
-  treeEdges.forEach((edge) => {
-    graph.setEdge(edge.source, edge.target);
-  });
-
+  conversationNodes.forEach((node) => graph.setNode(node.id, getNodeSize(node)));
+  treeEdges.forEach((edge) => graph.setEdge(edge.source, edge.target));
   dagre.layout(graph);
 
   const laidOutConversationNodes = conversationNodes.map((node) => {
     const size = getNodeSize(node);
-    const position = graph.node(node.id) as { x: number; y: number } | undefined;
-
+    const dagrePosition = graph.node(node.id) as { x: number; y: number } | undefined;
+    const storedDraftPosition =
+      node.data.kind === "prompt-draft" ? node.data.position ?? null : null;
     return {
       ...node,
-      draggable: false,
-      position: position
-        ? { x: position.x - size.width / 2, y: position.y - size.height / 2 }
-        : node.position,
+      draggable: node.data.kind === "prompt-draft",
+      position:
+        storedDraftPosition ??
+        (dagrePosition
+          ? { x: dagrePosition.x - size.width / 2, y: dagrePosition.y - size.height / 2 }
+          : node.position),
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
+      style: node.data.kind === "prompt-draft" ? { width: size.width } : node.style,
     } satisfies ThreadGraphFlowNode;
   });
 
   const laidOutArtifactNodes = artifactNodes.map((node, index) => {
     const size = getNodeSize(node);
-    const storedPosition = node.data.position;
-    const fallbackPosition = {
-      x: ARTIFACT_LANE_X,
-      y: ARTIFACT_START_Y + index * ARTIFACT_GAP_Y,
-    };
-
+    const fallbackPosition = { x: ARTIFACT_LANE_X, y: ARTIFACT_START_Y + index * ARTIFACT_GAP_Y };
     return {
       ...node,
       draggable: true,
-      position: storedPosition ?? fallbackPosition,
+      position: node.data.position ?? fallbackPosition,
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
-      style: {
-        width: size.width,
-      },
+      style: { width: size.width },
     } satisfies ThreadGraphFlowNode;
   });
 
-  return { nodes: [...laidOutConversationNodes, ...laidOutArtifactNodes], edges: sourceEdges };
+  return {
+    nodes: [...laidOutConversationNodes, ...laidOutArtifactNodes],
+    edges: sourceEdges,
+  };
 };

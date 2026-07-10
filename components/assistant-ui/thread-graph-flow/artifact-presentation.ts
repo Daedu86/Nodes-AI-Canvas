@@ -20,6 +20,11 @@ type ArtifactDescriptor =
   | SessionArtifactType
   | Pick<SessionArtifact, "artifactType" | "semanticType">;
 
+const descriptorOf = (value: ArtifactDescriptor) =>
+  typeof value === "string"
+    ? { artifactType: value, semanticType: null as SessionArtifactSemanticType | null }
+    : value;
+
 const stripMarkdownNoise = (value: string) =>
   value
     .replace(/^[-*+]\s+/, "")
@@ -35,102 +40,66 @@ const normalizeArtifactLines = (content: string) =>
     .map((line) => stripMarkdownNoise(line))
     .filter((line) => line.length > 0);
 
-export const getArtifactReadableRole = (artifactType: ArtifactDescriptor) => {
-  const descriptor =
-    typeof artifactType === "string"
-      ? { artifactType, semanticType: null as SessionArtifactSemanticType | null }
-      : artifactType;
+export const getArtifactReadableRole = (value: ArtifactDescriptor) => {
+  const descriptor = descriptorOf(value);
   if (descriptor.artifactType === "text") {
     switch (descriptor.semanticType) {
-      case "decision":
-        return "Decision call";
-      case "evidence":
-        return "Evidence set";
-      case "plan":
-        return "Execution plan";
-      case "question":
-        return "Open question";
-      case "draft":
-        return "Working draft";
-      default:
-        return "Reusable context";
+      case "decision": return "Decision call";
+      case "evidence": return "Evidence set";
+      case "plan": return "Execution plan";
+      case "table": return "Structured table";
+      case "question": return "Open question";
+      case "draft": return "Working draft";
+      default: return "Reusable context";
     }
   }
   switch (descriptor.artifactType) {
-    case "code":
-      return "Executable block";
-    case "image":
-      return "Visual evidence";
-    case "file":
-      return "Attached source";
-    default:
-      return "Reusable context";
+    case "code": return "Executable block";
+    case "image": return "Visual evidence";
+    case "file": return "Attached source";
+    default: return "Reusable context";
   }
 };
 
-export const getArtifactIntentLabel = (artifactType: ArtifactDescriptor) => {
-  const descriptor =
-    typeof artifactType === "string"
-      ? { artifactType, semanticType: null as SessionArtifactSemanticType | null }
-      : artifactType;
+export const getArtifactIntentLabel = (value: ArtifactDescriptor) => {
+  const descriptor = descriptorOf(value);
   if (descriptor.artifactType === "text") {
     switch (descriptor.semanticType) {
-      case "decision":
-        return "Use this when the model needs the current recommendation plus rationale.";
-      case "evidence":
-        return "Use this when the model needs grounded facts, references, or source-backed observations.";
-      case "plan":
-        return "Use this when the model needs ordered steps, milestones, or execution structure.";
-      case "question":
-        return "Use this when the model should keep an unresolved question visible and actionable.";
-      case "draft":
-        return "Use this when the model needs working copy, rough language, or a message in progress.";
-      default:
-        return "Use this when the model needs stable narrative context.";
+      case "decision": return "Captures the recommendation, rationale, risks, and alternatives.";
+      case "evidence": return "Captures claims, observations, sources, and why they matter.";
+      case "plan": return "Captures ordered steps, dependencies, and verification criteria.";
+      case "table": return "Captures consistent rows and columns with the original text as fallback.";
+      case "question": return "Keeps an unresolved question visible and actionable.";
+      case "draft": return "Keeps working copy or unfinished language available.";
+      default: return "Provides stable narrative context to a prompt.";
     }
   }
   switch (descriptor.artifactType) {
-    case "code":
-      return "Use this when the model needs exact syntax or implementation detail.";
-    case "image":
-      return "Use this when the model needs a human-readable read of an image.";
-    case "file":
-      return "Use this when the model needs a source file plus extracted notes.";
-    default:
-      return "Use this when the model needs stable narrative context.";
+    case "code": return "Provides exact syntax or implementation detail.";
+    case "image": return "Provides visual context and a human-readable note.";
+    case "file": return "Provides an uploaded source file plus extracted notes.";
+    default: return "Provides stable narrative context to a prompt.";
   }
 };
 
-export const getArtifactBadgeLabel = (artifact: ArtifactDescriptor) => {
-  const descriptor =
-    typeof artifact === "string"
-      ? { artifactType: artifact, semanticType: null as SessionArtifactSemanticType | null }
-      : artifact;
+export const getArtifactBadgeLabel = (value: ArtifactDescriptor) => {
+  const descriptor = descriptorOf(value);
   if (descriptor.artifactType === "text") {
     switch (descriptor.semanticType) {
-      case "decision":
-        return "Decision";
-      case "evidence":
-        return "Evidence";
-      case "plan":
-        return "Plan";
-      case "question":
-        return "Question";
-      case "draft":
-        return "Draft";
-      default:
-        return "Text context";
+      case "decision": return "Decision";
+      case "evidence": return "Evidence";
+      case "plan": return "Plan";
+      case "table": return "Table";
+      case "question": return "Question";
+      case "draft": return "Draft";
+      default: return "Text";
     }
   }
   switch (descriptor.artifactType) {
-    case "code":
-      return "Code context";
-    case "image":
-      return "Image context";
-    case "file":
-      return "File context";
-    default:
-      return "Text context";
+    case "code": return "Code";
+    case "image": return "Image";
+    case "file": return "File";
+    default: return "Text";
   }
 };
 
@@ -159,20 +128,17 @@ export const getArtifactCodeSample = (artifact: ArtifactLike, limit = 5) =>
 
 export const getArtifactLineCount = (artifact: ArtifactLike) => {
   const trimmed = artifact.content.trim();
-  if (!trimmed) return 0;
-  return trimmed.split(/\r?\n/).length;
+  return trimmed ? trimmed.split(/\r?\n/).length : 0;
 };
 
 export const getArtifactStatChips = (artifact: ArtifactLike) => {
   const chips: string[] = [];
-  if (artifact.artifactType === "text" && artifact.semanticType) {
-    chips.push(getArtifactBadgeLabel(artifact));
-  }
+  if (artifact.artifactType === "text" && artifact.semanticType) chips.push(getArtifactBadgeLabel(artifact));
   if (artifact.language) chips.push(artifact.language);
   if (artifact.fileName) chips.push(artifact.fileName);
   if (artifact.mimeType) chips.push(artifact.mimeType);
   const lineCount = getArtifactLineCount(artifact);
-  if (artifact.artifactType === "code" && lineCount > 0) {
+  if ((artifact.artifactType === "code" || artifact.semanticType === "table") && lineCount > 0) {
     chips.push(`${lineCount} line${lineCount === 1 ? "" : "s"}`);
   }
   return chips;

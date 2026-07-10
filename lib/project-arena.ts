@@ -151,7 +151,7 @@ const collectBranchEntries = (session: SessionDocument) => {
     const messageCount = entries.length;
     const artifactIds = new Set(
       session.contextLinks
-        .filter((link) => subtreeIds.has(link.targetMessageId))
+        .filter((link) => Boolean(link.targetMessageId && subtreeIds.has(link.targetMessageId)))
         .map((link) => link.artifactId),
     );
     const artifactTitles = session.artifacts

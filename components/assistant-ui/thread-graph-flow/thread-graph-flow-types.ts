@@ -4,6 +4,7 @@ import type { Edge, Node } from "@xyflow/react";
 import type { ProjectMemoryType } from "@/lib/memory-documents";
 import type {
   SessionArtifactSemanticType,
+  SessionArtifactSyncMode,
   SessionArtifactType,
 } from "@/lib/session-artifacts";
 import type { BranchOperation, BranchOperationDetail } from "@/lib/thread-branching";
@@ -16,6 +17,7 @@ export type ThreadGraphFlowNodeData = {
   depth?: number;
   draftBusy?: boolean;
   draftContextCount?: number;
+  draftOutputCount?: number;
   draftDetail?: BranchOperationDetail | null;
   draftDisabled?: boolean;
   draftError?: string | null;
@@ -42,6 +44,7 @@ export type ThreadGraphFlowNodeData = {
   preview: string;
   provider?: string | null;
   providerLabel?: string;
+  revisionCount?: number;
   role: string;
   idx?: number;
   messageId?: string | null;
@@ -49,6 +52,7 @@ export type ThreadGraphFlowNodeData = {
   sessionTitle?: string | null;
   sourceDataUrl?: string | null;
   statusLabel?: string | null;
+  syncMode?: SessionArtifactSyncMode;
   title?: string | null;
   onDraftCancel?: () => void;
   onDraftCancelRun?: () => void;
@@ -65,7 +69,14 @@ export type ThreadGraphFlowEdgeData = {
   label?: string;
   linkEditMode?: boolean;
   onCut?: () => void;
-  tone?: "default" | "bridge" | "context" | "edited" | "draft";
+  tone?:
+    | "default"
+    | "bridge"
+    | "context"
+    | "edited"
+    | "draft"
+    | "output"
+    | "pending-output";
 };
 
 export type ThreadGraphFlowNode = Node<ThreadGraphFlowNodeData>;
