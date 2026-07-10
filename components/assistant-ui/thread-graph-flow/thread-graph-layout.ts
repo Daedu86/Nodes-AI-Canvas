@@ -9,6 +9,7 @@ import type {
 
 const ROOT_NODE_SIZE = { width: 320, height: 172 };
 const MESSAGE_NODE_SIZE = { width: 360, height: 236 };
+const PROMPT_DRAFT_NODE_SIZE = { width: 400, height: 300 };
 const ARTIFACT_NODE_SIZE = { width: 320, height: 228 };
 const ARTIFACT_LANE_X = -420;
 const ARTIFACT_START_Y = 60;
@@ -18,6 +19,7 @@ const getNodeSize = (node: ThreadGraphFlowNode) => {
   const kind = node.data?.kind;
   if (kind === "root") return { ...ROOT_NODE_SIZE };
   if (kind === "artifact") return { ...ARTIFACT_NODE_SIZE };
+  if (kind === "prompt-draft") return { ...PROMPT_DRAFT_NODE_SIZE };
   return { ...MESSAGE_NODE_SIZE };
 };
 

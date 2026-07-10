@@ -18,7 +18,6 @@ const parseCsv = (value: string | undefined) =>
 
 const getAdminRecipients = () => parseCsv(process.env.SUPPORT_ADMIN_EMAILS);
 
-
 const getNotificationStoreDir = () =>
   process.env.PROJECT_NOTIFICATION_STORE_DIR
     ? path.resolve(process.env.PROJECT_NOTIFICATION_STORE_DIR)
@@ -119,4 +118,3 @@ export async function notifyProjectAccessed(input: {
     console.error("[project-notifications] access notification failed", error);
   }
 }
-

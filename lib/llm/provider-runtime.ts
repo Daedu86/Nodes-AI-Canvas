@@ -1,17 +1,14 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { createOllama, ollama } from "ollama-ai-provider";
 import { getLlmSettings } from "@/lib/llm-settings-store";
 import {
   getOpenRouterMetadataHeaders,
   getModelAttemptChain,
-  OLLAMA_API_URL,
   OPENROUTER_BASE_URL,
   type Provider,
   type ResolvedModelConfig,
 } from "@/lib/llm/config";
 import type { LlmSettingsState } from "@/lib/llm/user-settings";
 import { isVisionCapableModel } from "@/lib/llm/provider-catalog";
-import { validateOllamaBaseUrl } from "@/lib/server/ollama-base-url";
 import { type LlmRequestOverrides } from "@/lib/llm/request-overrides";
 import {
   getDefaultUserPlan,
@@ -59,11 +56,6 @@ const resolveOpenRouterApiKey = (
 function createOverridesFromSettings(
   settings: LlmSettingsState | null | undefined,
 ): LlmRequestOverrides {
-  const rawOllamaBaseUrl = normalizeValue(settings?.providers.ollama.baseUrl);
-  const validatedOllamaBaseUrl = rawOllamaBaseUrl
-    ? validateOllamaBaseUrl(rawOllamaBaseUrl)
-    : null;
-
   const openrouterKeys = settings?.providers.openrouter.apiKeys ?? [];
   const configuredActiveKeyId = settings?.providers.openrouter.activeApiKeyId ?? null;
   const activeEntry =
@@ -71,27 +63,11 @@ function createOverridesFromSettings(
       ? openrouterKeys.find((entry) => entry.id === configuredActiveKeyId)
       : undefined) ?? openrouterKeys[0];
 
-  const ollamaKeys = settings?.providers.ollama.apiKeys ?? [];
-  const configuredOllamaActiveKeyId = settings?.providers.ollama.activeApiKeyId ?? null;
-  const activeOllamaEntry =
-    (configuredOllamaActiveKeyId
-      ? ollamaKeys.find((entry) => entry.id === configuredOllamaActiveKeyId)
-      : undefined) ?? ollamaKeys[0];
-
   return {
-    ollamaBaseUrl: validatedOllamaBaseUrl?.ok ? validatedOllamaBaseUrl.normalized : undefined,
-    ollamaApiKey:
-      normalizeValue(activeOllamaEntry?.key) ?? normalizeValue(settings?.providers.ollama.apiKey),
     openrouterApiKey:
       normalizeValue(activeEntry?.key) ?? normalizeValue(settings?.providers.openrouter.apiKey),
   };
 }
-
-const isOllamaCloudEndpoint = (baseUrl?: string) => {
-  const value = normalizeValue(baseUrl);
-  if (!value) return false;
-  return value.includes("ollama.com");
-};
 
 function pickOpenRouterFallbackModels(config: ResolvedModelConfig) {
   const candidates = getModelAttemptChain(config)
@@ -207,14 +183,11 @@ export function getMissingProviderCredential(
         status: 503,
       };
     case "ollama":
-      if (isOllamaCloudEndpoint(overrides.ollamaBaseUrl) && !normalizeValue(overrides.ollamaApiKey)) {
-        return {
-          code: "missing_ollama_key",
-          message: "Ollama cloud endpoint needs your API key. Add one in Profile > LLM Models.",
-          status: 401,
-        };
-      }
-      return null;
+      return {
+        code: "missing_ollama_key",
+        message: "Ollama has been disabled for this deployment.",
+        status: 410,
+      };
     default:
       return null;
   }
@@ -240,16 +213,7 @@ export function createLanguageModel(
       })(config.modelId);
     }
     case "ollama":
-    default: {
-      const baseURL = normalizeValue(overrides.ollamaBaseUrl) ?? OLLAMA_API_URL;
-      const apiKey = normalizeValue(overrides.ollamaApiKey);
-      if (baseURL === OLLAMA_API_URL && !apiKey) {
-        return ollama(config.modelId);
-      }
-      return createOllama({
-        baseURL,
-        headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
-      })(config.modelId);
-    }
+    default:
+      throw new Error("Ollama has been disabled for this deployment.");
   }
 }

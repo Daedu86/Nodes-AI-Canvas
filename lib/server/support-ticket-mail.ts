@@ -8,7 +8,6 @@ const parseCsv = (value: string | undefined) =>
 
 const getAdminRecipients = () => parseCsv(process.env.SUPPORT_ADMIN_EMAILS);
 
-
 async function sendMail(input: { subject: string; text: string }) {
   const recipients = getAdminRecipients();
   if (recipients.length === 0) return;
@@ -74,4 +73,3 @@ export async function notifyAdminOnTicketComment(
     console.error("[support-ticket-mail] comment notification failed", error);
   }
 }
-

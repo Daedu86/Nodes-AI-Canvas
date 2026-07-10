@@ -83,7 +83,7 @@ describe("LlmSettingsProvider", () => {
     localStorage.clear();
   });
 
-  it("exposes the built-in OpenRouter and Ollama models by default", async () => {
+  it("exposes the built-in OpenRouter model by default", async () => {
     render(
       <LlmSettingsProvider>
         <Harness />
@@ -96,7 +96,7 @@ describe("LlmSettingsProvider", () => {
     expect(screen.getByTestId("options").textContent).not.toContain(
       "openrouter:arcee-ai/trinity-mini:free",
     );
-    expect(screen.getByTestId("options").textContent).toContain("ollama:gemma3:4b");
+    expect(screen.getByTestId("options").textContent).not.toContain("ollama:gemma3:4b");
   });
 
   it("updates the selector pool when the user customizes model availability", async () => {
@@ -121,6 +121,6 @@ describe("LlmSettingsProvider", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "models-ollama" }));
-    expect(screen.getByTestId("options").textContent).toContain("ollama:llama3.2:3b");
+    expect(screen.getByTestId("options").textContent).not.toContain("ollama:llama3.2:3b");
   });
 });

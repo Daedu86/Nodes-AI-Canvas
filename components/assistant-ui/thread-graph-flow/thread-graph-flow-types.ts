@@ -6,6 +6,7 @@ import type {
   SessionArtifactSemanticType,
   SessionArtifactType,
 } from "@/lib/session-artifacts";
+import type { BranchOperation, BranchOperationDetail } from "@/lib/thread-branching";
 
 export type ThreadGraphFlowNodeData = {
   accent?: string;
@@ -13,6 +14,14 @@ export type ThreadGraphFlowNodeData = {
   branchId?: string | number | null;
   byteSize?: number | null;
   depth?: number;
+  draftBusy?: boolean;
+  draftContextCount?: number;
+  draftDetail?: BranchOperationDetail | null;
+  draftDisabled?: boolean;
+  draftError?: string | null;
+  draftOperation?: BranchOperation | null;
+  draftRunInterruptionNote?: string | null;
+  draftText?: string;
   emphasis?: "normal" | "selected" | "lineage" | "muted";
   editedFromId?: string | null;
   fileName?: string | null;
@@ -20,7 +29,7 @@ export type ThreadGraphFlowNodeData = {
   isBridge?: boolean;
   isCut?: boolean;
   isRoot?: boolean;
-  kind?: "root" | "bridge" | "message" | "artifact";
+  kind?: "root" | "bridge" | "message" | "artifact" | "prompt-draft";
   language?: string | null;
   linkedArtifactCount?: number;
   memoryId?: string | null;
@@ -41,6 +50,10 @@ export type ThreadGraphFlowNodeData = {
   sourceDataUrl?: string | null;
   statusLabel?: string | null;
   title?: string | null;
+  onDraftCancel?: () => void;
+  onDraftCancelRun?: () => void;
+  onDraftSubmit?: () => void;
+  onDraftTextChange?: (value: string) => void;
 };
 
 export type ThreadGraphFlowEdgeData = {
@@ -52,7 +65,7 @@ export type ThreadGraphFlowEdgeData = {
   label?: string;
   linkEditMode?: boolean;
   onCut?: () => void;
-  tone?: "default" | "bridge" | "context" | "edited";
+  tone?: "default" | "bridge" | "context" | "edited" | "draft";
 };
 
 export type ThreadGraphFlowNode = Node<ThreadGraphFlowNodeData>;

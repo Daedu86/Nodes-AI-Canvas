@@ -91,7 +91,7 @@ export const DEFAULT_LLM_SETTINGS_STATE: LlmSettingsState = {
       apiKeys: [],
       baseUrl: "http://localhost:11434/api",
       clearApiKey: false,
-      enabled: true,
+      enabled: false,
       hasApiKey: false,
       models: DEFAULT_OLLAMA_MODELS,
     },
@@ -128,119 +128,77 @@ export const cloneDefaultLlmSettingsState = (): LlmSettingsState => ({
   },
 });
 
-const normalizeOpenRouterCustomModels = (value: unknown) => {
-  const entries = normalizeEditableModelList(
-    Array.isArray(value) ? (value as string[]) : typeof value === "string" ? value : [],
+const sanitizeApiKeyEntries = (value: unknown, fallbackName: string) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry, index) => {
+      if (!entry || typeof entry !== "object") return null;
+      const item = entry as {
+        createdAt?: unknown;
+        hasKey?: unknown;
+        id?: unknown;
+        key?: unknown;
+        name?: unknown;
+      };
+      const id = typeof item.id === "string" && item.id.trim() ? item.id.trim() : `${fallbackName}-${index}`;
+      const name = typeof item.name === "string" && item.name.trim() ? item.name.trim() : `${fallbackName} ${index + 1}`;
+      return {
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : undefined,
+        hasKey: item.hasKey === true,
+        id,
+        key: typeof item.key === "string" ? item.key : "",
+        name,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+};
+
+const normalizeOpenRouterApiKeys = (value: unknown) =>
+  sanitizeApiKeyEntries(value, "OpenRouter key");
+
+const normalizeOllamaApiKeys = (value: unknown) =>
+  sanitizeApiKeyEntries(value, "Ollama key");
+
+const normalizeEditableModelListValue = (value: unknown, fallback: string[] = []) => {
+  const normalized = normalizeEditableModelList(
+    Array.isArray(value)
+      ? value.filter((entry): entry is string => typeof entry === "string")
+      : typeof value === "string"
+        ? value
+        : fallback,
   );
-
-  // Keep it simple but safe: trim/unique already handled, now enforce a reasonable size and shape.
-  return entries
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0 && entry.length <= 120)
-    .filter((entry) => !/\s/.test(entry))
-    // Model ids are typically `org/model[:variant]` or `openrouter/free`.
-    .filter((entry) => /^[A-Za-z0-9._\-/:]+$/.test(entry))
-    .slice(0, 50);
-};
-
-const normalizeOpenRouterApiKeys = (value: unknown) => {
-  const rawEntries = Array.isArray(value) ? value : [];
-  return rawEntries
-    .map((entry): NonNullable<OpenRouterProviderSettings["apiKeys"]>[number] | null => {
-      if (!entry || typeof entry !== "object") return null;
-      const record = entry as Record<string, unknown>;
-      const id = typeof record.id === "string" ? record.id.trim() : "";
-      const name = typeof record.name === "string" ? record.name.trim() : "";
-      const key = typeof record.key === "string" ? record.key : "";
-      if (!id) return null;
-      return {
-        id,
-        name: name || "OpenRouter key",
-        key,
-        hasKey: record.hasKey === true || key.trim().length > 0,
-        createdAt:
-          typeof record.createdAt === "string" && record.createdAt.trim().length > 0
-            ? record.createdAt
-            : undefined,
-      };
-    })
-    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-    .slice(0, 20);
-};
-
-const getActiveApiKeyFromList = (provider: OpenRouterProviderSettings) => {
-  const keys = provider.apiKeys ?? [];
-  if (keys.length === 0) return undefined;
-  if (provider.activeApiKeyId) {
-    const active = keys.find((entry) => entry.id === provider.activeApiKeyId);
-    if (active?.key?.trim()) return active.key;
-  }
-  return keys.find((entry) => entry.key.trim().length > 0)?.key;
-};
-
-const normalizeOllamaApiKeys = (value: unknown) => {
-  const rawEntries = Array.isArray(value) ? value : [];
-  return rawEntries
-    .map((entry): NonNullable<OllamaProviderSettings["apiKeys"]>[number] | null => {
-      if (!entry || typeof entry !== "object") return null;
-      const record = entry as Record<string, unknown>;
-      const id = typeof record.id === "string" ? record.id.trim() : "";
-      const name = typeof record.name === "string" ? record.name.trim() : "";
-      const key = typeof record.key === "string" ? record.key : "";
-      if (!id) return null;
-      return {
-        id,
-        name: name || "Ollama key",
-        key,
-        hasKey: record.hasKey === true || key.trim().length > 0,
-        createdAt:
-          typeof record.createdAt === "string" && record.createdAt.trim().length > 0
-            ? record.createdAt
-            : undefined,
-      };
-    })
-    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-    .slice(0, 20);
-};
-
-const getActiveOllamaApiKeyFromList = (provider: OllamaProviderSettings) => {
-  const keys = provider.apiKeys ?? [];
-  if (keys.length === 0) return undefined;
-  if (provider.activeApiKeyId) {
-    const active = keys.find((entry) => entry.id === provider.activeApiKeyId);
-    if (active?.key?.trim()) return active.key;
-  }
-  return keys.find((entry) => entry.key.trim().length > 0)?.key;
+  return normalized.length > 0 ? normalized : [...fallback];
 };
 
 export const normalizeLlmSettingsState = (
   input: Partial<LlmSettingsState> | null | undefined,
 ): LlmSettingsState => {
   const base = cloneDefaultLlmSettingsState();
-  const providers = input?.providers;
-  if (!providers || typeof providers !== "object") {
-    return base;
-  }
+  const providers: Partial<LlmSettingsState["providers"]> = input?.providers ?? {};
 
-  const openrouterModels = Array.isArray(providers.openrouter?.enabledModels)
-    ? providers.openrouter.enabledModels
-    : null;
+  const hasIncomingOpenRouterEnabledModels = Boolean(
+    providers.openrouter &&
+      Object.prototype.hasOwnProperty.call(providers.openrouter, "enabledModels"),
+  );
+  const openRouterDeletedModels = normalizeEditableModelListValue(
+    providers.openrouter?.deletedModels,
+    [],
+  );
+  const openRouterEnabledModelsSource =
+    Array.isArray(providers.openrouter?.enabledModels)
+      ? providers.openrouter.enabledModels.filter((entry): entry is string => typeof entry === "string")
+      : typeof providers.openrouter?.enabledModels === "string"
+        ? providers.openrouter.enabledModels
+        : base.providers.openrouter.enabledModels;
+  const openRouterEnabledModelsRaw = normalizeEditableModelList(openRouterEnabledModelsSource);
+  const openRouterEnabledModels = (
+    openRouterEnabledModelsRaw.length > 0
+      ? openRouterEnabledModelsRaw
+      : hasIncomingOpenRouterEnabledModels
+        ? []
+        : [...base.providers.openrouter.enabledModels]
+  ).filter((modelId) => !openRouterDeletedModels.includes(modelId));
 
-  const deletedOpenRouterModels = Array.isArray(providers.openrouter?.deletedModels)
-    ? providers.openrouter.deletedModels.filter((modelId): modelId is string =>
-        OPENROUTER_FREE_MODEL_OPTIONS.some((option) => option.modelId === modelId),
-      )
-    : [];
-  const deletedOpenRouterModelSet = new Set(deletedOpenRouterModels);
-  const defaultOpenRouterEnabledModels = OPENROUTER_FREE_MODEL_OPTIONS.map((option) => option.modelId)
-    .filter((modelId) => !deletedOpenRouterModelSet.has(modelId));
-  const normalizedOpenRouterEnabledModels = Array.isArray(openrouterModels)
-    ? openrouterModels.filter(
-        (modelId): modelId is string =>
-          OPENROUTER_FREE_MODEL_OPTIONS.some((option) => option.modelId === modelId) &&
-          !deletedOpenRouterModelSet.has(modelId),
-      )
-    : defaultOpenRouterEnabledModels;
 
   base.providers.openrouter = {
     activeApiKeyId:
@@ -248,13 +206,12 @@ export const normalizeLlmSettingsState = (
       providers.openrouter.activeApiKeyId.trim().length > 0
         ? providers.openrouter.activeApiKeyId.trim()
         : null,
-    apiKey:
-      typeof providers.openrouter?.apiKey === "string" ? providers.openrouter.apiKey : "",
+    apiKey: typeof providers.openrouter?.apiKey === "string" ? providers.openrouter.apiKey : "",
     apiKeys: normalizeOpenRouterApiKeys(providers.openrouter?.apiKeys),
     clearApiKey: providers.openrouter?.clearApiKey === true,
-    customModels: normalizeOpenRouterCustomModels(providers.openrouter?.customModels),
-    deletedModels: deletedOpenRouterModels,
-    enabledModels: normalizedOpenRouterEnabledModels,
+    customModels: normalizeEditableModelListValue(providers.openrouter?.customModels, []),
+    deletedModels: openRouterDeletedModels,
+    enabledModels: openRouterEnabledModels,
     hasApiKey:
       providers.openrouter?.hasApiKey !== undefined
         ? providers.openrouter.hasApiKey
@@ -450,6 +407,22 @@ export const maskLlmSettingsState = (
       },
     },
   };
+};
+
+const getActiveApiKeyFromList = (provider: OpenRouterProviderSettings) => {
+  const activeId = provider.activeApiKeyId ?? null;
+  const entry =
+    (activeId ? provider.apiKeys?.find((candidate) => candidate.id === activeId) : undefined) ??
+    provider.apiKeys?.[0];
+  return entry?.key?.trim() ? entry.key : "";
+};
+
+const getActiveOllamaApiKeyFromList = (provider: OllamaProviderSettings) => {
+  const activeId = provider.activeApiKeyId ?? null;
+  const entry =
+    (activeId ? provider.apiKeys?.find((candidate) => candidate.id === activeId) : undefined) ??
+    provider.apiKeys?.[0];
+  return entry?.key?.trim() ? entry.key : "";
 };
 
 const resolveMergedApiKey = (

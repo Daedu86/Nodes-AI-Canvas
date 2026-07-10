@@ -78,6 +78,18 @@ describe("llm user settings", () => {
     expect(normalized.providers.openrouter.enabledModels).toEqual([]);
   });
 
+  it("preserves an explicitly empty OpenRouter enabled model list", () => {
+    const normalized = normalizeLlmSettingsState({
+      providers: {
+        openrouter: {
+          enabledModels: [],
+        },
+      },
+    });
+
+    expect(normalized.providers.openrouter.enabledModels).toEqual([]);
+  });
+
   it("preserves stored Ollama key material when incoming payload is masked", () => {
     const merged = mergeLlmSettingsState(
       {

@@ -8,11 +8,6 @@ vi.mock("@ai-sdk/openai", () => ({
   createOpenAI: createOpenAIMock,
 }));
 
-vi.mock("ollama-ai-provider", () => ({
-  createOllama: vi.fn(),
-  ollama: vi.fn(),
-}));
-
 import { createLanguageModel } from "../lib/llm/provider-runtime";
 
 describe("provider runtime", () => {

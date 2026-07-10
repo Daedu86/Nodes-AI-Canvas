@@ -42,6 +42,15 @@ const getBadgeTone = (data?: ThreadGraphFlowEdgeData) => {
     };
   }
 
+  if (data?.tone === "draft") {
+    return {
+      border: "border-emerald-500/35",
+      bg: "bg-emerald-500/10",
+      text: "text-emerald-700",
+      label: data?.label ?? "draft",
+    };
+  }
+
   return data?.label
     ? {
         border: "border-border/60",
@@ -111,7 +120,10 @@ export const ThreadGraphEdge = memo(
             stroke: accent,
             strokeOpacity: isMuted ? 0.08 : isSelected ? 0.98 : isLineage ? 0.85 : 0.72,
             strokeWidth: outerWidth,
-            strokeDasharray: isEditMode ? "10 8" : data?.tone === "context" ? "10 8" : undefined,
+            strokeDasharray:
+              isEditMode || data?.tone === "context" || data?.tone === "draft"
+                ? "10 8"
+                : undefined,
             filter: isMuted ? "none" : `drop-shadow(0 0 8px ${accent}33)`,
           }}
         />
@@ -127,6 +139,8 @@ export const ThreadGraphEdge = memo(
               ? "4 8"
               : data?.tone === "context"
                 ? "7 7"
+              : data?.tone === "draft"
+                ? "6 7"
               : data?.isEdited
                 ? "8 6"
                 : data?.isBridge
