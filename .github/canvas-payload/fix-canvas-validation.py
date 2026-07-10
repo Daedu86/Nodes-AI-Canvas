@@ -51,6 +51,16 @@ for old, new, label in [
     ("onClick={handleCreatePromptNode}", "onClick={() => handleCreatePromptNode()}", "prompt CTA click handler"),
 ]:
     replace_once(flow, old, new, label)
+replace_once(
+    flow,
+    "    draftContextArtifacts.length,\n"
+    "    draft.outputArtifactIds.length,\n"
+    "    draft.position,\n"
+    "    draftDetail,",
+    "    draftContextArtifacts.length,\n"
+    "    draftDetail,",
+    "nullable draft memo dependencies",
+)
 
 provider = Path("components/context/session-artifacts.tsx")
 replace_once(
