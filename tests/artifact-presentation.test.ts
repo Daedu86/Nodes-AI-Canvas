@@ -14,7 +14,7 @@ describe("artifact presentation helpers", () => {
     const artifact = {
       artifactType: "text" as const,
       byteSize: null,
-      content: "# Decision\n- Ship wiki first\n- Keep Nody focused on export",
+      content: "# Decision\n- Ship artifact workflow first\n- Keep Nody focused on export",
       fileName: null,
       language: null,
       mimeType: null,
@@ -23,7 +23,7 @@ describe("artifact presentation helpers", () => {
 
     expect(getArtifactHeadline(artifact)).toBe("Decision");
     expect(getArtifactHighlights(artifact)).toEqual([
-      "Ship wiki first",
+      "Ship artifact workflow first",
       "Keep Nody focused on export",
     ]);
   });

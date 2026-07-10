@@ -7,14 +7,13 @@ import { hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
 export type HistoryMode = "last" | "full";
 export type ModelProvider = LlmProviderId;
-export type SessionViewMode = "chat" | "split" | "canvas" | "wiki";
+export type SessionViewMode = "chat" | "split" | "canvas";
 export type StandaloneSessionViewMode = Exclude<SessionViewMode, "split">;
-export type SplitWorkspacePane = "chat" | "canvas" | "wiki";
+export type SplitWorkspacePane = "chat" | "canvas";
 
 export const SPLIT_WORKSPACE_PANES: SplitWorkspacePane[] = [
   "chat",
   "canvas",
-  "wiki",
 ];
 
 export type SplitPaneVisibility = Record<SplitWorkspacePane, boolean>;
@@ -69,7 +68,6 @@ const DEFAULT_STANDALONE_VIEW_MODE: StandaloneSessionViewMode = "canvas";
 const DEFAULT_SPLIT_PANE_VISIBILITY: SplitPaneVisibility = {
   chat: true,
   canvas: true,
-  wiki: true,
 };
 
 const DEFAULT_MODEL_CONFIG: ModelConfig = getSupportedModelConfig({
@@ -189,7 +187,6 @@ const readSplitPaneVisibility = (sessionId: string): SplitPaneVisibility => {
     return ensureAtLeastOneSplitPane({
       chat: parsed.chat ?? DEFAULT_SPLIT_PANE_VISIBILITY.chat,
       canvas: parsed.canvas ?? DEFAULT_SPLIT_PANE_VISIBILITY.canvas,
-      wiki: parsed.wiki ?? DEFAULT_SPLIT_PANE_VISIBILITY.wiki,
     });
   } catch {
     return DEFAULT_SPLIT_PANE_VISIBILITY;
@@ -204,7 +201,6 @@ const readViewMode = (sessionId: string): SessionViewMode => {
   if (
     value === "chat" ||
     value === "canvas" ||
-    value === "wiki" ||
     value === "split"
   ) {
     return value;
@@ -215,13 +211,8 @@ const readViewMode = (sessionId: string): SessionViewMode => {
   return DEFAULT_VIEW_MODE;
 };
 
-const isStandaloneViewMode = (value: string | null): value is StandaloneSessionViewMode => {
-  return (
-    value === "chat" ||
-    value === "canvas" ||
-    value === "wiki"
-  );
-};
+const isStandaloneViewMode = (value: string | null): value is StandaloneSessionViewMode =>
+  value === "chat" || value === "canvas";
 
 const readLastStandaloneViewMode = (
   sessionId: string,

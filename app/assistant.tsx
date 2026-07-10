@@ -17,13 +17,11 @@ import {
 import { PersistedSessionRuntimeBridge } from "@/components/context/persisted-session-runtime-bridge";
 import React, { useMemo } from "react";
 import { SessionUiStateProvider, useSessionUiState } from "@/components/context/session-ui-state";
-import { SessionKnowledgeProvider } from "@/components/context/session-knowledge";
 import { WorkspaceSurfaceProvider, useWorkspaceSurface } from "@/components/context/workspace-surface";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/workspace/app-header";
 import { ChatPanel } from "@/components/workspace/chat-panel";
-import { KnowledgeCenterWorkspace } from "@/components/workspace/knowledge-center-workspace";
 import { LlmModelsWorkspace } from "@/components/workspace/llm-models-workspace";
 import { AgentAccessWorkspace } from "@/components/workspace/agent-access-workspace";
 import { AgentWorkWorkspace } from "@/components/workspace/agent-work-workspace";
@@ -45,18 +43,6 @@ const GraphPanel = dynamic(
     loading: () => (
       <div className="flex h-full min-h-0 items-center justify-center rounded-lg border border-border/60 bg-background p-4 text-sm text-muted-foreground">
         Loading graph…
-      </div>
-    ),
-    ssr: false,
-  },
-);
-
-const WikiPanel = dynamic(
-  () => import("@/components/workspace/wiki-panel").then((mod) => mod.WikiPanel),
-  {
-    loading: () => (
-      <div className="flex h-full min-h-0 items-center justify-center rounded-lg border border-border/60 bg-background p-4 text-sm text-muted-foreground">
-        Loading wiki…
       </div>
     ),
     ssr: false,
@@ -230,7 +216,6 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
             latencyVersion,
           }}
         >
-          <SessionKnowledgeProvider>
             <SessionArtifactsProvider>
               <GraphBranchIntentProvider>
                 <LinkEditorProvider>
@@ -239,13 +224,11 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
                     <WorkspaceSplitLayout
                       chatPanel={<ChatPanel />}
                       canvasPanel={<GraphPanel />}
-                      wikiPanel={<WikiPanel />}
                     />
                   </>
                 </LinkEditorProvider>
               </GraphBranchIntentProvider>
             </SessionArtifactsProvider>
-          </SessionKnowledgeProvider>
         </MessageLatencyProvider>
       </RequestErrorProvider>
     </AssistantRuntimeProvider>
@@ -315,9 +298,6 @@ function WorkspaceShell() {
   }
   if (activeSurface === "plan-usage") {
     return <PlanUsageWorkspace />;
-  }
-  if (activeSurface === "knowledge-center") {
-    return <KnowledgeCenterWorkspace />;
   }
   if (activeSurface === "agent-access") {
     return <AgentAccessWorkspace />;

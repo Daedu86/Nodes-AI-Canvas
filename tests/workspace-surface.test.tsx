@@ -50,11 +50,6 @@ function SurfaceHarness() {
           <h1>Agent Work</h1>
           <button type="button">Back</button>
         </div>
-      ) : activeSurface === "knowledge-center" ? (
-        <div>
-          <h1>Knowledge Center</h1>
-          <button type="button">Back</button>
-        </div>
       ) : (
         <div>Workspace</div>
       )}
@@ -155,27 +150,6 @@ describe("WorkspaceSurfaceProvider", () => {
     expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
   });
 
-  it("opens the Knowledge Center workspace from Profile", async () => {
-    const user = userEvent.setup();
-
-    render(
-      <SidebarProvider>
-        <LlmSettingsProvider>
-          <WorkspaceSurfaceProvider>
-            <SurfaceHarness />
-          </WorkspaceSurfaceProvider>
-        </LlmSettingsProvider>
-      </SidebarProvider>,
-    );
-
-    expect(screen.getByTestId("surface").textContent).toBe("workspace");
-
-    await user.click(screen.getByRole("button", { name: "Knowledge Center" }));
-
-    expect(screen.getByTestId("surface").textContent).toBe("knowledge-center");
-    expect(screen.getByRole("heading", { name: "Knowledge Center" })).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Back" })).not.toBeNull();
-  });
 
   it("opens the Agent Access workspace from Profile", async () => {
     const user = userEvent.setup();

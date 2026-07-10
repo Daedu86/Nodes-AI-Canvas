@@ -58,15 +58,6 @@ Arena is where you compare directions side-by-side and promote the best result i
   <img alt="Project arena screenshot" src="docs/screenshots/project-arena.png" width="960" />
 </p>
 
-### Knowledge Center (built-in wiki)
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/03-knowledge-center-dark.png" />
-  <source media="(prefers-color-scheme: light)" srcset="docs/readme/03-knowledge-center.png" />
-  <img alt="Knowledge Center wiki" src="docs/readme/03-knowledge-center.png" />
-</picture>
-
-A wiki-style workspace for onboarding, patterns, and “how-to” docs that ship with the product.
 
 ### Project Context Builder
 
