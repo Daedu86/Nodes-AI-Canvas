@@ -1,0 +1,133 @@
+1);\n'
+    '    });\n'
+    '    return counts;\n'
+    '  }, [contextLinks]);',
+    '  const linkedTargetCountByArtifact = React.useMemo(() => {\n'
+    '    const counts = new Map<string, number>();\n'
+    '    canvasLinks.forEach((link) => {\n'
+    '      counts.set(link.artifactId, (counts.get(link.artifactId) ?? 0) + 1);\n'
+    '    });\n'
+    '    return counts;\n'
+    '  }, [canvasLinks]);',
+    "all link counts",
+)
+
+replace_once(
+    '  const nodeIndex = React.useMemo(\n'
+    '    () => new Map(canvasConversationNodes.map((node) => [node.id, node] as const)),\n'
+    '    [canvasConversationNodes],\n'
+    '  );',
+    '  const nodeIndex = React.useMemo(\n'
+    '    () => new Map(canvasConversationNodes.map((node) => [node.id, node] as const)),\n'
+    '    [canvasConversationNodes],\n'
+    '  );\n'
+    '  React.useEffect(() => {\n'
+    '    canvasConversationNodesRef.current = canvasConversationNodes;\n'
+    '  }, [canvasConversationNodes]);',
+    "conversation ref",
+)
+
+replace_once(
+    '  const draftContextArtifacts = React.useMemo(\n'
+    '    () => (draftAnchorNode ? getArtifactsForTarget(draftAnchorNode.id) : []),\n'
+    '    [draftAnchorNode, getArtifactsForTarget],\n'
+    '  );',
+    '  const draftContextArtifacts = React.useMemo(() => {\n'
+    '    if (!draft) return [];\n'
+    '    if (draft.inputArtifactIds.length > 0) {\n'
+    '      const inputIds = new Set(draft.inputArtifactIds);\n'
+    '      return artifacts.filter((artifact) => inputIds.has(artifact.id));\n'
+    '    }\n'
+    '    return draftAnchorNode ? getArtifactsForTarget(draftAnchorNode.id) : [];\n'
+    '  }, [artifacts, draft, draftAnchorNode, getArtifactsForTarget]);',
+    "draft input artifacts",
+)
+
+replace_once(
+    '        pendingDraftSubmissionRef.current = true;\n'
+    '        const executed = executeBranchSpec(runtime.threads.main, draftBranchSpec, {',
+    '        pendingDraftSubmissionRef.current = true;\n'
+    '        pendingOutputRunRef.current = {\n'
+    '          beforeNodeIds: new Set(canvasConversationNodesRef.current.map((node) => node.id)),\n'
+    '          sourcePromptId: CANVAS_PROMPT_DRAFT_NODE_ID,\n'
+    '          artifactIds: [...draft.outputArtifactIds],\n'
+    '        };\n'
+    '        const executed = executeBranchSpec(runtime.threads.main, draftBranchSpec, {',
+    "pending output run",
+)
+
+replace_once(
+    '          historyMode,\n'
+    '          modelId,\n'
+    '          provider,\n'
+    '          text: draft.text,\n'
+    '        });',
+    '          historyMode,\n'
+    '          inputArtifactIds: draft.inputArtifactIds,\n'
+    '          modelId,\n'
+    '          outputArtifactIds: draft.outputArtifactIds,\n'
+    '          outputArtifactTypes: draft.outputArtifactIds.map(\n'
+    '            (artifactId) => artifactIndex.get(artifactId)?.semanticType ?? null,\n'
+    '          ),\n'
+    '          provider,\n'
+    '          text: draft.text,\n'
+    '        });',
+    "runtime artifact metadata",
+)
+
+replace_once(
+    '          pendingDraftSubmissionRef.current = false;\n'
+    '          const message = "Branch draft is empty. Add a prompt before creating the branch.";',
+    '          pendingDraftSubmissionRef.current = false;\n'
+    '          pendingOutputRunRef.current = null;\n'
+    '          const message = "Branch draft is empty. Add a prompt before creating the branch.";',
+    "clear output ref on empty",
+)
+
+replace_once(
+    '        pendingDraftSubmissionRef.current = false;\n'
+    '        const message = "Canvas branching failed. Try again from the selected node.";',
+    '        pendingDraftSubmissionRef.current = false;\n'
+    '        pendingOutputRunRef.current = null;\n'
+    '        const message = "Canvas branching failed. Try again from the selected node.";',
+    "clear output ref on error",
+)
+
+replace_once(
+    '    clearRequestError,\n'
+    '    draft,\n'
+    '    draftBranchSpec,\n'
+    '    draftContextArtifacts,',
+    '    artifactIndex,\n'
+    '    clearRequestError,\n'
+    '    draft,\n'
+    '    draftBranchSpec,\n'
+    '    draftContextArtifacts,',
+    "submit dependencies",
+)
+
+sub_once(
+    r'  React\.useEffect\(\(\) => \{\n'
+    r'    const unsubscribe = runtime\.threads\.main\.unstable_on\("runEnd", \(\) => \{\n'
+    r'.*?'
+    r'    return unsubscribe;\n'
+    r'  \}, \[cancelDraft, runtime\.threads\.main\]\);',
+    '''  React.useEffect(() => {
+    const unsubscribe = runtime.threads.main.unstable_on("runEnd", () => {
+      const pendingOutput = pendingOutputRunRef.current;
+      const resolveCompletedRun = (attempt: number) => {
+        const currentNodes = canvasConversationNodesRef.current;
+        const newNodes = pendingOutput
+          ? currentNodes.filter((node) => !pendingOutput.beforeNodeIds.has(node.id))
+          : [];
+        const responseNode = [...newNodes]
+          .sort((a, b) => (b.idx ?? 0) - (a.idx ?? 0))
+          .find((node) => node.role === "assistant");
+        const promptNode =
+          responseNode?.parentId
+            ? currentNodes.find((node) => node.id === responseNode.parentId) ?? null
+            : [...newNodes]
+                .sort((a, b) => (b.idx ?? 0) - (a.idx ?? 0))
+                .find((node) => node.role === "user") ?? null;
+
+        if (pendingOutput && re

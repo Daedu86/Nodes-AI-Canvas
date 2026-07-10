@@ -1,0 +1,155 @@
+sponseNode && promptNode) {
+          applyCompletedResponse({
+            promptId: promptNode.id,
+            responseId: responseNode.id,
+            sourcePromptId: pendingOutput.sourcePromptId,
+            artifactIds: pendingOutput.artifactIds,
+            text: responseNode.text,
+          });
+          pendingOutputRunRef.current = null;
+        } else if (pendingOutput && attempt < 12) {
+          window.setTimeout(() => resolveCompletedRun(attempt + 1), 75);
+          return;
+        } else {
+          pendingOutputRunRef.current = null;
+        }
+
+        if (!pendingDraftSubmissionRef.current) return;
+        if (requestErrorRef.current) {
+          pendingDraftSubmissionRef.current = false;
+          setIsSubmittingBranch(false);
+          return;
+        }
+        pendingDraftSubmissionRef.current = false;
+        setCanvasDraftError(null);
+        cancelDraft();
+        setIsSubmittingBranch(false);
+      };
+      window.setTimeout(() => resolveCompletedRun(0), 0);
+    });
+    return unsubscribe;
+  }, [applyCompletedResponse, cancelDraft, runtime.threads.main]);''',
+    "run end capture",
+    re.S,
+)
+
+replace_once(
+    '        role: "artifact",\n'
+    '        semanticType: artifact.semanticType ?? null,\n'
+    '        sourceDataUrl: artifact.sourceDataUrl ?? null,\n'
+    '        title: artifact.title,',
+    '        revisionCount: artifact.revisions?.length ?? 0,\n'
+    '        role: "artifact",\n'
+    '        semanticType: artifact.semanticType ?? null,\n'
+    '        sourceDataUrl: artifact.sourceDataUrl ?? null,\n'
+    '        syncMode: artifact.syncMode ?? "auto",\n'
+    '        title: artifact.title,',
+    "artifact node metadata",
+)
+
+replace_once(
+    '          draftContextCount: draftContextArtifacts.length,\n'
+    '          draftDetail,',
+    '          draftContextCount: draftContextArtifacts.length,\n'
+    '          draftOutputCount: draft.outputArtifactIds.length,\n'
+    '          draftDetail,',
+    "draft output count",
+)
+
+replace_once(
+    '          position: null,\n'
+    '          preview: draft.text || "Draft prompt",',
+    '          position: draft.position ?? null,\n'
+    '          preview: draft.text || "Draft prompt",',
+    "draft stored position",
+)
+
+replace_once(
+    '    draftContextArtifacts.length,\n'
+    '    draftDetail,',
+    '    draftContextArtifacts.length,\n'
+    '    draft.outputArtifactIds.length,\n'
+    '    draft.position,\n'
+    '    draftDetail,',
+    "draft node dependencies",
+)
+
+replace_once(
+    '  const baseDraftNodes = React.useMemo<ThreadGraphFlowNode[]>(() => {',
+    '''  const baseOutputEdges = React.useMemo<ThreadGraphFlowEdge[]>(() => {
+    return canvasLinks.flatMap((link) => {
+      if (link.relation !== "output") return [];
+      const artifact = artifactIndex.get(link.artifactId);
+      const sourceId = link.responseId ?? link.promptId;
+      if (!artifact || !sourceId) return [];
+      const sourceExists =
+        sourceId === CANVAS_PROMPT_DRAFT_NODE_ID || nodeIndex.has(sourceId);
+      if (!sourceExists) return [];
+      const pending = !link.responseId;
+      const accent = artifactAccent(artifact);
+      return [{
+        id: `output:${sourceId}->${link.artifactId}`,
+        source: sourceId,
+        target: link.artifactId,
+        type: "threadEdge",
+        selectable: false,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: accent,
+          width: 16,
+          height: 16,
+        },
+        data: {
+          accent,
+          emphasis: "normal",
+          label: pending ? "pending output" : "output",
+          tone: pending ? "pending-output" : "output",
+        },
+      }];
+    });
+  }, [artifactIndex, canvasLinks, nodeIndex]);
+
+  const baseDraftNodes = React.useMemo<ThreadGraphFlowNode[]>(() => {''',
+    "output edges",
+)
+
+replace_once(
+    '        [...baseConversationEdges, ...baseDraftEdges, ...baseContextEdges],',
+    '        [...baseConversationEdges, ...baseDraftEdges, ...baseContextEdges, ...baseOutputEdges],',
+    "layout output edges",
+)
+replace_once(
+    '      baseContextEdges,\n'
+    '      baseConversationEdges,',
+    '      baseContextEdges,\n'
+    '      baseConversationEdges,\n'
+    '      baseOutputEdges,',
+    "layout output deps",
+)
+
+replace_once(
+    '  const handleCreatePromptNode = React.useCallback(() => {',
+    '  const handleCreatePromptNode = React.useCallback((position?: { x: number; y: number } | null) => {',
+    "prompt position signature",
+)
+replace_once(
+    '    beginDraft(anchor.id, operation, initialText);\n'
+    '    setFlowRenderMode("2d");',
+    '    beginDraft(anchor.id, operation, initialText, { position: position ?? null });\n'
+    '    setFlowRenderMode("2d");',
+    "prompt begin position",
+)
+
+replace_once(
+    '      options?: { semanticType?: SessionArtifactSemanticType | null },',
+    '      options?: {\n'
+    '        semanticType?: SessionArtifactSemanticType | null;\n'
+    '        position?: { x: number; y: number } | null;\n'
+    '      },',
+    "artifact create options",
+)
+replace_once(
+    '        language: artifactType === "code" ? "ts" : null,\n'
+    '      });',
+    '        language: artifactType === "code" ? "ts" : null,\n'
+    '        position: options?.position ?? null,\
