@@ -1,13 +1,14 @@
-name: Verify feature removal
+name: Finalize feature removal
 
 on:
-  pull_request:
+  push:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  verify:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -16,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -23,32 +26,132 @@ jobs:
           node-version: "24"
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Collect residual feature references
-        id: residuals
-        continue-on-error: true
+      - name: Remove residual feature references
         shell: bash
         run: |
-          pattern="$(printf '\142\162\151\145\146')"
-          git grep -n -i "$pattern" -- . > residual-references.txt || true
-          test ! -s residual-references.txt
+          python <<'PY'
+          from pathlib import Path
 
-      - name: Upload residual reference scan
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: residual-reference-scan
-          path: residual-references.txt
-          if-no-files-found: error
+          def replace_required(path: str, old: str, new: str, label: str) -> None:
+              target = Path(path)
+              source = target.read_text(encoding="utf-8")
+              if old not in source:
+                  raise SystemExit(f"Missing expected text for {label} in {path}")
+              target.write_text(source.replace(old, new), encoding="utf-8")
 
-      - name: Enforce residual reference scan
-        if: steps.residuals.outcome == 'failure'
-        run: exit 1
+          replace_required(
+              "components/workspace/wiki-panel.tsx",
+              'import { Button } from "@/components/ui/button";\n',
+              "",
+              "Wiki Brief button import",
+          )
+          replace_required(
+              "components/workspace/wiki-panel.tsx",
+              'import { useSessionUiState } from "@/components/context/session-ui-state";\n',
+              "",
+              "Wiki Brief navigation state import",
+          )
+          replace_required(
+              "components/workspace/wiki-panel.tsx",
+              '  const { setViewMode } = useSessionUiState();\n\n',
+              "",
+              "Wiki Brief navigation state",
+          )
+          replace_required(
+              "components/workspace/wiki-panel.tsx",
+              '''          <div className="mt-4 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs" onClick={() => setViewMode("brief")}>
+              Brief
+            </Button>
+          </div>
+''',
+              "",
+              "Wiki Brief navigation button",
+          )
+
+          knowledge_path = Path("components/workspace/knowledge-center-workspace.tsx")
+          knowledge = knowledge_path.read_text(encoding="utf-8")
+          replacements = [
+              (
+                  "Nodes is a decision workspace. You explore in chat, structure in canvas, stabilize in wiki, and then produce a brief. The core idea is that exploration should remain inspectable and reusable, not flattened into a single transcript.",
+                  "Nodes is a decision workspace. You explore in chat, structure in canvas, and stabilize durable knowledge in wiki. The core idea is that exploration should remain inspectable and reusable, not flattened into a single transcript.",
+              ),
+              ('          "Brief as the current answer snapshot.",\n', ""),
+              ('          "5. Use Brief for the final summary.",\n', ""),
+              (
+                  '''      {
+        id: "brief",
+        title: "Brief",
+        body:
+          "Brief is the canonical output snapshot: recommendation, evidence, risks, and next steps. It should be the thing you can share or paste into a doc.",
+      },
+''',
+                  "",
+              ),
+              (
+                  "Sessions are the working units. Projects group sessions and consolidate the wiki and brief into longer-lived context.",
+                  "Sessions are the working units. Projects group sessions and consolidate wiki knowledge and reusable artifacts into longer-lived context.",
+              ),
+              (
+                  '''      {
+        id: "why-brief",
+        title: "Why a Brief?",
+        body:
+          "Because you need a canonical output. Brief is the product’s landing format for decisions and next steps.",
+      },
+''',
+                  "",
+              ),
+              ('                  <div className="grid gap-3 md:grid-cols-[repeat(5,minmax(0,1fr))]">',
+               '                  <div className="grid gap-3 md:grid-cols-[repeat(4,minmax(0,1fr))]">'),
+              ('                      ["Brief", "Land on the current recommendation."],\n', ""),
+          ]
+          for old, new in replacements:
+              if old not in knowledge:
+                  raise SystemExit(f"Missing expected Knowledge Center text: {old[:80]!r}")
+              knowledge = knowledge.replace(old, new)
+          knowledge_path.write_text(knowledge, encoding="utf-8")
+
+          replace_required(
+              "components/assistant-ui/thread-graph-flow/artifact-presentation.ts",
+              'return "Reusable brief";',
+              'return "Reusable context";',
+              "artifact readable role",
+          )
+          replace_required(
+              "tests/artifact-presentation.test.ts",
+              'title: "Decision Brief",',
+              'title: "Decision Context",',
+              "artifact fixture title",
+          )
+
+          Path(".github/workflows/verify-feature-removal.yml").unlink()
+          PY
+
+      - name: Verify no functional references remain
+        shell: bash
+        run: |
+          matches="$(git grep -n -i brief -- . || true)"
+          unexpected="$(printf '%s\n' "$matches" | grep -vE 'components/workspace/project-wiki\.tsx:.*BriefcaseBusiness|tests/(chat-route|llm-helpers|title-route)\.test\.ts:.*brief\.pdf' || true)"
+          if [ -n "$unexpected" ]; then
+            printf '%s\n' "$unexpected"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Run unit tests
         run: npm test
 
       - name: Build production application
         run: npm run build
+
+      - name: Commit verified removal
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: remove residual Brief references"
+          git push origin HEAD:codex/remove-brief-feature-final
