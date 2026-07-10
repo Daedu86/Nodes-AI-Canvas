@@ -26,11 +26,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+      - name: Initialize validation log
+        shell: bash
+        run: |
+          {
+            echo "node=$(node --version)"
+            echo "npm=$(npm --version)"
+            echo "python=$(python --version 2>&1)"
+          } > /tmp/canvas-build.log
 
       - name: Integrate and validate
         shell: bash
@@ -94,7 +97,7 @@ jobs:
               echo "Legacy artifact template UI still exists."
               exit 1
             fi
-          ) 2>&1 | tee /tmp/canvas-build.log
+          ) 2>&1 | tee -a /tmp/canvas-build.log
 
       - name: Publish final commit
         shell: bash
