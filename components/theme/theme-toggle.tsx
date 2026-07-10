@@ -34,24 +34,22 @@ export function ThemeToggle({
   }, [theme]);
 
   const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+  const nextTheme = theme === "dark" ? "light" : "dark";
+  const actionLabel = `Switch to ${nextTheme} mode`;
+  const ThemeIcon = theme === "dark" ? Sun : Moon;
+  const iconOnly = size === "icon";
 
   return (
     <Button
       variant={variant}
       size={size}
       onClick={toggle}
-      aria-label="Toggle dark mode"
+      aria-label={actionLabel}
+      title={actionLabel}
       className={cn(className)}
     >
-      {theme === "dark" ? (
-        <>
-          <Sun className="mr-2 size-4" /> Light
-        </>
-      ) : (
-        <>
-          <Moon className="mr-2 size-4" /> Dark
-        </>
-      )}
+      <ThemeIcon className={cn("size-4", !iconOnly && "mr-2")} />
+      {!iconOnly ? <span className="truncate">{nextTheme === "light" ? "Light" : "Dark"}</span> : null}
     </Button>
   );
 }
