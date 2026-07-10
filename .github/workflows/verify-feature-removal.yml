@@ -26,14 +26,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check residual feature references
+      - name: Collect residual feature references
+        id: residuals
+        continue-on-error: true
         shell: bash
         run: |
           pattern="$(printf '\142\162\151\145\146')"
-          if git grep -n -i "$pattern" -- .; then
-            echo "Residual feature references found."
-            exit 1
-          fi
+          git grep -n -i "$pattern" -- . > residual-references.txt || true
+          test ! -s residual-references.txt
+
+      - name: Upload residual reference scan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: residual-reference-scan
+          path: residual-references.txt
+          if-no-files-found: error
+
+      - name: Enforce residual reference scan
+        if: steps.residuals.outcome == 'failure'
+        run: exit 1
 
       - name: Run unit tests
         run: npm test
