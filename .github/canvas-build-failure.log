@@ -14,8 +14,8 @@ restored lib/session-artifacts.ts 1e926596972cfb704878c7a47e0343d4b1ac8e66
 ++ dirname components/context/graph-branch-intent.tsx
 + mkdir -p components/context
 + gh api repos/Daedu86/Nodes-AI-Canvas/git/blobs/df26e4d6cc36041445fa1cc827a6c73adcdb476f --jq .content
-+ tr -d '\n'
 + base64 --decode
++ tr -d '\n'
 + echo 'restored components/context/graph-branch-intent.tsx df26e4d6cc36041445fa1cc827a6c73adcdb476f'
 restored components/context/graph-branch-intent.tsx df26e4d6cc36041445fa1cc827a6c73adcdb476f
 + restore_blob lib/thread-branching-runtime.ts a786e7289476ea6fd9733f9cafd20bdf4bb1a430
@@ -108,5 +108,8 @@ restored tests/session-artifacts.test.ts 8af69134e10a4324378a7fbe2707dd7161cd773
 + base64 --decode
 + echo 'restored tests/block-library.test.tsx f341558d55e56573edf9aec24da45d91c4153c2a'
 restored tests/block-library.test.tsx f341558d55e56573edf9aec24da45d91c4153c2a
-+ base64 --decode .github/canvas-payload/provider.b64
-base64: invalid input
++ cp .github/canvas-payload/provider.b64 components/context/session-artifacts.tsx
++ cp .github/canvas-payload/artifact-node.b64 components/assistant-ui/thread-graph-flow/artifact-node.tsx
++ cat .github/canvas-payload/patch-thread-flow.part00.b64 .github/canvas-payload/patch-thread-flow.part01.b64 .github/canvas-payload/patch-thread-flow.part02.b64 .github/canvas-payload/patch-thread-flow.part03.b64 .github/canvas-payload/patch-thread-flow.part04.b64 .github/canvas-payload/patch-thread-flow.part05.b64 .github/canvas-payload/patch-thread-flow.part06.b64
++ python /tmp/patch-thread-flow.py
+legacy semantic preset code remains
