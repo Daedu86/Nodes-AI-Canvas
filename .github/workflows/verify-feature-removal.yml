@@ -1,0 +1,42 @@
+name: Verify feature removal
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check residual feature references
+        shell: bash
+        run: |
+          pattern="$(printf '\142\162\151\145\146')"
+          if git grep -n -i "$pattern" -- .; then
+            echo "Residual feature references found."
+            exit 1
+          fi
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build production application
+        run: npm run build
