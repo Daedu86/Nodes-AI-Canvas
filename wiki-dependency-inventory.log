@@ -1,0 +1,224 @@
+./scripts/render-readme-svgs.mjs:25:    input: "docs/readme/03-knowledge-center.svg",
+./scripts/render-readme-svgs.mjs:26:    output: "docs/readme/03-knowledge-center.png",
+./scripts/render-readme-svgs.mjs:29:    input: "docs/readme/03-knowledge-center-dark.svg",
+./scripts/render-readme-svgs.mjs:30:    output: "docs/readme/03-knowledge-center-dark.png",
+./README.md:61:### Knowledge Center (built-in wiki)
+./README.md:64:  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/03-knowledge-center-dark.png" />
+./README.md:65:  <source media="(prefers-color-scheme: light)" srcset="docs/readme/03-knowledge-center.png" />
+./README.md:66:  <img alt="Knowledge Center wiki" src="docs/readme/03-knowledge-center.png" />
+./README.md:69:A wiki-style workspace for onboarding, patterns, and “how-to” docs that ship with the product.
+./docs/readme/03-knowledge-center-dark.svg:69:    <text x="468" y="177" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="10" font-weight="850" fill="#EAF0FF" fill-opacity=".58" letter-spacing="2">WIKI</text>
+./docs/readme/03-knowledge-center-dark.svg:85:    <text x="120" y="648" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="12" font-weight="650" fill="#EAF0FF" fill-opacity=".60">A built-in wiki keeps the product learnable as it grows.</text>
+./docs/readme/03-knowledge-center.svg:65:  <text x="468" y="177" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="10" font-weight="850" fill="#EAF0FF" fill-opacity=".58" letter-spacing="2">WIKI</text>
+./docs/readme/03-knowledge-center.svg:81:  <text x="120" y="648" font-family="ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial" font-size="12" font-weight="650" fill="#EAF0FF" fill-opacity=".60">A built-in wiki keeps the product learnable as it grows.</text>
+./lib/project-wiki.ts:8:export type ProjectWikiPageId =
+./lib/project-wiki.ts:16:export type ProjectWikiFocus =
+./lib/project-wiki.ts:35:export type ProjectWikiPage = {
+./lib/project-wiki.ts:37:  id: ProjectWikiPageId;
+./lib/project-wiki.ts:42:export type ProjectWiki = {
+./lib/project-wiki.ts:44:  pages: ProjectWikiPage[];
+./lib/project-wiki.ts:47:type BuildProjectWikiArgs = {
+./lib/project-wiki.ts:48:  focus: ProjectWikiFocus;
+./lib/project-wiki.ts:84:export function buildProjectWiki({
+./lib/project-wiki.ts:89:}: BuildProjectWikiArgs): ProjectWiki {
+./lib/project-wiki.ts:108:  const overviewPage: ProjectWikiPage = {
+./lib/project-wiki.ts:126:  const sessionsPage: ProjectWikiPage = {
+./lib/project-wiki.ts:139:  const knowledgePage: ProjectWikiPage = {
+./lib/project-wiki.ts:165:  const decisionsPage: ProjectWikiPage = {
+./lib/project-wiki.ts:195:  const focusPage: ProjectWikiPage = {
+./lib/project-wiki.ts:231:  const openQuestionsPage: ProjectWikiPage = {
+./lib/session-wiki.ts:10:export type SessionWikiNode = {
+./lib/session-wiki.ts:18:export type SessionWikiPageId =
+./lib/session-wiki.ts:26:export type SessionWikiPage = {
+./lib/session-wiki.ts:28:  id: SessionWikiPageId;
+./lib/session-wiki.ts:33:export type SessionWiki = {
+./lib/session-wiki.ts:35:  pages: SessionWikiPage[];
+./lib/session-wiki.ts:38:type BuildSessionWikiArgs = {
+./lib/session-wiki.ts:41:  nodes: SessionWikiNode[];
+./lib/session-wiki.ts:63:const getBranchNodes = (nodes: SessionWikiNode[], anchorId: string) => {
+./lib/session-wiki.ts:81:export function buildSessionWiki({
+./lib/session-wiki.ts:87:}: BuildSessionWikiArgs): SessionWiki {
+./lib/session-wiki.ts:104:  const overviewPage: SessionWikiPage = {
+./lib/session-wiki.ts:125:  const branchPage: SessionWikiPage = {
+./lib/session-wiki.ts:150:  const artifactPage: SessionWikiPage = {
+./lib/session-wiki.ts:176:  const decisionsPage: SessionWikiPage = {
+./lib/session-wiki.ts:200:  const focusPage: SessionWikiPage = {
+./lib/session-wiki.ts:237:  const openQuestionsPage: SessionWikiPage = {
+./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx:79:import { useSessionKnowledge } from "@/components/context/session-knowledge";
+./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx:503:  const { publishSnapshot } = useSessionKnowledge();
+./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx:1849:  const sessionKnowledgeNodes = React.useMemo(
+./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx:1864:    publishSnapshot({
+./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx:1867:      nodes: sessionKnowledgeNodes,
+./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx:1877:    publishSnapshot,
+./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx:1879:    sessionKnowledgeNodes,
+./components/auth/sidebar-profile.tsx:86:          variant={activeSurface === "knowledge-center" ? "default" : "outline"}
+./components/auth/sidebar-profile.tsx:214:            variant={activeSurface === "knowledge-center" ? "default" : "outline"}
+./components/context/workspace-surface.tsx:11:  | "knowledge-center"
+./components/context/workspace-surface.tsx:41:    if (value === "knowledge-center") return "knowledge-center";
+./components/context/workspace-surface.tsx:84:      showKnowledgeCenter: () => setActiveSurface("knowledge-center"),
+./components/context/session-knowledge.tsx:6:  buildSessionWiki,
+./components/context/session-knowledge.tsx:7:  type SessionWiki,
+./components/context/session-knowledge.tsx:8:  type SessionWikiNode,
+./components/context/session-knowledge.tsx:9:  type SessionWikiPageId,
+./components/context/session-knowledge.tsx:10:} from "@/lib/session-wiki";
+./components/context/session-knowledge.tsx:12:type SessionKnowledgeSnapshot = {
+./components/context/session-knowledge.tsx:15:  nodes: SessionWikiNode[];
+./components/context/session-knowledge.tsx:21:type SessionKnowledgeContextValue = {
+./components/context/session-knowledge.tsx:22:  publishSnapshot: (snapshot: SessionKnowledgeSnapshot | null) => void;
+./components/context/session-knowledge.tsx:23:  selectedWikiPageId: SessionWikiPageId;
+./components/context/session-knowledge.tsx:24:  setSelectedWikiPageId: (value: SessionWikiPageId) => void;
+./components/context/session-knowledge.tsx:25:  snapshot: SessionKnowledgeSnapshot | null;
+./components/context/session-knowledge.tsx:26:  wiki: SessionWiki | null;
+./components/context/session-knowledge.tsx:29:const SessionKnowledgeContext = React.createContext<SessionKnowledgeContextValue | null>(null);
+./components/context/session-knowledge.tsx:31:export function SessionKnowledgeProvider({ children }: { children: React.ReactNode }) {
+./components/context/session-knowledge.tsx:32:  const [snapshot, setSnapshot] = React.useState<SessionKnowledgeSnapshot | null>(null);
+./components/context/session-knowledge.tsx:33:  const [selectedWikiPageId, setSelectedWikiPageId] = React.useState<SessionWikiPageId>("overview");
+./components/context/session-knowledge.tsx:35:  const wiki = React.useMemo(
+./components/context/session-knowledge.tsx:38:        ? buildSessionWiki({
+./components/context/session-knowledge.tsx:50:    setSelectedWikiPageId("overview");
+./components/context/session-knowledge.tsx:53:  const value = React.useMemo<SessionKnowledgeContextValue>(
+./components/context/session-knowledge.tsx:55:      publishSnapshot: setSnapshot,
+./components/context/session-knowledge.tsx:56:      selectedWikiPageId,
+./components/context/session-knowledge.tsx:57:      setSelectedWikiPageId,
+./components/context/session-knowledge.tsx:59:      wiki,
+./components/context/session-knowledge.tsx:61:    [selectedWikiPageId, snapshot, wiki],
+./components/context/session-knowledge.tsx:65:    <SessionKnowledgeContext.Provider value={value}>
+./components/context/session-knowledge.tsx:67:    </SessionKnowledgeContext.Provider>
+./components/context/session-knowledge.tsx:71:export function useSessionKnowledge() {
+./components/context/session-knowledge.tsx:72:  const context = React.useContext(SessionKnowledgeContext);
+./components/context/session-knowledge.tsx:74:    throw new Error("useSessionKnowledge must be used within SessionKnowledgeProvider");
+./components/context/session-knowledge.tsx:79:export type { SessionKnowledgeSnapshot };
+./components/context/session-ui-state.tsx:10:export type SessionViewMode = "chat" | "split" | "canvas" | "wiki";
+./components/context/session-ui-state.tsx:12:export type SplitWorkspacePane = "chat" | "canvas" | "wiki";
+./components/context/session-ui-state.tsx:17:  "wiki",
+./components/context/session-ui-state.tsx:72:  wiki: true,
+./components/context/session-ui-state.tsx:192:      wiki: parsed.wiki ?? DEFAULT_SPLIT_PANE_VISIBILITY.wiki,
+./components/context/session-ui-state.tsx:207:    value === "wiki" ||
+./components/context/session-ui-state.tsx:222:    value === "wiki"
+./components/workspace/app-header.tsx:31:    { icon: BookCopy, label: "Wiki", value: "wiki" },
+./components/workspace/knowledge-center-workspace.tsx:68:          "Nodes is a decision workspace. You explore in chat, structure in canvas, and stabilize durable knowledge in wiki. The core idea is that exploration should remain inspectable and reusable, not flattened into a single transcript.",
+./components/workspace/knowledge-center-workspace.tsx:72:          "Wiki as canonical knowledge.",
+./components/workspace/knowledge-center-workspace.tsx:84:          "3. Consolidate stable facts into Wiki.",
+./components/workspace/knowledge-center-workspace.tsx:109:        id: "wiki",
+./components/workspace/knowledge-center-workspace.tsx:110:        title: "Wiki",
+./components/workspace/knowledge-center-workspace.tsx:112:          "Wiki is the memory layer. It holds the stable facts, decisions, and open questions you want to carry forward.",
+./components/workspace/knowledge-center-workspace.tsx:118:          "Nody is a query surface over your workspace. It reads canvas and wiki, then produces synthesis with links back to sources.",
+./components/workspace/knowledge-center-workspace.tsx:144:          "Use the canvas to keep sibling branches visible. Promote stable conclusions to wiki and keep evidence as artifacts so you can audit why a branch won.",
+./components/workspace/knowledge-center-workspace.tsx:158:          "Artifacts are reusable units. They turn messy exploration into structured material you can cite, reuse, and promote into the wiki.",
+./components/workspace/knowledge-center-workspace.tsx:169:        title: "Promotion To Wiki",
+./components/workspace/knowledge-center-workspace.tsx:171:          "When something is stable enough, promote it. The wiki should contain what you want to keep, not everything you tried.",
+./components/workspace/knowledge-center-workspace.tsx:185:          "Sessions are the working units. Projects group sessions and consolidate wiki knowledge and reusable artifacts into longer-lived context.",
+./components/workspace/knowledge-center-workspace.tsx:346:        id: "why-wiki",
+./components/workspace/knowledge-center-workspace.tsx:347:        title: "Why a Wiki?",
+./components/workspace/knowledge-center-workspace.tsx:349:          "Because chat is not memory. The wiki is the stable layer that remains useful after exploration ends.",
+./components/workspace/knowledge-center-workspace.tsx:369:    body: "The product guide now behaves like a wiki: searchable navigation, page-level structure, and deep links to sections.",
+./components/workspace/knowledge-center-workspace.tsx:546:                  Product wiki for how Nodes works, what each surface is for, and how to use the
+./components/workspace/knowledge-center-workspace.tsx:697:                      ["Wiki", "Promote stable knowledge."],
+./components/workspace/project-workspace.tsx:25:import { ProjectWiki } from "@/components/workspace/project-wiki";
+./components/workspace/project-workspace.tsx:126:  const [workspaceMode, setWorkspaceMode] = React.useState<"canvas" | "arena" | "wiki">(() =>
+./components/workspace/project-workspace.tsx:1955:                    : "Canonical project wiki compiled from the shared canvas, typed nodes, and project context."}
+./components/workspace/project-workspace.tsx:1969:                variant={workspaceMode === "wiki" ? "default" : "outline"}
+./components/workspace/project-workspace.tsx:1971:                onClick={() => setWorkspaceMode("wiki")}
+./components/workspace/project-workspace.tsx:1973:                Wiki
+./components/workspace/project-workspace.tsx:2007:            ) : workspaceMode === "wiki" ? (
+./components/workspace/project-workspace.tsx:2008:              <ProjectWiki
+./components/workspace/workspace-split-layout.tsx:20:  wikiPanel: React.ReactNode;
+./components/workspace/workspace-split-layout.tsx:67:  wikiPanel,
+./components/workspace/workspace-split-layout.tsx:94:        id: "wiki",
+./components/workspace/workspace-split-layout.tsx:97:        label: "Wiki",
+./components/workspace/workspace-split-layout.tsx:99:        panel: wikiPanel,
+./components/workspace/workspace-split-layout.tsx:102:    [canvasPanel, chatPanel, wikiPanel],
+./components/workspace/workspace-split-layout.tsx:118:          {viewMode === "wiki" ? (
+./components/workspace/workspace-split-layout.tsx:119:            <SinglePanelLayer active>{wikiPanel}</SinglePanelLayer>
+./components/workspace/project-wiki.tsx:16:  buildProjectWiki,
+./components/workspace/project-wiki.tsx:17:  type ProjectWikiFocus,
+./components/workspace/project-wiki.tsx:18:  type ProjectWikiPageId,
+./components/workspace/project-wiki.tsx:19:} from "@/lib/project-wiki";
+./components/workspace/project-wiki.tsx:21:const pageIcon: Record<ProjectWikiPageId, typeof BookCopy> = {
+./components/workspace/project-wiki.tsx:30:export function ProjectWiki({
+./components/workspace/project-wiki.tsx:36:  focus: ProjectWikiFocus;
+./components/workspace/project-wiki.tsx:41:  const wiki = React.useMemo(
+./components/workspace/project-wiki.tsx:43:      buildProjectWiki({
+./components/workspace/project-wiki.tsx:51:  const [selectedPageId, setSelectedPageId] = React.useState<ProjectWikiPageId>("overview");
+./components/workspace/project-wiki.tsx:57:  const activePage = wiki.pages.find((page) => page.id === selectedPageId) ?? wiki.pages[0];
+./components/workspace/project-wiki.tsx:68:              <p className="text-sm font-semibold text-foreground">Project Wiki</p>
+./components/workspace/project-wiki.tsx:83:            {wiki.pages.length} pages
+./components/workspace/project-wiki.tsx:87:          {wiki.pages.map((page) => {
+./components/workspace/wiki-panel.tsx:4:import { useSessionKnowledge } from "@/components/context/session-knowledge";
+./components/workspace/wiki-panel.tsx:5:import type { SessionWikiPageId } from "@/lib/session-wiki";
+./components/workspace/wiki-panel.tsx:7:const pageIcon: Record<SessionWikiPageId, typeof BookCopy> = {
+./components/workspace/wiki-panel.tsx:16:type WikiSection = {
+./components/workspace/wiki-panel.tsx:21:const parseWikiSections = (body: string): WikiSection[] => {
+./components/workspace/wiki-panel.tsx:23:  const sections: WikiSection[] = [];
+./components/workspace/wiki-panel.tsx:24:  let current: WikiSection = { heading: null, lines: [] };
+./components/workspace/wiki-panel.tsx:51:const renderWikiBlocks = (lines: string[]) => {
+./components/workspace/wiki-panel.tsx:94:export function WikiPanel() {
+./components/workspace/wiki-panel.tsx:95:  const { selectedWikiPageId, setSelectedWikiPageId, wiki } = useSessionKnowledge();
+./components/workspace/wiki-panel.tsx:96:  const activePage = wiki?.pages.find((page) => page.id === selectedWikiPageId) ?? wiki?.pages[0] ?? null;
+./components/workspace/wiki-panel.tsx:97:  const activeSections = activePage ? parseWikiSections(activePage.body) : [];
+./components/workspace/wiki-panel.tsx:108:              <p className="text-base font-semibold tracking-[-0.02em] text-foreground">Wiki</p>
+./components/workspace/wiki-panel.tsx:114:          {wiki?.pages.map((page) => {
+./components/workspace/wiki-panel.tsx:126:                onClick={() => setSelectedWikiPageId(page.id)}
+./components/workspace/wiki-panel.tsx:137:              Open the canvas to let the wiki compile its first pages.
+./components/workspace/wiki-panel.tsx:150:                    Session wiki
+./components/workspace/wiki-panel.tsx:157:                    {wiki?.pages.length ?? 0} pages
+./components/workspace/wiki-panel.tsx:178:                      <div className="space-y-3">{renderWikiBlocks(section.lines)}</div>
+./components/workspace/wiki-panel.tsx:193:            No wiki pages yet.
+./tests/knowledge-center-workspace.test.tsx:7:import { KnowledgeCenterWorkspace } from "../components/workspace/knowledge-center-workspace";
+./tests/session-ui-state.test.tsx:42:      <button type="button" onClick={() => setViewMode("wiki")}>
+./tests/session-ui-state.test.tsx:43:        Set wiki
+./tests/session-ui-state.test.tsx:124:        wiki: false,
+./tests/session-ui-state.test.tsx:135:      "chat:closed|canvas:open|wiki:closed",
+./tests/session-ui-state.test.tsx:163:    fireEvent.click(screen.getByRole("button", { name: "Set wiki" }));
+./tests/session-ui-state.test.tsx:164:    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("wiki");
+./tests/session-ui-state.test.tsx:180:    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("wiki");
+./tests/project-wiki.test.ts:5:import { buildProjectWiki } from "../lib/project-wiki";
+./tests/project-wiki.test.ts:69:    content: "How should project memory be promoted into the wiki?",
+./tests/project-wiki.test.ts:87:  globalContext: "The system should compile project knowledge into a durable wiki layer.",
+./tests/project-wiki.test.ts:103:describe("buildProjectWiki", () => {
+./tests/project-wiki.test.ts:105:    const wiki = buildProjectWiki({
+./tests/project-wiki.test.ts:121:    expect(wiki.pages.map((page) => page.id)).toEqual([
+./tests/project-wiki.test.ts:130:    expect(wiki.digest).toContain("Nody Knowledge");
+./tests/project-wiki.test.ts:131:    expect(wiki.digest).toContain("The system should compile project knowledge into a durable wiki layer.");
+./tests/project-wiki.test.ts:133:    const decisionsPage = wiki.pages.find((page) => page.id === "decisions");
+./tests/project-wiki.test.ts:137:    const openQuestionsPage = wiki.pages.find((page) => page.id === "open-questions");
+./tests/project-wiki.test.ts:142:    const focusPage = wiki.pages.find((page) => page.id === "focus");
+./tests/workspace-split-layout.test.tsx:22:      <button type="button" onClick={() => setViewMode("wiki")}>Show Wiki</button>
+./tests/workspace-split-layout.test.tsx:27:          wikiPanel={<div data-testid="wiki-panel">wiki</div>}
+./tests/workspace-split-layout.test.tsx:55:    expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
+./tests/workspace-split-layout.test.tsx:57:    fireEvent.click(screen.getByRole("button", { name: "Hide Wiki pane in split" }));
+./tests/workspace-split-layout.test.tsx:58:    expect(screen.queryByTestId("wiki-panel")).toBeNull();
+./tests/workspace-split-layout.test.tsx:60:    fireEvent.click(screen.getByRole("button", { name: "Show Wiki" }));
+./tests/workspace-split-layout.test.tsx:61:    expect(screen.getByTestId("view-mode").textContent).toBe("wiki");
+./tests/workspace-split-layout.test.tsx:62:    expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
+./tests/workspace-split-layout.test.tsx:66:    expect(screen.getByTestId("view-mode").textContent).toBe("wiki");
+./tests/workspace-split-layout.test.tsx:71:    expect(screen.queryByTestId("wiki-panel")).toBeNull();
+./tests/workspace-split-layout.test.tsx:76:    expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
+./tests/project-workspace.test.tsx:145:vi.mock("@/components/workspace/project-wiki", () => ({
+./tests/project-workspace.test.tsx:146:  ProjectWiki: () => <div>Wiki stub</div>,
+./tests/app-header.test.tsx:47:      <button type="button" onClick={() => setViewMode("wiki")}>
+./tests/app-header.test.tsx:48:        Set wiki
+./tests/app-header.test.tsx:79:    fireEvent.click(screen.getByRole("button", { name: "Set wiki" }));
+./tests/app-header.test.tsx:80:    expect(screen.getByTestId("view-mode").textContent).toBe("wiki");
+./tests/app-header.test.tsx:86:    expect(screen.getByTestId("view-mode").textContent).toBe("wiki");
+./tests/artifact-presentation.test.ts:17:      content: "# Decision\n- Ship wiki first\n- Keep Nody focused on export",
+./tests/artifact-presentation.test.ts:26:      "Ship wiki first",
+./tests/session-wiki.test.ts:2:import { buildSessionWiki } from "../lib/session-wiki";
+./tests/session-wiki.test.ts:4:describe("buildSessionWiki", () => {
+./tests/session-wiki.test.ts:5:  it("elevates decision and question artifacts into the session wiki", () => {
+./tests/session-wiki.test.ts:6:    const wiki = buildSessionWiki({
+./tests/session-wiki.test.ts:49:    expect(wiki.pages.map((page) => page.id)).toEqual([
+./tests/session-wiki.test.ts:58:    const decisionsPage = wiki.pages.find((page) => page.id === "decisions");
+./tests/session-wiki.test.ts:62:    const openQuestionsPage = wiki.pages.find((page) => page.id === "open-questions");
+./tests/session-wiki.test.ts:66:    const focusPage = wiki.pages.find((page) => page.id === "focus");
+./tests/workspace-surface.test.tsx:53:      ) : activeSurface === "knowledge-center" ? (
+./tests/workspace-surface.test.tsx:175:    expect(screen.getByTestId("surface").textContent).toBe("knowledge-center");
+./app/assistant.tsx:20:import { SessionKnowledgeProvider } from "@/components/context/session-knowledge";
+./app/assistant.tsx:26:import { KnowledgeCenterWorkspace } from "@/components/workspace/knowledge-center-workspace";
+./app/assistant.tsx:54:const WikiPanel = dynamic(
+./app/assistant.tsx:55:  () => import("@/components/workspace/wiki-panel").then((mod) => mod.WikiPanel),
+./app/assistant.tsx:59:        Loading wiki…
+./app/assistant.tsx:233:          <SessionKnowledgeProvider>
+./app/assistant.tsx:242:                      wikiPanel={<WikiPanel />}
+./app/assistant.tsx:248:          </SessionKnowledgeProvider>
+./app/assistant.tsx:319:  if (activeSurface === "knowledge-center") {
