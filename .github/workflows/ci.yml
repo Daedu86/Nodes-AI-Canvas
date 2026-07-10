@@ -34,7 +34,21 @@ jobs:
         run: npm ci
 
       - name: Lint
-        run: npx eslint .
+        id: lint
+        continue-on-error: true
+        run: npx eslint . --format json --output-file eslint-report.json
+
+      - name: Upload ESLint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eslint-report
+          path: eslint-report.json
+          if-no-files-found: error
+
+      - name: Enforce lint result
+        if: steps.lint.outcome == 'failure'
+        run: exit 1
 
       - name: Unit tests with coverage
         run: npm run test:coverage
