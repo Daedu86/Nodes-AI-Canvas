@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 30
     env:
       NEXT_TELEMETRY_DISABLED: "1"
-      CANVAS_VALIDATION_REVISION: "7"
+      CANVAS_VALIDATION_REVISION: "8"
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check out main
