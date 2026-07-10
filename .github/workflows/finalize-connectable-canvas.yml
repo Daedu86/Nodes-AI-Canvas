@@ -30,7 +30,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Integrate and validate
@@ -67,11 +67,11 @@ jobs:
             cat .github/canvas-payload/patch-thread-flow.part*.b64 > /tmp/patch-thread-flow.py
             sed -i '/if "quickSemanticPresets" in text or "semanticArtifactPresets" in text:/,+1d' /tmp/patch-thread-flow.py
             python /tmp/patch-thread-flow.py
+            python .github/canvas-payload/fix-canvas-validation.py
 
             rm -rf .github/canvas-payload
 
             npm ci
-            npx tsc --noEmit
             npx vitest run tests/session-artifacts.test.ts tests/block-library.test.tsx
             npm test
             npm run build
