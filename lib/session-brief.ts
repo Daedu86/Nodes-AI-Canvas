@@ -33,8 +33,7 @@ const parseOpenQuestions = (wiki: SessionWiki | null) => {
   const page = wiki?.pages.find((entry) => entry.id === "open-questions");
   if (!page) return [];
   return page.body
-    .split(/?
-/)
+    .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => /^-\s+/.test(line))
     .map((line) => line.replace(/^-\s+/, "").trim())
