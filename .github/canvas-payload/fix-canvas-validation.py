@@ -87,3 +87,9 @@ replace_once(
     'aria-label="Send prompt node"',
     "prompt submit accessible label",
 )
+replace_once(
+    prompt_node,
+    "Enter sends · Shift+Enter adds a line",
+    "Enter sends, Shift+Enter adds newline",
+    "prompt keyboard hint",
+)
