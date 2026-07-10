@@ -62,7 +62,7 @@ export function SidebarProfile() {
 
   if (isCollapsed) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-[16px] border border-border/80 bg-card/88 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+      <div className="flex w-full flex-col items-center gap-2">
         <div
           className="flex size-9 items-center justify-center rounded-[12px] border border-border/80 bg-muted/60 text-muted-foreground"
           title={displayName}

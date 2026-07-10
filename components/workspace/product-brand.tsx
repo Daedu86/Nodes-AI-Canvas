@@ -11,6 +11,7 @@ type ProductBrandProps = {
 export function ProductBrand({
   className,
   modeLabel,
+  compact = false,
   ...props
 }: ProductBrandProps) {
   return (
@@ -35,18 +36,20 @@ export function ProductBrand({
           <circle cx="29" cy="29" r="3.25" fill="currentColor" stroke="none" />
         </svg>
       </div>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-[13px] font-semibold tracking-[0.16em] text-foreground uppercase">
-            Nodes
-          </span>
-          {modeLabel ? (
-            <span className="rounded-full border border-border/80 bg-muted/80 px-2 py-0.5 text-[9px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
-              {modeLabel}
+      {!compact ? (
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[13px] font-semibold tracking-[0.16em] text-foreground uppercase">
+              Nodes
             </span>
-          ) : null}
+            {modeLabel ? (
+              <span className="rounded-full border border-border/80 bg-muted/80 px-2 py-0.5 text-[9px] font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                {modeLabel}
+              </span>
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
