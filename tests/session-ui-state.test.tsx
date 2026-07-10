@@ -39,8 +39,8 @@ function SplitToggleHarness() {
   return (
     <div>
       <div data-testid="toggle-view-mode">{viewMode}</div>
-      <button type="button" onClick={() => setViewMode("wiki")}>
-        Set wiki
+      <button type="button" onClick={() => setViewMode("chat")}>
+        Set chat
       </button>
       <button type="button" onClick={() => setViewMode("split")}>
         Enter split directly
@@ -115,13 +115,12 @@ describe("SessionUiStateProvider", () => {
     expect(screen.getByTestId("split-ratios").textContent).toBe("0.28:0.58");
   });
 
-  it("defaults split mode to all three workspace panes and guards against empty persisted state", () => {
+  it("defaults split mode to both workspace panes and guards against empty persisted state", () => {
     localStorage.setItem(
       "session-ui.splitPaneVisibility.v1:session-a",
       JSON.stringify({
         chat: false,
         canvas: false,
-        wiki: false,
       }),
     );
 
@@ -132,7 +131,7 @@ describe("SessionUiStateProvider", () => {
     );
 
     expect(screen.getByTestId("split-panes").textContent).toBe(
-      "chat:closed|canvas:open|wiki:closed",
+      "chat:closed|canvas:open",
     );
   });
 
@@ -160,8 +159,8 @@ describe("SessionUiStateProvider", () => {
     fireEvent.click(screen.getByRole("button", { name: "Toggle split" }));
     expect(screen.getByTestId("toggle-view-mode").textContent).toBe("canvas");
 
-    fireEvent.click(screen.getByRole("button", { name: "Set wiki" }));
-    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("wiki");
+    fireEvent.click(screen.getByRole("button", { name: "Set chat" }));
+    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("chat");
 
     fireEvent.click(screen.getByRole("button", { name: "Enter split directly" }));
     expect(screen.getByTestId("toggle-view-mode").textContent).toBe("split");
@@ -177,6 +176,6 @@ describe("SessionUiStateProvider", () => {
     expect(screen.getByTestId("toggle-view-mode").textContent).toBe("split");
 
     fireEvent.click(screen.getByRole("button", { name: "Toggle split" }));
-    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("wiki");
+    expect(screen.getByTestId("toggle-view-mode").textContent).toBe("chat");
   });
 });

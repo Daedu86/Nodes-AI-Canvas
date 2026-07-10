@@ -4,7 +4,6 @@ import React from "react";
 import {
   Activity,
   BarChart3,
-  BookOpenText,
   Bot,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -28,7 +27,6 @@ export function SidebarProfile() {
     showAdminUsers,
     showAgentAccess,
     showAgentWork,
-    showKnowledgeCenter,
     showLlmModels,
     showPlanUsage,
     showSupport,
@@ -80,17 +78,6 @@ export function SidebarProfile() {
           aria-label="Plan & Usage"
         >
           <BarChart3 className="size-4" />
-        </Button>
-        <Button
-          type="button"
-          variant={activeSurface === "knowledge-center" ? "default" : "outline"}
-          size="icon"
-          className="size-9"
-          onClick={showKnowledgeCenter}
-          title="Knowledge Center"
-          aria-label="Knowledge Center"
-        >
-          <BookOpenText className="size-4" />
         </Button>
         <Button
           type="button"
@@ -208,16 +195,6 @@ export function SidebarProfile() {
           >
             <BarChart3 className="size-4" />
             Plan &amp; Usage
-          </Button>
-          <Button
-            type="button"
-            variant={activeSurface === "knowledge-center" ? "default" : "outline"}
-            size="sm"
-            className="w-full justify-start"
-            onClick={showKnowledgeCenter}
-          >
-            <BookOpenText className="size-4" />
-            Knowledge Center
           </Button>
           <Button
             type="button"

@@ -22,14 +22,6 @@ const jobs = [
     output: "docs/readme/02-canvas-artifacts-dark.png",
   },
   {
-    input: "docs/readme/03-knowledge-center.svg",
-    output: "docs/readme/03-knowledge-center.png",
-  },
-  {
-    input: "docs/readme/03-knowledge-center-dark.svg",
-    output: "docs/readme/03-knowledge-center-dark.png",
-  },
-  {
     input: "docs/readme/04-llm-models.svg",
     output: "docs/readme/04-llm-models.png",
   },

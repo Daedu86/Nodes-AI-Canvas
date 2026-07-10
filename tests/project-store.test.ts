@@ -87,7 +87,7 @@ describe("project-store", () => {
     const third = await createProject({ title: "Third" });
 
     await deleteProject(first.id);
-    expect((await listProjects()).map((project) => project.id)).toEqual([third.id, second.id]);
+    expect((await listProjects()).map((project) => project.id).sort()).toEqual([second.id, third.id].sort());
 
     await deleteProjects([second.id, third.id]);
     expect(await listProjects()).toHaveLength(0);

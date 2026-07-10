@@ -142,9 +142,6 @@ vi.mock("@/components/workspace/project-arena", () => ({
   ProjectArena: () => <div>Arena stub</div>,
 }));
 
-vi.mock("@/components/workspace/project-wiki", () => ({
-  ProjectWiki: () => <div>Wiki stub</div>,
-}));
 
 describe("ProjectWorkspace", () => {
   beforeEach(() => {

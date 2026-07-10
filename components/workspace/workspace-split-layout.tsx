@@ -2,7 +2,6 @@
 
 import React from "react";
 import {
-  BookCopy,
   MessageSquareText,
   Plus,
   Workflow,
@@ -17,7 +16,6 @@ import {
 type WorkspaceSplitLayoutProps = {
   chatPanel: React.ReactNode;
   canvasPanel: React.ReactNode;
-  wikiPanel: React.ReactNode;
 };
 
 type SplitPaneDefinition = {
@@ -64,7 +62,6 @@ const SinglePanelLayer = ({
 export function WorkspaceSplitLayout({
   chatPanel,
   canvasPanel,
-  wikiPanel,
 }: WorkspaceSplitLayoutProps) {
   const {
     splitPaneVisibility,
@@ -90,16 +87,8 @@ export function WorkspaceSplitLayout({
         minWidth: 460,
         panel: canvasPanel,
       },
-      {
-        id: "wiki",
-        icon: BookCopy,
-        idealWidth: 400,
-        label: "Wiki",
-        minWidth: 320,
-        panel: wikiPanel,
-      },
     ],
-    [canvasPanel, chatPanel, wikiPanel],
+    [canvasPanel, chatPanel],
   );
 
   const openPanes = splitPanes.filter((pane) => splitPaneVisibility[pane.id]);
@@ -115,9 +104,6 @@ export function WorkspaceSplitLayout({
         <div className="relative min-h-0 flex-1">
           <SinglePanelLayer active={viewMode === "chat"}>{chatPanel}</SinglePanelLayer>
           <SinglePanelLayer active={viewMode === "canvas"}>{canvasPanel}</SinglePanelLayer>
-          {viewMode === "wiki" ? (
-            <SinglePanelLayer active>{wikiPanel}</SinglePanelLayer>
-          ) : null}
         </div>
       </div>
     );

@@ -76,7 +76,6 @@ import { useHistoryMode } from "@/components/context/history-mode";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { useLinkEditor } from "@/components/context/link-editor";
 import { useModelConfig } from "@/components/context/model-config";
-import { useSessionKnowledge } from "@/components/context/session-knowledge";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
 import { useRequestError } from "@/components/context/request-error";
 import { useSessionArtifacts } from "@/components/context/session-artifacts";
@@ -500,7 +499,6 @@ export function ThreadGraphFlow() {
   const { historyMode } = useHistoryMode();
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
-  const { publishSnapshot } = useSessionKnowledge();
   const { clearRequestError, requestError, setRequestError } = useRequestError();
   const { activeSession, activeSessionId } = usePersistedSessions();
   const {
@@ -1846,38 +1844,6 @@ export function ThreadGraphFlow() {
       })),
     [canvasConversationNodes],
   );
-  const sessionKnowledgeNodes = React.useMemo(
-    () =>
-      canvasConversationNodes.map((node) => ({
-        branchId:
-          typeof node.branchId === "string" || typeof node.branchId === "number"
-            ? node.branchId
-            : null,
-        id: node.id,
-        parentId: node.parentId,
-        role: node.role,
-        text: node.text,
-      })),
-    [canvasConversationNodes],
-  );
-  React.useEffect(() => {
-    publishSnapshot({
-      artifacts,
-      contextLinks,
-      nodes: sessionKnowledgeNodes,
-      selectedNodeId,
-      sessionId: activeSessionId,
-      sessionTitle: activeSession?.title ?? null,
-    });
-  }, [
-    activeSession?.title,
-    activeSessionId,
-    artifacts,
-    contextLinks,
-    publishSnapshot,
-    selectedNodeId,
-    sessionKnowledgeNodes,
-  ]);
 
   return (
     <section className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.08),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.98),rgba(241,245,249,0.96))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.16),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.12),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.9))]">

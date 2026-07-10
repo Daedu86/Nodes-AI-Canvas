@@ -44,8 +44,8 @@ function HeaderHarness() {
   return (
     <div>
       <div data-testid="view-mode">{viewMode}</div>
-      <button type="button" onClick={() => setViewMode("wiki")}>
-        Set wiki
+      <button type="button" onClick={() => setViewMode("chat")}>
+        Set chat
       </button>
       <AppHeader />
     </div>
@@ -76,13 +76,13 @@ describe("AppHeader", () => {
     fireEvent.click(screen.getByRole("button", { name: "Exit split workspace" }));
     expect(screen.getByTestId("view-mode").textContent).toBe("canvas");
 
-    fireEvent.click(screen.getByRole("button", { name: "Set wiki" }));
-    expect(screen.getByTestId("view-mode").textContent).toBe("wiki");
+    fireEvent.click(screen.getByRole("button", { name: "Set chat" }));
+    expect(screen.getByTestId("view-mode").textContent).toBe("chat");
 
     fireEvent.click(screen.getByRole("button", { name: "Open split workspace" }));
     expect(screen.getByTestId("view-mode").textContent).toBe("split");
 
     fireEvent.click(screen.getByRole("button", { name: "Exit split workspace" }));
-    expect(screen.getByTestId("view-mode").textContent).toBe("wiki");
+    expect(screen.getByTestId("view-mode").textContent).toBe("chat");
   });
 });
