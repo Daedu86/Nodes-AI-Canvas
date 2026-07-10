@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { buildSessionBrief, type SessionBrief } from "@/lib/session-brief";
 import type { SessionArtifact, SessionContextLink } from "@/lib/session-artifacts";
 import {
   buildSessionWiki,
@@ -20,7 +19,6 @@ type SessionKnowledgeSnapshot = {
 };
 
 type SessionKnowledgeContextValue = {
-  brief: SessionBrief | null;
   publishSnapshot: (snapshot: SessionKnowledgeSnapshot | null) => void;
   selectedWikiPageId: SessionWikiPageId;
   setSelectedWikiPageId: (value: SessionWikiPageId) => void;
@@ -48,32 +46,19 @@ export function SessionKnowledgeProvider({ children }: { children: React.ReactNo
     [snapshot],
   );
 
-  const brief = React.useMemo(
-    () =>
-      snapshot
-        ? buildSessionBrief({
-            artifacts: snapshot.artifacts,
-            sessionTitle: snapshot.sessionTitle,
-            wiki,
-          })
-        : null,
-    [snapshot, wiki],
-  );
-
   React.useEffect(() => {
     setSelectedWikiPageId("overview");
   }, [snapshot?.sessionId]);
 
   const value = React.useMemo<SessionKnowledgeContextValue>(
     () => ({
-      brief,
       publishSnapshot: setSnapshot,
       selectedWikiPageId,
       setSelectedWikiPageId,
       snapshot,
       wiki,
     }),
-    [brief, selectedWikiPageId, snapshot, wiki],
+    [selectedWikiPageId, snapshot, wiki],
   );
 
   return (
