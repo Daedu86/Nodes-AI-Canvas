@@ -20,13 +20,11 @@ function LayoutHarness() {
       <button type="button" onClick={() => setViewMode("split")}>Show split</button>
       <button type="button" onClick={() => setViewMode("canvas")}>Show canvas</button>
       <button type="button" onClick={() => setViewMode("wiki")}>Show Wiki</button>
-      <button type="button" onClick={() => setViewMode("brief")}>Show Brief</button>
       <div style={{ width: 1200, height: 800 }}>
         <WorkspaceSplitLayout
           chatPanel={<div data-testid="chat-panel">chat</div>}
           canvasPanel={<div data-testid="canvas-panel">canvas</div>}
           wikiPanel={<div data-testid="wiki-panel">wiki</div>}
-          briefPanel={<div data-testid="brief-panel">brief</div>}
         />
       </div>
     </div>
@@ -55,15 +53,13 @@ describe("WorkspaceSplitLayout", () => {
     expect(screen.queryByTestId("chat-panel")).not.toBeNull();
     expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
     expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
-    expect(screen.queryByTestId("brief-panel")).not.toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Hide Brief pane in split" }));
-    expect(screen.queryByTestId("brief-panel")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Hide Wiki pane in split" }));
+    expect(screen.queryByTestId("wiki-panel")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show Wiki" }));
     expect(screen.getByTestId("view-mode").textContent).toBe("wiki");
     expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
-    expect(screen.queryByTestId("brief-panel")).toBeNull();
 
     unmount();
     renderLayout("session-a");
@@ -72,12 +68,11 @@ describe("WorkspaceSplitLayout", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show split" }));
     expect(screen.queryByTestId("chat-panel")).not.toBeNull();
     expect(screen.queryByTestId("canvas-panel")).not.toBeNull();
-    expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
-    expect(screen.queryByTestId("brief-panel")).toBeNull();
+    expect(screen.queryByTestId("wiki-panel")).toBeNull();
 
     cleanup();
     renderLayout("session-b");
     expect(screen.getByTestId("view-mode").textContent).toBe("split");
-    expect(screen.queryByTestId("brief-panel")).not.toBeNull();
+    expect(screen.queryByTestId("wiki-panel")).not.toBeNull();
   });
 });
