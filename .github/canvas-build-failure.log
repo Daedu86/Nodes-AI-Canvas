@@ -14,8 +14,8 @@ restored lib/session-artifacts.ts 1e926596972cfb704878c7a47e0343d4b1ac8e66
 ++ dirname components/context/graph-branch-intent.tsx
 + mkdir -p components/context
 + gh api repos/Daedu86/Nodes-AI-Canvas/git/blobs/df26e4d6cc36041445fa1cc827a6c73adcdb476f --jq .content
-+ base64 --decode
 + tr -d '\n'
++ base64 --decode
 + echo 'restored components/context/graph-branch-intent.tsx df26e4d6cc36041445fa1cc827a6c73adcdb476f'
 restored components/context/graph-branch-intent.tsx df26e4d6cc36041445fa1cc827a6c73adcdb476f
 + restore_blob lib/thread-branching-runtime.ts a786e7289476ea6fd9733f9cafd20bdf4bb1a430
@@ -111,5 +111,135 @@ restored tests/block-library.test.tsx f341558d55e56573edf9aec24da45d91c4153c2a
 + cp .github/canvas-payload/provider.b64 components/context/session-artifacts.tsx
 + cp .github/canvas-payload/artifact-node.b64 components/assistant-ui/thread-graph-flow/artifact-node.tsx
 + cat .github/canvas-payload/patch-thread-flow.part00.b64 .github/canvas-payload/patch-thread-flow.part01.b64 .github/canvas-payload/patch-thread-flow.part02.b64 .github/canvas-payload/patch-thread-flow.part03.b64 .github/canvas-payload/patch-thread-flow.part04.b64 .github/canvas-payload/patch-thread-flow.part05.b64 .github/canvas-payload/patch-thread-flow.part06.b64
++ sed -i '/if "quickSemanticPresets" in text or "semanticArtifactPresets" in text:/,+1d' /tmp/patch-thread-flow.py
 + python /tmp/patch-thread-flow.py
-legacy semantic preset code remains
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx lines 2985
++ rm -rf .github/canvas-payload
++ npm ci
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'camera-controls@3.1.2',
+npm warn EBADENGINE   required: { node: '>=22.0.0', npm: '>=10.5.1' },
+npm warn EBADENGINE   current: { node: 'v20.20.2', npm: '10.8.2' }
+npm warn EBADENGINE }
+
+added 766 packages, and audited 767 packages in 16s
+
+265 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
++ npx tsc --noEmit
+components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx(1323,5): error TS18047: 'draft' is possibly 'null'.
+components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx(1324,5): error TS18047: 'draft' is possibly 'null'.
+components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx(2233,15): error TS2322: Type '(position?: { x: number; y: number; } | null) => void' is not assignable to type 'MouseEventHandler<HTMLButtonElement>'.
+  Types of parameters 'position' and 'event' are incompatible.
+    Type 'MouseEvent<HTMLButtonElement, MouseEvent>' is missing the following properties from type '{ x: number; y: number; }': x, y
+components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx(2561,26): error TS2552: Cannot find name 'semanticArtifactPresets'. Did you mean 'semanticArtifactMeta'?
+components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx(2561,57): error TS7031: Binding element 'semanticType' implicitly has an 'any' type.
+components/context/session-artifacts.tsx(352,9): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+lib/project-arena.ts(154,42): error TS2345: Argument of type 'string | null | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+tests/account-plan-route.test.ts(71,12): error TS18048: 'response' is possibly 'undefined'.
+tests/account-plan-route.test.ts(72,18): error TS18048: 'response' is possibly 'undefined'.
+tests/admin-users-route.test.ts(55,12): error TS18048: 'response' is possibly 'undefined'.
+tests/admin-users-route.test.ts(56,18): error TS18048: 'response' is possibly 'undefined'.
+tests/admin-users-route.test.ts(73,12): error TS18048: 'response' is possibly 'undefined'.
+tests/admin-users-route.test.ts(74,18): error TS18048: 'response' is possibly 'undefined'.
+tests/admin-users-route.test.ts(104,12): error TS18048: 'response' is possibly 'undefined'.
+tests/admin-users-route.test.ts(105,18): error TS18048: 'response' is possibly 'undefined'.
+tests/agent-token-route.test.ts(81,12): error TS18048: 'response' is possibly 'undefined'.
+tests/agent-token-route.test.ts(82,18): error TS18048: 'response' is possibly 'undefined'.
+tests/agent-token-route.test.ts(105,12): error TS18048: 'response' is possibly 'undefined'.
+tests/agent-token-route.test.ts(106,18): error TS18048: 'response' is possibly 'undefined'.
+tests/agent-token-route.test.ts(135,12): error TS18048: 'postResponse' is possibly 'undefined'.
+tests/agent-token-route.test.ts(142,12): error TS18048: 'deleteResponse' is possibly 'undefined'.
+tests/agent-token-route.test.ts(161,12): error TS18048: 'response' is possibly 'undefined'.
+tests/agent-token-route.test.ts(162,18): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(84,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(113,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(169,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(205,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(238,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(239,18): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(278,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(279,18): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(306,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(325,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(326,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(347,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(348,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(349,18): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(368,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(369,12): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(370,18): error TS18048: 'response' is possibly 'undefined'.
+tests/chat-route.test.ts(390,12): error TS18048: 'first' is possibly 'undefined'.
+tests/chat-route.test.ts(403,12): error TS18048: 'second' is possibly 'undefined'.
+tests/chat-route.test.ts(404,12): error TS18048: 'second' is possibly 'undefined'.
+tests/chat-route.test.ts(405,12): error TS18048: 'second' is possibly 'undefined'.
+tests/chat-route.test.ts(406,18): error TS18048: 'second' is possibly 'undefined'.
+tests/chat-route.test.ts(430,12): error TS18048: 'first' is possibly 'undefined'.
+tests/chat-route.test.ts(443,12): error TS18048: 'second' is possibly 'undefined'.
+tests/chat-route.test.ts(444,12): error TS18048: 'second' is possibly 'undefined'.
+tests/chat-route.test.ts(445,18): error TS18048: 'second' is possibly 'undefined'.
+tests/chat-route.test.ts(469,12): error TS18048: 'response' is possibly 'undefined'.
+tests/e2e/chat-image-attachment.spec.ts(19,5): error TS2322: Type '{ length: number; toString(): string; toLocaleString(): string; toLocaleString(locales: string | string[], options?: (NumberFormatOptions & DateTimeFormatOptions) | undefined): string; ... 38 more ...; "Content-Type": string; } | { ...; } | { ...; }' is not assignable to type '{ [key: string]: string; } | undefined'.
+  Type '{ length: number; toString(): string; toLocaleString(): string; toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions & Intl.DateTimeFormatOptions): string; pop(): [...] | undefined; ... 37 more ...; "Content-Type": string; }' is not assignable to type '{ [key: string]: string; }'.
+    Property 'length' is incompatible with index signature.
+      Type 'number' is not assignable to type 'string'.
+tests/e2e/session-return-send.spec.ts(38,5): error TS2322: Type '{ length: number; toString(): string; toLocaleString(): string; toLocaleString(locales: string | string[], options?: (NumberFormatOptions & DateTimeFormatOptions) | undefined): string; ... 38 more ...; "Content-Type": string; } | { ...; } | { ...; }' is not assignable to type '{ [key: string]: string; } | undefined'.
+  Type '{ length: number; toString(): string; toLocaleString(): string; toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions & Intl.DateTimeFormatOptions): string; pop(): [...] | undefined; ... 37 more ...; "Content-Type": string; }' is not assignable to type '{ [key: string]: string; }'.
+    Property 'length' is incompatible with index signature.
+      Type 'number' is not assignable to type 'string'.
+tests/e2e/smoke.spec.ts(71,5): error TS2322: Type '{ length: number; toString(): string; toLocaleString(): string; toLocaleString(locales: string | string[], options?: (NumberFormatOptions & DateTimeFormatOptions) | undefined): string; ... 38 more ...; "Content-Type": string; } | { ...; } | { ...; }' is not assignable to type '{ [key: string]: string; } | undefined'.
+  Type '{ length: number; toString(): string; toLocaleString(): string; toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions & Intl.DateTimeFormatOptions): string; pop(): [...] | undefined; ... 37 more ...; "Content-Type": string; }' is not assignable to type '{ [key: string]: string; }'.
+    Property 'length' is incompatible with index signature.
+      Type 'number' is not assignable to type 'string'.
+tests/llm-control-route.test.ts(35,12): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-control-route.test.ts(36,18): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-control-route.test.ts(55,12): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-control-route.test.ts(73,12): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-control-route.test.ts(74,18): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-control-route.test.ts(103,12): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-control-route.test.ts(104,18): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-control-route.test.ts(137,12): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-control-route.test.ts(138,18): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-helpers.test.ts(136,54): error TS2322: Type '"openai"' is not assignable to type '"openrouter" | "ollama" | undefined'.
+tests/llm-helpers.test.ts(141,59): error TS2322: Type '"anthropic"' is not assignable to type '"openrouter" | "ollama" | undefined'.
+tests/llm-helpers.test.ts(146,60): error TS2322: Type '"google"' is not assignable to type '"openrouter" | "ollama" | undefined'.
+tests/llm-settings-route.test.ts(53,12): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-settings-route.test.ts(55,18): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-settings-route.test.ts(114,12): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-settings-route.test.ts(131,18): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-settings-route.test.ts(184,12): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-settings-route.test.ts(229,12): error TS18048: 'response' is possibly 'undefined'.
+tests/llm-user-settings.test.ts(8,7): error TS2741: Property 'ollama' is missing in type '{ openrouter: { apiKey: string; enabledModels: string[]; }; }' but required in type '{ ollama: OllamaProviderSettings; openrouter: OpenRouterProviderSettings; }'.
+tests/llm-user-settings.test.ts(24,9): error TS2741: Property 'ollama' is missing in type '{ openrouter: { activeApiKeyId: string; apiKey: string; apiKeys: { createdAt: string; id: string; key: string; name: string; }[]; enabledModels: string[]; }; }' but required in type '{ ollama: OllamaProviderSettings; openrouter: OpenRouterProviderSettings; }'.
+tests/llm-user-settings.test.ts(66,9): error TS2741: Property 'apiKey' is missing in type '{ deletedModels: string[]; enabledModels: string[]; }' but required in type 'OpenRouterProviderSettings'.
+tests/llm-user-settings.test.ts(84,9): error TS2741: Property 'apiKey' is missing in type '{ enabledModels: never[]; }' but required in type 'OpenRouterProviderSettings'.
+tests/llm-user-settings.test.ts(96,9): error TS2741: Property 'openrouter' is missing in type '{ ollama: { activeApiKeyId: string; apiKey: string; apiKeys: { createdAt: string; id: string; key: string; name: string; }[]; baseUrl: string; enabled: true; models: string[]; }; }' but required in type '{ ollama: OllamaProviderSettings; openrouter: OpenRouterProviderSettings; }'.
+tests/project-context-builder.test.ts(64,9): error TS2322: Type '{ arenaWinnerBranchKey: null; arenaWinnerSessionId: string; createdAt: string; globalContext: string; id: string; memoryIds: string[]; sessionCount: number; sessionIds: string[]; title: string; updatedAt: string; }' is not assignable to type 'ProjectDocument'.
+  Property 'accessRole' is missing in type '{ arenaWinnerBranchKey: null; arenaWinnerSessionId: string; createdAt: string; globalContext: string; id: string; memoryIds: string[]; sessionCount: number; sessionIds: string[]; title: string; updatedAt: string; }' but required in type 'ProjectSummary'.
+tests/provider-runtime.test.ts(50,27): error TS2352: Conversion of type 'undefined' to type 'RequestInit' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+tests/provider-runtime.test.ts(50,53): error TS2493: Tuple type '[]' of length '0' has no element at index '1'.
+tests/provider-runtime.test.ts(83,27): error TS2352: Conversion of type 'undefined' to type 'RequestInit' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+tests/provider-runtime.test.ts(83,53): error TS2493: Tuple type '[]' of length '0' has no element at index '1'.
+tests/session-artifact-upload-route.test.ts(49,12): error TS18048: 'response' is possibly 'undefined'.
+tests/session-artifact-upload-route.test.ts(63,12): error TS18048: 'response' is possibly 'undefined'.
+tests/session-artifact-upload-route.test.ts(80,12): error TS18048: 'response' is possibly 'undefined'.
+tests/session-artifact-upload-route.test.ts(81,18): error TS18048: 'response' is possibly 'undefined'.
+tests/session-artifact-upload-route.test.ts(98,12): error TS18048: 'response' is possibly 'undefined'.
+tests/session-artifact-upload-route.test.ts(113,18): error TS18048: 'response' is possibly 'undefined'.
+tests/session-blob-maintenance-route.test.ts(55,12): error TS18048: 'response' is possibly 'undefined'.
+tests/session-blob-maintenance-route.test.ts(56,18): error TS18048: 'response' is possibly 'undefined'.
+tests/session-blob-maintenance-route.test.ts(69,12): error TS18048: 'response' is possibly 'undefined'.
+tests/session-blob-maintenance-route.test.ts(70,18): error TS18048: 'response' is possibly 'undefined'.
+tests/session-blob-maintenance-route.test.ts(85,12): error TS18048: 'response' is possibly 'undefined'.
+tests/thread-normalization.test.ts(27,12): error TS2352: Conversion of type '{ metadata: { custom: Record<string, unknown>; } | undefined; sourceId?: string | undefined; id: string; role: "user" | "assistant"; content: never[]; }' to type 'ThreadMessage' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ metadata: { custom: Record<string, unknown>; } | undefined; sourceId?: string | undefined; id: string; role: "user" | "assistant"; content: never[]; }' is not comparable to type '(BaseThreadMessage & MessageCommonProps & { readonly role: "user"; readonly content: readonly ThreadUserMessagePart[]; readonly attachments: readonly CompleteAttachment[]; readonly metadata: { ...; }; }) | (BaseThreadMessage & ... 1 more ... & { ...; })'.
+    Type '{ metadata: { custom: Record<string, unknown>; } | undefined; sourceId?: string | undefined; id: string; role: "user" | "assistant"; content: never[]; }' is not comparable to type 'BaseThreadMessage & MessageCommonProps & { readonly role: "assistant"; readonly content: readonly ThreadAssistantMessagePart[]; readonly status: MessageStatus; readonly metadata: { ...; }; }'.
+      Property 'createdAt' is missing in type '{ metadata: { custom: Record<string, unknown>; } | undefined; sourceId?: string | undefined; id: string; role: "user" | "assistant"; content: never[]; }' but required in type 'MessageCommonProps'.
+tests/title-route.test.ts(64,12): error TS18048: 'response' is possibly 'undefined'.
+tests/title-route.test.ts(72,18): error TS18048: 'response' is possibly 'undefined'.
+tests/title-route.test.ts(89,12): error TS18048: 'response' is possibly 'undefined'.
+tests/title-route.test.ts(90,18): error TS18048: 'response' is possibly 'undefined'.
