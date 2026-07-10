@@ -1,8 +1,9 @@
 name: Remove Wiki
 
 on:
-  push:
-    branches: [codex/remove-wiki]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -15,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: codex/remove-wiki
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -45,6 +46,4 @@ jobs:
           git add -A
           git diff --cached --quiet && exit 0
           git commit -m "refactor: remove wiki"
-          git push origin HEAD:codex/remove-wiki
-
-# One-time validation workflow; the migration removes this file after success.
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
