@@ -5,6 +5,11 @@ const PIXEL_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6p2sQAAAAASUVORK5CYII=";
 
 type Page = import("@playwright/test").Page;
+type JsonRecord = Record<string, unknown>;
+type ChatRequest = { url: string; postData?: unknown };
+
+const isJsonRecord = (value: unknown): value is JsonRecord =>
+  typeof value === "object" && value !== null;
 
 const DEV_AUTH_EMAIL = process.env.AUTH_DEV_EMAIL || "demo@nodes.local";
 const DEV_AUTH_PASSWORD = process.env.AUTH_DEV_PASSWORD || "dev-password";
@@ -82,7 +87,7 @@ test("attaching an image includes it in the sent message", async ({ page }) => {
   const filePath = test.info().outputPath("pixel.png");
   await fs.writeFile(filePath, Buffer.from(PIXEL_PNG_BASE64, "base64"));
 
-  const chatRequests: Array<{ url: string; postData?: any }> = [];
+  const chatRequests: ChatRequest[] = [];
   const chatRequestBodies: string[] = [];
   page.on("request", (req) => {
     if (req.method() !== "POST") return;
@@ -137,28 +142,29 @@ test("attaching an image includes it in the sent message", async ({ page }) => {
   // Assert the request included an image part.
   expect(chatRequests.length).toBeGreaterThan(0);
   const last = chatRequests.at(-1)?.postData;
-  const messages = Array.isArray(last?.messages) ? last.messages : [];
-  const lastUser = [...messages].reverse().find((m: any) => m?.role === "user");
+  const messages = isJsonRecord(last) && Array.isArray(last.messages) ? last.messages : [];
+  const lastUser = [...messages]
+    .reverse()
+    .find((message): message is JsonRecord => isJsonRecord(message) && message.role === "user");
   const parts = Array.isArray(lastUser?.parts)
     ? lastUser.parts
     : Array.isArray(lastUser?.content)
       ? lastUser.content
       : [];
   expect(Array.isArray(parts)).toBeTruthy();
-  const hasImage =
-    Array.isArray(parts) &&
-    parts.some((p: any) => {
-      if (p?.type === "image" && typeof p.image === "string") return true;
-      if (
-        p?.type === "file" &&
-        typeof p.url === "string" &&
-        typeof p.mediaType === "string" &&
-        p.mediaType.startsWith("image/")
-      ) {
-        return true;
-      }
-      return false;
-    });
+  const hasImage = parts.some((part) => {
+    if (!isJsonRecord(part)) return false;
+    if (part.type === "image" && typeof part.image === "string") return true;
+    if (
+      part.type === "file" &&
+      typeof part.url === "string" &&
+      typeof part.mediaType === "string" &&
+      part.mediaType.startsWith("image/")
+    ) {
+      return true;
+    }
+    return false;
+  });
   expect(hasImage).toBeTruthy();
 });
 
@@ -181,7 +187,7 @@ test("attaching an image does not auto-send when text is already typed", async (
   const filePath = test.info().outputPath("pixel.png");
   await fs.writeFile(filePath, Buffer.from(PIXEL_PNG_BASE64, "base64"));
 
-  const chatRequests: Array<{ url: string; postData?: any }> = [];
+  const chatRequests: ChatRequest[] = [];
   page.on("request", (req) => {
     if (req.method() !== "POST") return;
     if (!req.url().includes("/api/chat")) return;
