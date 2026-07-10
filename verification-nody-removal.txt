@@ -1,0 +1,258 @@
+Nody removal verification
+commit=3a7b1962556d8e0b3a0c41da52074cf218e1f440
+npm_ci=0
+typecheck=2
+tests=1
+build=1
+
+===== npm ci (tail) =====
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'camera-controls@3.1.2',
+npm warn EBADENGINE   required: { node: '>=22.0.0', npm: '>=10.5.1' },
+npm warn EBADENGINE   current: { node: 'v20.20.2', npm: '10.8.2' }
+npm warn EBADENGINE }
+
+added 766 packages, and audited 767 packages in 18s
+
+265 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+===== typecheck (tail) =====
+lib/session-brief.ts(36,12): error TS1161: Unterminated regular expression literal.
+lib/session-brief.ts(38,1): error TS1161: Unterminated regular expression literal.
+lib/session-brief.ts(38,2): error TS1005: ':' expected.
+tests/session-brief.test.ts(38,63): error TS1002: Unterminated string literal.
+tests/session-brief.test.ts(39,5): error TS1005: ',' expected.
+tests/session-brief.test.ts(39,11): error TS1005: ',' expected.
+tests/session-brief.test.ts(39,18): error TS1005: ',' expected.
+tests/session-brief.test.ts(39,25): error TS1005: ',' expected.
+tests/session-brief.test.ts(39,35): error TS1005: ',' expected.
+tests/session-brief.test.ts(39,38): error TS1005: ',' expected.
+tests/session-brief.test.ts(39,40): error TS1002: Unterminated string literal.
+tests/session-brief.test.ts(40,13): error TS1005: ':' expected.
+tests/session-brief.test.ts(40,15): error TS1005: ',' expected.
+tests/session-brief.test.ts(40,33): error TS1005: ':' expected.
+
+===== tests (tail) =====
+ [32m✓[39m tests/thread-composer.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 352[2mms[22m[39m
+ [32m✓[39m tests/llm-helpers.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/workspace-surface.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1271[2mms[22m[39m
+     [33m[2m✓[22m[39m opens the LLM Models workspace from Profile [33m 628[2mms[22m[39m
+ [32m✓[39m tests/project-arena.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/thread-normalization.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/project-context-builder.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/projects-context.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m tests/agent-token-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m tests/project-wiki.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+ [31m❯[39m tests/session-ui-state.test.tsx [2m([22m[2m6 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 276[2mms[22m[39m
+     [32m✓[39m preserves known custom provider model configs from storage[32m 56[2mms[22m[39m
+     [32m✓[39m falls back when a persisted provider is malformed[32m 3[2mms[22m[39m
+     [32m✓[39m upgrades legacy default split ratios to the calmer canvas-first layout[32m 3[2mms[22m[39m
+[31m     [31m×[31m defaults split mode to all five workspace panes and guards against empty persisted state[39m[32m 8[2mms[22m[39m
+     [32m✓[39m starts a post-auth landing session in chat mode when no session preference exists[32m 4[2mms[22m[39m
+[31m     [31m×[31m remembers the last standalone view when split is opened directly and toggled off later[39m[32m 200[2mms[22m[39m
+ [32m✓[39m tests/project-collaboration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+[90mstderr[2m | tests/llm-control-route.test.ts[2m > [22m[2m/api/llm/control[2m > [22m[2mreturns a generic stop error instead of raw command output
+[22m[39mollama stop failed Error: spawn ENOENT ollama
+    at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/llm-control-route.test.ts:126:18
+    at Mock [90m(file:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/spy[24m/dist/index.js:332:34[90m)[39m
+    at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mapp/api/llm/control/route.ts:29:5
+    at new Promise (<anonymous>)
+    at execFileAsync [90m(/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mapp/api/llm/control/route.ts:28:10[90m)[39m
+    at Module.POST [90m(/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mapp/api/llm/control/route.ts:104:15[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:95:5)[39m
+    at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/llm-control-route.test.ts:130:22
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:20
+
+ [32m✓[39m tests/llm-control-route.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32m✓[39m tests/llm-user-settings.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/project-workspace.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 1027[2mms[22m[39m
+     [33m[2m✓[22m[39m shows a visible context CTA in project overview and returns focus to the editor [33m 761[2mms[22m[39m
+ [32m✓[39m tests/session-artifact-upload-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 72[2mms[22m[39m
+ [32m✓[39m tests/context-builder.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/canvas-prompt-node.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 446[2mms[22m[39m
+ [32m✓[39m tests/request-errors.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m tests/project-store.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [31m❯[39m tests/session-brief.test.ts [2m([22m[2m0 test[22m[2m)[22m
+ [32m✓[39m tests/admin-users-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+[90mstderr[2m | tests/title-route.test.ts[2m > [22m[2m/api/title[2m > [22m[2mreturns a generic title error instead of raw upstream details
+[22m[39m/api/title error: Error: provider trace here
+    at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/title-route.test.ts:76:44
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2955:64
+
+ [32m✓[39m tests/title-route.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m tests/llm-settings.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 372[2mms[22m[39m
+     [33m[2m✓[22m[39m updates the selector pool when the user customizes model availability [33m 315[2mms[22m[39m
+ [32m✓[39m tests/api-access.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m tests/thread-branching-runtime.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/workspace-split-layout.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 418[2mms[22m[39m
+     [33m[2m✓[22m[39m persists the main panel view mode per session [33m 416[2mms[22m[39m
+ [32m✓[39m tests/account-plan-route.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32m✓[39m tests/agent-token.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m tests/thread-list.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 604[2mms[22m[39m
+     [33m[2m✓[22m[39m suppresses accidental new-session clicks immediately after leaving manage mode [33m 602[2mms[22m[39m
+ [32m✓[39m tests/provider-runtime.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m tests/session-blob-maintenance-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32m✓[39m tests/app-header.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 430[2mms[22m[39m
+     [33m[2m✓[22m[39m uses the main Split control as a reversible toggle [33m 426[2mms[22m[39m
+ [32m✓[39m tests/session-wiki.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+ [31m❯[39m tests/canvas-agent-route.test.ts [2m([22m[2m0 test[22m[2m)[22m
+ [32m✓[39m tests/memory-store.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m tests/thread-branching.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/agent-work-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 430[2mms[22m[39m
+     [33m[2m✓[22m[39m deletes a saved token from the dashboard activity view [33m 426[2mms[22m[39m
+ [32m✓[39m tests/artifact-presentation.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstderr[2m | tests/theme-toggle.test.tsx[2m > [22m[2mThemeToggle[2m > [22m[2mhydrates without recovering when a persisted light theme exists
+[22m[39mThe current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+[90mstderr[2m | tests/theme-toggle.test.tsx[2m > [22m[2mThemeToggle[2m > [22m[2mhydrates without recovering when a persisted light theme exists
+[22m[39mThe current testing environment is not configured to support act(...)
+
+ [32m✓[39m tests/theme-toggle.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 362[2mms[22m[39m
+ [32m✓[39m tests/session-blob-store.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m tests/agent-access-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 500[2mms[22m[39m
+     [33m[2m✓[22m[39m creates a token with an explicit expiry and confirms it was saved [33m 498[2mms[22m[39m
+ [32m✓[39m tests/root-page.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32m✓[39m tests/graph-models.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/knowledge-center-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 815[2mms[22m[39m
+     [33m[2m✓[22m[39m surfaces Agent Access docs and section matches from search [33m 813[2mms[22m[39m
+ [32m✓[39m tests/openrouter-deployment-key-policy.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/llm-settings-store.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/auth-screen.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 93[2mms[22m[39m
+ [32m✓[39m tests/e2e-auth.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/ollama-provider-policy.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/post-auth-handoff.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/app-title-sync.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 16[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/canvas-agent-route.test.ts[2m [ tests/canvas-agent-route.test.ts ][22m
+[31m[1mError[22m: Cannot find module '/app/api/canvas-agent/route' imported from /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/canvas-agent-route.test.ts[39m
+[36m [2m❯[22m tests/canvas-agent-route.test.ts:[2m22:1[22m[39m
+    [90m 20|[39m }))[33m;[39m
+    [90m 21|[39m
+    [90m 22|[39m [35mimport[39m { [33mPOST[39m } [35mfrom[39m [32m"../app/api/canvas-agent/route"[39m[33m;[39m
+    [90m   |[39m [31m^[39m
+    [90m 23|[39m
+    [90m 24|[39m [34mdescribe[39m([32m"/api/canvas-agent"[39m[33m,[39m () [33m=>[39m {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/session-brief.test.ts[2m [ tests/session-brief.test.ts ][22m
+[31m[1mError[22m: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnterminated string
+    [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m tests/session-brief.test.ts:38:19 [38;5;246m][0m
+    [38;5;246m│[0m
+ [38;5;246m38 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249mb[0m[38;5;249mo[0m[38;5;249md[0m[38;5;249my[0m[38;5;249m:[0m[38;5;249m [0m"- Q1: Should the brief be the final export?
+ [38;5;240m   │[0m                   ──────────────────────┬──────────────────────  
+ [38;5;240m   │[0m                                         ╰──────────────────────── 
+[38;5;246m────╯[0m
+[39m
+  Plugin: [35mvite:oxc[39m
+  File: [36m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/session-brief.test.ts[39m
+[90m [2m❯[22m transformWithOxc node_modules/vite/dist/node/chunks/node.js:[2m4017:19[22m[39m
+[90m [2m❯[22m TransformPluginContext.transform node_modules/vite/dist/node/chunks/node.js:[2m4088:26[22m[39m
+[90m [2m❯[22m EnvironmentPluginContainer.transform node_modules/vite/dist/node/chunks/node.js:[2m30151:51[22m[39m
+[90m [2m❯[22m loadAndTransform node_modules/vite/dist/node/chunks/node.js:[2m20098:26[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯[22m[39m
+
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/session-ui-state.test.tsx[2m > [22mSessionUiStateProvider[2m > [22mdefaults split mode to all five workspace panes and guards against empty persisted state
+[31m[1mAssertionError[22m: expected 'chat:closed|canvas:open|wiki:closed|b…' to be 'chat:closed|canvas:open|wiki:closed|b…' // Object.is equality[39m
+
+Expected: [32m"chat:closed|canvas:open|wiki:closed|brief:closed[7m|nody:closed[27m"[39m
+Received: [31m"chat:closed|canvas:open|wiki:closed|brief:closed"[39m
+
+[36m [2m❯[22m tests/session-ui-state.test.tsx:[2m136:59[22m[39m
+    [90m134|[39m     )[33m;[39m
+    [90m135|[39m
+    [90m136|[39m     [34mexpect[39m(screen[33m.[39m[34mgetByTestId[39m([32m"split-panes"[39m)[33m.[39mtextContent)[33m.[39m[34mtoBe[39m(
+    [90m   |[39m                                                           [31m^[39m
+    [90m137|[39m       [32m"chat:closed|canvas:open|wiki:closed|brief:closed|nody:closed"[39m[33m,[39m
+    [90m138|[39m     )[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/session-ui-state.test.tsx[2m > [22mSessionUiStateProvider[2m > [22mremembers the last standalone view when split is opened directly and toggled off later
+[31m[1mAssertionError[22m: expected 'canvas' to be 'nody' // Object.is equality[39m
+
+Expected: [32m"nody"[39m
+Received: [31m"canvas"[39m
+
+[36m [2m❯[22m tests/session-ui-state.test.tsx:[2m182:64[22m[39m
+    [90m180|[39m
+    [90m181|[39m     fireEvent.click(screen.getByRole("button", { name: "Toggle split" …
+    [90m182|[39m     expect(screen.getByTestId("toggle-view-mode").textContent).toBe("n…
+    [90m   |[39m                                                                [31m^[39m
+    [90m183|[39m   })[33m;[39m
+    [90m184|[39m })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m52 passed[39m[22m[90m (55)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m158 passed[39m[22m[90m (160)[39m
+[2m   Start at [22m 12:26:51
+[2m   Duration [22m 16.41s[2m (transform 2.35s, setup 0ms, import 11.61s, tests 8.51s, environment 16.60s)[22m
+
+
+::error file=/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/canvas-agent-route.test.ts,title=tests/canvas-agent-route.test.ts,line=22,column=1::Error: Cannot find module '/app/api/canvas-agent/route' imported from /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/canvas-agent-route.test.ts%0A ❯ tests/canvas-agent-route.test.ts:22:1%0A%0A⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯%0ASerialized Error: { code: 'ERR_MODULE_NOT_FOUND' }%0A
+
+::error file=/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/session-ui-state.test.tsx,title=tests/session-ui-state.test.tsx > SessionUiStateProvider > defaults split mode to all five workspace panes and guards against empty persisted state,line=136,column=59::AssertionError: expected 'chat:closed|canvas:open|wiki:closed|b…' to be 'chat:closed|canvas:open|wiki:closed|b…' // Object.is equality%0A%0AExpected: "chat:closed|canvas:open|wiki:closed|brief:closed|nody:closed"%0AReceived: "chat:closed|canvas:open|wiki:closed|brief:closed"%0A%0A ❯ tests/session-ui-state.test.tsx:136:59%0A%0A
+
+::error file=/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/session-ui-state.test.tsx,title=tests/session-ui-state.test.tsx > SessionUiStateProvider > remembers the last standalone view when split is opened directly and toggled off later,line=182,column=64::AssertionError: expected 'canvas' to be 'nody' // Object.is equality%0A%0AExpected: "nody"%0AReceived: "canvas"%0A%0A ❯ tests/session-ui-state.test.tsx:182:64%0A%0A
+
+===== build (tail) =====
+
+> nodes@0.1.0 build
+> next build
+
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+   ▲ Next.js 15.5.20
+
+   Creating an optimized production build ...
+Failed to compile.
+
+./lib/session-brief.ts
+Error:   [31mx[0m Unterminated regexp literal
+    ,-[[36;1;4m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/lib/session-brief.ts[0m:36:1]
+ [2m33[0m |   const page = wiki?.pages.find((entry) => entry.id === "open-questions");
+ [2m34[0m |   if (!page) return [];
+ [2m35[0m |   return page.body
+ [2m36[0m |     .split(/?
+    : [35;1m           ^[0m
+ [2m37[0m | /)
+ [2m38[0m |     .map((line) => line.trim())
+ [2m39[0m |     .filter((line) => /^-\s+/.test(line))
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/session-brief.ts
+./components/context/session-knowledge.tsx
+./app/assistant.tsx
+
+
+> Build failed because of webpack errors
