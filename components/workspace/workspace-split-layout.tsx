@@ -3,7 +3,6 @@
 import React from "react";
 import {
   BookCopy,
-  FileText,
   MessageSquareText,
   Plus,
   Workflow,
@@ -19,7 +18,6 @@ type WorkspaceSplitLayoutProps = {
   chatPanel: React.ReactNode;
   canvasPanel: React.ReactNode;
   wikiPanel: React.ReactNode;
-  briefPanel: React.ReactNode;
 };
 
 type SplitPaneDefinition = {
@@ -67,7 +65,6 @@ export function WorkspaceSplitLayout({
   chatPanel,
   canvasPanel,
   wikiPanel,
-  briefPanel,
 }: WorkspaceSplitLayoutProps) {
   const {
     splitPaneVisibility,
@@ -101,16 +98,8 @@ export function WorkspaceSplitLayout({
         minWidth: 320,
         panel: wikiPanel,
       },
-      {
-        id: "brief",
-        icon: FileText,
-        idealWidth: 400,
-        label: "Brief",
-        minWidth: 320,
-        panel: briefPanel,
-      },
     ],
-    [briefPanel, canvasPanel, chatPanel, wikiPanel],
+    [canvasPanel, chatPanel, wikiPanel],
   );
 
   const openPanes = splitPanes.filter((pane) => splitPaneVisibility[pane.id]);
@@ -128,9 +117,6 @@ export function WorkspaceSplitLayout({
           <SinglePanelLayer active={viewMode === "canvas"}>{canvasPanel}</SinglePanelLayer>
           {viewMode === "wiki" ? (
             <SinglePanelLayer active>{wikiPanel}</SinglePanelLayer>
-          ) : null}
-          {viewMode === "brief" ? (
-            <SinglePanelLayer active>{briefPanel}</SinglePanelLayer>
           ) : null}
         </div>
       </div>
