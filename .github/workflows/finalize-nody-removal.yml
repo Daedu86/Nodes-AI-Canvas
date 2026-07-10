@@ -1,0 +1,64 @@
+name: Finalize Nody Removal
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Remove residual canvas action
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx')
+          source = path.read_text(encoding='utf-8')
+          source = source.replace('  Bot,\n', '')
+          source, count = re.subn(
+              r'\n            <div className="flex shrink-0 items-center gap-2">\n              <button\n                type="button"\n                className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2\.5 py-1\.5 text-\[11px\] text-sky-700 transition-colors hover:bg-sky-500/15"\n                onClick=\{\(\) => setViewMode\("nody"\)\}\n              >\n                <Bot className="h-3\.5 w-3\.5" />\n                <span>Open Nody</span>\n              </button>\n            </div>',
+              '',
+              source,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit('Residual canvas action was not found exactly once')
+          path.write_text(source, encoding='utf-8')
+
+          Path('verification-nody-removal.txt').unlink(missing_ok=True)
+          Path('.github/workflows/finalize-nody-removal.yml').unlink(missing_ok=True)
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build production app
+        run: npm run build
+
+      - name: Commit directly to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: finish Nody removal"
+          git push origin HEAD:main
