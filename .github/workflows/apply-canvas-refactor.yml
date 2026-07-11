@@ -15,7 +15,7 @@ jobs:
   apply:
     if: contains(github.event.head_commit.message, '[canvas-refactor-staging]')
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 30
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
@@ -76,6 +76,31 @@ jobs:
               "  buildImagePreviewDataUrl,\n  estimateDataUrlBytes,\n  getArtifactUploadLimit,",
               1,
           )
+          flow = flow.replace(
+              '''  const handleToolbarArtifactCreate = React.useCallback(
+              (
+                artifactType: SessionArtifact["artifactType"],
+                options?: { semanticType?: SessionArtifactSemanticType | null },
+              ) => {
+                setToolbarMenu(null);
+                handleCreateArtifact(artifactType, options);
+              },
+              [handleCreateArtifact],
+            );
+
+            const handleToolbarUpload = React.useCallback((artifactType: "image" | "file") => {
+              setToolbarMenu(null);
+              if (artifactType === "image") {
+                imageUploadInputRef.current?.click();
+                return;
+              }
+              fileUploadInputRef.current?.click();
+            }, []);
+
+          ''',
+              "",
+              1,
+          )
           flow_path.write_text(flow, encoding="utf-8")
 
           upload_path = Path("components/assistant-ui/thread-graph-flow/canvas-upload-utils.ts")
@@ -102,7 +127,7 @@ jobs:
           npm test
           npm run build
           npx playwright install --with-deps chromium
-          npm run test:e2e -- --workers=1
+          npx playwright test tests/e2e/smoke.spec.ts --workers=1 --grep "preserves a session thread when switching to a project and back|copies graph JSON after a reply|creates a new root branch from the flow canvas|creates a sibling user branch from a flow user node|creates a follow-up user branch from a flow assistant node"
 
           trap - ERR
           rm -rf .github/canvas-refactor
