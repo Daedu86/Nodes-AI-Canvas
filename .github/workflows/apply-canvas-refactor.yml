@@ -57,6 +57,7 @@ jobs:
 
           base64 --decode .github/canvas-refactor/apply.py.gz.b64 | gzip --decompress > /tmp/apply_canvas_refactor.py
           echo "be7e745d60e770868c1afed108fb8a4b81444ad4461738440ecc145205e81019  /tmp/apply_canvas_refactor.py" | sha256sum --check
+          sed -i 's@ROOT = Path(__file__).resolve().parents\[2\]@ROOT = Path.cwd()@' /tmp/apply_canvas_refactor.py
           python3 -m py_compile /tmp/apply_canvas_refactor.py
           python3 /tmp/apply_canvas_refactor.py
 
