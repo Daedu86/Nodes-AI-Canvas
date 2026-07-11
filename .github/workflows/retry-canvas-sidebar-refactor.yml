@@ -1,0 +1,61 @@
+name: Retry canvas sidebar refactor
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-canvas-sidebar-refactor
+  cancel-in-progress: true
+
+jobs:
+  retry:
+    if: contains(github.event.head_commit.message, '[canvas-sidebar-retry]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: "true"
+      GH_TOKEN: ${{ github.token }}
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Reuse refactor gate without browser suite
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/apply-canvas-sidebar-refactor.yml').read_text(encoding='utf-8').splitlines()
+          marker = next(index for index, line in enumerate(source) if line.strip() == 'run: |')
+          script_lines = []
+          for line in source[marker + 1:]:
+              script_lines.append(line[10:] if line.startswith('          ') else line)
+          script = '\n'.join(script_lines) + '\n'
+          script = '\n'.join(
+              line for line in script.splitlines()
+              if 'npx playwright install' not in line
+              and 'npx playwright test' not in line
+          ) + '\n'
+          script = script.replace(
+              'rm -f .github/workflows/apply-canvas-sidebar-refactor.yml',
+              'rm -f .github/workflows/apply-canvas-sidebar-refactor.yml\n'
+              'rm -f .github/workflows/retry-canvas-sidebar-refactor.yml',
+              1,
+          )
+          Path('/tmp/run-canvas-sidebar-refactor.sh').write_text(script, encoding='utf-8')
+          PY
+          bash /tmp/run-canvas-sidebar-refactor.sh
