@@ -1,0 +1,184 @@
+/tmp/apply_canvas_concurrency.py: OK
+wrote lib/canvas-run-scheduler.ts
+wrote components/assistant-ui/thread-graph-flow/use-canvas-run-manager.ts
+wrote app/api/canvas-runs/route.ts
+wrote tests/canvas-prompt-artifact.test.ts
+wrote tests/canvas-run-scheduler.test.ts
+wrote tests/canvas-run-manager.test.tsx
+patched lib/session-artifacts.ts
+patched lib/session-artifacts.ts
+patched lib/session-artifacts.ts
+patched lib/session-artifacts.ts
+patched lib/session-artifacts.ts
+patched lib/session-artifacts.ts
+patched lib/session-artifacts.ts
+patched components/context/session-artifacts.tsx
+patched components/context/session-artifacts.tsx
+patched components/context/session-artifacts.tsx
+patched components/context/session-artifacts.tsx
+patched components/context/session-artifacts.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow-types.ts
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow-types.ts
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow-types.ts
+wrote components/assistant-ui/thread-graph-flow/canvas-prompt-node.tsx
+patched components/assistant-ui/thread-graph-flow/artifact-presentation.ts
+patched components/assistant-ui/thread-graph-flow/artifact-presentation.ts
+patched components/assistant-ui/thread-graph-flow/artifact-presentation.ts
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+patched lib/user-plan.ts
+patched lib/user-plan.ts
+patched components/workspace/project-canvas-data.ts
+canvas concurrency patch complete
+
+added 761 packages, and audited 762 packages in 18s
+
+265 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm warn allow-scripts 2 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   sharp@0.34.5 (install: node install/check.js || npm run build)
+npm warn allow-scripts   unrs-resolver@1.9.2 (postinstall: napi-postinstall unrs-resolver 1.9.2 check)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
+
+/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+    18:3   warning  'Code2' is defined but never used                                  @typescript-eslint/no-unused-vars
+    24:3   warning  'ImagePlus' is defined but never used                              @typescript-eslint/no-unused-vars
+    35:3   warning  'Upload' is defined but never used                                 @typescript-eslint/no-unused-vars
+   476:7   warning  'canvasToolbarButtonClassName' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   522:11  warning  'activeSession' is assigned a value but never used                 @typescript-eslint/no-unused-vars
+  1936:9   warning  'handleToolbarArtifactCreate' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  1947:9   warning  'handleToolbarUpload' is assigned a value but never used           @typescript-eslint/no-unused-vars
+
+✖ 7 problems (0 errors, 7 warnings)
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas[39m
+
+ [32m✓[39m tests/canvas-run-scheduler.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/canvas-prompt-artifact.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+ [31m❯[39m tests/canvas-run-manager.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 189[2mms[22m[39m
+     [32m✓[39m dispatches three free-tier prompts concurrently[32m 165[2mms[22m[39m
+[31m     [31m×[31m serializes runs that share an output artifact[39m[32m 22[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/canvas-run-manager.test.tsx[2m > [22museCanvasRunManager[2m > [22mserializes runs that share an output artifact
+[31m[1mTestingLibraryElementError[22m: Found multiple elements with the role "button" and name "Run A"
+
+Here are the matching elements:
+
+Ignored nodes: comments, script, style
+[36m<button>[31m
+  [0mRun A[0m
+[36m</button>[31m
+
+Ignored nodes: comments, script, style
+[36m<button>[31m
+  [0mRun A[0m
+[36m</button>[31m
+
+(If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+Ignored nodes: comments, script, style
+[36m<body>[31m
+  [36m<div>[31m
+    [36m<div>[31m
+      [36m<button>[31m
+        [0mRun A[0m
+      [36m</button>[31m
+      [36m<button>[31m
+        [0mRun B[0m
+      [36m</button>[31m
+      [36m<button>[31m
+        [0mRun C[0m
+      [36m</button>[31m
+      [36m<div[31m
+        [33mdata-testid[31m=[32m"counts"[31m
+      [36m>[31m
+        [0m0[0m
+        [0m:[0m
+        [0m0[0m
+      [36m</div>[31m
+    [36m</div>[31m
+  [36m</div>[31m
+  [36m<div>[31m
+    [36m<div>[31m
+      [36m<button>[31m
+        [0mRun A[0m
+      [36m</button>[31m
+      [36m<button>[31m
+        [0mRun B[0m
+      [36m</button>[31m
+      [36m<button>[31m
+        [0mRun C[0m
+      [36m</button>[31m
+      [36m<div[31m
+        [33mdata-testid[31m=[32m"counts"[31m
+      [36m>[31m
+        [0m0[0m
+        [0m:[0m
+        [0m0[0m
+      [36m</div>[31m
+    [36m</div>[31m
+  [36m</div>[31m
+[36m</body>[31m[39m
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m getElementError node_modules/@testing-library/dom/dist/query-helpers.js:[2m20:35[22m[39m
+[90m [2m❯[22m getMultipleElementsFoundError node_modules/@testing-library/dom/dist/query-helpers.js:[2m23:10[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m55:13[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m tests/canvas-run-manager.test.tsx:[2m137:14[22m[39m
+    [90m135|[39m     [34mrender[39m([33m<[39m[33mHarness[39m [33mlinks[39m[33m=[39m[33m{[39mlinks[33m}[39m [33m/[39m[33m>[39m)[33m;[39m
+    [90m136|[39m     [35mawait[39m [34mact[39m([35masync[39m () [33m=>[39m {
+    [90m137|[39m       screen[33m.[39m[34mgetByRole[39m([32m"button"[39m[33m,[39m { name[33m:[39m [32m"Run A"[39m })[33m.[39m[34mclick[39m()[33m;[39m
+    [90m   |[39m              [31m^[39m
+    [90m138|[39m       screen[33m.[39m[34mgetByRole[39m([32m"button"[39m[33m,[39m { name[33m:[39m [32m"Run B"[39m })[33m.[39m[34mclick[39m()[33m;[39m
+    [90m139|[39m       [35mawait[39m [33mPromise[39m[33m.[39m[34mresolve[39m()[33m;[39m
+[90m [2m❯[22m node_modules/@testing-library/react/dist/act-compat.js:[2m47:24[22m[39m
+[90m [2m❯[22m process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:[2m814:22[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/react/dist/act-compat.js:[2m46:25[22m[39m
+[90m [2m❯[22m tests/canvas-run-manager.test.tsx:[2m136:11[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 09:33:27
+[2m   Duration [22m 1.17s[2m (transform 130ms, setup 0ms, import 271ms, tests 206ms, environment 649ms)[22m
+
+
+::error file=/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/canvas-run-manager.test.tsx,title=tests/canvas-run-manager.test.tsx > useCanvasRunManager > serializes runs that share an output artifact,line=137,column=14::TestingLibraryElementError: Found multiple elements with the role "button" and name "Run A"%0A%0AHere are the matching elements:%0A%0AIgnored nodes: comments, script, style%0A<button>%0A  Run A%0A</button>%0A%0AIgnored nodes: comments, script, style%0A<button>%0A  Run A%0A</button>%0A%0A(If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).%0A%0AIgnored nodes: comments, script, style%0A<body>%0A  <div>%0A    <div>%0A      <button>%0A        Run A%0A      </button>%0A      <button>%0A        Run B%0A      </button>%0A      <button>%0A        Run C%0A      </button>%0A      <div%0A        data-testid="counts"%0A      >%0A        0%0A        :%0A        0%0A      </div>%0A    </div>%0A  </div>%0A  <div>%0A    <div>%0A      <button>%0A        Run A%0A      </button>%0A      <button>%0A        Run B%0A      </button>%0A      <button>%0A        Run C%0A      </button>%0A      <div%0A        data-testid="counts"%0A      >%0A        0%0A        :%0A        0%0A      </div>%0A    </div>%0A  </div>%0A</body>%0A ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19%0A ❯ getElementError node_modules/@testing-library/dom/dist/query-helpers.js:20:35%0A ❯ getMultipleElementsFoundError node_modules/@testing-library/dom/dist/query-helpers.js:23:10%0A ❯ node_modules/@testing-library/dom/dist/query-helpers.js:55:13%0A ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19%0A ❯ tests/canvas-run-manager.test.tsx:137:14%0A ❯ node_modules/@testing-library/react/dist/act-compat.js:47:24%0A ❯ process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22%0A ❯ node_modules/@testing-library/react/dist/act-compat.js:46:25%0A ❯ tests/canvas-run-manager.test.tsx:136:11%0A%0A
+Validation failed with exit code 1
+HEAD is now at 36a6bec chore: validate canvas concurrency with failure report [canvas-concurrency-staging] [skip vercel]
