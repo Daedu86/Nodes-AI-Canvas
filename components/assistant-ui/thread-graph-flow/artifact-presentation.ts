@@ -57,6 +57,7 @@ export const getArtifactReadableRole = (value: ArtifactDescriptor) => {
     case "code": return "Executable block";
     case "image": return "Visual evidence";
     case "file": return "Attached source";
+    case "prompt": return "Independent LLM instruction";
     default: return "Reusable context";
   }
 };
@@ -78,6 +79,7 @@ export const getArtifactIntentLabel = (value: ArtifactDescriptor) => {
     case "code": return "Provides exact syntax or implementation detail.";
     case "image": return "Provides visual context and a human-readable note.";
     case "file": return "Provides an uploaded source file plus extracted notes.";
+    case "prompt": return "Runs an independent LLM instruction with connected inputs and outputs.";
     default: return "Provides stable narrative context to a prompt.";
   }
 };
@@ -99,6 +101,7 @@ export const getArtifactBadgeLabel = (value: ArtifactDescriptor) => {
     case "code": return "Code";
     case "image": return "Image";
     case "file": return "File";
+    case "prompt": return "Prompt";
     default: return "Text";
   }
 };

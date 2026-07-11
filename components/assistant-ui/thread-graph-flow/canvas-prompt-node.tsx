@@ -1,3 +1,4 @@
+
 "use client";
 
 import { memo } from "react";
@@ -7,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import type { ThreadGraphFlowNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-flow-types";
 
 export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphFlowNode>) => {
+  const persistent = data.kind === "canvas-prompt";
   const detail = data.draftDetail;
   const text = data.draftText ?? "";
-  const busy = Boolean(data.draftBusy);
+  const status = data.promptStatus ?? (data.draftBusy ? "running" : "idle");
+  const busy = status === "running" || status === "queued" || Boolean(data.draftBusy);
   const disabled = Boolean(data.draftDisabled);
   const canSubmit = !disabled && !busy && text.trim().length > 0;
   const contextCount = data.draftContextCount ?? 0;
@@ -32,9 +35,13 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-emerald-300/35 bg-emerald-400/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-100">
-                Draft prompt
+                {persistent ? "Prompt" : "Draft prompt"}
               </span>
-              {detail ? (
+              {persistent ? (
+                <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-200/90">
+                  {status}
+                </span>
+              ) : detail ? (
                 <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-200/90">
                   {detail.title}
                 </span>
@@ -51,7 +58,9 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
               ) : null}
             </div>
             <p className="text-[11px] leading-5 text-slate-300/88">
-              {detail?.description ?? "Write a prompt directly on the canvas."}
+              {persistent
+                ? "Runs independently from chat and other prompt nodes. Shared outputs are serialized."
+                : detail?.description ?? "Write a prompt directly on the canvas."}
             </p>
           </div>
           <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300/90">
@@ -61,7 +70,7 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
 
         <div className="relative mt-3 space-y-2">
           <textarea
-            aria-label="Draft prompt"
+            aria-label={persistent ? "Canvas prompt" : "Draft prompt"}
             rows={5}
             value={text}
             placeholder={detail?.placeholder ?? "Write a prompt..."}
@@ -88,20 +97,25 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
               AI requests are disabled. Enable AI in the header to run this prompt.
             </div>
           ) : null}
+          {persistent && data.promptResult ? (
+            <div className="nowheel max-h-36 overflow-y-auto rounded-xl border border-emerald-300/20 bg-emerald-400/8 px-3 py-2 text-xs leading-5 text-slate-100">
+              {data.promptResult}
+            </div>
+          ) : null}
         </div>
 
         <div className="relative mt-3 flex justify-end gap-2">
           <Button type="button" variant="ghost" className="nodrag border border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.08]" onClick={data.onDraftCancel} disabled={busy}>
-            <Trash2 className="mr-1.5 h-4 w-4" /> Delete draft
+            <Trash2 className="mr-1.5 h-4 w-4" /> {persistent ? "Delete prompt" : "Delete draft"}
           </Button>
           {data.onDraftCancelRun ? (
-            <Button type="button" variant="outline" className="nodrag border-amber-300/35 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15" onClick={data.onDraftCancelRun} disabled={busy}>
+            <Button type="button" variant="outline" className="nodrag border-amber-300/35 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15" onClick={data.onDraftCancelRun}>
               <XCircle className="mr-1.5 h-4 w-4" /> Cancel run
             </Button>
           ) : null}
-          <Button type="button" className="nodrag bg-emerald-400 text-slate-950 hover:bg-emerald-300" onClick={data.onDraftSubmit} disabled={!canSubmit} aria-label="Send prompt node">
+          <Button type="button" className="nodrag bg-emerald-400 text-slate-950 hover:bg-emerald-300" onClick={data.onDraftSubmit} disabled={!canSubmit} aria-label={persistent ? "Run canvas prompt" : "Send prompt node"}>
             <SendHorizontal className="mr-1.5 h-4 w-4" />
-            {busy ? "Running..." : outputCount > 0 ? `Run → ${outputCount}` : "Run"}
+            {status === "queued" ? "Queued" : status === "running" ? "Running..." : outputCount > 0 ? `Run → ${outputCount}` : "Run"}
           </Button>
         </div>
       </div>

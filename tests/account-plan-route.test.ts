@@ -72,7 +72,7 @@ describe("/api/account/plan", () => {
     await expect(response.json()).resolves.toEqual({
       isAdmin: true,
       limits: expect.objectContaining({
-        concurrent: 1,
+        concurrent: 3,
         perDay: 120,
         perHour: 40,
         perMinute: 8,

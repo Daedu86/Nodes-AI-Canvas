@@ -197,7 +197,7 @@ export function buildProjectCanvasFlow(
           `${sessionStats.messageCount} messages`,
           `${sessionStats.rootCount} root branches`,
           `${sessionStats.siblingGroups} branching points`,
-          `${session.artifacts.length} artifacts`,
+          `${session.artifacts.filter((artifact) => artifact.artifactType !== "prompt").length} artifacts`,
         ].filter(Boolean).join(" · "),
         role: "session",
         sessionId: session.id,

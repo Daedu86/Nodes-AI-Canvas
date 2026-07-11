@@ -62,6 +62,7 @@ import {
   getArtifactStatChips,
 } from "@/components/assistant-ui/thread-graph-flow/artifact-presentation";
 import { CanvasPromptNode } from "@/components/assistant-ui/thread-graph-flow/canvas-prompt-node";
+import { useCanvasRunManager } from "@/components/assistant-ui/thread-graph-flow/use-canvas-run-manager";
 import { ThreadGraphEdge } from "@/components/assistant-ui/thread-graph-flow/thread-graph-edge";
 import { ThreadGraph3D } from "@/components/assistant-ui/thread-graph-flow/thread-graph-3d";
 import { layoutThreadGraphFlow } from "@/components/assistant-ui/thread-graph-flow/thread-graph-layout";
@@ -214,6 +215,8 @@ const artifactAccent = (
       return "#db2777";
     case "file":
       return "#2563eb";
+    case "prompt":
+      return "#0f766e";
     default:
       return "#7c3aed";
   }
@@ -244,6 +247,8 @@ const artifactDefaultTitle = (
       return `Image Context ${count}`;
     case "file":
       return `File Context ${count}`;
+    case "prompt":
+      return `Prompt ${count}`;
     default:
       return `${semanticMeta?.titlePrefix ?? "Text Context"} ${count}`;
   }
@@ -266,6 +271,8 @@ const artifactContentLabel = (
       return "Notes";
     case "file":
       return "Extracted text / notes";
+    case "prompt":
+      return "Prompt";
     default:
       return "Content";
   }
@@ -293,6 +300,8 @@ const artifactContentPlaceholder = (
       return "Describe what matters about this image...";
     case "file":
       return "Review or refine the extracted file text here...";
+    case "prompt":
+      return "Write an independent model instruction...";
     default:
       return "Write reusable context here...";
   }
@@ -519,7 +528,7 @@ export function ThreadGraphFlow() {
     setViewMode,
   } = useSessionUiState();
   const {
-    artifacts,
+    artifacts: sessionArtifacts,
     canvasLinks,
     contextLinks,
     applyCompletedResponse,
@@ -636,10 +645,39 @@ export function ThreadGraphFlow() {
   React.useEffect(() => {
     canvasConversationNodesRef.current = canvasConversationNodes;
   }, [canvasConversationNodes]);
+  const canvasPrompts = React.useMemo(
+    () => sessionArtifacts.filter((artifact) => artifact.artifactType === "prompt"),
+    [sessionArtifacts],
+  );
+  const artifacts = React.useMemo(
+    () => sessionArtifacts.filter((artifact) => artifact.artifactType !== "prompt"),
+    [sessionArtifacts],
+  );
   const artifactIndex = React.useMemo(
     () => new Map(artifacts.map((artifact) => [artifact.id, artifact] as const)),
     [artifacts],
   );
+  const promptIndex = React.useMemo(
+    () => new Map(canvasPrompts.map((prompt) => [prompt.id, prompt] as const)),
+    [canvasPrompts],
+  );
+  const {
+    activeCount: activeCanvasRunCount,
+    cancelAll: cancelAllCanvasRuns,
+    cancelPrompt: cancelCanvasPrompt,
+    queuedCount: queuedCanvasRunCount,
+    runPrompt: runCanvasPrompt,
+  } = useCanvasRunManager({
+    applyCompletedResponse,
+    artifacts,
+    canvasLinks,
+    enabled: llmEnabled,
+    maxConcurrent: 3,
+    model: modelId,
+    prompts: canvasPrompts,
+    provider,
+    updateArtifact,
+  });
   const linkedTargetCountByArtifact = React.useMemo(() => {
     const counts = new Map<string, number>();
     canvasLinks.forEach((link) => {
@@ -654,6 +692,7 @@ export function ThreadGraphFlow() {
     const hasCodeArtifacts = artifacts.some((artifact) => artifact.artifactType === "code");
     const hasImageArtifacts = artifacts.some((artifact) => artifact.artifactType === "image");
     const hasFileArtifacts = artifacts.some((artifact) => artifact.artifactType === "file");
+    const hasCanvasPrompts = canvasPrompts.length > 0;
     return [
       ...conversationLegend,
       ...(hasTextArtifacts
@@ -668,8 +707,11 @@ export function ThreadGraphFlow() {
       ...(hasFileArtifacts
         ? [{ key: "artifact-file", label: "File Context", swatch: artifactAccent("file") }]
         : []),
+      ...(hasCanvasPrompts
+        ? [{ key: "canvas-prompt", label: "Independent Prompt", swatch: artifactAccent("prompt") }]
+        : []),
     ];
-  }, [artifacts, nodes]);
+  }, [artifacts, canvasPrompts.length, nodes]);
 
   React.useEffect(() => {
     setStoredViewport(readFlowViewport(activeSessionId));
@@ -1040,7 +1082,7 @@ export function ThreadGraphFlow() {
         setFocusedMessageId(null);
         return;
       }
-      if (artifactIndex.has(nodeId)) {
+      if (artifactIndex.has(nodeId) || promptIndex.has(nodeId)) {
         setFocusedMessageId(null);
         return;
       }
@@ -1048,7 +1090,7 @@ export function ThreadGraphFlow() {
         setFocusedMessageId(nodeId);
       }
     },
-    [artifactIndex, nodeIndex, setCanvasSelectionId, setFocusedMessageId],
+    [artifactIndex, nodeIndex, promptIndex, setCanvasSelectionId, setFocusedMessageId],
   );
 
   React.useEffect(() => {
@@ -1065,11 +1107,15 @@ export function ThreadGraphFlow() {
     if (!canvasSelectionId || canvasSelectionId === selectedNodeId) {
       return;
     }
-    if (!nodeIndex.has(canvasSelectionId) && !artifactIndex.has(canvasSelectionId)) {
+    if (
+      !nodeIndex.has(canvasSelectionId) &&
+      !artifactIndex.has(canvasSelectionId) &&
+      !promptIndex.has(canvasSelectionId)
+    ) {
       return;
     }
     applyCanvasSelection(canvasSelectionId);
-  }, [applyCanvasSelection, artifactIndex, canvasSelectionId, nodeIndex, selectedNodeId]);
+  }, [applyCanvasSelection, artifactIndex, canvasSelectionId, nodeIndex, promptIndex, selectedNodeId]);
 
   React.useEffect(() => {
     if (densityMode === "focus" && !selectedNodeId) {
@@ -1172,6 +1218,51 @@ export function ThreadGraphFlow() {
     }));
   }, [artifacts, linkedTargetCountByArtifact]);
 
+  const baseCanvasPromptNodes = React.useMemo<ThreadGraphFlowNode[]>(() =>
+    canvasPrompts.map((prompt) => {
+      const inputCount = canvasLinks.filter(
+        (link) => link.relation === "context" && link.promptId === prompt.id,
+      ).length;
+      const outputCount = canvasLinks.filter(
+        (link) => link.relation === "output" && link.promptId === prompt.id,
+      ).length;
+      const status = prompt.promptStatus ?? "idle";
+      return {
+        id: prompt.id,
+        type: "promptNode",
+        position: prompt.position ?? { x: 0, y: 0 },
+        selectable: true,
+        draggable: true,
+        data: {
+          accent: "#0f766e",
+          draftBusy: status === "running" || status === "queued",
+          draftContextCount: inputCount,
+          draftDisabled: !llmEnabled,
+          draftError: prompt.promptError ?? null,
+          draftOutputCount: outputCount,
+          draftText: prompt.content,
+          emphasis: "normal",
+          filterMatched: true,
+          kind: "canvas-prompt",
+          position: prompt.position ?? null,
+          preview: prompt.content || "Independent canvas prompt",
+          promptResult: prompt.promptResult ?? null,
+          promptStatus: status,
+          role: "prompt",
+          title: prompt.title,
+          onDraftCancel: () => deleteArtifact(prompt.id),
+          onDraftCancelRun:
+            status === "running" || status === "queued"
+              ? () => cancelCanvasPrompt(prompt.id)
+              : undefined,
+          onDraftSubmit: () => runCanvasPrompt(prompt.id),
+          onDraftTextChange: (value) =>
+            updateArtifact(prompt.id, { content: value }, { revisionOrigin: "manual", revisionAuthor: "user" }),
+        },
+      } satisfies ThreadGraphFlowNode;
+    }),
+  [canvasLinks, canvasPrompts, cancelCanvasPrompt, deleteArtifact, llmEnabled, runCanvasPrompt, updateArtifact]);
+
   const handleCutEdge = React.useCallback(
     (childId: string, parentId: string | null) => {
       cutLink(childId, parentId);
@@ -1223,8 +1314,8 @@ export function ThreadGraphFlow() {
   const baseContextEdges = React.useMemo<ThreadGraphFlowEdge[]>(() => {
     return contextLinks.flatMap((link) => {
       const artifact = artifactIndex.get(link.artifactId);
-      const targetNode = nodeIndex.get(link.targetMessageId);
-      if (!artifact || !targetNode) return [];
+      const targetExists = nodeIndex.has(link.targetMessageId) || promptIndex.has(link.targetMessageId);
+      if (!artifact || !targetExists) return [];
       const accent = artifactAccent(artifact);
       return [
         {
@@ -1248,16 +1339,21 @@ export function ThreadGraphFlow() {
         },
       ];
     });
-  }, [artifactIndex, contextLinks, nodeIndex]);
+  }, [artifactIndex, contextLinks, nodeIndex, promptIndex]);
 
   const baseOutputEdges = React.useMemo<ThreadGraphFlowEdge[]>(() => {
     return canvasLinks.flatMap((link) => {
       if (link.relation !== "output") return [];
       const artifact = artifactIndex.get(link.artifactId);
-      const sourceId = link.responseId ?? link.promptId;
+      const sourceId =
+        link.promptId && promptIndex.has(link.promptId)
+          ? link.promptId
+          : link.responseId ?? link.promptId;
       if (!artifact || !sourceId) return [];
       const sourceExists =
-        sourceId === CANVAS_PROMPT_DRAFT_NODE_ID || nodeIndex.has(sourceId);
+        sourceId === CANVAS_PROMPT_DRAFT_NODE_ID ||
+        nodeIndex.has(sourceId) ||
+        promptIndex.has(sourceId);
       if (!sourceExists) return [];
       const pending = !link.responseId;
       const accent = artifactAccent(artifact);
@@ -1281,7 +1377,7 @@ export function ThreadGraphFlow() {
         },
       }];
     });
-  }, [artifactIndex, canvasLinks, nodeIndex]);
+  }, [artifactIndex, canvasLinks, nodeIndex, promptIndex]);
 
   const baseDraftNodes = React.useMemo<ThreadGraphFlowNode[]>(() => {
     if (!draft || !draftBranchSpec || !draftDetail) return [];
@@ -1367,11 +1463,12 @@ export function ThreadGraphFlow() {
   const { nodes: flowNodes, edges: flowEdges } = React.useMemo(
     () =>
       layoutThreadGraphFlow(
-        [...baseConversationNodes, ...baseDraftNodes, ...baseArtifactNodes],
+        [...baseConversationNodes, ...baseDraftNodes, ...baseCanvasPromptNodes, ...baseArtifactNodes],
         [...baseConversationEdges, ...baseDraftEdges, ...baseContextEdges, ...baseOutputEdges],
       ),
     [
       baseArtifactNodes,
+      baseCanvasPromptNodes,
       baseContextEdges,
       baseConversationEdges,
       baseOutputEdges,
@@ -1690,40 +1787,25 @@ export function ThreadGraphFlow() {
   );
 
   const handleCreatePromptNode = React.useCallback((position?: { x: number; y: number } | null) => {
-    const selectedOperations = selectedMessageNode
-      ? getAllowedBranchOperations(selectedMessageNode)
-      : [];
-    const anchor =
-      selectedMessageNode && selectedOperations.length > 0
-        ? selectedMessageNode
-        : nodeIndex.get(ROOT_NODE_ID) ?? null;
-    if (!anchor) {
-      const message = "Unable to create a prompt node from this canvas state.";
-      setCanvasDraftError(message);
-      setRequestError(message);
-      return;
-    }
-    const operation = getAllowedBranchOperations(anchor)[0];
-    if (!operation) {
-      const message = "Unable to branch from the selected canvas node.";
-      setCanvasDraftError(message);
-      setRequestError(message);
-      return;
-    }
     clearRequestError();
     setCanvasDraftError(null);
-    const initialText =
-      anchor.role === "user" && operation !== "create-follow-up-prompt" ? anchor.text : "";
-    beginDraft(anchor.id, operation, initialText, { position: position ?? null });
+    const prompt = createArtifact({
+      artifactType: "prompt",
+      content: "",
+      position: position ?? null,
+      semanticType: null,
+      title: `Prompt ${canvasPrompts.length + 1}`,
+    });
     setFlowRenderMode("2d");
-    applyCanvasSelection(anchor.id);
+    setSelectedNodeId(prompt.id);
+    setCanvasSelectionId(prompt.id);
+    setFocusedMessageId(null);
   }, [
-    applyCanvasSelection,
-    beginDraft,
+    canvasPrompts.length,
     clearRequestError,
-    nodeIndex,
-    selectedMessageNode,
-    setRequestError,
+    createArtifact,
+    setCanvasSelectionId,
+    setFocusedMessageId,
   ]);
 
   const handleCreateArtifact = React.useCallback(
@@ -1996,12 +2078,13 @@ export function ThreadGraphFlow() {
     (nodeId: string | null | undefined): SessionCanvasEndpoint | null => {
       if (!nodeId) return null;
       if (nodeId === CANVAS_PROMPT_DRAFT_NODE_ID) return { id: nodeId, kind: "draft" };
+      if (promptIndex.has(nodeId)) return { id: nodeId, kind: "prompt" };
       if (artifactIndex.has(nodeId)) return { id: nodeId, kind: "artifact" };
       const node = nodeIndex.get(nodeId);
       if (!node) return null;
       return { id: nodeId, kind: node.role === "assistant" ? "response" : "prompt" };
     },
-    [artifactIndex, nodeIndex],
+    [artifactIndex, nodeIndex, promptIndex],
   );
 
   const handleCanvasConnect = React.useCallback(
@@ -2229,12 +2312,18 @@ export function ThreadGraphFlow() {
               {connectionError}
             </p>
           ) : null}
+          {activeCanvasRunCount > 0 || queuedCanvasRunCount > 0 ? (
+            <div className="flex items-center justify-between rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs text-foreground">
+              <span>{activeCanvasRunCount} running · {queuedCanvasRunCount} queued</span>
+              <button type="button" className="font-medium text-emerald-700 dark:text-emerald-200" onClick={cancelAllCanvasRuns}>Cancel all</button>
+            </div>
+          ) : null}
           {showCanvasPromptCta ? (
             <button
               type="button"
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55"
               onClick={() => handleCreatePromptNode()}
-              disabled={!llmEnabled || isSubmittingBranch}
+              disabled={!llmEnabled}
             >
               <Plus className="h-4 w-4 text-emerald-600" />
               <span>Create prompt node</span>
@@ -2929,7 +3018,7 @@ export function ThreadGraphFlow() {
               }}
               onNodeDragStop={(_, node) => {
                 const position = { x: node.position.x, y: node.position.y };
-                if (node.data?.kind === "artifact") {
+                if (node.data?.kind === "artifact" || node.data?.kind === "canvas-prompt") {
                   updateArtifact(node.id, { position });
                 } else if (node.data?.kind === "prompt-draft") {
                   setDraftPosition(position);
@@ -2944,7 +3033,7 @@ export function ThreadGraphFlow() {
                 applyCanvasSelection(node.id);
               }}
               onNodeDoubleClick={(_, node) => {
-                if (node.data.kind === "artifact" || node.id === ROOT_NODE_ID) return;
+                if (node.data.kind === "artifact" || node.data.kind === "canvas-prompt" || node.id === ROOT_NODE_ID) return;
                 applyCanvasSelection(node.id);
                 setViewMode("split");
                 scrollMessageIntoView(node.id);

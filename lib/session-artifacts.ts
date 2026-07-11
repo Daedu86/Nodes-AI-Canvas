@@ -1,4 +1,11 @@
-export type SessionArtifactType = "text" | "code" | "image" | "file";
+export type SessionArtifactType = "text" | "code" | "image" | "file" | "prompt";
+export type SessionCanvasPromptStatus =
+  | "idle"
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
 export type SessionArtifactSemanticType =
   | "decision"
   | "evidence"
@@ -36,6 +43,14 @@ export type SessionArtifact = {
     y: number;
   } | null;
   sourceDataUrl?: string | null;
+  promptStatus?: SessionCanvasPromptStatus | null;
+  promptResult?: string | null;
+  promptError?: string | null;
+  promptRunId?: string | null;
+  promptModel?: string | null;
+  promptProvider?: string | null;
+  promptStartedAt?: string | null;
+  promptCompletedAt?: string | null;
   syncMode?: SessionArtifactSyncMode;
   revisions?: SessionArtifactRevision[];
   createdAt: string;
@@ -117,7 +132,19 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
 const isArtifactType = (value: unknown): value is SessionArtifactType =>
-  value === "text" || value === "code" || value === "image" || value === "file";
+  value === "text" ||
+  value === "code" ||
+  value === "image" ||
+  value === "file" ||
+  value === "prompt";
+
+const isCanvasPromptStatus = (value: unknown): value is SessionCanvasPromptStatus =>
+  value === "idle" ||
+  value === "queued" ||
+  value === "running" ||
+  value === "completed" ||
+  value === "failed" ||
+  value === "cancelled";
 
 const isArtifactSemanticType = (value: unknown): value is SessionArtifactSemanticType =>
   value === "decision" ||
@@ -225,6 +252,19 @@ export const normalizeSessionArtifacts = (value: unknown): SessionArtifact[] => 
           typeof entry.sourceDataUrl === "string" && entry.sourceDataUrl.length > 0
             ? entry.sourceDataUrl
             : null,
+        promptStatus:
+          artifactType === "prompt"
+            ? isCanvasPromptStatus(entry.promptStatus)
+              ? entry.promptStatus
+              : "idle"
+            : null,
+        promptResult: artifactType === "prompt" ? normalizeNullableString(entry.promptResult) : null,
+        promptError: artifactType === "prompt" ? normalizeNullableString(entry.promptError) : null,
+        promptRunId: artifactType === "prompt" ? normalizeNullableString(entry.promptRunId) : null,
+        promptModel: artifactType === "prompt" ? normalizeNullableString(entry.promptModel) : null,
+        promptProvider: artifactType === "prompt" ? normalizeNullableString(entry.promptProvider) : null,
+        promptStartedAt: artifactType === "prompt" ? normalizeNullableString(entry.promptStartedAt) : null,
+        promptCompletedAt: artifactType === "prompt" ? normalizeNullableString(entry.promptCompletedAt) : null,
         syncMode: isSyncMode(entry.syncMode) ? entry.syncMode : "auto",
         revisions: normalizeSessionArtifactRevisions(entry.revisions, updatedAt),
         createdAt,
@@ -616,7 +656,7 @@ export const applyResponseToArtifacts = ({
 };
 
 export const toLlmContextArtifacts = (artifacts: SessionArtifact[]): LlmContextArtifact[] =>
-  artifacts.map((artifact) => ({
+  artifacts.filter((artifact) => artifact.artifactType !== "prompt").map((artifact) => ({
     id: artifact.id,
     title: artifact.title,
     artifactType: artifact.artifactType,
@@ -629,17 +669,7 @@ export const toLlmContextArtifacts = (artifacts: SessionArtifact[]): LlmContextA
   }));
 
 export const normalizeLlmContextArtifacts = (value: unknown): LlmContextArtifact[] =>
-  normalizeSessionArtifacts(value).map((artifact) => ({
-    id: artifact.id,
-    title: artifact.title,
-    artifactType: artifact.artifactType,
-    semanticType: artifact.semanticType ?? null,
-    byteSize: artifact.byteSize ?? null,
-    content: artifact.content,
-    fileName: artifact.fileName ?? null,
-    language: artifact.language ?? null,
-    mimeType: artifact.mimeType ?? null,
-  }));
+  toLlmContextArtifacts(normalizeSessionArtifacts(value));
 
 export const getSemanticArtifactLabel = (
   semanticType?: SessionArtifactSemanticType | null,
@@ -662,6 +692,8 @@ export const getSessionArtifactDisplayLabel = (
       return "Image";
     case "file":
       return "File";
+    case "prompt":
+      return "Prompt";
     default:
       return "Text";
   }

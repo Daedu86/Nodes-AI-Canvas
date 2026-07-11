@@ -49,6 +49,14 @@ type ArtifactPatch = Partial<
     | "language"
     | "mimeType"
     | "position"
+    | "promptCompletedAt"
+    | "promptError"
+    | "promptModel"
+    | "promptProvider"
+    | "promptResult"
+    | "promptRunId"
+    | "promptStartedAt"
+    | "promptStatus"
     | "semanticType"
     | "sourceDataUrl"
     | "syncMode"
@@ -111,6 +119,16 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
   const hydratedSessionIdRef = React.useRef<string | null>(null);
   const lastSavedSignatureRef = React.useRef<string | null>(null);
   const saveTimeoutRef = React.useRef<number | null>(null);
+  const artifactsRef = React.useRef<SessionArtifact[]>(artifacts);
+  const canvasLinksRef = React.useRef<SessionCanvasLink[]>(canvasLinks);
+
+  React.useEffect(() => {
+    artifactsRef.current = artifacts;
+  }, [artifacts]);
+
+  React.useEffect(() => {
+    canvasLinksRef.current = canvasLinks;
+  }, [canvasLinks]);
 
   const contextLinks = React.useMemo<ContextLinkView[]>(
     () =>
@@ -188,6 +206,14 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
       language: input.language?.trim() || null,
       mimeType: input.mimeType?.trim() || null,
       position: input.position ?? null,
+      promptStatus: input.artifactType === "prompt" ? "idle" : null,
+      promptResult: null,
+      promptError: null,
+      promptRunId: null,
+      promptModel: null,
+      promptProvider: null,
+      promptStartedAt: null,
+      promptCompletedAt: null,
       sourceDataUrl: input.sourceDataUrl ?? null,
       syncMode: input.syncMode ?? "auto",
       revisions: [],
@@ -242,7 +268,14 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
 
   const deleteArtifact = React.useCallback((artifactId: string) => {
     setArtifacts((current) => current.filter((artifact) => artifact.id !== artifactId));
-    setCanvasLinks((current) => current.filter((link) => link.artifactId !== artifactId));
+    setCanvasLinks((current) =>
+      current.filter(
+        (link) =>
+          link.artifactId !== artifactId &&
+          link.promptId !== artifactId &&
+          link.responseId !== artifactId,
+      ),
+    );
   }, []);
 
   const connectCanvasBlocks = React.useCallback(
@@ -345,8 +378,8 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
       artifactIds?: string[];
     }) => {
       const result = applyResponseToArtifacts({
-        artifacts,
-        links: canvasLinks,
+        artifacts: artifactsRef.current,
+        links: canvasLinksRef.current,
         promptId: input.promptId,
         responseId: input.responseId,
         sourcePromptId: input.sourcePromptId ?? undefined,
@@ -355,6 +388,8 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
         createdAt: new Date().toISOString(),
       });
       if (result.changed) {
+        artifactsRef.current = result.artifacts;
+        canvasLinksRef.current = result.links;
         setArtifacts(result.artifacts);
         setCanvasLinks(result.links);
       }
@@ -363,7 +398,7 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
         skippedArtifactIds: result.skippedArtifactIds,
       };
     },
-    [artifacts, canvasLinks],
+    [],
   );
 
   const value = React.useMemo<SessionArtifactsContextValue>(

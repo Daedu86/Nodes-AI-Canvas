@@ -5,6 +5,7 @@ import type { ProjectMemoryType } from "@/lib/memory-documents";
 import type {
   SessionArtifactSemanticType,
   SessionArtifactSyncMode,
+  SessionCanvasPromptStatus,
   SessionArtifactType,
 } from "@/lib/session-artifacts";
 import type { BranchOperation, BranchOperationDetail } from "@/lib/thread-branching";
@@ -31,7 +32,7 @@ export type ThreadGraphFlowNodeData = {
   isBridge?: boolean;
   isCut?: boolean;
   isRoot?: boolean;
-  kind?: "root" | "bridge" | "message" | "artifact" | "prompt-draft";
+  kind?: "root" | "bridge" | "message" | "artifact" | "prompt-draft" | "canvas-prompt";
   language?: string | null;
   linkedArtifactCount?: number;
   memoryId?: string | null;
@@ -41,6 +42,8 @@ export type ThreadGraphFlowNodeData = {
   mimeType?: string | null;
   semanticType?: SessionArtifactSemanticType | null;
   position?: { x: number; y: number } | null;
+  promptResult?: string | null;
+  promptStatus?: SessionCanvasPromptStatus | null;
   preview: string;
   provider?: string | null;
   providerLabel?: string;

@@ -16,14 +16,14 @@ export type ChatQuotaLimits = {
 };
 
 const FREE_PLAN_DEFAULTS = {
-  concurrent: 1,
+  concurrent: 3,
   perDay: 120,
   perHour: 40,
   perMinute: 8,
 } as const;
 
 const PAID_PLAN_DEFAULTS = {
-  concurrent: 2,
+  concurrent: 6,
   perDay: 600,
   perHour: 120,
   perMinute: 24,
