@@ -62,8 +62,9 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
-          path = Path("tests/canvas-run-manager.test.tsx")
-          text = path.read_text(encoding="utf-8")
+
+          run_manager_test = Path("tests/canvas-run-manager.test.tsx")
+          text = run_manager_test.read_text(encoding="utf-8")
           text = text.replace(
               'import { act, render, screen } from "@testing-library/react";',
               'import { act, cleanup, render, screen } from "@testing-library/react";',
@@ -72,7 +73,20 @@ jobs:
               'afterEach(() => {\n  vi.restoreAllMocks();',
               'afterEach(() => {\n  cleanup();\n  vi.restoreAllMocks();',
           )
-          path.write_text(text, encoding="utf-8")
+          run_manager_test.write_text(text, encoding="utf-8")
+
+          prompt_node = Path("components/assistant-ui/thread-graph-flow/canvas-prompt-node.tsx")
+          text = prompt_node.read_text(encoding="utf-8")
+          text = text.replace(
+              'Enter runs, Shift+Enter adds newline',
+              'Enter sends, Shift+Enter adds newline',
+          )
+          prompt_node.write_text(text, encoding="utf-8")
+
+          account_plan_test = Path("tests/account-plan-route.test.ts")
+          text = account_plan_test.read_text(encoding="utf-8")
+          text = text.replace('concurrent: 1,', 'concurrent: 3,')
+          account_plan_test.write_text(text, encoding="utf-8")
           PY
 
           npm ci
@@ -86,6 +100,7 @@ jobs:
             lib/canvas-run-scheduler.ts \
             lib/session-artifacts.ts \
             lib/user-plan.ts \
+            tests/account-plan-route.test.ts \
             tests/canvas-prompt-artifact.test.ts \
             tests/canvas-run-manager.test.tsx \
             tests/canvas-run-scheduler.test.ts
