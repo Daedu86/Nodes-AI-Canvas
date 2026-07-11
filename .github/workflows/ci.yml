@@ -4,31 +4,52 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
+          cache: npm
 
-      - name: Install
-        run: npm ci
+      - name: Install dependencies
+        run: npm ci --no-audit --fund=false
 
-      - name: Install Playwright browsers
+      - name: Lint
+        run: npx eslint . --max-warnings=0
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: Test (lint + unit + e2e)
-        env:
-          CI: "true"
-        run: npm run test:ci
+      - name: End-to-end tests
+        run: npm run test:e2e -- --workers=1
 
-      - name: Upload Playwright artifacts
+      - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -36,10 +57,5 @@ jobs:
           path: |
             test-results
             playwright-report
-
-      - name: Upload coverage
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: vitest-coverage
-          path: coverage
+          if-no-files-found: ignore
+          retention-days: 1
