@@ -1,0 +1,229 @@
+thread-graph-flow.tsx: 1750 lines
+
+added 766 packages, and audited 767 packages in 16s
+
+265 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+  179:9  warning  'pendingOutputRunRef' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+
+
+/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+  179:9  warning  'pendingOutputRunRef' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas[39m
+
+ [32m✓[39m tests/canvas-branch-controller.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 16:45:54
+[2m   Duration [22m 1.15s[2m (transform 137ms, setup 0ms, import 341ms, tests 20ms, environment 663ms)[22m
+
+
+> nodes@0.1.0 test
+> vitest run
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas[39m
+
+ [32m✓[39m tests/session-store.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mnormalizes browser content arrays and sends only the latest user message by default
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"8c283d1a-ff0c-41da-9d50-ba61a8d047fd","route":"/api/chat","status":"accepted","userId":"test-user"}
+
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mpreserves non-text parts through explicit placeholders when full history is requested
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":"full","modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"aa353d80-ccf5-4703-9f7d-84808c5e7876","route":"/api/chat","status":"accepted","userId":"test-user"}
+
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreads context artifacts from metadata.custom for branch-created runs
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":1,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"8ddddd60-f449-40f6-a2db-321188203b84","route":"/api/chat","status":"accepted","userId":"test-user"}
+
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a classified client-safe error message from the stream layer
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"bbf8df88-b9b2-4377-b08e-a1fab1747405","route":"/api/chat","status":"accepted","userId":"test-user"}
+
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a rate-limit message when the stream layer surfaces an AI retry wrapper
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"google/gemma-4-31b-it:free","provider":"openrouter","requestId":"904a913e-d77b-4468-b708-dc7261e5889c","route":"/api/chat","status":"accepted","userId":"test-user"}
+
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mretries the OpenRouter free router when a selected free model is unavailable
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"google/gemma-4-31b-it:free","provider":"openrouter","requestId":"199277e4-7d05-484d-a3d9-76d976ef3fef","route":"/api/chat","status":"accepted","userId":"test-user"}
+
+[90mstderr[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mretries the OpenRouter free router when a selected free model is unavailable
+[22m[39m/api/chat error: {
+  provider: [32m'openrouter'[39m,
+  modelId: [32m'google/gemma-4-31b-it:free'[39m,
+  code: [32m'model_unavailable'[39m,
+  status: [33m400[39m
+}
+
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a specific configuration error when the OpenRouter key is missing
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"8f583d8c-493c-4461-9393-116b75cf27ae","route":"/api/chat","status":"accepted","userId":"test-user"}
+[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"missing_openrouter_key","fallbackApplied":false,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"8f583d8c-493c-4461-9393-116b75cf27ae","resolvedModelId":"nvidia/nemotron-3-super-120b-a12b:free","resolvedProvider":"openrouter","route":"/api/chat","status":"failed","userId":"test-user"}
+
+[90mstderr[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a specific configuration error when the OpenRouter key is missing
+[22m[39mMissing provider credential for openrouter
+
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mmaps repeated provider rate limits to a specific client-safe response
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"openrouter/free","provider":"openrouter","requestId":"6ab75df4-c208-41b8-940c-4ac9b51792e2","route":"/api/chat","status":"accepted","userId":"test-user"}
+[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":1,"errorCode":"provider_rate_limited","fallbackApplied":false,"historyMode":null,"modelId":"openrouter/free","provider":"openrouter","requestId":"6ab75df4-c208-41b8-940c-4ac9b51792e2","resolvedModelId":"openrouter/free","resolvedProvider":"openrouter","route":"/api/chat","status":"failed","userId":"test-user"}
+
+[90mstderr[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mmaps repeated provider rate limits to a specific client-safe response
+[22m[39m/api/chat error: {
+  provider: [32m'openrouter'[39m,
+  modelId: [32m'openrouter/free'[39m,
+  code: [32m'provider_rate_limited'[39m,
+  status: [33m429[39m
+}
+
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects chat requests once the per-minute quota is exhausted
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"cd8387fe-1684-4d03-b892-a71bf9dda274","route":"/api/chat","status":"accepted","userId":"test-user"}
+
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects chat requests once the per-minute quota is exhausted
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":1,"errorCode":"chat_quota_exceeded","historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"6aae993e-e8d3-46eb-b5e4-a7ba5dcabe9f","route":"/api/chat","status":"rejected","userId":"test-user"}
+
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects overlapping requests with a specific concurrency error
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-nano-30b-a3b:free","provider":"openrouter","requestId":"604bbde5-7510-49fe-8f9c-53bef7142f40","route":"/api/chat","status":"accepted","userId":"test-user"}
+
+[90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects overlapping requests with a specific concurrency error
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"chat_concurrency_limited","historyMode":null,"modelId":"nvidia/nemotron-3-nano-30b-a3b:free","provider":"openrouter","requestId":"74b2ff62-2b00-4d01-9b5a-8fa18ed1a38a","route":"/api/chat","status":"rejected","userId":"test-user"}
+
+ [32m✓[39m tests/chat-route.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 133[2mms[22m[39m
+ [32m✓[39m tests/thread-composer.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 404[2mms[22m[39m
+     [33m[2m✓[22m[39m sets run config and sends when the send button is clicked [33m 310[2mms[22m[39m
+ [32m✓[39m tests/llm-settings-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m tests/persisted-sessions.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 85[2mms[22m[39m
+ [32m✓[39m tests/session-artifacts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/llm-helpers.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/project-arena.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/workspace-surface.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1080[2mms[22m[39m
+     [33m[2m✓[22m[39m opens the LLM Models workspace from Profile [33m 496[2mms[22m[39m
+ [32m✓[39m tests/projects-context.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 88[2mms[22m[39m
+ [32m✓[39m tests/canvas-graph-projection.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/thread-normalization.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/project-context-builder.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m tests/session-ui-state.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 315[2mms[22m[39m
+ [32m✓[39m tests/agent-token-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m tests/canvas-run-manager.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 273[2mms[22m[39m
+ [32m✓[39m tests/project-collaboration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+[90mstderr[2m | tests/llm-control-route.test.ts[2m > [22m[2m/api/llm/control[2m > [22m[2mreturns a generic stop error instead of raw command output
+[22m[39mollama stop failed Error: spawn ENOENT ollama
+    at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/llm-control-route.test.ts:126:18
+    at Mock [90m(file:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/spy[24m/dist/index.js:332:34[90m)[39m
+    at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mapp/api/llm/control/route.ts:29:5
+    at new Promise (<anonymous>)
+    at execFileAsync [90m(/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mapp/api/llm/control/route.ts:28:10[90m)[39m
+    at Module.POST [90m(/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mapp/api/llm/control/route.ts:104:15[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+    at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/llm-control-route.test.ts:130:22
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:20
+
+ [32m✓[39m tests/llm-control-route.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+ [32m✓[39m tests/llm-user-settings.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/canvas-prompt-node.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 448[2mms[22m[39m
+ [32m✓[39m tests/session-artifact-upload-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 65[2mms[22m[39m
+ [32m✓[39m tests/context-builder.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/project-workspace.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 890[2mms[22m[39m
+     [33m[2m✓[22m[39m shows a visible context CTA in project overview and returns focus to the editor [33m 685[2mms[22m[39m
+ [32m✓[39m tests/project-store.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m tests/request-errors.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m tests/admin-users-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+[90mstderr[2m | tests/title-route.test.ts[2m > [22m[2m/api/title[2m > [22m[2mreturns a generic title error instead of raw upstream details
+[22m[39m/api/title error: Error: provider trace here
+    at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/title-route.test.ts:76:44
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2955:64
+
+ [32m✓[39m tests/title-route.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32m✓[39m tests/llm-settings.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 370[2mms[22m[39m
+     [33m[2m✓[22m[39m updates the selector pool when the user customizes model availability [33m 311[2mms[22m[39m
+ [32m✓[39m tests/api-access.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 79[2mms[22m[39m
+ [32m✓[39m tests/thread-branching-runtime.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/block-library.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 678[2mms[22m[39m
+     [33m[2m✓[22m[39m shows the initial categories and contains no legacy template heading [33m 373[2mms[22m[39m
+ [32m✓[39m tests/account-plan-route.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 41[2mms[22m[39m
+ [32m✓[39m tests/thread-list.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 601[2mms[22m[39m
+     [33m[2m✓[22m[39m suppresses accidental new-session clicks immediately after leaving manage mode [33m 598[2mms[22m[39m
+ [32m✓[39m tests/agent-token.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m tests/provider-runtime.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m tests/app-header.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 395[2mms[22m[39m
+     [33m[2m✓[22m[39m uses the main Split control as a reversible toggle [33m 393[2mms[22m[39m
+ [32m✓[39m tests/session-blob-maintenance-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m tests/memory-store.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m tests/canvas-branch-controller.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m tests/agent-work-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 383[2mms[22m[39m
+     [33m[2m✓[22m[39m deletes a saved token from the dashboard activity view [33m 381[2mms[22m[39m
+ [32m✓[39m tests/thread-branching.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/workspace-split-layout.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 313[2mms[22m[39m
+     [33m[2m✓[22m[39m persists the main panel view mode per session [33m 311[2mms[22m[39m
+[90mstderr[2m | tests/theme-toggle.test.tsx[2m > [22m[2mThemeToggle[2m > [22m[2mhydrates without recovering when a persisted light theme exists
+[22m[39mThe current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+[90mstderr[2m | tests/theme-toggle.test.tsx[2m > [22m[2mThemeToggle[2m > [22m[2mhydrates without recovering when a persisted light theme exists
+[22m[39mThe current testing environment is not configured to support act(...)
+
+ [32m✓[39m tests/theme-toggle.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 345[2mms[22m[39m
+ [32m✓[39m tests/artifact-presentation.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/canvas-run-scheduler.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/agent-access-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 482[2mms[22m[39m
+     [33m[2m✓[22m[39m creates a token with an explicit expiry and confirms it was saved [33m 479[2mms[22m[39m
+ [32m✓[39m tests/session-blob-store.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m tests/root-page.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 53[2mms[22m[39m
+ [32m✓[39m tests/graph-models.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/openrouter-deployment-key-policy.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/canvas-prompt-artifact.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/llm-settings-store.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/e2e-auth.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/auth-screen.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 75[2mms[22m[39m
+ [32m✓[39m tests/post-auth-handoff.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m tests/ollama-provider-policy.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/app-title-sync.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 16[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m57 passed[39m[22m[90m (57)[39m
+[2m      Tests [22m [1m[32m178 passed[39m[22m[90m (178)[39m
+[2m   Start at [22m 16:45:55
+[2m   Duration [22m 17.46s[2m (transform 2.42s, setup 0ms, import 12.18s, tests 8.34s, environment 20.25s)[22m
+
+
+> nodes@0.1.0 build
+> next build
+
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+   ▲ Next.js 15.5.20
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 27.1s
+   Linting and checking validity of types ...
+
+./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+179:9  Warning: 'pendingOutputRunRef' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+Failed to compile.
+
+./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx:230:5
+Type error: Cannot find name 'canvasConversationNodesRef'. Did you mean 'canvasConversationNodes'?
+
+[0m [90m 228 |[39m   )[33m;[39m
+ [90m 229 |[39m   [33mReact[39m[33m.[39museEffect(() [33m=>[39m {
+[31m[1m>[22m[39m[90m 230 |[39m     canvasConversationNodesRef[33m.[39mcurrent [33m=[39m canvasConversationNodes[33m;[39m
+ [90m     |[39m     [31m[1m^[22m[39m
+ [90m 231 |[39m   }[33m,[39m [canvasConversationNodes])[33m;[39m
+ [90m 232 |[39m   [36mconst[39m canvasPrompts [33m=[39m [33mReact[39m[33m.[39museMemo(
+ [90m 233 |[39m     () [33m=>[39m sessionArtifacts[33m.[39mfilter((artifact) [33m=>[39m artifact[33m.[39martifactType [33m===[39m [32m"prompt"[39m)[33m,[39m[0m
+Next.js build worker exited with code: 1 and signal: null
+Validation failed with exit code 1
+HEAD is now at 4d2c60c chore: run canvas branch controller gate [canvas-branch-controller] [skip vercel]
