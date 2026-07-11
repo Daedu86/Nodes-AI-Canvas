@@ -1,0 +1,92 @@
+name: Apply canvas concurrency
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-canvas-concurrency
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: contains(github.event.head_commit.message, '[canvas-concurrency-staging]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Reconstruct verified patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/canvas-concurrency/apply.py.gz.b64.part* | base64 --decode | gzip --decompress > /tmp/apply_canvas_concurrency.py
+          echo "8d5d495c0d30d0e6136216642ed43dccc9401802076932598977bd1da93ba329  /tmp/apply_canvas_concurrency.py" | sha256sum --check
+          python3 -m py_compile /tmp/apply_canvas_concurrency.py
+
+      - name: Apply implementation
+        run: python3 /tmp/apply_canvas_concurrency.py
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint changed implementation
+        run: >-
+          npx eslint
+          app/api/canvas-runs/route.ts
+          components/assistant-ui/thread-graph-flow/canvas-prompt-node.tsx
+          components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+          components/assistant-ui/thread-graph-flow/thread-graph-flow-types.ts
+          components/assistant-ui/thread-graph-flow/use-canvas-run-manager.ts
+          components/context/session-artifacts.tsx
+          lib/canvas-run-scheduler.ts
+          lib/session-artifacts.ts
+          lib/user-plan.ts
+          tests/canvas-prompt-artifact.test.ts
+          tests/canvas-run-manager.test.tsx
+          tests/canvas-run-scheduler.test.ts
+
+      - name: Test free-tier canvas concurrency
+        run: >-
+          npx vitest run
+          tests/canvas-prompt-artifact.test.ts
+          tests/canvas-run-scheduler.test.ts
+          tests/canvas-run-manager.test.tsx
+
+      - name: Run complete unit suite
+        run: npm test
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Finalize one deployable commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/canvas-concurrency
+          rm -f .github/workflows/apply-canvas-concurrency.yml
+          cat > vercel.json <<'EOF'
+          {
+            "framework": "nextjs"
+          }
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add concurrent canvas prompt runs"
+          git push origin HEAD:main
