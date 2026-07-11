@@ -3,18 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "eslint . --fix",
+    "format:check": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
     "rotate:secrets": "node --env-file=.env.local scripts/rotate-secrets.mjs",
     "setup:supabase-storage": "node --env-file=.env.local scripts/setup-supabase-storage.mjs",
     "migrate:supabase": "node --env-file=.env.local scripts/migrate-to-supabase.mjs",
     "test": "vitest run",
+    "test:unit": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:ci": "npm run lint && npm run test:coverage && npm run test:e2e -- --workers=1"
+    "check": "npm run format:check && npm run typecheck && npm run test:coverage",
+    "test:ci": "npm run check && npm run test:e2e -- --workers=1"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.52",

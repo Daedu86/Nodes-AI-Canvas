@@ -1,14 +1,27 @@
 # Development
 
-This repo is a Next.js (React) app.
+This repository is a Next.js and React application.
 
 ## Requirements
 
-- Node.js 20+ (recommended)
+- Node.js 22
 - npm
 - One model provider:
   - OpenRouter for hosted models
   - Ollama for local models
+
+The repository pins the Node major in `.nvmrc`, `package.json`, and CI. With nvm:
+
+```bash
+nvm install
+nvm use
+```
+
+Verify the active runtime before installing dependencies:
+
+```bash
+node --version
+```
 
 ## Install
 
@@ -59,10 +72,25 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-## Tests
+## Quality commands
 
 ```bash
+npm run format
+npm run format:check
+npm run typecheck
 npm test
+npm run test:coverage
 npm run test:e2e
 ```
 
+`format` applies the autofixes supplied by the repository's ESLint configuration. `format:check` is the non-mutating form used by CI.
+
+`npm run check` runs formatting/lint validation, TypeScript, and unit coverage. `npm run test:ci` adds the Playwright suite with one worker.
+
+Coverage uses V8 and enforces the thresholds in `vitest.config.ts`. The run writes:
+
+- `coverage/index.html` for local inspection.
+- `coverage/coverage-summary.json` for tooling.
+- a text summary in the terminal.
+
+The production build is intentionally left to Vercel so GitHub Actions does not duplicate build minutes.

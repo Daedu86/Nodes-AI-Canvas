@@ -17,7 +17,8 @@ export default defineConfig({
     exclude: ["tests/e2e/**"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "html"],
+      reportsDirectory: "coverage",
+      reporter: ["text", "json-summary", "html"],
       include: ["app/**", "components/**", "lib/**"],
       exclude: [
         "**/*.d.ts",
@@ -29,7 +30,7 @@ export default defineConfig({
         "app/**/loading.*",
         "app/**/not-found.*",
       ],
-      // Minimal guardrails: raise as the suite grows.
+      // Baseline guardrails. Raise them only alongside tests that demonstrate the increase.
       thresholds: {
         lines: 30,
         functions: 25,
