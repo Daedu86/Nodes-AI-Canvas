@@ -19,8 +19,8 @@ const githubConfigured = Boolean(process.env.AUTH_GITHUB_ID && process.env.AUTH_
 const googleConfigured = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
 const emailConfigured = false;
 const agentTokenLoginEnabled =
-  process.env.AUTH_ENABLE_AGENT_TOKEN_LOGIN !== "0" &&
-  Boolean(process.env.AUTH_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim());
+  process.env.AUTH_ENABLE_AGENT_TOKEN_LOGIN === "1" &&
+  Boolean(process.env.AGENT_TOKEN_SECRET?.trim());
 const devCredentialsEnabled =
   process.env.AUTH_ENABLE_DEV_CREDENTIALS === "1" &&
   process.env.NODE_ENV === "development" &&
