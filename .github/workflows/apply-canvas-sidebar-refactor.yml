@@ -1,0 +1,415 @@
+name: Apply canvas sidebar refactor
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-canvas-sidebar-refactor
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: contains(github.event.head_commit.message, '[canvas-sidebar-refactor]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: "true"
+      GH_TOKEN: ${{ github.token }}
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Apply, verify, and finalize
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          LOG=/tmp/canvas-sidebar-refactor.log
+          exec > >(tee -a "$LOG") 2>&1
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          record_failure() {
+            status=$?
+            trap - ERR
+            echo "Validation failed with exit code $status"
+            git reset --hard HEAD
+            mkdir -p .github/canvas-sidebar-refactor
+            cp "$LOG" .github/canvas-sidebar-refactor/last-failure.log
+            git add .github/canvas-sidebar-refactor/last-failure.log
+            git commit -m "chore: record canvas sidebar validation failure [skip vercel]"
+            git push origin HEAD:main
+            exit "$status"
+          }
+          trap record_failure ERR
+
+          fetch_blob() {
+            local sha="$1"
+            local path="$2"
+            mkdir -p "$(dirname "$path")"
+            gh api "repos/$GITHUB_REPOSITORY/git/blobs/$sha" --jq '.content' \
+              | tr -d '\n' \
+              | base64 --decode > "$path"
+          }
+
+          fetch_blob bff826664000d52a780bd11f58ea144bd8bf5830 \
+            components/assistant-ui/thread-graph-flow/canvas-sidebar.tsx
+          fetch_blob f424e4ea6e3e1e408ffed9ae526e6f6f5131d983 \
+            components/assistant-ui/thread-graph-flow/canvas-artifact-inspector.tsx
+          fetch_blob 15785e045bf62c0ed4f1e51e242fb2d386c216bc \
+            components/assistant-ui/thread-graph-flow/canvas-message-inspector.tsx
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          sidebar_path = Path("components/assistant-ui/thread-graph-flow/canvas-sidebar.tsx")
+          sidebar = sidebar_path.read_text(encoding="utf-8")
+          sidebar = sidebar.replace(
+              "  showCanvasPromptCta: boolean;\n  spotlight: FlowSpotlightMode;",
+              "  promptDisabled: boolean;\n  showCanvasPromptCta: boolean;\n  showInspector: boolean;\n  spotlight: FlowSpotlightMode;",
+              1,
+          )
+          sidebar = sidebar.replace(
+              "  showCanvasPromptCta,\n  spotlight,",
+              "  promptDisabled,\n  showCanvasPromptCta,\n  showInspector,\n  spotlight,",
+              1,
+          )
+          sidebar = sidebar.replace(
+              "            onClick={onCreatePrompt}\n          >",
+              "            onClick={onCreatePrompt}\n            disabled={promptDisabled}\n          >",
+              1,
+          )
+          focus_start = sidebar.index('      <div className="flex min-w-0 flex-col gap-2">')
+          focus_end = sidebar.rindex("      </div>\n    </aside>") + len("      </div>")
+          focus_block = sidebar[focus_start:focus_end]
+          sidebar = (
+              sidebar[:focus_start]
+              + "      {showInspector ? (\n"
+              + focus_block.replace("\n", "\n  ")
+              + "\n      ) : null}"
+              + sidebar[focus_end:]
+          )
+          sidebar_path.write_text(sidebar, encoding="utf-8")
+
+          message_path = Path("components/assistant-ui/thread-graph-flow/canvas-message-inspector.tsx")
+          message = message_path.read_text(encoding="utf-8")
+          message = message.replace(
+              "  onOpenInChat: () => void;\n  onRestoreSelected: () => void;",
+              "  onOpenInChat: () => void;\n  onResetView: () => void;\n  onRestoreSelected: () => void;",
+              1,
+          )
+          message = message.replace(
+              "  onOpenInChat,\n  onRestoreSelected,",
+              "  onOpenInChat,\n  onResetView,\n  onRestoreSelected,",
+              1,
+          )
+          message = message.replace(
+              '<span>Reset view</span>\n        </button>',
+              '<span>Reset view</span>\n        </button>',
+              1,
+          )
+          reset_marker = '''        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs hover:bg-muted"
+          onClick={onClearFocus}
+        >
+          <span>Reset view</span>
+        </button>'''
+          message = message.replace(
+              reset_marker,
+              reset_marker.replace("onClick={onClearFocus}", "onClick={onResetView}"),
+              1,
+          )
+          message_path.write_text(message, encoding="utf-8")
+
+          flow_path = Path("components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx")
+          flow = flow_path.read_text(encoding="utf-8")
+
+          lucide_import = '''import {
+            Copy as CopyIcon,
+            Crosshair,
+            FileImage,
+            FilePlus2,
+            Focus,
+            MoreHorizontal,
+            Plus,
+            RotateCcw,
+            Scissors,
+            Sparkles,
+            Trash2,
+            Unlink2,
+          } from "lucide-react";
+          '''
+          flow = flow.replace(lucide_import, "", 1)
+          flow = flow.replace(
+              'import { CanvasStage } from "@/components/assistant-ui/thread-graph-flow/canvas-stage";\n',
+              'import { CanvasArtifactInspector } from "@/components/assistant-ui/thread-graph-flow/canvas-artifact-inspector";\n'
+              'import { CanvasMessageInspector } from "@/components/assistant-ui/thread-graph-flow/canvas-message-inspector";\n'
+              'import { CanvasSidebar } from "@/components/assistant-ui/thread-graph-flow/canvas-sidebar";\n'
+              'import { CanvasStage } from "@/components/assistant-ui/thread-graph-flow/canvas-stage";\n',
+              1,
+          )
+          flow = flow.replace(
+              'import { GraphBranchActions } from "@/components/assistant-ui/thread-graph-flow/graph-branch-actions";\n',
+              "",
+              1,
+          )
+          old_workspace_import = '''import {
+            artifactAccent,
+            artifactContentLabel,
+            artifactContentPlaceholder,
+            artifactDefaultTitle,
+            artifactTypeLabel,
+            CANVAS_BRANCH_CANCEL_FAILURE,
+            CANVAS_BRANCH_RUN_NOTICE,
+            CANVAS_PROMPT_DRAFT_NODE_ID,
+            canvasToolbarIconButtonClassName,
+            flowFilterLabel,
+            formatByteSize,
+            getSemanticArtifactMeta,
+            isFlowViewport,
+            LegendItem,
+            providerDisplay,
+            readFlowRenderMode,
+            scrollMessageIntoView,
+            semanticArtifactPresets,
+            trimArtifactPreview,
+            type FlowDensityMode,
+            type FlowRenderMode,
+            type FlowSpotlightMode,
+          } from "@/components/assistant-ui/thread-graph-flow/canvas-workspace-utils";'''
+          new_workspace_import = '''import {
+            artifactAccent,
+            artifactDefaultTitle,
+            artifactTypeLabel,
+            CANVAS_BRANCH_CANCEL_FAILURE,
+            CANVAS_BRANCH_RUN_NOTICE,
+            CANVAS_PROMPT_DRAFT_NODE_ID,
+            formatByteSize,
+            isFlowViewport,
+            providerDisplay,
+            readFlowRenderMode,
+            scrollMessageIntoView,
+            trimArtifactPreview,
+            type FlowDensityMode,
+            type FlowRenderMode,
+            type FlowSpotlightMode,
+          } from "@/components/assistant-ui/thread-graph-flow/canvas-workspace-utils";'''
+          if old_workspace_import not in flow:
+              raise RuntimeError("workspace import marker not found")
+          flow = flow.replace(old_workspace_import, new_workspace_import, 1)
+
+          toggle_toolbar = '''  const toggleToolbarMenu = React.useCallback((menu: "add" | "tools") => {
+            setToolbarMenu((current) => (current === menu ? null : menu));
+          }, []);
+
+          '''
+          flow = flow.replace(toggle_toolbar, "", 1)
+
+          semantic_meta = '''  const selectedArtifactSemanticMeta = React.useMemo(
+            () =>
+              selectedArtifact?.artifactType === "text"
+                ? getSemanticArtifactMeta(selectedArtifact.semanticType ?? null)
+                : null,
+            [selectedArtifact],
+          );
+          '''
+          flow = flow.replace(semantic_meta, "", 1)
+
+          aside_start = flow.index("        <aside\n          ref={toolbarMenuRef}")
+          aside_end = flow.index("        </aside>", aside_start) + len("        </aside>")
+          replacement = '''        <CanvasSidebar
+          activeCanvasRunCount={activeCanvasRunCount}
+          artifactCount={artifacts.length}
+          connectionError={connectionError}
+          densityMode={densityMode}
+          filterCounts={filterCounts}
+          flowNodeCount={flowNodes.length}
+          flowRenderMode={flowRenderMode}
+          hiddenCanvasNodeCount={hiddenCanvasNodeCount}
+          legendItems={legendItems}
+          linkEditMode={linkEditMode}
+          onCancelAllRuns={cancelAllCanvasRuns}
+          onCopyJson={handleCopyJson}
+          onCreatePrompt={() => handleCreatePromptNode()}
+          onDensityModeChange={setDensityMode}
+          onFlowRenderModeChange={setFlowRenderMode}
+          onLinkEditModeChange={setLinkEditMode}
+          onResetLinks={resetLinks}
+          onSpotlightChange={setSpotlight}
+          onToolbarMenuChange={setToolbarMenu}
+          promptDisabled={!llmEnabled}
+          queuedCanvasRunCount={queuedCanvasRunCount}
+          resetLinkCount={overrides.size}
+          selectedBranchPathLabel={selectedBranchPathLabel}
+          selectedCanvasLabel={selectedCanvasLabel}
+          selectedCanvasPreview={selectedCanvasPreview}
+          selectedNodeId={selectedNodeId}
+          showCanvasPromptCta={showCanvasPromptCta}
+          showInspector={
+            !!selectedArtifact ||
+            (!!selectedFlowNode && !!selectedMessageNode) ||
+            linkEditMode ||
+            overrides.size > 0
+          }
+          spotlight={spotlight}
+          toolbarMenu={toolbarMenu}
+          toolbarMenuRef={toolbarMenuRef}
+          visibleCanvasNodeCount={visibleCanvasNodeCount}
+        >
+          <div
+            ref={inspectorScrollRef}
+            className="max-h-[min(34rem,calc(100vh-11rem))] overflow-y-auto rounded-[26px] border border-border/60 bg-background/85 px-3 py-3 shadow-sm"
+          >
+            {selectedArtifact ? (
+              <CanvasArtifactInspector
+                artifact={selectedArtifact}
+                artifactLineCount={selectedArtifactLineCount}
+                artifactPreviewSize={selectedArtifactPreviewSize}
+                artifactSize={selectedArtifactSize}
+                artifactStatChips={selectedArtifactStatChips}
+                attachableTargets={attachableTargets}
+                contextBudgetMaxImagePreviewBytes={
+                  contextBudgetPolicy.maxImagePreviewBytes
+                }
+                hasOutputLink={canvasLinks.some(
+                  (link) =>
+                    link.relation === "output" &&
+                    link.artifactId === selectedArtifact.id,
+                )}
+                isLinkedToTarget={(targetId) =>
+                  isArtifactLinkedToTarget(selectedArtifact.id, targetId)
+                }
+                linkedTargetCount={selectedContextLinkedMessageIds.size}
+                onConnectTo={handleArtifactConnectFromInspector}
+                onDelete={() => {
+                  deleteArtifact(selectedArtifact.id);
+                  applyCanvasSelection(null);
+                }}
+                onDisconnectOutput={() => {
+                  const outputLink = canvasLinks.find(
+                    (link) =>
+                      link.relation === "output" &&
+                      link.artifactId === selectedArtifact.id,
+                  );
+                  if (outputLink) removeCanvasLink(outputLink.id);
+                }}
+                onOpenTarget={applyCanvasSelection}
+                onRestoreRevision={(revisionId) =>
+                  restoreArtifactRevision(selectedArtifact.id, revisionId)
+                }
+                onToggleLink={(targetId) =>
+                  handleToggleArtifactLink(selectedArtifact.id, targetId)
+                }
+                onToggleSync={() =>
+                  setArtifactSyncMode(
+                    selectedArtifact.id,
+                    selectedArtifact.syncMode === "paused" ? "auto" : "paused",
+                  )
+                }
+                onUpdate={(patch) => updateArtifact(selectedArtifact.id, patch)}
+              />
+            ) : selectedFlowNode && selectedMessageNode ? (
+              <CanvasMessageInspector
+                activeDraft={
+                  draft && draft.anchorId === selectedMessageNode.id
+                    ? { operation: draft.operation, text: draft.text }
+                    : null
+                }
+                artifacts={artifacts}
+                busy={isSubmittingBranch}
+                contextCount={selectedContextArtifacts.length}
+                details={selectedBranchOptions}
+                disabled={!llmEnabled}
+                isLinkedToTarget={(artifactId) =>
+                  isArtifactLinkedToTarget(artifactId, selectedMessageNode.id)
+                }
+                linkEditMode={linkEditMode}
+                onCancelDraft={handleCancelPromptDraft}
+                onCancelRun={isThreadRunning ? handleCancelRun : undefined}
+                onChooseOperation={handleChooseBranchOperation}
+                onClearFocus={() => applyCanvasSelection(null)}
+                onCutSelected={handleCutSelected}
+                onDraftTextChange={setDraftText}
+                onFocusSelected={handleFocusSelected}
+                onOpenInChat={handleOpenSelectedInChat}
+                onResetView={handleResetView}
+                onRestoreSelected={handleRestoreSelected}
+                onSubmitDraft={handleSubmitBranchDraft}
+                onToggleArtifactLink={(artifactId) =>
+                  handleToggleArtifactLink(artifactId, selectedMessageNode.id)
+                }
+                runInterruptionNote={
+                  isThreadRunning ? CANVAS_BRANCH_RUN_NOTICE : null
+                }
+                selectedBranchPathLabel={selectedBranchPathLabel}
+                selectedFlowNode={selectedFlowNode}
+                selectedMessageNode={selectedMessageNode}
+                selectedNodeId={selectedNodeId}
+                selectedOverride={!!selectedOverride}
+                selectedParentId={selectedParentId}
+                selectedPreview={selectedPreview}
+              />
+            ) : (
+              <div className="space-y-2 rounded-[24px] border border-dashed border-border/70 bg-background/80 px-4 py-5 text-left">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Nothing selected
+                </p>
+                <p className="text-sm font-medium text-foreground/85">
+                  Pick a message node to branch, or select an artifact to shape
+                  reusable context.
+                </p>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  The canvas is your structured input layer. Use it to build
+                  artifacts the model can reason over without losing
+                  human-readable form.
+                </p>
+              </div>
+            )}
+          </div>
+        </CanvasSidebar>'''
+          flow = flow[:aside_start] + replacement + flow[aside_end:]
+          flow_path.write_text(flow, encoding="utf-8")
+          print(f"thread-graph-flow.tsx: {len(flow.splitlines())} lines")
+          PY
+
+          npm ci
+          npx eslint --fix \
+            components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx \
+            components/assistant-ui/thread-graph-flow/canvas-sidebar.tsx \
+            components/assistant-ui/thread-graph-flow/canvas-artifact-inspector.tsx \
+            components/assistant-ui/thread-graph-flow/canvas-message-inspector.tsx
+          npx eslint \
+            components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx \
+            components/assistant-ui/thread-graph-flow/canvas-sidebar.tsx \
+            components/assistant-ui/thread-graph-flow/canvas-artifact-inspector.tsx \
+            components/assistant-ui/thread-graph-flow/canvas-message-inspector.tsx
+          npm test
+          npm run build
+          npx playwright install --with-deps chromium
+          npx playwright test tests/e2e/smoke.spec.ts --workers=1 --grep "preserves a session thread when switching to a project and back|copies graph JSON after a reply|creates a new root branch from the flow canvas|creates a sibling user branch from a flow user node|creates a follow-up user branch from a flow assistant node"
+
+          trap - ERR
+          rm -rf .github/canvas-sidebar-refactor
+          rm -f .github/workflows/apply-canvas-sidebar-refactor.yml
+          cat > vercel.json <<'EOF'
+          {
+            "framework": "nextjs"
+          }
+          EOF
+          git add -A
+          git commit -m "refactor: extract canvas sidebar inspectors"
+          git push origin HEAD:main
