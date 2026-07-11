@@ -69,14 +69,16 @@ jobs:
               flow,
               count=1,
           )
-          flow = flow.replace(
-              '                selectedMessageNode={selectedMessageNode}\n',
+          flow, message_prop_count = re.subn(
+              r'\n\s*selectedMessageNode=\{selectedMessageNode\}',
               '',
-              1,
+              flow,
+              count=1,
           )
-          if toolbar_count != 1 or semantic_count != 1:
+          if toolbar_count != 1 or semantic_count != 1 or message_prop_count != 1:
               raise RuntimeError(
-                  f"Expected one toolbar and semantic cleanup, got {toolbar_count=} {semantic_count=}"
+                  "Expected one toolbar, semantic, and message-prop cleanup; "
+                  f"got {toolbar_count=} {semantic_count=} {message_prop_count=}"
               )
           flow_path.write_text(flow, encoding="utf-8")
 
