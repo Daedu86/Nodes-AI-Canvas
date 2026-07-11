@@ -1,0 +1,215 @@
+name: Apply canvas branch controller
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-canvas-branch-controller
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: contains(github.event.head_commit.message, '[canvas-branch-controller]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      GH_TOKEN: ${{ github.token }}
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Apply and validate branch controller extraction
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          LOG=/tmp/canvas-branch-controller.log
+          exec > >(tee -a "$LOG") 2>&1
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          record_failure() {
+            status=$?
+            trap - ERR
+            echo "Validation failed with exit code $status"
+            git reset --hard HEAD
+            mkdir -p .github/canvas-branch-controller
+            cp "$LOG" .github/canvas-branch-controller/last-failure.log
+            git add .github/canvas-branch-controller/last-failure.log
+            git commit -m "chore: record branch controller validation failure [skip vercel]"
+            git push origin HEAD:main
+            exit "$status"
+          }
+          trap record_failure ERR
+
+          fetch_blob() {
+            local sha="$1"
+            local path="$2"
+            mkdir -p "$(dirname "$path")"
+            gh api "repos/$GITHUB_REPOSITORY/git/blobs/$sha" --jq '.content' \
+              | tr -d '\n' \
+              | base64 --decode > "$path"
+          }
+
+          fetch_blob f87bc0709f9b50e45bd4b095baf2411e7b70ef51 \
+            components/assistant-ui/thread-graph-flow/use-canvas-branch-controller.ts
+          fetch_blob 6e98027d118fe1e66e7c413883f3eee68191a657 \
+            tests/canvas-branch-controller.test.tsx
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          hook_path = Path(
+              "components/assistant-ui/thread-graph-flow/use-canvas-branch-controller.ts"
+          )
+          hook = hook_path.read_text(encoding="utf-8")
+          hook = hook.replace(
+              "  setRequestError: (message: string) => void;",
+              "  setRequestError: (message: string | null) => void;",
+              1,
+          )
+          hook_path.write_text(hook, encoding="utf-8")
+
+          path = Path("components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx")
+          text = path.read_text(encoding="utf-8")
+
+          manager_import = 'import { useCanvasRunManager } from "@/components/assistant-ui/thread-graph-flow/use-canvas-run-manager";\n'
+          controller_import = 'import { useCanvasBranchController } from "@/components/assistant-ui/thread-graph-flow/use-canvas-branch-controller";\n'
+          if controller_import not in text:
+              text = text.replace(
+                  manager_import,
+                  controller_import + manager_import,
+                  1,
+              )
+
+          text = text.replace("  CANVAS_BRANCH_CANCEL_FAILURE,\n", "", 1)
+          text = text.replace(
+              'import { executeBranchSpec } from "@/lib/thread-branching-runtime";\n',
+              "",
+              1,
+          )
+          text = text.replace(
+              'import { ensureThreadIdle } from "@/lib/thread-run-control";\n',
+              "",
+              1,
+          )
+          text = text.replace("  toLlmContextArtifacts,\n", "", 1)
+          text = text.replace(
+              '  const [isSubmittingBranch, setIsSubmittingBranch] = React.useState(false);\n',
+              "",
+              1,
+          )
+          text = text.replace(
+              '  const [canvasDraftError, setCanvasDraftError] = React.useState<string | null>(null);\n',
+              "",
+              1,
+          )
+
+          text = text.replace(
+              '''  const pendingDraftSubmissionRef = React.useRef(false);
+          ''',
+              "",
+              1,
+          )
+          text = text.replace(
+              '''  const pendingOutputRunRef = React.useRef<{
+            beforeNodeIds: Set<string>;
+            sourcePromptId: string;
+            artifactIds: string[];
+          } | null>(null);
+          ''',
+              "",
+              1,
+          )
+          text = text.replace(
+              '''  const canvasConversationNodesRef = React.useRef<ThreadGraphNodeModel[]>([]);
+            const requestErrorRef = React.useRef<string | null>(requestError);
+
+            React.useEffect(() => {
+              requestErrorRef.current = requestError;
+            }, [requestError]);
+
+          ''',
+              "",
+              1,
+          )
+          text = text.replace(
+              '''  React.useEffect(() => {
+            canvasConversationNodesRef.current = canvasConversationNodes;
+          }, [canvasConversationNodes]);
+          ''',
+              "",
+              1,
+          )
+
+          start = text.index("  const handleCancelRun = React.useCallback(() => {")
+          end = text.index("  const applyCanvasSelection = React.useCallback(", start)
+          controller = '''  const {
+            canvasDraftError,
+            handleCancelPromptDraft,
+            handleCancelRun,
+            handleSubmitBranchDraft,
+            isSubmittingBranch,
+          } = useCanvasBranchController({
+            applyCompletedResponse,
+            artifactIndex,
+            cancelDraft,
+            canvasConversationNodes,
+            clearRequestError,
+            draft,
+            draftBranchSpec,
+            draftContextArtifacts,
+            historyMode,
+            llmEnabled,
+            modelId,
+            provider,
+            requestError,
+            setRequestError,
+            threadRuntime: runtime.threads.main,
+          });
+
+          '''
+          text = text[:start] + controller + text[end:]
+
+          path.write_text(text, encoding="utf-8")
+          print(f"thread-graph-flow.tsx: {len(text.splitlines())} lines")
+          PY
+
+          npm ci
+          npx eslint --fix \
+            components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx \
+            components/assistant-ui/thread-graph-flow/use-canvas-branch-controller.ts \
+            tests/canvas-branch-controller.test.tsx
+          npx eslint \
+            components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx \
+            components/assistant-ui/thread-graph-flow/use-canvas-branch-controller.ts \
+            tests/canvas-branch-controller.test.tsx
+          npx vitest run tests/canvas-branch-controller.test.tsx
+          npm test
+          npm run build
+
+          trap - ERR
+          rm -rf .github/canvas-branch-controller
+          rm -f .github/workflows/apply-canvas-branch-controller.yml
+          cat > vercel.json <<'EOF'
+          {
+            "framework": "nextjs"
+          }
+          EOF
+          git add -A
+          git commit -m "refactor: extract canvas branch controller"
+          git push origin HEAD:main
