@@ -4,17 +4,17 @@ Created components/assistant-ui/thread-graph-flow/canvas-workspace-utils.tsx
 Created components/assistant-ui/thread-graph-flow/canvas-upload-utils.ts
 Created components/assistant-ui/thread-graph-flow/canvas-stage.tsx
 Changed files:
- .../thread-graph-flow/thread-graph-flow.tsx        | 577 +++------------------
- 1 file changed, 58 insertions(+), 519 deletions(-)
+ .../thread-graph-flow/thread-graph-flow.tsx        | 578 +++------------------
+ 1 file changed, 59 insertions(+), 519 deletions(-)
 Main component lines:
-2616 components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+2617 components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
 npm warn EBADENGINE Unsupported engine {
 npm warn EBADENGINE   package: 'camera-controls@3.1.2',
 npm warn EBADENGINE   required: { node: '>=22.0.0', npm: '>=10.5.1' },
 npm warn EBADENGINE   current: { node: 'v20.20.2', npm: '10.8.2' }
 npm warn EBADENGINE }
 
-added 766 packages, and audited 767 packages in 15s
+added 766 packages, and audited 767 packages in 16s
 
 265 packages are looking for funding
   run `npm fund` for details
@@ -22,8 +22,8 @@ added 766 packages, and audited 767 packages in 15s
 found 0 vulnerabilities
 
 /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
-  1539:9  warning  'handleToolbarArtifactCreate' is assigned a value but never used  @typescript-eslint/no-unused-vars
-  1550:9  warning  'handleToolbarUpload' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  1540:9  warning  'handleToolbarArtifactCreate' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  1551:9  warning  'handleToolbarUpload' is assigned a value but never used          @typescript-eslint/no-unused-vars
 
 ✖ 2 problems (0 errors, 2 warnings)
 
@@ -34,24 +34,23 @@ found 0 vulnerabilities
 
 [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas[39m
 
- [32m✓[39m tests/session-store.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 90[2mms[22m[39m
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mnormalizes browser content arrays and sends only the latest user message by default
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"da60e9dc-8d31-4334-a619-d7c7ff67c59c","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"ba737e27-ecbb-4a91-9fbe-720eb70965c3","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mpreserves non-text parts through explicit placeholders when full history is requested
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":"full","modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"d086bc0d-1879-4973-ba26-f0246ff7f7bc","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":"full","modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"09fe91d5-97e6-4acb-8c1d-6c84d14fc8e1","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreads context artifacts from metadata.custom for branch-created runs
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":1,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"b1c9a07b-3530-4514-abb0-0bff56c8c3a1","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":1,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"f64a5740-9c9b-4f62-80e3-788a87fbb74f","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a classified client-safe error message from the stream layer
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"de568ce1-5221-4298-a64a-4e8730010f25","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"9ea80ae9-6062-4016-a7c1-b5c7930e4d7a","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a rate-limit message when the stream layer surfaces an AI retry wrapper
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"google/gemma-4-31b-it:free","provider":"openrouter","requestId":"e300d47a-de3d-4d40-a97b-fa0803b5b5ba","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"google/gemma-4-31b-it:free","provider":"openrouter","requestId":"8107bd22-aead-491e-9d4e-f8cd491977c0","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mretries the OpenRouter free router when a selected free model is unavailable
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"google/gemma-4-31b-it:free","provider":"openrouter","requestId":"fb59cc48-3bb5-406b-be46-b8cee8cf8fa3","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"google/gemma-4-31b-it:free","provider":"openrouter","requestId":"e42f568a-36af-4f36-b9b0-82db806a11c2","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstderr[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mretries the OpenRouter free router when a selected free model is unavailable
 [22m[39m/api/chat error: {
@@ -62,15 +61,15 @@ found 0 vulnerabilities
 }
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a specific configuration error when the OpenRouter key is missing
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"5fe676f4-cab4-4e11-b6e6-5d256b1d2322","route":"/api/chat","status":"accepted","userId":"test-user"}
-[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":1,"errorCode":"missing_openrouter_key","fallbackApplied":false,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"5fe676f4-cab4-4e11-b6e6-5d256b1d2322","resolvedModelId":"nvidia/nemotron-3-super-120b-a12b:free","resolvedProvider":"openrouter","route":"/api/chat","status":"failed","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"5c86eafb-1a7d-4d28-8214-09d3eae6d1d8","route":"/api/chat","status":"accepted","userId":"test-user"}
+[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"missing_openrouter_key","fallbackApplied":false,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"5c86eafb-1a7d-4d28-8214-09d3eae6d1d8","resolvedModelId":"nvidia/nemotron-3-super-120b-a12b:free","resolvedProvider":"openrouter","route":"/api/chat","status":"failed","userId":"test-user"}
 
 [90mstderr[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a specific configuration error when the OpenRouter key is missing
 [22m[39mMissing provider credential for openrouter
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mmaps repeated provider rate limits to a specific client-safe response
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"openrouter/free","provider":"openrouter","requestId":"e781389c-7707-46ba-b1b9-d1343f344c1d","route":"/api/chat","status":"accepted","userId":"test-user"}
-[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"provider_rate_limited","fallbackApplied":false,"historyMode":null,"modelId":"openrouter/free","provider":"openrouter","requestId":"e781389c-7707-46ba-b1b9-d1343f344c1d","resolvedModelId":"openrouter/free","resolvedProvider":"openrouter","route":"/api/chat","status":"failed","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"openrouter/free","provider":"openrouter","requestId":"09f94ea3-eea8-4494-af11-b8eba9084314","route":"/api/chat","status":"accepted","userId":"test-user"}
+[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":1,"errorCode":"provider_rate_limited","fallbackApplied":false,"historyMode":null,"modelId":"openrouter/free","provider":"openrouter","requestId":"09f94ea3-eea8-4494-af11-b8eba9084314","resolvedModelId":"openrouter/free","resolvedProvider":"openrouter","route":"/api/chat","status":"failed","userId":"test-user"}
 
 [90mstderr[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mmaps repeated provider rate limits to a specific client-safe response
 [22m[39m/api/chat error: {
@@ -81,34 +80,34 @@ found 0 vulnerabilities
 }
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects chat requests once the per-minute quota is exhausted
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"71e89070-fba4-47aa-8be8-44d527d38479","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"3aefd8fe-c213-4c83-9772-fffcf47b4acb","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects chat requests once the per-minute quota is exhausted
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"chat_quota_exceeded","historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"3b897524-a0c6-4642-8a81-74ac4a774d1d","route":"/api/chat","status":"rejected","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"chat_quota_exceeded","historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"57c66b99-04dc-4852-b50a-a4a8eafc949e","route":"/api/chat","status":"rejected","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects overlapping requests with a specific concurrency error
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-nano-30b-a3b:free","provider":"openrouter","requestId":"a84e182c-28a8-49f2-9daa-600db8729c00","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-nano-30b-a3b:free","provider":"openrouter","requestId":"5c7426a1-482f-48e1-8bac-749ee5629e88","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects overlapping requests with a specific concurrency error
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"chat_concurrency_limited","historyMode":null,"modelId":"nvidia/nemotron-3-nano-30b-a3b:free","provider":"openrouter","requestId":"ea6b82d9-960f-4a9a-9c8e-6fb0bf565981","route":"/api/chat","status":"rejected","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"chat_concurrency_limited","historyMode":null,"modelId":"nvidia/nemotron-3-nano-30b-a3b:free","provider":"openrouter","requestId":"cc7c23f9-9a87-497f-a5b3-7d6710fb82d8","route":"/api/chat","status":"rejected","userId":"test-user"}
 
- [32m✓[39m tests/chat-route.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 118[2mms[22m[39m
- [32m✓[39m tests/thread-composer.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 445[2mms[22m[39m
-     [33m[2m✓[22m[39m sets run config and sends when the send button is clicked [33m 356[2mms[22m[39m
- [32m✓[39m tests/persisted-sessions.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 83[2mms[22m[39m
- [32m✓[39m tests/session-artifacts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 15[2mms[22m[39m
- [32m✓[39m tests/llm-settings-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 55[2mms[22m[39m
- [32m✓[39m tests/llm-helpers.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/project-arena.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 17[2mms[22m[39m
- [32m✓[39m tests/workspace-surface.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1133[2mms[22m[39m
-     [33m[2m✓[22m[39m opens the LLM Models workspace from Profile [33m 559[2mms[22m[39m
- [32m✓[39m tests/projects-context.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 106[2mms[22m[39m
- [32m✓[39m tests/thread-normalization.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/chat-route.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 101[2mms[22m[39m
+ [32m✓[39m tests/session-store.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 471[2mms[22m[39m
+ [32m✓[39m tests/thread-composer.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 421[2mms[22m[39m
+ [32m✓[39m tests/llm-settings-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 76[2mms[22m[39m
+ [32m✓[39m tests/persisted-sessions.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 79[2mms[22m[39m
+ [32m✓[39m tests/session-artifacts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/llm-helpers.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/project-arena.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/workspace-surface.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1247[2mms[22m[39m
+     [33m[2m✓[22m[39m opens the LLM Models workspace from Profile [33m 556[2mms[22m[39m
+ [32m✓[39m tests/projects-context.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 78[2mms[22m[39m
+ [32m✓[39m tests/thread-normalization.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/project-context-builder.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 35[2mms[22m[39m
  [32m✓[39m tests/session-ui-state.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 332[2mms[22m[39m
- [32m✓[39m tests/project-context-builder.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 26[2mms[22m[39m
- [32m✓[39m tests/agent-token-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 50[2mms[22m[39m
- [32m✓[39m tests/canvas-run-manager.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 281[2mms[22m[39m
- [32m✓[39m tests/project-collaboration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m tests/agent-token-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 41[2mms[22m[39m
+ [32m✓[39m tests/canvas-run-manager.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 279[2mms[22m[39m
+ [32m✓[39m tests/project-collaboration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 32[2mms[22m[39m
 [90mstderr[2m | tests/llm-control-route.test.ts[2m > [22m[2m/api/llm/control[2m > [22m[2mreturns a generic stop error instead of raw command output
 [22m[39mollama stop failed Error: spawn ENOENT ollama
     at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/llm-control-route.test.ts:126:18
@@ -121,16 +120,17 @@ found 0 vulnerabilities
     at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/llm-control-route.test.ts:130:22
     at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:20
 
- [32m✓[39m tests/llm-control-route.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 59[2mms[22m[39m
- [32m✓[39m tests/llm-user-settings.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m tests/session-artifact-upload-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 65[2mms[22m[39m
- [32m✓[39m tests/canvas-prompt-node.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 503[2mms[22m[39m
- [32m✓[39m tests/context-builder.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
- [32m✓[39m tests/project-workspace.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 955[2mms[22m[39m
-     [33m[2m✓[22m[39m shows a visible context CTA in project overview and returns focus to the editor [33m 703[2mms[22m[39m
- [32m✓[39m tests/request-errors.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 34[2mms[22m[39m
- [32m✓[39m tests/project-store.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 53[2mms[22m[39m
- [32m✓[39m tests/admin-users-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m tests/llm-control-route.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m tests/llm-user-settings.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/canvas-prompt-node.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 616[2mms[22m[39m
+     [33m[2m✓[22m[39m renders a canvas draft composer with controls and hint [33m 357[2mms[22m[39m
+ [32m✓[39m tests/project-workspace.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 963[2mms[22m[39m
+     [33m[2m✓[22m[39m shows a visible context CTA in project overview and returns focus to the editor [33m 685[2mms[22m[39m
+ [32m✓[39m tests/session-artifact-upload-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 59[2mms[22m[39m
+ [32m✓[39m tests/context-builder.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/request-errors.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m tests/project-store.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m tests/admin-users-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 47[2mms[22m[39m
 [90mstderr[2m | tests/title-route.test.ts[2m > [22m[2m/api/title[2m > [22m[2mreturns a generic title error instead of raw upstream details
 [22m[39m/api/title error: Error: provider trace here
     at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/title-route.test.ts:76:44
@@ -144,24 +144,25 @@ found 0 vulnerabilities
     at runWithTimeout [90m(file:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10[90m)[39m
     at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2955:64
 
- [32m✓[39m tests/title-route.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 32[2mms[22m[39m
- [32m✓[39m tests/llm-settings.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 364[2mms[22m[39m
- [32m✓[39m tests/api-access.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m tests/title-route.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m tests/llm-settings.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 381[2mms[22m[39m
+     [33m[2m✓[22m[39m updates the selector pool when the user customizes model availability [33m 323[2mms[22m[39m
+ [32m✓[39m tests/api-access.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m tests/block-library.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 657[2mms[22m[39m
+     [33m[2m✓[22m[39m shows the initial categories and contains no legacy template heading [33m 366[2mms[22m[39m
  [32m✓[39m tests/thread-branching-runtime.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 16[2mms[22m[39m
- [32m✓[39m tests/block-library.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 724[2mms[22m[39m
-     [33m[2m✓[22m[39m shows the initial categories and contains no legacy template heading [33m 403[2mms[22m[39m
- [32m✓[39m tests/account-plan-route.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 26[2mms[22m[39m
- [32m✓[39m tests/agent-token.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 38[2mms[22m[39m
- [32m✓[39m tests/thread-list.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 618[2mms[22m[39m
-     [33m[2m✓[22m[39m suppresses accidental new-session clicks immediately after leaving manage mode [33m 616[2mms[22m[39m
- [32m✓[39m tests/provider-runtime.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 35[2mms[22m[39m
- [32m✓[39m tests/session-blob-maintenance-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 36[2mms[22m[39m
- [32m✓[39m tests/app-header.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 426[2mms[22m[39m
-     [33m[2m✓[22m[39m uses the main Split control as a reversible toggle [33m 424[2mms[22m[39m
+ [32m✓[39m tests/account-plan-route.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32m✓[39m tests/agent-token.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 70[2mms[22m[39m
+ [32m✓[39m tests/thread-list.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 693[2mms[22m[39m
+     [33m[2m✓[22m[39m suppresses accidental new-session clicks immediately after leaving manage mode [33m 691[2mms[22m[39m
+ [32m✓[39m tests/provider-runtime.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m tests/session-blob-maintenance-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m tests/app-header.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 383[2mms[22m[39m
+     [33m[2m✓[22m[39m uses the main Split control as a reversible toggle [33m 382[2mms[22m[39m
  [32m✓[39m tests/memory-store.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 16[2mms[22m[39m
- [32m✓[39m tests/thread-branching.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
- [32m✓[39m tests/agent-work-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 497[2mms[22m[39m
-     [33m[2m✓[22m[39m deletes a saved token from the dashboard activity view [33m 495[2mms[22m[39m
+ [32m✓[39m tests/thread-branching.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/agent-work-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 521[2mms[22m[39m
+     [33m[2m✓[22m[39m deletes a saved token from the dashboard activity view [33m 519[2mms[22m[39m
 [90mstderr[2m | tests/theme-toggle.test.tsx[2m > [22m[2mThemeToggle[2m > [22m[2mhydrates without recovering when a persisted light theme exists
 [22m[39mThe current testing environment is not configured to support act(...)
 The current testing environment is not configured to support act(...)
@@ -169,28 +170,30 @@ The current testing environment is not configured to support act(...)
 [90mstderr[2m | tests/theme-toggle.test.tsx[2m > [22m[2mThemeToggle[2m > [22m[2mhydrates without recovering when a persisted light theme exists
 [22m[39mThe current testing environment is not configured to support act(...)
 
- [32m✓[39m tests/theme-toggle.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 312[2mms[22m[39m
- [32m✓[39m tests/artifact-presentation.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
- [32m✓[39m tests/workspace-split-layout.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 283[2mms[22m[39m
+ [32m✓[39m tests/theme-toggle.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 379[2mms[22m[39m
+     [33m[2m✓[22m[39m renders only the icon in an icon-sized button [33m 301[2mms[22m[39m
+ [32m✓[39m tests/artifact-presentation.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/workspace-split-layout.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 344[2mms[22m[39m
+     [33m[2m✓[22m[39m persists the main panel view mode per session [33m 342[2mms[22m[39m
  [32m✓[39m tests/canvas-run-scheduler.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
- [32m✓[39m tests/session-blob-store.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 14[2mms[22m[39m
- [32m✓[39m tests/root-page.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 46[2mms[22m[39m
- [32m✓[39m tests/graph-models.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
- [32m✓[39m tests/agent-access-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 546[2mms[22m[39m
-     [33m[2m✓[22m[39m creates a token with an explicit expiry and confirms it was saved [33m 544[2mms[22m[39m
- [32m✓[39m tests/openrouter-deployment-key-policy.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
- [32m✓[39m tests/canvas-prompt-artifact.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 10[2mms[22m[39m
- [32m✓[39m tests/llm-settings-store.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
- [32m✓[39m tests/auth-screen.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 103[2mms[22m[39m
+ [32m✓[39m tests/session-blob-store.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/root-page.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m tests/graph-models.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/agent-access-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 562[2mms[22m[39m
+     [33m[2m✓[22m[39m creates a token with an explicit expiry and confirms it was saved [33m 560[2mms[22m[39m
+ [32m✓[39m tests/openrouter-deployment-key-policy.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/canvas-prompt-artifact.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/llm-settings-store.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/auth-screen.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 95[2mms[22m[39m
  [32m✓[39m tests/e2e-auth.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/post-auth-handoff.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 22[2mms[22m[39m
  [32m✓[39m tests/ollama-provider-policy.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
- [32m✓[39m tests/app-title-sync.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m tests/post-auth-handoff.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m tests/app-title-sync.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 18[2mms[22m[39m
 
 [2m Test Files [22m [1m[32m55 passed[39m[22m[90m (55)[39m
 [2m      Tests [22m [1m[32m172 passed[39m[22m[90m (172)[39m
-[2m   Start at [22m 13:17:25
-[2m   Duration [22m 18.06s[2m (transform 2.52s, setup 0ms, import 12.48s, tests 8.82s, environment 19.87s)[22m
+[2m   Start at [22m 13:20:09
+[2m   Duration [22m 18.78s[2m (transform 2.77s, setup 0ms, import 13.36s, tests 9.57s, environment 20.10s)[22m
 
 
 > nodes@0.1.0 build
@@ -200,26 +203,1166 @@ The current testing environment is not configured to support act(...)
    ▲ Next.js 15.5.20
 
    Creating an optimized production build ...
- ✓ Compiled successfully in 28.7s
+ ✓ Compiled successfully in 31.1s
    Linting and checking validity of types ...
 
 ./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
-1539:9  Warning: 'handleToolbarArtifactCreate' is assigned a value but never used.  @typescript-eslint/no-unused-vars
-1550:9  Warning: 'handleToolbarUpload' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1540:9  Warning: 'handleToolbarArtifactCreate' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1551:9  Warning: 'handleToolbarUpload' is assigned a value but never used.  @typescript-eslint/no-unused-vars
 
 info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
-Failed to compile.
+   Collecting page data ...
+   Generating static pages (0/24) ...
+   Generating static pages (6/24) 
+   Generating static pages (12/24) 
+   Generating static pages (18/24) 
+ ✓ Generating static pages (24/24)
+   Finalizing page optimization ...
+   Collecting build traces ...
 
-./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx:1797:22
-Type error: Cannot find name 'estimateDataUrlBytes'.
+Route (app)                                      Size  First Load JS
+┌ ƒ /                                          148 kB         424 kB
+├ ƒ /_not-found                                  1 kB         104 kB
+├ ƒ /admin/users                                171 B         130 kB
+├ ƒ /api/account/plan                           192 B         103 kB
+├ ƒ /api/admin/users                            192 B         103 kB
+├ ƒ /api/agents/chat                            192 B         103 kB
+├ ƒ /api/agents/token                           192 B         103 kB
+├ ƒ /api/agents/work                            192 B         103 kB
+├ ƒ /api/auth/[...nextauth]                     192 B         103 kB
+├ ƒ /api/canvas-runs                            192 B         103 kB
+├ ƒ /api/chat                                   305 B         249 kB
+├ ƒ /api/llm/control                            192 B         103 kB
+├ ƒ /api/llm/openrouter/free-models             192 B         103 kB
+├ ƒ /api/llm/settings                           192 B         103 kB
+├ ƒ /api/memory                                 192 B         103 kB
+├ ƒ /api/memory/[memoryId]                      192 B         103 kB
+├ ƒ /api/projects                               192 B         103 kB
+├ ƒ /api/projects/[projectId]                   192 B         103 kB
+├ ƒ /api/projects/[projectId]/members           192 B         103 kB
+├ ƒ /api/sessions                               192 B         103 kB
+├ ƒ /api/sessions/[sessionId]                   192 B         103 kB
+├ ƒ /api/sessions/[sessionId]/artifacts         192 B         103 kB
+├ ƒ /api/sessions/blob-maintenance              192 B         103 kB
+├ ƒ /api/support/tickets                        192 B         103 kB
+├ ƒ /api/support/tickets/[ticketId]             192 B         103 kB
+├ ƒ /api/support/tickets/[ticketId]/comments    192 B         103 kB
+├ ƒ /api/title                                  192 B         103 kB
+├ ○ /apple-icon.png                               0 B            0 B
+└ ○ /icon.png                                     0 B            0 B
++ First Load JS shared by all                  103 kB
+  ├ chunks/1255-ab54a41c275880be.js             46 kB
+  ├ chunks/4bd1b696-100b9d70ed4e49c1.js       54.2 kB
+  └ other shared chunks (total)                2.8 kB
 
-[0m [90m 1795 |[39m   [36mconst[39m selectedArtifactSize [33m=[39m formatByteSize(selectedArtifact[33m?[39m[33m.[39mbyteSize)[33m;[39m
- [90m 1796 |[39m   [36mconst[39m selectedArtifactPreviewSize [33m=[39m selectedArtifact[33m?[39m[33m.[39msourceDataUrl
-[31m[1m>[22m[39m[90m 1797 |[39m     [33m?[39m formatByteSize(estimateDataUrlBytes(selectedArtifact[33m.[39msourceDataUrl))
- [90m      |[39m                      [31m[1m^[22m[39m
- [90m 1798 |[39m     [33m:[39m [36mnull[39m[33m;[39m
- [90m 1799 |[39m   [36mconst[39m selectedArtifactStatChips [33m=[39m [33mReact[39m[33m.[39museMemo(
- [90m 1800 |[39m     () [33m=>[39m (selectedArtifact [33m?[39m getArtifactStatChips(selectedArtifact) [33m:[39m [])[33m,[39m[0m
-Next.js build worker exited with code: 1 and signal: null
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+Installing dependencies...
+Switching to root user to install dependencies...
+Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+Get:6 https://packages.microsoft.com/repos/azure-cli noble InRelease [3564 B]
+Hit:2 http://azure.archive.ubuntu.com/ubuntu noble InRelease
+Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+Get:8 https://dl.google.com/linux/chrome-stable/deb stable InRelease [1825 B]
+Get:3 http://azure.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+Get:4 http://azure.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+Get:5 http://azure.archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+Get:9 https://packages.microsoft.com/repos/azure-cli noble/main amd64 Packages [2314 B]
+Get:10 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [214 kB]
+Get:11 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [181 kB]
+Get:12 https://packages.microsoft.com/ubuntu/24.04/prod noble/main armhf Packages [11.6 kB]
+Get:13 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1092 kB]
+Get:22 https://dl.google.com/linux/chrome-stable/deb stable/main amd64 Packages [1216 B]
+Get:14 http://azure.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [269 kB]
+Get:15 http://azure.archive.ubuntu.com/ubuntu noble-updates/main amd64 Components [180 kB]
+Get:16 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1660 kB]
+Get:17 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [327 kB]
+Get:18 http://azure.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Components [388 kB]
+Get:19 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1225 kB]
+Get:20 http://azure.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [276 kB]
+Get:21 http://azure.archive.ubuntu.com/ubuntu noble-updates/multiverse amd64 Components [940 B]
+Get:23 http://azure.archive.ubuntu.com/ubuntu noble-backports/main amd64 Components [5760 B]
+Get:24 http://azure.archive.ubuntu.com/ubuntu noble-backports/universe amd64 Components [10.5 kB]
+Get:25 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [827 kB]
+Get:26 http://azure.archive.ubuntu.com/ubuntu noble-security/main Translation-en [187 kB]
+Get:27 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 Components [44.8 kB]
+Get:28 http://azure.archive.ubuntu.com/ubuntu noble-security/main amd64 c-n-f Metadata [11.9 kB]
+Get:29 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1174 kB]
+Get:30 http://azure.archive.ubuntu.com/ubuntu noble-security/universe Translation-en [231 kB]
+Get:31 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 Components [76.3 kB]
+Get:32 http://azure.archive.ubuntu.com/ubuntu noble-security/universe amd64 c-n-f Metadata [24.2 kB]
+Fetched 8809 kB in 1s (6772 kB/s)
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+libasound2t64 is already the newest version (1.2.11-1ubuntu0.2).
+libasound2t64 set to manually installed.
+libatk-bridge2.0-0t64 is already the newest version (2.52.0-1build1).
+libatk-bridge2.0-0t64 set to manually installed.
+libatk1.0-0t64 is already the newest version (2.52.0-1build1).
+libatk1.0-0t64 set to manually installed.
+libatspi2.0-0t64 is already the newest version (2.52.0-1build1).
+libatspi2.0-0t64 set to manually installed.
+libcairo2 is already the newest version (1.18.0-3build1).
+libcairo2 set to manually installed.
+libcups2t64 is already the newest version (2.4.7-1.2ubuntu7.14).
+libcups2t64 set to manually installed.
+libdbus-1-3 is already the newest version (1.14.10-4ubuntu4.1).
+libdbus-1-3 set to manually installed.
+libdrm2 is already the newest version (2.4.125-1ubuntu0.1~24.04.2).
+libdrm2 set to manually installed.
+libgbm1 is already the newest version (25.2.8-0ubuntu0.24.04.2).
+libgbm1 set to manually installed.
+libglib2.0-0t64 is already the newest version (2.80.0-6ubuntu3.8).
+libglib2.0-0t64 set to manually installed.
+libnspr4 is already the newest version (2:4.35-1.1build1).
+libnspr4 set to manually installed.
+libnss3 is already the newest version (2:3.98-1ubuntu0.2).
+libnss3 set to manually installed.
+libpango-1.0-0 is already the newest version (1.52.1+ds-1build1).
+libpango-1.0-0 set to manually installed.
+libx11-6 is already the newest version (2:1.8.7-1build1).
+libx11-6 set to manually installed.
+libxcb1 is already the newest version (1.15-1ubuntu2).
+libxcb1 set to manually installed.
+libxcomposite1 is already the newest version (1:0.4.5-1build3).
+libxcomposite1 set to manually installed.
+libxdamage1 is already the newest version (1:1.1.6-1build1).
+libxdamage1 set to manually installed.
+libxext6 is already the newest version (2:1.3.4-1build2).
+libxext6 set to manually installed.
+libxfixes3 is already the newest version (1:6.0.0-2build1).
+libxfixes3 set to manually installed.
+libxkbcommon0 is already the newest version (1.6.0-1build1).
+libxkbcommon0 set to manually installed.
+libxrandr2 is already the newest version (2:1.5.2-2build1).
+libxrandr2 set to manually installed.
+xvfb is already the newest version (2:21.1.12-1ubuntu1.6).
+fonts-noto-color-emoji is already the newest version (2.047-0ubuntu0.24.04.1).
+libfontconfig1 is already the newest version (2.15.0-1.1ubuntu2).
+libfontconfig1 set to manually installed.
+libfreetype6 is already the newest version (2.13.2+dfsg-1ubuntu0.1).
+libfreetype6 set to manually installed.
+fonts-liberation is already the newest version (1:2.1.5-3).
+fonts-liberation set to manually installed.
+The following additional packages will be installed:
+  xfonts-encodings xfonts-utils
+Recommended packages:
+  fonts-ipafont-mincho fonts-tlwg-loma
+The following NEW packages will be installed:
+  fonts-freefont-ttf fonts-ipafont-gothic fonts-tlwg-loma-otf fonts-unifont
+  fonts-wqy-zenhei xfonts-cyrillic xfonts-encodings xfonts-scalable
+  xfonts-utils
+0 upgraded, 9 newly installed, 0 to remove and 38 not upgraded.
+Need to get 21.1 MB of archives.
+After this operation, 79.5 MB of additional disk space will be used.
+Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+Get:2 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 fonts-ipafont-gothic all 00303-21ubuntu1 [3513 kB]
+Get:3 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 fonts-freefont-ttf all 20211204+svn4273-2 [5641 kB]
+Get:4 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 fonts-tlwg-loma-otf all 1:0.7.3-1 [107 kB]
+Get:5 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 fonts-unifont all 1:15.1.01-1build1 [2993 kB]
+Get:6 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 fonts-wqy-zenhei all 0.9.45-8 [7472 kB]
+Get:7 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 xfonts-encodings all 1:1.0.5-0ubuntu2 [578 kB]
+Get:8 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 xfonts-utils amd64 1:7.7+6build3 [94.4 kB]
+Get:9 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 xfonts-cyrillic all 1:1.0.5+nmu1 [384 kB]
+Get:10 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 xfonts-scalable all 1:1.0.3-1.3 [304 kB]
+Fetched 21.1 MB in 0s (77.1 MB/s)
+Selecting previously unselected package fonts-ipafont-gothic.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 202701 files and directories currently installed.)
+Preparing to unpack .../0-fonts-ipafont-gothic_00303-21ubuntu1_all.deb ...
+Unpacking fonts-ipafont-gothic (00303-21ubuntu1) ...
+Selecting previously unselected package fonts-freefont-ttf.
+Preparing to unpack .../1-fonts-freefont-ttf_20211204+svn4273-2_all.deb ...
+Unpacking fonts-freefont-ttf (20211204+svn4273-2) ...
+Selecting previously unselected package fonts-tlwg-loma-otf.
+Preparing to unpack .../2-fonts-tlwg-loma-otf_1%3a0.7.3-1_all.deb ...
+Unpacking fonts-tlwg-loma-otf (1:0.7.3-1) ...
+Selecting previously unselected package fonts-unifont.
+Preparing to unpack .../3-fonts-unifont_1%3a15.1.01-1build1_all.deb ...
+Unpacking fonts-unifont (1:15.1.01-1build1) ...
+Selecting previously unselected package fonts-wqy-zenhei.
+Preparing to unpack .../4-fonts-wqy-zenhei_0.9.45-8_all.deb ...
+Unpacking fonts-wqy-zenhei (0.9.45-8) ...
+Selecting previously unselected package xfonts-encodings.
+Preparing to unpack .../5-xfonts-encodings_1%3a1.0.5-0ubuntu2_all.deb ...
+Unpacking xfonts-encodings (1:1.0.5-0ubuntu2) ...
+Selecting previously unselected package xfonts-utils.
+Preparing to unpack .../6-xfonts-utils_1%3a7.7+6build3_amd64.deb ...
+Unpacking xfonts-utils (1:7.7+6build3) ...
+Selecting previously unselected package xfonts-cyrillic.
+Preparing to unpack .../7-xfonts-cyrillic_1%3a1.0.5+nmu1_all.deb ...
+Unpacking xfonts-cyrillic (1:1.0.5+nmu1) ...
+Selecting previously unselected package xfonts-scalable.
+Preparing to unpack .../8-xfonts-scalable_1%3a1.0.3-1.3_all.deb ...
+Unpacking xfonts-scalable (1:1.0.3-1.3) ...
+Setting up fonts-wqy-zenhei (0.9.45-8) ...
+Setting up fonts-freefont-ttf (20211204+svn4273-2) ...
+Setting up fonts-tlwg-loma-otf (1:0.7.3-1) ...
+Setting up xfonts-encodings (1:1.0.5-0ubuntu2) ...
+Setting up fonts-ipafont-gothic (00303-21ubuntu1) ...
+update-alternatives: using /usr/share/fonts/opentype/ipafont-gothic/ipag.ttf to provide /usr/share/fonts/truetype/fonts-japanese-gothic.ttf (fonts-japanese-gothic.ttf) in auto mode
+Setting up fonts-unifont (1:15.1.01-1build1) ...
+Setting up xfonts-utils (1:7.7+6build3) ...
+Setting up xfonts-cyrillic (1:1.0.5+nmu1) ...
+Setting up xfonts-scalable (1:1.0.3-1.3) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+Not building database; man-db/auto-update is not 'true'.
+Processing triggers for fontconfig (2.15.0-1.1ubuntu2) ...
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+Downloading Chrome for Testing 147.0.7727.15 (playwright chromium v1217) from https://cdn.playwright.dev/builds/cft/147.0.7727.15/linux64/chrome-linux64.zip
+|                                                                                |   0% of 170.4 MiB
+|■■■■■■■■                                                                        |  10% of 170.4 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 170.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 170.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 170.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 170.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 170.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 170.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 170.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 170.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 170.4 MiB
+Chrome for Testing 147.0.7727.15 (playwright chromium v1217) downloaded to /home/runner/.cache/ms-playwright/chromium-1217
+Downloading FFmpeg (playwright ffmpeg v1011) from https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1011/ffmpeg-linux.zip
+|                                                                                |   0% of 2.3 MiB
+|■■■■■■■■                                                                        |  10% of 2.3 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 2.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 2.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 2.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 2.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 2.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 2.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 2.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 2.3 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 2.3 MiB
+FFmpeg (playwright ffmpeg v1011) downloaded to /home/runner/.cache/ms-playwright/ffmpeg-1011
+Downloading Chrome Headless Shell 147.0.7727.15 (playwright chromium-headless-shell v1217) from https://cdn.playwright.dev/builds/cft/147.0.7727.15/linux64/chrome-headless-shell-linux64.zip
+|                                                                                |   0% of 112 MiB
+|■■■■■■■■                                                                        |  10% of 112 MiB
+|■■■■■■■■■■■■■■■■                                                                |  20% of 112 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■                                                        |  30% of 112 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                                |  40% of 112 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 112 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 112 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 112 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 112 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 112 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 112 MiB
+Chrome Headless Shell 147.0.7727.15 (playwright chromium-headless-shell v1217) downloaded to /home/runner/.cache/ms-playwright/chromium_headless_shell-1217
+
+> nodes@0.1.0 test:e2e
+> playwright test --workers=1
+
+
+Running 36 tests using 1 worker
+
+  ✘   1 tests/e2e/chat-image-attachment.spec.ts:81:5 › attaching an image includes it in the sent message (1.0m)
+  ✘   2 tests/e2e/chat-image-attachment.spec.ts:165:5 › send is blocked while an image is still preparing (15.1s)
+  ✘   3 tests/e2e/chat-image-attachment.spec.ts:180:5 › attaching an image does not auto-send when text is already typed (1.0m)
+  -   4 tests/e2e/readme-capture.spec.ts:294:5 › captures a cleaner workspace hero screenshot
+  -   5 tests/e2e/readme-capture.spec.ts:356:5 › captures a project canvas screenshot
+  -   6 tests/e2e/readme-capture.spec.ts:422:5 › captures a cleaner project arena screenshot
+  -   7 tests/e2e/readme-capture.spec.ts:478:5 › captures a project context builder screenshot
+  ✘   8 tests/e2e/session-return-send.spec.ts:138:5 › composer still works after leaving the session surface and returning (24.6s)
+  ✘   9 tests/e2e/session-return-send.spec.ts:157:5 › composer still works after reopening the app with the stored active session (23.6s)
+  ✘  10 tests/e2e/smoke.spec.ts:466:5 › preserves chat thread and canvas nodes when switching workspace modes (14.6s)
+  ✓  11 tests/e2e/smoke.spec.ts:486:5 › preserves a session thread when switching to a project and back (14.9s)
+  ✓  12 tests/e2e/smoke.spec.ts:663:5 › loads the workspace without getting stuck on session bootstrap (4.3s)
+  ✓  13 tests/e2e/smoke.spec.ts:669:5 › sends a prompt and renders the mocked assistant reply (9.1s)
+  ✓  14 tests/e2e/smoke.spec.ts:678:5 › copies graph JSON after a reply (9.3s)
+  ✘  15 tests/e2e/smoke.spec.ts:692:5 › respects the selected local model in the request metadata (1.0m)
+  ✓  16 tests/e2e/smoke.spec.ts:707:5 › sends full history when Full mode is selected (10.9s)
+  ✘  17 tests/e2e/smoke.spec.ts:718:5 › creates the first prompt directly from an empty flow canvas (23.7s)
+  ✓  18 tests/e2e/smoke.spec.ts:761:5 › creates an assistant branch when reloading a reply (10.4s)
+  ✓  19 tests/e2e/smoke.spec.ts:785:5 › persists edit branching across reloads (11.6s)
+  ✓  20 tests/e2e/smoke.spec.ts:841:5 › creates a new root branch from the flow canvas (11.3s)
+  ✘  21 tests/e2e/smoke.spec.ts:856:5 › creates a new root branch from the chat thread (25.8s)
+  ✓  22 tests/e2e/smoke.spec.ts:871:5 › creates a sibling user branch from a flow user node (13.2s)
+  ✘  23 tests/e2e/smoke.spec.ts:900:5 › creates a sibling user branch from a chat user node (27.4s)
+  ✓  24 tests/e2e/smoke.spec.ts:921:5 › creates a follow-up user branch from a flow assistant node (12.0s)
+  ✘  25 tests/e2e/smoke.spec.ts:943:5 › creates a follow-up user branch from a chat assistant node (25.6s)
+  ✘  26 tests/e2e/smoke.spec.ts:966:5 › renders distinct root-user branches without overlap (26.3s)
+  ✘  27 tests/e2e/smoke.spec.ts:990:5 › renders distinct later-user branches without overlap (27.6s)
+  ✘  28 tests/e2e/smoke.spec.ts:1024:5 › cuts and restores a graph link from the flow renderer (1.0m)
+  ✓  29 tests/e2e/smoke.spec.ts:1058:5 › deletes a session durably across reload (9.9s)
+  ✘  30 tests/e2e/smoke.spec.ts:1094:5 › creates a project from multiple saved sessions and opens the aggregated canvas (1.0m)
+  ✘  31 tests/e2e/smoke.spec.ts:1144:5 › creates a typed node from canvas focus inside a project (24.0s)
+  ✓  32 tests/e2e/smoke.spec.ts:1172:5 › deletes a project durably across reload (14.1s)
+  ✘  33 tests/e2e/smoke.spec.ts:1211:5 › shows a visible fallback message when the provider request fails (24.1s)
+  ✘  34 tests/e2e/smoke.spec.ts:1233:5 › creates a semantic text artifact, attaches it as context, and branches with it from the flow (1.0m)
+  ✘  35 tests/e2e/smoke.spec.ts:1304:5 › uploads an image artifact, persists it, and branches with it from the flow (31.8s)
+  ✘  36 tests/e2e/smoke.spec.ts:1382:5 › opens the canvas guide and explains the selected focus (1.0m)
+
+
+  1) tests/e2e/chat-image-attachment.spec.ts:81:5 › attaching an image includes it in the sent message 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.selectOption: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('combobox', { name: 'Model' })[22m
+    [2m    - locator resolved to <select class="text-foreground bg-muted/70 hover:bg-muted focus-visible:ring-ring flex min-w-48 items-center rounded-md border px-2 py-1 text-xs outline-none transition-colors">…</select>[22m
+    [2m  - attempting select option action[22m
+    [2m    2 × waiting for element to be visible and enabled[22m
+    [2m      - did not find some options[22m
+    [2m    - retrying select option action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible and enabled[22m
+    [2m      - did not find some options[22m
+    [2m    - retrying select option action[22m
+    [2m      - waiting 100ms[22m
+    [2m    94 × waiting for element to be visible and enabled[22m
+    [2m       - did not find some options[22m
+    [2m     - retrying select option action[22m
+    [2m       - waiting 500ms[22m
+
+
+      101 |
+      102 |   // Switch to a vision-capable model so image parts are accepted.
+    > 103 |   await page.getByRole("combobox", { name: "Model" }).selectOption({
+          |                                                       ^
+      104 |     label: "OpenRouter · Nemotron Nano 12B V2 VL (free)",
+      105 |   });
+      106 |
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/chat-image-attachment.spec.ts:103:55
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chat-image-attachment-atta-abed8-udes-it-in-the-sent-message/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chat-image-attachment-atta-abed8-udes-it-in-the-sent-message/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chat-image-attachment-atta-abed8-udes-it-in-the-sent-message/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chat-image-attachment-atta-abed8-udes-it-in-the-sent-message/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chat-image-attachment-atta-abed8-udes-it-in-the-sent-message/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) tests/e2e/chat-image-attachment.spec.ts:165:5 › send is blocked while an image is still preparing 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: getByTestId('composer-error')
+    Expected pattern: [32m/preparing the image attachment|text-only|Could not send/i[39m
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 5000ms[22m
+    [2m  - waiting for getByTestId('composer-error')[22m
+
+
+      175 |   await page.getByRole("button", { name: "Send" }).click();
+      176 |   const alert = page.getByTestId("composer-error");
+    > 177 |   await expect(alert).toContainText(/preparing the image attachment|text-only|Could not send/i);
+          |                       ^
+      178 | });
+      179 |
+      180 | test("attaching an image does not auto-send when text is already typed", async ({ page }) => {
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/chat-image-attachment.spec.ts:177:23
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chat-image-attachment-send-dd9b9-an-image-is-still-preparing/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chat-image-attachment-send-dd9b9-an-image-is-still-preparing/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chat-image-attachment-send-dd9b9-an-image-is-still-preparing/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chat-image-attachment-send-dd9b9-an-image-is-still-preparing/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chat-image-attachment-send-dd9b9-an-image-is-still-preparing/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) tests/e2e/chat-image-attachment.spec.ts:180:5 › attaching an image does not auto-send when text is already typed 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.selectOption: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('combobox', { name: 'Model' })[22m
+    [2m    - locator resolved to <select class="text-foreground bg-muted/70 hover:bg-muted focus-visible:ring-ring flex min-w-48 items-center rounded-md border px-2 py-1 text-xs outline-none transition-colors">…</select>[22m
+    [2m  - attempting select option action[22m
+    [2m    2 × waiting for element to be visible and enabled[22m
+    [2m      - did not find some options[22m
+    [2m    - retrying select option action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible and enabled[22m
+    [2m      - did not find some options[22m
+    [2m    - retrying select option action[22m
+    [2m      - waiting 100ms[22m
+    [2m    95 × waiting for element to be visible and enabled[22m
+    [2m       - did not find some options[22m
+    [2m     - retrying select option action[22m
+    [2m       - waiting 500ms[22m
+
+
+      194 |
+      195 |   // Switch to a vision-capable model so image parts are accepted.
+    > 196 |   await page.getByRole("combobox", { name: "Model" }).selectOption({
+          |                                                       ^
+      197 |     label: "OpenRouter · Nemotron Nano 12B V2 VL (free)",
+      198 |   });
+      199 |
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/chat-image-attachment.spec.ts:196:55
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/chat-image-attachment-atta-9ee10--when-text-is-already-typed/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/chat-image-attachment-atta-9ee10--when-text-is-already-typed/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/chat-image-attachment-atta-9ee10--when-text-is-already-typed/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/chat-image-attachment-atta-9ee10--when-text-is-already-typed/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/chat-image-attachment-atta-9ee10--when-text-is-already-typed/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) tests/e2e/session-return-send.spec.ts:138:5 › composer still works after leaving the session surface and returning 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('[data-message-id]').filter({ hasText: 'E2E reply: hello one [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 15000ms[22m
+    [2m  - waiting for locator('[data-message-id]').filter({ hasText: 'E2E reply: hello one [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()[22m
+
+
+      129 |   }
+      130 |   await expect(threadMessage(page, prompt)).toBeVisible({ timeout: 15_000 });
+    > 131 |   await expect(threadMessage(page, expectedReply(prompt))).toBeVisible({ timeout: 15_000 });
+          |                                                            ^
+      132 | }
+      133 |
+      134 | test.beforeEach(async ({ page }) => {
+        at sendPrompt (/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/session-return-send.spec.ts:131:60)
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/session-return-send.spec.ts:142:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/session-return-send-compos-de581-ssion-surface-and-returning/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/session-return-send-compos-de581-ssion-surface-and-returning/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/session-return-send-compos-de581-ssion-surface-and-returning/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/session-return-send-compos-de581-ssion-surface-and-returning/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/session-return-send-compos-de581-ssion-surface-and-returning/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) tests/e2e/session-return-send.spec.ts:157:5 › composer still works after reopening the app with the stored active session 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('[data-message-id]').filter({ hasText: 'E2E reply: first message [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 15000ms[22m
+    [2m  - waiting for locator('[data-message-id]').filter({ hasText: 'E2E reply: first message [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()[22m
+
+
+      129 |   }
+      130 |   await expect(threadMessage(page, prompt)).toBeVisible({ timeout: 15_000 });
+    > 131 |   await expect(threadMessage(page, expectedReply(prompt))).toBeVisible({ timeout: 15_000 });
+          |                                                            ^
+      132 | }
+      133 |
+      134 | test.beforeEach(async ({ page }) => {
+        at sendPrompt (/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/session-return-send.spec.ts:131:60)
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/session-return-send.spec.ts:160:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/session-return-send-compos-e7ac8-h-the-stored-active-session/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/session-return-send-compos-e7ac8-h-the-stored-active-session/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/session-return-send-compos-e7ac8-h-the-stored-active-session/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/session-return-send-compos-e7ac8-h-the-stored-active-session/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/session-return-send-compos-e7ac8-h-the-stored-active-session/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) tests/e2e/smoke.spec.ts:466:5 › preserves chat thread and canvas nodes when switching workspace modes 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCount[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator:  locator('.react-flow__node')
+    Expected: [32m3[39m
+    Received: [31m1[39m
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toHaveCount" with timeout 5000ms[22m
+    [2m  - waiting for locator('.react-flow__node')[22m
+    [2m    9 × locator resolved to 1 element[22m
+    [2m      - unexpected value "1"[22m
+
+
+      473 |
+      474 |   await page.getByRole("button", { name: "Show canvas panel" }).click();
+    > 475 |   await expect(page.locator(".react-flow__node")).toHaveCount(3);
+          |                                                   ^
+      476 |   await expect(page.locator(".react-flow__node").first()).toBeVisible();
+      477 |   await expect(page.locator('.react-flow__node[data-id="__ROOT__"]')).toHaveCount(1);
+      478 |   const graph = await copyGraphJson(page);
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:475:51
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-preserves-chat-threa-a2b09-n-switching-workspace-modes/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-preserves-chat-threa-a2b09-n-switching-workspace-modes/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-preserves-chat-threa-a2b09-n-switching-workspace-modes/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-preserves-chat-threa-a2b09-n-switching-workspace-modes/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-preserves-chat-threa-a2b09-n-switching-workspace-modes/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) tests/e2e/smoke.spec.ts:692:5 › respects the selected local model in the request metadata ─────
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.selectOption: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('select')[22m
+    [2m    - locator resolved to <select class="text-foreground bg-muted/70 hover:bg-muted focus-visible:ring-ring flex min-w-48 items-center rounded-md border px-2 py-1 text-xs outline-none transition-colors">…</select>[22m
+    [2m  - attempting select option action[22m
+    [2m    2 × waiting for element to be visible and enabled[22m
+    [2m      - did not find some options[22m
+    [2m    - retrying select option action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible and enabled[22m
+    [2m      - did not find some options[22m
+    [2m    - retrying select option action[22m
+    [2m      - waiting 100ms[22m
+    [2m    106 × waiting for element to be visible and enabled[22m
+    [2m        - did not find some options[22m
+    [2m      - retrying select option action[22m
+    [2m        - waiting 500ms[22m
+
+
+      693 |   await gotoChat(page);
+      694 |
+    > 695 |   await page.locator("select").selectOption("ollama:gemma3:4b");
+          |                                ^
+      696 |   const reply = await sendPrompt(page, "Model selection prompt", {
+      697 |     provider: "ollama",
+      698 |     model: "gemma3:4b",
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:695:32
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-respects-the-selecte-3e50b-del-in-the-request-metadata/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-respects-the-selecte-3e50b-del-in-the-request-metadata/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-respects-the-selecte-3e50b-del-in-the-request-metadata/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-respects-the-selecte-3e50b-del-in-the-request-metadata/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-respects-the-selecte-3e50b-del-in-the-request-metadata/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  8) tests/e2e/smoke.spec.ts:718:5 › creates the first prompt directly from an empty flow canvas ───
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]')
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 15000ms[22m
+    [2m  - waiting for locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]')[22m
+
+
+      725 |   await page.getByRole("button", { name: "Create prompt node" }).click();
+      726 |   const draftNode = page.locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]');
+    > 727 |   await expect(draftNode).toBeVisible({ timeout: 15_000 });
+          |                           ^
+      728 |   await draftNode.getByRole("textbox", { name: "Draft prompt" }).fill("Canvas first prompt");
+      729 |
+      730 |   const responsePromise = page.waitForResponse(
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:727:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-creates-the-first-pr-a8be9-y-from-an-empty-flow-canvas/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-creates-the-first-pr-a8be9-y-from-an-empty-flow-canvas/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-creates-the-first-pr-a8be9-y-from-an-empty-flow-canvas/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-creates-the-first-pr-a8be9-y-from-an-empty-flow-canvas/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-creates-the-first-pr-a8be9-y-from-an-empty-flow-canvas/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  9) tests/e2e/smoke.spec.ts:856:5 › creates a new root branch from the chat thread ────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('[data-message-id]').filter({ hasText: 'E2E reply: Chat-created root branch [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 15000ms[22m
+    [2m  - waiting for locator('[data-message-id]').filter({ hasText: 'E2E reply: Chat-created root branch [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()[22m
+
+
+      590 |   const reply = expectedReply(prompt, options);
+      591 |   await expect(threadMessage(page, prompt)).toBeVisible();
+    > 592 |   await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
+          |                                            ^
+      593 |   return reply;
+      594 | }
+      595 |
+        at createBranchFromChat (/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:592:44)
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:860:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-new-root-branch-from-the-chat-thread/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-new-root-branch-from-the-chat-thread/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-creates-a-new-root-branch-from-the-chat-thread/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-new-root-branch-from-the-chat-thread/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-creates-a-new-root-branch-from-the-chat-thread/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10) tests/e2e/smoke.spec.ts:900:5 › creates a sibling user branch from a chat user node ──────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('[data-message-id]').filter({ hasText: 'E2E reply: Chat user sibling alternative [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 15000ms[22m
+    [2m  - waiting for locator('[data-message-id]').filter({ hasText: 'E2E reply: Chat user sibling alternative [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()[22m
+
+
+      590 |   const reply = expectedReply(prompt, options);
+      591 |   await expect(threadMessage(page, prompt)).toBeVisible();
+    > 592 |   await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
+          |                                            ^
+      593 |   return reply;
+      594 | }
+      595 |
+        at createBranchFromChat (/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:592:44)
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:905:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-sibling-user-branch-from-a-chat-user-node/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-sibling-user-branch-from-a-chat-user-node/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-creates-a-sibling-user-branch-from-a-chat-user-node/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-sibling-user-branch-from-a-chat-user-node/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-creates-a-sibling-user-branch-from-a-chat-user-node/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  11) tests/e2e/smoke.spec.ts:943:5 › creates a follow-up user branch from a chat assistant node ───
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('[data-message-id]').filter({ hasText: 'E2E reply: Chat assistant follow-up prompt [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 15000ms[22m
+    [2m  - waiting for locator('[data-message-id]').filter({ hasText: 'E2E reply: Chat assistant follow-up prompt [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()[22m
+
+
+      590 |   const reply = expectedReply(prompt, options);
+      591 |   await expect(threadMessage(page, prompt)).toBeVisible();
+    > 592 |   await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
+          |                                            ^
+      593 |   return reply;
+      594 | }
+      595 |
+        at createBranchFromChat (/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:592:44)
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:947:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-follow-up--0fdb2--from-a-chat-assistant-node/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-follow-up--0fdb2--from-a-chat-assistant-node/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-creates-a-follow-up--0fdb2--from-a-chat-assistant-node/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-follow-up--0fdb2--from-a-chat-assistant-node/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-creates-a-follow-up--0fdb2--from-a-chat-assistant-node/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  12) tests/e2e/smoke.spec.ts:966:5 › renders distinct root-user branches without overlap ──────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('[data-message-id]').filter({ hasText: 'E2E reply: Root branch edited prompt [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 15000ms[22m
+    [2m  - waiting for locator('[data-message-id]').filter({ hasText: 'E2E reply: Root branch edited prompt [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()[22m
+
+
+      392 |   const editedReply = expectedReply(editedPrompt, options);
+      393 |   await expect(threadMessage(page, editedPrompt)).toBeVisible();
+    > 394 |   await expect(threadMessage(page, editedReply)).toBeVisible({
+          |                                                  ^
+      395 |     timeout: 15_000,
+      396 |   });
+      397 | }
+        at editUserPrompt (/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:394:50)
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:972:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-renders-distinct-root-user-branches-without-overlap/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-renders-distinct-root-user-branches-without-overlap/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-renders-distinct-root-user-branches-without-overlap/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-renders-distinct-root-user-branches-without-overlap/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-renders-distinct-root-user-branches-without-overlap/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  13) tests/e2e/smoke.spec.ts:990:5 › renders distinct later-user branches without overlap ─────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('[data-message-id]').filter({ hasText: 'E2E reply: Later user edited prompt [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 15000ms[22m
+    [2m  - waiting for locator('[data-message-id]').filter({ hasText: 'E2E reply: Later user edited prompt [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1]' }).first()[22m
+
+
+      392 |   const editedReply = expectedReply(editedPrompt, options);
+      393 |   await expect(threadMessage(page, editedPrompt)).toBeVisible();
+    > 394 |   await expect(threadMessage(page, editedReply)).toBeVisible({
+          |                                                  ^
+      395 |     timeout: 15_000,
+      396 |   });
+      397 | }
+        at editUserPrompt (/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:394:50)
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:995:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-renders-distinct-later-user-branches-without-overlap/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-renders-distinct-later-user-branches-without-overlap/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-renders-distinct-later-user-branches-without-overlap/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-renders-distinct-later-user-branches-without-overlap/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-renders-distinct-later-user-branches-without-overlap/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  14) tests/e2e/smoke.spec.ts:1024:5 › cuts and restores a graph link from the flow renderer ───────
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.dispatchEvent: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('.react-flow__node[data-id="tI6uliY8kf1IlXAk"]')[22m
+
+
+      1037 |   await page.getByRole("button", { name: /Canvas tools/i }).click();
+      1038 |   await page.getByRole("button", { name: "Edit Links" }).click();
+    > 1039 |   await page.locator(`.react-flow__node[data-id="${assistantNodeId}"]`).dispatchEvent("click");
+           |                                                                         ^
+      1040 |   await page.getByRole("button", { name: "Cut selected link" }).click();
+      1041 |   await expect(page.getByRole("button", { name: /Reset Cuts \(1\)/ })).toBeVisible();
+      1042 |   await expect(page.getByRole("button", { name: "Restore link" })).toBeVisible();
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:1039:73
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-cuts-and-restores-a-graph-link-from-the-flow-renderer/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-cuts-and-restores-a-graph-link-from-the-flow-renderer/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-cuts-and-restores-a-graph-link-from-the-flow-renderer/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-cuts-and-restores-a-graph-link-from-the-flow-renderer/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-cuts-and-restores-a-graph-link-from-the-flow-renderer/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  15) tests/e2e/smoke.spec.ts:1094:5 › creates a project from multiple saved sessions and opens the aggregated canvas 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('.react-flow__node [data-memory-type="merge"]').first()[22m
+
+
+      1134 |   await page.getByRole("button", { name: "Canvas" }).last().click();
+      1135 |   await expect(page.getByText("Arena memo", { exact: true }).first()).toBeVisible();
+    > 1136 |   await page.locator('.react-flow__node [data-memory-type="merge"]').first().click();
+           |                                                                              ^
+      1137 |   await expect(page.getByRole("button", { name: "Use as global context" })).toBeVisible();
+      1138 |   await page.getByRole("button", { name: "Use as global context" }).click();
+      1139 |   await expect(page.getByPlaceholder(/Describe the cross-session goal/i)).toHaveValue(
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:1136:78
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-project-fr-35465-opens-the-aggregated-canvas/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-project-fr-35465-opens-the-aggregated-canvas/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-creates-a-project-fr-35465-opens-the-aggregated-canvas/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-project-fr-35465-opens-the-aggregated-canvas/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-creates-a-project-fr-35465-opens-the-aggregated-canvas/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  16) tests/e2e/smoke.spec.ts:1144:5 › creates a typed node from canvas focus inside a project ─────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('.react-flow__node [data-memory-type="decision"]').first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('.react-flow__node [data-memory-type="decision"]').first()[22m
+
+
+      1165 |
+      1166 |   await expect(page.getByText("Decision node created and attached.")).toBeVisible();
+    > 1167 |   await expect(page.locator('.react-flow__node [data-memory-type="decision"]').first()).toBeVisible();
+           |                                                                                         ^
+      1168 |   await page.locator('.react-flow__node [data-memory-type="decision"]').first().click();
+      1169 |   await expect(page.getByRole("button", { name: "Append to global context" })).toBeVisible();
+      1170 | });
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:1167:89
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-typed-node-87e71-nvas-focus-inside-a-project/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-typed-node-87e71-nvas-focus-inside-a-project/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-creates-a-typed-node-87e71-nvas-focus-inside-a-project/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-typed-node-87e71-nvas-focus-inside-a-project/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-creates-a-typed-node-87e71-nvas-focus-inside-a-project/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  17) tests/e2e/smoke.spec.ts:1211:5 › shows a visible fallback message when the provider request fails 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: getByTestId('composer-error')
+    Expected pattern: [32m/Assistant request failed\. Check the selected model or provider and try again\.|LLM backend unavailable/i[39m
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 15000ms[22m
+    [2m  - waiting for getByTestId('composer-error')[22m
+
+
+      1224 |
+      1225 |   await expect(threadMessage(page, "Provider failure prompt")).toBeVisible();
+    > 1226 |   await expect(page.getByTestId("composer-error")).toContainText(
+           |                                                    ^
+      1227 |     /Assistant request failed\. Check the selected model or provider and try again\.|LLM backend unavailable/i,
+      1228 |     { timeout: 15_000 },
+      1229 |   );
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:1226:52
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-shows-a-visible-fall-1e94a--the-provider-request-fails/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-shows-a-visible-fall-1e94a--the-provider-request-fails/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-shows-a-visible-fall-1e94a--the-provider-request-fails/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-shows-a-visible-fall-1e94a--the-provider-request-fails/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-shows-a-visible-fall-1e94a--the-provider-request-fails/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  18) tests/e2e/smoke.spec.ts:1233:5 › creates a semantic text artifact, attaches it as context, and branches with it from the flow 
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Draft' })[22m
+
+
+      1241 |   if (!assistantNodeId) return;
+      1242 |
+    > 1243 |   await page.getByRole("button", { name: "Draft" }).click();
+           |                                                     ^
+      1244 |   await page.getByLabel("Artifact content").fill("Use the attached artifact as additional product context.");
+      1245 |
+      1246 |   await page.getByRole("button", { name: `Attach target ${assistantNodeId}` }).click();
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:1243:53
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-semantic-t-a0390-nches-with-it-from-the-flow/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-semantic-t-a0390-nches-with-it-from-the-flow/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-creates-a-semantic-t-a0390-nches-with-it-from-the-flow/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-creates-a-semantic-t-a0390-nches-with-it-from-the-flow/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-creates-a-semantic-t-a0390-nches-with-it-from-the-flow/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  19) tests/e2e/smoke.spec.ts:1304:5 › uploads an image artifact, persists it, and branches with it from the flow 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('[data-message-id]').filter({ hasText: 'E2E reply: Use the image artifact too [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1 context=1 contextTitles=diagram]' }).first()
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 15000ms[22m
+    [2m  - waiting for locator('[data-message-id]').filter({ hasText: 'E2E reply: Use the image artifact too [provider=openrouter model=nvidia/nemotron-3-super-120b-a12b:free history=last count=1 context=1 contextTitles=diagram]' }).first()[22m
+
+
+      1358 |     contextTitles: ["diagram"],
+      1359 |   });
+    > 1360 |   await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
+           |                                            ^
+      1361 |
+      1362 |   const graphAfter = await copyGraphJson(page);
+      1363 |   expect(
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:1360:44
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-uploads-an-image-art-a8486-nches-with-it-from-the-flow/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-uploads-an-image-art-a8486-nches-with-it-from-the-flow/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-uploads-an-image-art-a8486-nches-with-it-from-the-flow/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-uploads-an-image-art-a8486-nches-with-it-from-the-flow/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-uploads-an-image-art-a8486-nches-with-it-from-the-flow/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  20) tests/e2e/smoke.spec.ts:1382:5 › opens the canvas guide and explains the selected focus ──────
+
+    [31mTest timeout of 60000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Show nody panel' })[22m
+
+
+      1389 |   if (!assistantNodeId) return;
+      1390 |
+    > 1391 |   await page.getByRole("button", { name: "Show nody panel" }).click();
+           |                                                               ^
+      1392 |   await page.locator(`.react-flow__node[data-id="${assistantNodeId}"]`).dispatchEvent("click");
+      1393 |   const responsePromise = page.waitForResponse(
+      1394 |     (response) => response.url().includes("/api/canvas-agent") && response.request().method() === "POST",
+        at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:1391:63
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/smoke-opens-the-canvas-guide-and-explains-the-selected-focus/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/smoke-opens-the-canvas-guide-and-explains-the-selected-focus/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/smoke-opens-the-canvas-guide-and-explains-the-selected-focus/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/smoke-opens-the-canvas-guide-and-explains-the-selected-focus/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/smoke-opens-the-canvas-guide-and-explains-the-selected-focus/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  20 failed
+    tests/e2e/chat-image-attachment.spec.ts:81:5 › attaching an image includes it in the sent message 
+    tests/e2e/chat-image-attachment.spec.ts:165:5 › send is blocked while an image is still preparing 
+    tests/e2e/chat-image-attachment.spec.ts:180:5 › attaching an image does not auto-send when text is already typed 
+    tests/e2e/session-return-send.spec.ts:138:5 › composer still works after leaving the session surface and returning 
+    tests/e2e/session-return-send.spec.ts:157:5 › composer still works after reopening the app with the stored active session 
+    tests/e2e/smoke.spec.ts:466:5 › preserves chat thread and canvas nodes when switching workspace modes 
+    tests/e2e/smoke.spec.ts:692:5 › respects the selected local model in the request metadata ──────
+    tests/e2e/smoke.spec.ts:718:5 › creates the first prompt directly from an empty flow canvas ────
+    tests/e2e/smoke.spec.ts:856:5 › creates a new root branch from the chat thread ─────────────────
+    tests/e2e/smoke.spec.ts:900:5 › creates a sibling user branch from a chat user node ────────────
+    tests/e2e/smoke.spec.ts:943:5 › creates a follow-up user branch from a chat assistant node ─────
+    tests/e2e/smoke.spec.ts:966:5 › renders distinct root-user branches without overlap ────────────
+    tests/e2e/smoke.spec.ts:990:5 › renders distinct later-user branches without overlap ───────────
+    tests/e2e/smoke.spec.ts:1024:5 › cuts and restores a graph link from the flow renderer ─────────
+    tests/e2e/smoke.spec.ts:1094:5 › creates a project from multiple saved sessions and opens the aggregated canvas 
+    tests/e2e/smoke.spec.ts:1144:5 › creates a typed node from canvas focus inside a project ───────
+    tests/e2e/smoke.spec.ts:1211:5 › shows a visible fallback message when the provider request fails 
+    tests/e2e/smoke.spec.ts:1233:5 › creates a semantic text artifact, attaches it as context, and branches with it from the flow 
+    tests/e2e/smoke.spec.ts:1304:5 › uploads an image artifact, persists it, and branches with it from the flow 
+    tests/e2e/smoke.spec.ts:1382:5 › opens the canvas guide and explains the selected focus ────────
+  4 skipped
+  12 passed (15.5m)
 Validation failed with exit code 1
-HEAD is now at 47ec054 fix: retain inspector icon in canvas refactor [canvas-refactor-staging] [skip vercel]
+HEAD is now at 5f430c9 fix: export canvas preview sizing helper [canvas-refactor-staging] [skip vercel]
