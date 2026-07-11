@@ -1,10 +1,32 @@
 /tmp/apply_canvas_refactor.py: OK
-Traceback (most recent call last):
-  File "/tmp/apply_canvas_refactor.py", line 5, in <module>
-    ROOT = Path(__file__).resolve().parents[2]
-           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
-  File "/usr/lib/python3.12/pathlib.py", line 281, in __getitem__
-    raise IndexError(idx)
-IndexError: 2
+Refactored thread-graph-flow.tsx from 3077 to 2615 lines.
+Created components/assistant-ui/thread-graph-flow/canvas-workspace-utils.tsx
+Created components/assistant-ui/thread-graph-flow/canvas-upload-utils.ts
+Created components/assistant-ui/thread-graph-flow/canvas-stage.tsx
+Changed files:
+ .../thread-graph-flow/thread-graph-flow.tsx        | 578 +++------------------
+ 1 file changed, 58 insertions(+), 520 deletions(-)
+Main component lines:
+2615 components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'camera-controls@3.1.2',
+npm warn EBADENGINE   required: { node: '>=22.0.0', npm: '>=10.5.1' },
+npm warn EBADENGINE   current: { node: 'v20.20.2', npm: '10.8.2' }
+npm warn EBADENGINE }
+
+added 766 packages, and audited 767 packages in 12s
+
+265 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+  1538:9   warning  'handleToolbarArtifactCreate' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  1549:9   warning  'handleToolbarUpload' is assigned a value but never used          @typescript-eslint/no-unused-vars
+  2452:22  error    'Crosshair' is not defined                                        react/jsx-no-undef
+
+✖ 3 problems (1 error, 2 warnings)
+
 Validation failed with exit code 1
-HEAD is now at 88c2e84 chore: validate canvas refactor [canvas-refactor-staging] [skip vercel]
+HEAD is now at 8a53e76 fix: resolve canvas refactor workspace root [canvas-refactor-staging] [skip vercel]
