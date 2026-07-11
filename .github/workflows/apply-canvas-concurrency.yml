@@ -60,6 +60,21 @@ jobs:
           python3 -m py_compile /tmp/apply_canvas_concurrency.py
           python3 /tmp/apply_canvas_concurrency.py
 
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("tests/canvas-run-manager.test.tsx")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              'import { act, render, screen } from "@testing-library/react";',
+              'import { act, cleanup, render, screen } from "@testing-library/react";',
+          )
+          text = text.replace(
+              'afterEach(() => {\n  vi.restoreAllMocks();',
+              'afterEach(() => {\n  cleanup();\n  vi.restoreAllMocks();',
+          )
+          path.write_text(text, encoding="utf-8")
+          PY
+
           npm ci
           npx eslint \
             app/api/canvas-runs/route.ts \
