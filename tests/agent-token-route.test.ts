@@ -62,7 +62,7 @@ describe("/api/agents/token", () => {
     });
   });
 
-  it("mints a token with an explicit expiry and returns save status", async () => {
+  it("mints a token with an explicit expiry after persisting its record", async () => {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const response = await POST(
@@ -93,6 +93,42 @@ describe("/api/agents/token", () => {
         tokenId: "token-1",
       }),
     );
+  });
+
+  it("does not expose a token when its authoritative record cannot be saved", async () => {
+    upsertAgentTokenRecordMock.mockResolvedValue(false);
+
+    const response = await POST(
+      new Request("http://localhost/api/agents/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: "CI bot" }),
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body).toEqual({
+      error: "Agent token storage is unavailable. No token was issued.",
+    });
+    expect(body).not.toHaveProperty("token");
+  });
+
+  it("requires the dedicated agent token secret", async () => {
+    isAgentTokenConfiguredMock.mockReturnValue(false);
+
+    const response = await POST(
+      new Request("http://localhost/api/agents/token", {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "Agent tokens require AGENT_TOKEN_SECRET.",
+    });
+    expect(mintAgentTokenMock).not.toHaveBeenCalled();
   });
 
   it("revokes an existing token", async () => {

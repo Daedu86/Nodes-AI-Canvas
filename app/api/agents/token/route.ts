@@ -19,20 +19,22 @@ type PostBody = {
   ttlDays?: number;
 };
 
+const JSON_HEADERS = { "Content-Type": "application/json" } as const;
+
 export async function POST(req: Request) {
   const guarded = await requireLocalApiUser(req);
   if ("response" in guarded) return guarded.response;
   if (guarded.user.isAgent) {
     return new Response(JSON.stringify({ error: "Agent tokens cannot manage other agent tokens." }), {
       status: 403,
-      headers: { "Content-Type": "application/json" },
+      headers: JSON_HEADERS,
     });
   }
 
   if (!isAgentTokenConfigured()) {
-    return new Response(JSON.stringify({ error: "Agent tokens require AUTH_SECRET." }), {
+    return new Response(JSON.stringify({ error: "Agent tokens require AGENT_TOKEN_SECRET." }), {
       status: 503,
-      headers: { "Content-Type": "application/json" },
+      headers: JSON_HEADERS,
     });
   }
 
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
         }),
         {
           status: 400,
-          headers: { "Content-Type": "application/json" },
+          headers: JSON_HEADERS,
         },
       );
     }
@@ -65,14 +67,14 @@ export async function POST(req: Request) {
     if (Number.isNaN(requestedExpiresAt.getTime())) {
       return new Response(JSON.stringify({ error: "Pick a valid expiry date and time." }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: JSON_HEADERS,
       });
     }
     const maxExpiresAt = now + MAX_AGENT_TOKEN_LIFETIME_DAYS * 24 * 60 * 60 * 1000;
     if (requestedExpiresAt.getTime() <= now) {
       return new Response(JSON.stringify({ error: "Expiry must be in the future." }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: JSON_HEADERS,
       });
     }
     if (requestedExpiresAt.getTime() > maxExpiresAt) {
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
         }),
         {
           status: 400,
-          headers: { "Content-Type": "application/json" },
+          headers: JSON_HEADERS,
         },
       );
     }
@@ -108,9 +110,20 @@ export async function POST(req: Request) {
     label: minted.label,
     expiresAt: minted.expiresAt,
   });
+  if (!saved) {
+    return new Response(
+      JSON.stringify({
+        error: "Agent token storage is unavailable. No token was issued.",
+      }),
+      {
+        status: 503,
+        headers: JSON_HEADERS,
+      },
+    );
+  }
 
   return Response.json({
-    saved,
+    saved: true,
     token: minted.token,
     tokenId: minted.tokenId,
     label: minted.label,
@@ -124,7 +137,7 @@ export async function DELETE(req: Request) {
   if (guarded.user.isAgent) {
     return new Response(JSON.stringify({ error: "Agent tokens cannot manage other agent tokens." }), {
       status: 403,
-      headers: { "Content-Type": "application/json" },
+      headers: JSON_HEADERS,
     });
   }
 
@@ -133,7 +146,7 @@ export async function DELETE(req: Request) {
   if (!tokenId) {
     return new Response(JSON.stringify({ error: "Missing tokenId." }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: JSON_HEADERS,
     });
   }
 
@@ -150,7 +163,7 @@ export async function DELETE(req: Request) {
       }),
       {
         status: 503,
-        headers: { "Content-Type": "application/json" },
+        headers: JSON_HEADERS,
       },
     );
   }
@@ -158,7 +171,7 @@ export async function DELETE(req: Request) {
   if (!revoked) {
     return new Response(JSON.stringify({ error: "Agent token not found." }), {
       status: 404,
-      headers: { "Content-Type": "application/json" },
+      headers: JSON_HEADERS,
     });
   }
 
