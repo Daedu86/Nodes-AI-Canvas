@@ -87,6 +87,14 @@ jobs:
           text = account_plan_test.read_text(encoding="utf-8")
           text = text.replace('concurrent: 1,', 'concurrent: 3,')
           account_plan_test.write_text(text, encoding="utf-8")
+
+          canvas_route = Path("app/api/canvas-runs/route.ts")
+          text = canvas_route.read_text(encoding="utf-8")
+          text = text.replace(
+              'export const isFreeCanvasModel =',
+              'const isFreeCanvasModel =',
+          )
+          canvas_route.write_text(text, encoding="utf-8")
           PY
 
           npm ci
