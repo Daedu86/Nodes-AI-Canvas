@@ -189,7 +189,7 @@ describe("canvas graph projection", () => {
 
   it("creates stable structure signatures", () => {
     expect(buildGraphStructureSignature(flowNodes, flowEdges)).toContain(
-      "artifact-1::root-user:__ROOT__->user-1",
+      "artifact-1::artifact::root-user:__ROOT__->user-1",
     );
     expect(buildTreeStructureSignature(conversationNodes, flowEdges)).toContain(
       "assistant-1:main",
