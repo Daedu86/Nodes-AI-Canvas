@@ -5,14 +5,22 @@ import {
 import type { LlmSettingsRepository } from "@/lib/persistence/llm-settings-repository";
 import { getSupabasePersistenceClient } from "@/lib/persistence/supabase/client";
 import { ensureData, requireOwnerId } from "@/lib/persistence/supabase/shared";
+import {
+  decryptLlmSettingsCredentials,
+  encryptLlmSettingsCredentials,
+} from "@/lib/server/llm-settings-encryption";
 
 type LlmSettingsRow = {
   owner_id: string;
   settings_json: unknown;
 };
 
-const toLlmSettingsFromRow = (row: LlmSettingsRow): LlmSettingsState =>
-  normalizeLlmSettingsState(row.settings_json as Partial<LlmSettingsState>);
+const toLlmSettingsFromRow = (row: LlmSettingsRow): LlmSettingsState => {
+  const decoded = decryptLlmSettingsCredentials(row.owner_id, row.settings_json);
+  return normalizeLlmSettingsState(
+    decoded.settings as Partial<LlmSettingsState> | null | undefined,
+  );
+};
 
 export const supabaseLlmSettingsRepository: LlmSettingsRepository = {
   async getSettings(ownerId) {
@@ -34,12 +42,13 @@ export const supabaseLlmSettingsRepository: LlmSettingsRepository = {
 
   async saveSettings(ownerId, settings) {
     const client = getSupabasePersistenceClient();
+    const normalized = normalizeLlmSettingsState(settings);
     const { data, error } = await client
       .from("llm_settings")
       .upsert(
         {
           owner_id: requireOwnerId(ownerId),
-          settings_json: normalizeLlmSettingsState(settings),
+          settings_json: encryptLlmSettingsCredentials(ownerId, normalized),
         },
         { onConflict: "owner_id" },
       )

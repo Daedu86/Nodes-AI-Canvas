@@ -6,12 +6,20 @@ import {
   type LlmSettingsState,
 } from "@/lib/llm/user-settings";
 import type { LlmSettingsRepository } from "@/lib/persistence/llm-settings-repository";
+import {
+  decryptLlmSettingsCredentials,
+  encryptLlmSettingsCredentials,
+} from "@/lib/server/llm-settings-encryption";
 
 type StoredLlmSettings = {
   createdAt: string;
   ownerId: string;
-  settings: LlmSettingsState;
+  settings: unknown;
   updatedAt: string;
+};
+
+type LoadedLlmSettings = Omit<StoredLlmSettings, "settings"> & {
+  settings: LlmSettingsState;
 };
 
 const SETTINGS_FILE_EXTENSION = ".json";
@@ -38,17 +46,20 @@ async function writeStoredSettings(entry: StoredLlmSettings) {
   await fs.rename(tempPath, filePath);
 }
 
-async function readStoredSettings(ownerId: string): Promise<StoredLlmSettings | null> {
+async function readStoredSettings(ownerId: string): Promise<LoadedLlmSettings | null> {
   try {
     const raw = await fs.readFile(getLlmSettingsFilePath(ownerId), "utf8");
     const parsed = JSON.parse(raw) as Partial<StoredLlmSettings>;
+    const decoded = decryptLlmSettingsCredentials(ownerId, parsed.settings);
     return {
       createdAt:
         typeof parsed.createdAt === "string" && parsed.createdAt.length > 0
           ? parsed.createdAt
           : new Date().toISOString(),
       ownerId,
-      settings: normalizeLlmSettingsState(parsed.settings),
+      settings: normalizeLlmSettingsState(
+        decoded.settings as Partial<LlmSettingsState> | null | undefined,
+      ),
       updatedAt:
         typeof parsed.updatedAt === "string" && parsed.updatedAt.length > 0
           ? parsed.updatedAt
@@ -71,13 +82,14 @@ export const fileLlmSettingsRepository: LlmSettingsRepository = {
   async saveSettings(ownerId, settings) {
     const existing = await readStoredSettings(ownerId);
     const now = new Date().toISOString();
+    const normalized = normalizeLlmSettingsState(settings);
     const next: StoredLlmSettings = {
       createdAt: existing?.createdAt ?? now,
       ownerId,
-      settings: normalizeLlmSettingsState(settings),
+      settings: encryptLlmSettingsCredentials(ownerId, normalized),
       updatedAt: now,
     };
     await writeStoredSettings(next);
-    return next.settings;
+    return normalized;
   },
 };
