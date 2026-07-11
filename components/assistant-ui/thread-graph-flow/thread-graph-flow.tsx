@@ -7,20 +7,6 @@ import {
   type ReactFlowInstance,
   type Viewport,
 } from "@xyflow/react";
-import {
-  Copy as CopyIcon,
-  Crosshair,
-  FileImage,
-  FilePlus2,
-  Focus,
-  MoreHorizontal,
-  Plus,
-  RotateCcw,
-  Scissors,
-  Sparkles,
-  Trash2,
-  Unlink2,
-} from "lucide-react";
 import React from "react";
 import { useThreadRepoItems } from "@/components/assistant-ui/use-thread-repo-items";
 import { buildThreadGraphNodes } from "@/components/assistant-ui/thread-graph/build-graph-nodes";
@@ -41,6 +27,9 @@ import {
   getCanvasBlockDefinition,
   type CanvasBlockDefinition,
 } from "@/components/assistant-ui/thread-graph-flow/block-library";
+import { CanvasArtifactInspector } from "@/components/assistant-ui/thread-graph-flow/canvas-artifact-inspector";
+import { CanvasMessageInspector } from "@/components/assistant-ui/thread-graph-flow/canvas-message-inspector";
+import { CanvasSidebar } from "@/components/assistant-ui/thread-graph-flow/canvas-sidebar";
 import { CanvasStage } from "@/components/assistant-ui/thread-graph-flow/canvas-stage";
 import {
   buildImagePreviewDataUrl,
@@ -52,29 +41,21 @@ import {
 } from "@/components/assistant-ui/thread-graph-flow/canvas-upload-utils";
 import {
   artifactAccent,
-  artifactContentLabel,
-  artifactContentPlaceholder,
   artifactDefaultTitle,
   artifactTypeLabel,
   CANVAS_BRANCH_CANCEL_FAILURE,
   CANVAS_BRANCH_RUN_NOTICE,
   CANVAS_PROMPT_DRAFT_NODE_ID,
-  canvasToolbarIconButtonClassName,
-  flowFilterLabel,
   formatByteSize,
-  getSemanticArtifactMeta,
   isFlowViewport,
-  LegendItem,
   providerDisplay,
   readFlowRenderMode,
   scrollMessageIntoView,
-  semanticArtifactPresets,
   trimArtifactPreview,
   type FlowDensityMode,
   type FlowRenderMode,
   type FlowSpotlightMode,
 } from "@/components/assistant-ui/thread-graph-flow/canvas-workspace-utils";
-import { GraphBranchActions } from "@/components/assistant-ui/thread-graph-flow/graph-branch-actions";
 import {
   getArtifactLineCount,
   getArtifactStatChips,
@@ -1533,9 +1514,6 @@ export function ThreadGraphFlow() {
     ],
   );
 
-  const toggleToolbarMenu = React.useCallback((menu: "add" | "tools") => {
-    setToolbarMenu((current) => (current === menu ? null : menu));
-  }, []);
 
   const handleImageUploadChange = React.useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1807,13 +1785,6 @@ export function ThreadGraphFlow() {
     !draft &&
     !selectedArtifact &&
     (!selectedMessageNode || selectedMessageNode.id === ROOT_NODE_ID);
-  const selectedArtifactSemanticMeta = React.useMemo(
-    () =>
-      selectedArtifact?.artifactType === "text"
-        ? getSemanticArtifactMeta(selectedArtifact.semanticType ?? null)
-        : null,
-    [selectedArtifact],
-  );
   const attachableTargets = React.useMemo(
     () =>
       canvasConversationNodes.filter((node) => !node.isBridge).map((node) => ({
@@ -1847,724 +1818,155 @@ export function ThreadGraphFlow() {
           onCollapsedChange={setBlockLibraryCollapsed}
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 p-3 lg:flex-row">
-        <aside
-          ref={toolbarMenuRef}
-          className="flex min-h-0 w-full shrink-0 flex-col gap-3 overflow-y-auto rounded-[24px] border border-white/70 bg-white/84 p-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/78 lg:w-[18rem] lg:max-w-[22rem]"
+        <CanvasSidebar
+activeCanvasRunCount={activeCanvasRunCount}
+artifactCount={artifacts.length}
+connectionError={connectionError}
+densityMode={densityMode}
+filterCounts={filterCounts}
+flowNodeCount={flowNodes.length}
+flowRenderMode={flowRenderMode}
+hiddenCanvasNodeCount={hiddenCanvasNodeCount}
+legendItems={legendItems}
+linkEditMode={linkEditMode}
+onCancelAllRuns={cancelAllCanvasRuns}
+onCopyJson={handleCopyJson}
+onCreatePrompt={() => handleCreatePromptNode()}
+onDensityModeChange={setDensityMode}
+onFlowRenderModeChange={setFlowRenderMode}
+onLinkEditModeChange={setLinkEditMode}
+onResetLinks={resetLinks}
+onSpotlightChange={setSpotlight}
+onToolbarMenuChange={setToolbarMenu}
+promptDisabled={!llmEnabled}
+queuedCanvasRunCount={queuedCanvasRunCount}
+resetLinkCount={overrides.size}
+selectedBranchPathLabel={selectedBranchPathLabel}
+selectedCanvasLabel={selectedCanvasLabel}
+selectedCanvasPreview={selectedCanvasPreview}
+selectedNodeId={selectedNodeId}
+showCanvasPromptCta={showCanvasPromptCta}
+showInspector={
+  !!selectedArtifact ||
+  (!!selectedFlowNode && !!selectedMessageNode) ||
+  linkEditMode ||
+  overrides.size > 0
+}
+spotlight={spotlight}
+toolbarMenu={toolbarMenu}
+toolbarMenuRef={toolbarMenuRef}
+visibleCanvasNodeCount={visibleCanvasNodeCount}
         >
-        <div className="min-w-0 border-b border-border/60 pb-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-200">
-              Canvas
-            </span>
-            {selectedNodeId ? (
-              <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-700 dark:text-violet-200">
-                Focus
-              </span>
-            ) : null}
-            {densityMode === "focus" ? (
-              <span className="rounded-full border border-border/60 bg-background/85 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                Path mode
-              </span>
-            ) : null}
-          </div>
-          <p className="mt-2 line-clamp-2 text-sm font-medium text-foreground">{selectedCanvasLabel}</p>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{selectedCanvasPreview}</p>
-          {selectedBranchPathLabel ? (
-            <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-muted-foreground">
-              <span className="font-medium text-foreground/80">Path:</span> {selectedBranchPathLabel}
-            </p>
-          ) : null}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
-              {visibleCanvasNodeCount} / {flowNodes.length} nodes
-            </span>
-            <span className="inline-flex items-center rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-1 text-[11px] text-violet-700">
-              {artifacts.length} artifact{artifacts.length === 1 ? "" : "s"}
-            </span>
-            {hiddenCanvasNodeCount > 0 ? (
-              <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
-                {hiddenCanvasNodeCount} hidden
-              </span>
-            ) : null}
-          </div>
-        </div>
-        <div
-          className="flex flex-col gap-3 border-b border-border/60 pb-3"
-        >
-          {connectionError ? (
-            <p role="alert" className="rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">
-              {connectionError}
-            </p>
-          ) : null}
-          {activeCanvasRunCount > 0 || queuedCanvasRunCount > 0 ? (
-            <div className="flex items-center justify-between rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs text-foreground">
-              <span>{activeCanvasRunCount} running · {queuedCanvasRunCount} queued</span>
-              <button type="button" className="font-medium text-emerald-700 dark:text-emerald-200" onClick={cancelAllCanvasRuns}>Cancel all</button>
-            </div>
-          ) : null}
-          {showCanvasPromptCta ? (
-            <button
-              type="button"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-55"
-              onClick={() => handleCreatePromptNode()}
-              disabled={!llmEnabled}
-            >
-              <Plus className="h-4 w-4 text-emerald-600" />
-              <span>Create prompt node</span>
-            </button>
-          ) : null}
-          <div className="flex items-center rounded-full border border-border/60 bg-background/92 p-1 text-[11px] font-medium text-muted-foreground shadow-sm">
-            <button
-              type="button"
-              className={`inline-flex items-center rounded-full px-3 py-2 transition-colors ${
-                flowRenderMode === "2d"
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              onClick={() => setFlowRenderMode("2d")}
-              aria-label="Switch canvas to 2D"
-            >
-              2D
-            </button>
-            <button
-              type="button"
-              className={`inline-flex items-center rounded-full px-3 py-2 transition-colors ${
-                flowRenderMode === "3d"
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              onClick={() => setFlowRenderMode("3d")}
-              aria-label="Switch canvas to 3D"
-            >
-              3D
-            </button>
-          </div>
-          <div className="relative w-full">
-            <button
-              type="button"
-              aria-expanded={toolbarMenu === "tools"}
-              aria-haspopup="menu"
-              aria-label="Canvas tools"
-              className={`${canvasToolbarIconButtonClassName} w-full justify-center`}
-              onClick={() => toggleToolbarMenu("tools")}
-            >
-              <MoreHorizontal className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Tools</span>
-            </button>
-            {toolbarMenu === "tools" ? (
-              <div className="mt-2 w-full rounded-[18px] border border-white/70 bg-white/90 p-2 shadow-sm dark:border-white/10 dark:bg-slate-950/92">
-                <p className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Canvas tools
-                </p>
-                <div className="space-y-1">
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-3 rounded-[18px] px-3 py-2 text-left transition-colors hover:bg-background/85"
-                    onClick={() => {
-                      setToolbarMenu(null);
-                      setLinkEditMode((prev) => !prev);
-                    }}
-                  >
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background/85 text-foreground/80">
-                      <Scissors className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium text-foreground">
-                        {linkEditMode ? "Finish Editing" : "Edit Links"}
-                      </span>
-                      <span className="block text-xs leading-5 text-muted-foreground">
-                        Cut and restore parent-child links from the graph.
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-3 rounded-[18px] px-3 py-2 text-left transition-colors hover:bg-background/85"
-                    onClick={() => {
-                      setToolbarMenu(null);
-                      handleCopyJson();
-                    }}
-                  >
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/60 bg-background/85 text-foreground/80">
-                      <CopyIcon className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium text-foreground">Copy JSON</span>
-                      <span className="block text-xs leading-5 text-muted-foreground">
-                        Export the visible graph snapshot for debugging or handoff.
-                      </span>
-                    </span>
-                  </button>
-                </div>
-                {legendItems.length > 0 ? (
-                  <>
-                    <div className="my-2 h-px bg-black/[0.06] dark:bg-white/[0.08]" />
-                    <div className="flex flex-wrap gap-1.5 px-2 pb-1 pt-1">
-                      {legendItems.slice(0, 4).map((item) => (
-                        <LegendItem key={item.key} color={item.swatch} label={item.label} />
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
-        {selectedArtifact || (selectedFlowNode && selectedMessageNode) || linkEditMode || overrides.size > 0 ? (
-        <div className="flex min-w-0 flex-col gap-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Canvas focus
-              </p>
-              <p className="text-xs text-foreground/80">
-                {selectedNodeId
-                  ? "Inspector for the current node or artifact."
-                  : "Select a node or artifact to inspect and branch from it."}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {(Object.keys(flowFilterLabel) as FlowSpotlightMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] transition-colors ${
-                  spotlight === mode
-                    ? "border-sky-500/35 bg-sky-500/10 text-sky-700 dark:text-sky-200"
-                    : "border-border/60 bg-background/80 text-muted-foreground hover:bg-background"
-                }`}
-                onClick={() => setSpotlight(mode)}
-              >
-                <span>{flowFilterLabel[mode]}</span>
-                <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] dark:bg-white/10">
-                  {filterCounts[mode]}
-                </span>
-              </button>
-            ))}
-            <button
-              type="button"
-              disabled={!selectedNodeId}
-              className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                densityMode === "focus"
-                  ? "border-violet-500/35 bg-violet-500/10 text-violet-700 dark:text-violet-200"
-                  : "border-border/60 bg-background/80 text-muted-foreground hover:bg-background"
-              }`}
-              onClick={() =>
-                setDensityMode((current) => (current === "focus" ? "overview" : "focus"))
-              }
-            >
-              <Focus className="h-3.5 w-3.5" />
-              <span>{densityMode === "focus" ? "Focus path" : "Enter focus"}</span>
-            </button>
-          </div>
-          {linkEditMode ? (
-            <p className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[11px] leading-5 text-rose-700 dark:text-rose-200">
-              Link edit mode is on. Use <span className="font-semibold">Cut selected link</span> from the inspector, then restore it when needed.
-            </p>
-          ) : null}
-          {overrides.size > 0 ? (
-            <button
-              type="button"
-              className="inline-flex w-fit items-center gap-1 rounded-full border border-border/60 bg-background/90 px-2.5 py-1.5 text-[11px] hover:bg-background"
-              onClick={resetLinks}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Reset Cuts ({overrides.size})</span>
-            </button>
-          ) : null}
-          <div
-            ref={inspectorScrollRef}
-            className="max-h-[min(34rem,calc(100vh-11rem))] overflow-y-auto rounded-[26px] border border-border/60 bg-background/85 px-3 py-3 shadow-sm"
-          >
-            {selectedArtifact ? (
-              <div className="space-y-3">
-                <div className="grid gap-2 rounded-xl border border-border/60 bg-muted/20 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-medium text-foreground">Synchronization</p>
-                      <p className="text-[11px] text-muted-foreground">Auto updates only after run completion.</p>
-                    </div>
-                    <button
-                      type="button"
-                      className="rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs"
-                      onClick={() =>
-                        setArtifactSyncMode(
-                          selectedArtifact.id,
-                          selectedArtifact.syncMode === "paused" ? "auto" : "paused",
-                        )
-                      }
-                    >
-                      {selectedArtifact.syncMode === "paused" ? "Resume auto" : "Pause auto"}
-                    </button>
-                  </div>
-                  <label className="grid gap-1 text-xs text-foreground">
-                    <span>Connect to…</span>
-                    <select
-                      aria-label="Connect selected artifact to"
-                      defaultValue=""
-                      className="h-9 rounded-md border border-border/60 bg-background px-2 text-xs"
-                      onChange={(event) => {
-                        handleArtifactConnectFromInspector(event.target.value);
-                        event.currentTarget.value = "";
-                      }}
-                    >
-                      <option value="" disabled>Select a prompt or response</option>
-                      {canvasConversationNodes
-                        .filter((node) => node.id !== ROOT_NODE_ID && !node.isBridge)
-                        .map((node) => (
-                          <option
-                            key={node.id}
-                            value={`${node.role === "assistant" ? "response" : "prompt"}:${node.id}`}
-                          >
-                            {node.role === "assistant" ? "Output from" : "Input to"} · {node.text.replace(/\s+/g, " ").slice(0, 56) || node.id}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                  {selectedArtifact.revisions && selectedArtifact.revisions.length > 0 ? (
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-foreground">Revision history</p>
-                      <div className="max-h-32 space-y-1 overflow-y-auto">
-                        {[...selectedArtifact.revisions].reverse().map((revision) => (
-                          <button
-                            key={revision.id}
-                            type="button"
-                            className="flex w-full items-center justify-between gap-2 rounded-md border border-border/60 bg-background px-2 py-1.5 text-left text-[11px] hover:bg-muted"
-                            onClick={() => restoreArtifactRevision(selectedArtifact.id, revision.id)}
-                          >
-                            <span className="truncate">{revision.content.replace(/\s+/g, " ").slice(0, 58) || "Empty"}</span>
-                            <span className="shrink-0 text-muted-foreground">{revision.origin}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                        style={{
-                          borderColor: `${artifactAccent(selectedArtifact)}55`,
-                          color: artifactAccent(selectedArtifact),
-                        }}
-                      >
-                        {artifactTypeLabel(selectedArtifact)}
-                      </span>
-                      <span className="rounded-full border border-border/60 bg-muted/70 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                        {selectedContextLinkedMessageIds.size} linked target{selectedContextLinkedMessageIds.size === 1 ? "" : "s"}
-                      </span>
-                      {selectedArtifactSize ? (
-                        <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          {selectedArtifactSize}
-                        </span>
-                      ) : null}
-                      {selectedArtifactPreviewSize ? (
-                        <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          preview {selectedArtifactPreviewSize}
-                        </span>
-                      ) : null}
-                      {selectedArtifactStatChips.slice(0, 2).map((chip) => (
-                        <span
-                          key={chip}
-                          className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
-                        >
-                          {chip}
-                        </span>
-                      ))}
-                      {selectedArtifact.artifactType === "code" && selectedArtifactLineCount > 0 ? (
-                        <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          {selectedArtifactLineCount} lines
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {canvasLinks.some((link) => link.relation === "output" && link.artifactId === selectedArtifact.id) ? (
-                      <button
-                        type="button"
-                        className="rounded-md border border-border/60 bg-background px-2.5 py-1.5 text-xs hover:bg-muted"
-                        onClick={() => {
-                          const outputLink = canvasLinks.find(
-                            (link) => link.relation === "output" && link.artifactId === selectedArtifact.id,
-                          );
-                          if (outputLink) removeCanvasLink(outputLink.id);
-                        }}
-                      >
-                        Disconnect output
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 rounded-md border border-rose-500/35 bg-rose-500/10 px-2.5 py-1.5 text-xs text-rose-700 hover:bg-rose-500/15"
-                      onClick={() => {
-                        deleteArtifact(selectedArtifact.id);
-                        applyCanvasSelection(null);
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span>Delete</span>
-                    </button>
-                    <Sparkles className="h-4 w-4 text-violet-600" />
-                  </div>
-                </div>
-                <div className="grid gap-2 md:grid-cols-[1.4fr,0.8fr]">
-                  <label className="space-y-1 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground/80">Title</span>
-                    <input
-                      type="text"
-                      aria-label="Artifact title"
-                      value={selectedArtifact.title}
-                      onChange={(event) => updateArtifact(selectedArtifact.id, { title: event.target.value })}
-                      className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-violet-500/35"
-                    />
-                  </label>
-                  {selectedArtifact.artifactType === "text" ? (
-                    <label className="space-y-1 text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground/80">Semantic type</span>
-                      <select
-                        aria-label="Artifact semantic type"
-                        value={selectedArtifact.semanticType ?? "draft"}
-                        onChange={(event) =>
-                          updateArtifact(selectedArtifact.id, {
-                            semanticType: event.target.value as SessionArtifactSemanticType,
-                          })
-                        }
-                        className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-violet-500/35"
-                      >
-                        {semanticArtifactPresets.map(({ semanticType }) => (
-                          <option key={semanticType} value={semanticType}>
-                            {getSemanticArtifactMeta(semanticType)?.label ?? semanticType}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : selectedArtifact.artifactType === "code" ? (
-                    <label className="space-y-1 text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground/80">Language</span>
-                      <input
-                        type="text"
-                        aria-label="Artifact language"
-                        value={selectedArtifact.language ?? ""}
-                        onChange={(event) => updateArtifact(selectedArtifact.id, { language: event.target.value })}
-                        placeholder="ts"
-                        className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-violet-500/35"
-                      />
-                    </label>
-                  ) : (
-                    <div className="space-y-1 rounded-xl border border-border/60 bg-background px-3 py-2 text-xs text-muted-foreground">
-                      <p className="font-medium text-foreground/80">Artifact metadata</p>
-                      <div className="space-y-1">
-                        {selectedArtifact.fileName ? <p>File: {selectedArtifact.fileName}</p> : null}
-                        {selectedArtifact.mimeType ? <p>MIME: {selectedArtifact.mimeType}</p> : null}
-                        {selectedArtifactSize ? <p>Size: {selectedArtifactSize}</p> : null}
-                        {selectedArtifactPreviewSize ? (
-                          <p>
-                            Preview: {selectedArtifactPreviewSize} / budget {formatBytes(contextBudgetPolicy.maxImagePreviewBytes)}
-                          </p>
-                        ) : null}
-                        {selectedArtifact.blobRef ? <p>Original stored in blob store</p> : null}
-                        {!selectedArtifact.fileName && !selectedArtifact.mimeType && !selectedArtifactSize && !selectedArtifactPreviewSize && !selectedArtifact.blobRef ? (
-                          <p>No upload metadata stored for this artifact.</p>
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {selectedArtifact.artifactType === "image" && selectedArtifact.sourceDataUrl ? (
-                  <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
-                    <div className="flex items-center gap-2 text-xs font-medium text-foreground/80">
-                      <FileImage className="h-4 w-4 text-pink-600" />
-                      <span>Image preview</span>
-                    </div>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      alt={selectedArtifact.title}
-                      src={selectedArtifact.sourceDataUrl}
-                      className="max-h-48 w-full rounded-xl border border-border/50 object-contain bg-muted/20"
-                    />
-                  </div>
-                ) : null}
-                <label className="space-y-1 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground/80">
-                    {selectedArtifact.artifactType === "text"
-                      ? artifactContentLabel(selectedArtifact)
-                      : artifactContentLabel(selectedArtifact)}
-                  </span>
-                  <textarea
-                    aria-label={
-                      selectedArtifact.artifactType === "text"
-                        ? "Artifact content"
-                        : selectedArtifact.artifactType === "image"
-                          ? "Artifact notes"
-                          : selectedArtifact.artifactType === "file"
-                            ? "Artifact extracted text"
-                            : "Artifact content"
-                    }
-                    rows={6}
-                    value={selectedArtifact.content}
-                    onChange={(event) => updateArtifact(selectedArtifact.id, { content: event.target.value })}
-                    placeholder={artifactContentPlaceholder(selectedArtifact)}
-                    className="min-h-[136px] w-full resize-y rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-violet-500/35"
-                  />
-                </label>
-                <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium text-foreground/80">Links</p>
-                    {selectedArtifactSemanticMeta ? (
-                      <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                        {selectedArtifactSemanticMeta.label}
-                      </span>
-                    ) : null}
-                  </div>
-                  {attachableTargets.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No available targets.</p>
-                  ) : (
-                    <div className="max-h-[148px] space-y-2 overflow-y-auto pr-1">
-                      {attachableTargets.map((target) => {
-                        const isLinked = isArtifactLinkedToTarget(selectedArtifact.id, target.id);
-                        return (
-                          <div
-                            key={target.id}
-                            className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${
-                              isLinked
-                                ? "border-violet-500/30 bg-violet-500/10"
-                                : "border-border/60 bg-background"
-                            }`}
-                          >
-                            <div className="min-w-0 space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                                  {target.role}
-                                </span>
-                                <span className="truncate text-xs font-medium text-foreground/85">
-                                  {target.preview}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                aria-label={`${isLinked ? "Detach" : "Attach"} target ${target.id}`}
-                                className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs ${
-                                  isLinked
-                                    ? "border-violet-500/35 bg-violet-500/10 text-violet-700 hover:bg-violet-500/15"
-                                    : "border-border/60 bg-background hover:bg-muted"
-                                }`}
-                                onClick={() => handleToggleArtifactLink(selectedArtifact.id, target.id)}
-                              >
-                                {isLinked ? <Unlink2 className="h-3.5 w-3.5" /> : <FilePlus2 className="h-3.5 w-3.5" />}
-                                <span>{isLinked ? "Detach" : "Attach"}</span>
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`Open target ${target.id}`}
-                                className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs hover:bg-muted"
-                                onClick={() => applyCanvasSelection(target.id)}
-                              >
-                                <span>Open</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : selectedFlowNode && selectedMessageNode ? (
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
-                        style={{
-                          borderColor: `${selectedFlowNode.data.accent ?? "#64748b"}55`,
-                          color: selectedFlowNode.data.accent ?? "#64748b",
-                        }}
-                      >
-                        {selectedFlowNode.data.role}
-                      </span>
-                      {selectedFlowNode.data.branchId ? (
-                        <span className="rounded-full border border-border/60 bg-muted/60 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          {String(selectedFlowNode.data.branchId)}
-                        </span>
-                      ) : null}
-                      {selectedFlowNode.data.isCut ? (
-                        <span className="rounded-full border border-rose-500/35 bg-rose-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-rose-700">
-                          Cut
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {selectedFlowNode.data.isCut
-                        ? "This node is temporarily disconnected from its original parent."
-                        : "Selecting a node spotlights both its lineage and any linked context artifacts."}
-                    </p>
-                  </div>
-                  <Sparkles className="h-4 w-4 text-sky-600" />
-                </div>
-                <p className="line-clamp-2 text-sm text-foreground/90">
-                  {selectedPreview || "No preview available"}
-                </p>
-                {selectedBranchPathLabel ? (
-                  <p className="rounded-2xl border border-border/60 bg-background/85 px-3 py-2 text-[11px] leading-5 text-muted-foreground">
-                    <span className="font-medium text-foreground/80">Path:</span> {selectedBranchPathLabel}
-                  </p>
-                ) : null}
-                <div className="flex flex-wrap items-center gap-2">
-                  {selectedNodeId !== ROOT_NODE_ID ? (
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs hover:bg-muted"
-                      onClick={handleOpenSelectedInChat}
-                    >
-                      <Focus className="h-3.5 w-3.5" />
-                      <span>Open in chat</span>
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs hover:bg-muted"
-                    onClick={handleFocusSelected}
-                  >
-                    <Crosshair className="h-3.5 w-3.5" />
-                    <span>Fit selection</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs hover:bg-muted"
-                    onClick={handleResetView}
-                  >
-                    <span>Reset view</span>
-                  </button>
-                  {linkEditMode && !selectedOverride && selectedParentId ? (
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 rounded-md border border-rose-500/35 bg-rose-500/10 px-2.5 py-1 text-xs text-rose-700 hover:bg-rose-500/15"
-                      onClick={handleCutSelected}
-                    >
-                      <Scissors className="h-3.5 w-3.5" />
-                      <span>Cut selected link</span>
-                    </button>
-                  ) : null}
-                  {selectedOverride ? (
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 rounded-md border border-rose-500/35 bg-rose-500/10 px-2.5 py-1 text-xs text-rose-700 hover:bg-rose-500/15"
-                      onClick={handleRestoreSelected}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      <span>Restore link</span>
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background px-2.5 py-1 text-xs hover:bg-muted"
-                    onClick={() => applyCanvasSelection(null)}
-                  >
-                    <span>Clear focus</span>
-                  </button>
-                </div>
-                <GraphBranchActions
-                  activeDraft={
-                    draft && draft.anchorId === selectedMessageNode.id
-                      ? { operation: draft.operation, text: draft.text }
-                      : null
-                  }
-                  busy={isSubmittingBranch}
-                  contextCount={selectedContextArtifacts.length}
-                  disabled={!llmEnabled}
-                  details={selectedBranchOptions}
-                  onCancelDraft={handleCancelPromptDraft}
-                  onCancelRun={isThreadRunning ? handleCancelRun : undefined}
-                  onChooseOperation={handleChooseBranchOperation}
-                  onDraftTextChange={setDraftText}
-                  onSubmitDraft={handleSubmitBranchDraft}
-                  runInterruptionNote={isThreadRunning ? CANVAS_BRANCH_RUN_NOTICE : null}
-                />
-                <div className="space-y-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 shadow-sm">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-foreground/80">Linked context artifacts</p>
-                    <p className="text-xs text-muted-foreground">
-                      Attach reusable artifacts to this node. Branches created from here will include the linked artifacts as additional LLM context.
-                    </p>
-                  </div>
-                  {artifacts.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      No artifacts yet. Create one from the header actions above.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {artifacts.map((artifact) => {
-                        const isLinked = isArtifactLinkedToTarget(artifact.id, selectedMessageNode.id);
-                        return (
-                          <div
-                            key={artifact.id}
-                            className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${
-                              isLinked
-                                ? "border-violet-500/30 bg-violet-500/10"
-                                : "border-border/60 bg-background"
-                            }`}
-                          >
-                            <div className="min-w-0 space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]"
-                                  style={{
-                                    borderColor: `${artifactAccent(artifact)}44`,
-                                    color: artifactAccent(artifact),
-                                  }}
-                                >
-                                  {artifactTypeLabel(artifact)}
-                                </span>
-                                <span className="truncate text-xs font-medium text-foreground/85">
-                                  {artifact.title}
-                                </span>
-                              </div>
-                              <p className="line-clamp-1 text-xs text-muted-foreground">
-                                {trimArtifactPreview(artifact)}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs ${
-                                isLinked
-                                  ? "border-violet-500/35 bg-violet-500/10 text-violet-700 hover:bg-violet-500/15"
-                                  : "border-border/60 bg-background hover:bg-muted"
-                              }`}
-                              onClick={() => handleToggleArtifactLink(artifact.id, selectedMessageNode.id)}
-                            >
-                              {isLinked ? <Unlink2 className="h-3.5 w-3.5" /> : <FilePlus2 className="h-3.5 w-3.5" />}
-                              <span>{isLinked ? "Detach" : "Attach"}</span>
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2 rounded-[24px] border border-dashed border-border/70 bg-background/80 px-4 py-5 text-left">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Nothing selected
-                </p>
-                <p className="text-sm font-medium text-foreground/85">
-                  Pick a message node to branch, or select an artifact to shape reusable context.
-                </p>
-                <p className="text-xs leading-5 text-muted-foreground">
-                  The canvas is your structured input layer. Use it to build artifacts the model can reason over without losing human-readable form.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-        ) : null}
-        </aside>
+<div
+  ref={inspectorScrollRef}
+  className="max-h-[min(34rem,calc(100vh-11rem))] overflow-y-auto rounded-[26px] border border-border/60 bg-background/85 px-3 py-3 shadow-sm"
+>
+  {selectedArtifact ? (
+    <CanvasArtifactInspector
+      artifact={selectedArtifact}
+      artifactLineCount={selectedArtifactLineCount}
+      artifactPreviewSize={selectedArtifactPreviewSize}
+      artifactSize={selectedArtifactSize}
+      artifactStatChips={selectedArtifactStatChips}
+      attachableTargets={attachableTargets}
+      contextBudgetMaxImagePreviewBytes={
+        contextBudgetPolicy.maxImagePreviewBytes
+      }
+      hasOutputLink={canvasLinks.some(
+        (link) =>
+          link.relation === "output" &&
+          link.artifactId === selectedArtifact.id,
+      )}
+      isLinkedToTarget={(targetId) =>
+        isArtifactLinkedToTarget(selectedArtifact.id, targetId)
+      }
+      linkedTargetCount={selectedContextLinkedMessageIds.size}
+      onConnectTo={handleArtifactConnectFromInspector}
+      onDelete={() => {
+        deleteArtifact(selectedArtifact.id);
+        applyCanvasSelection(null);
+      }}
+      onDisconnectOutput={() => {
+        const outputLink = canvasLinks.find(
+          (link) =>
+            link.relation === "output" &&
+            link.artifactId === selectedArtifact.id,
+        );
+        if (outputLink) removeCanvasLink(outputLink.id);
+      }}
+      onOpenTarget={applyCanvasSelection}
+      onRestoreRevision={(revisionId) =>
+        restoreArtifactRevision(selectedArtifact.id, revisionId)
+      }
+      onToggleLink={(targetId) =>
+        handleToggleArtifactLink(selectedArtifact.id, targetId)
+      }
+      onToggleSync={() =>
+        setArtifactSyncMode(
+          selectedArtifact.id,
+          selectedArtifact.syncMode === "paused" ? "auto" : "paused",
+        )
+      }
+      onUpdate={(patch) => updateArtifact(selectedArtifact.id, patch)}
+    />
+  ) : selectedFlowNode && selectedMessageNode ? (
+    <CanvasMessageInspector
+      activeDraft={
+        draft && draft.anchorId === selectedMessageNode.id
+          ? { operation: draft.operation, text: draft.text }
+          : null
+      }
+      artifacts={artifacts}
+      busy={isSubmittingBranch}
+      contextCount={selectedContextArtifacts.length}
+      details={selectedBranchOptions}
+      disabled={!llmEnabled}
+      isLinkedToTarget={(artifactId) =>
+        isArtifactLinkedToTarget(artifactId, selectedMessageNode.id)
+      }
+      linkEditMode={linkEditMode}
+      onCancelDraft={handleCancelPromptDraft}
+      onCancelRun={isThreadRunning ? handleCancelRun : undefined}
+      onChooseOperation={handleChooseBranchOperation}
+      onClearFocus={() => applyCanvasSelection(null)}
+      onCutSelected={handleCutSelected}
+      onDraftTextChange={setDraftText}
+      onFocusSelected={handleFocusSelected}
+      onOpenInChat={handleOpenSelectedInChat}
+      onResetView={handleResetView}
+      onRestoreSelected={handleRestoreSelected}
+      onSubmitDraft={handleSubmitBranchDraft}
+      onToggleArtifactLink={(artifactId) =>
+        handleToggleArtifactLink(artifactId, selectedMessageNode.id)
+      }
+      runInterruptionNote={
+        isThreadRunning ? CANVAS_BRANCH_RUN_NOTICE : null
+      }
+      selectedBranchPathLabel={selectedBranchPathLabel}
+      selectedFlowNode={selectedFlowNode}
+      selectedNodeId={selectedNodeId}
+      selectedOverride={!!selectedOverride}
+      selectedParentId={selectedParentId}
+      selectedPreview={selectedPreview}
+    />
+  ) : (
+    <div className="space-y-2 rounded-[24px] border border-dashed border-border/70 bg-background/80 px-4 py-5 text-left">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        Nothing selected
+      </p>
+      <p className="text-sm font-medium text-foreground/85">
+        Pick a message node to branch, or select an artifact to shape
+        reusable context.
+      </p>
+      <p className="text-xs leading-5 text-muted-foreground">
+        The canvas is your structured input layer. Use it to build
+        artifacts the model can reason over without losing
+        human-readable form.
+      </p>
+    </div>
+  )}
+</div>
+        </CanvasSidebar>
         <CanvasStage
           activeSessionId={activeSessionId}
           edges={decoratedFlowEdges}
