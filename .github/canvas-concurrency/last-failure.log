@@ -85,14 +85,14 @@ npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to revi
 
 [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas[39m
 
- [32m✓[39m tests/canvas-run-scheduler.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
- [32m✓[39m tests/canvas-prompt-artifact.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
- [32m✓[39m tests/canvas-run-manager.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 188[2mms[22m[39m
+ [32m✓[39m tests/canvas-run-scheduler.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/canvas-prompt-artifact.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/canvas-run-manager.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 198[2mms[22m[39m
 
 [2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
 [2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
-[2m   Start at [22m 09:34:50
-[2m   Duration [22m 1.14s[2m (transform 159ms, setup 0ms, import 296ms, tests 200ms, environment 657ms)[22m
+[2m   Start at [22m 09:37:01
+[2m   Duration [22m 1.22s[2m (transform 134ms, setup 0ms, import 290ms, tests 212ms, environment 689ms)[22m
 
 
 > nodes@0.1.0 test
@@ -101,24 +101,24 @@ npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to revi
 
 [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas[39m
 
- [32m✓[39m tests/session-store.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 70[2mms[22m[39m
+ [32m✓[39m tests/session-store.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 78[2mms[22m[39m
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mnormalizes browser content arrays and sends only the latest user message by default
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"0f94d5be-5a78-4d6f-b71e-4a99a1bc3527","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"19de97c7-a476-4ffc-a6ef-572caa40d1ab","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mpreserves non-text parts through explicit placeholders when full history is requested
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":"full","modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"115da07d-e352-43b4-afa0-d83bc8242f5f","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":"full","modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"0ecfee88-9289-47ec-861f-d0bfd908dfc3","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreads context artifacts from metadata.custom for branch-created runs
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":1,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"dc4271e3-fb5c-4bcb-93e2-16749ffe3ff9","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":1,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"d2d28d90-753e-4fad-b983-5e42a5b2857d","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a classified client-safe error message from the stream layer
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"7404f66a-ac87-4825-ae0d-e3d676e80ed7","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"d1507bd8-dceb-4965-bcdf-a82ce60875fd","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a rate-limit message when the stream layer surfaces an AI retry wrapper
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"google/gemma-4-31b-it:free","provider":"openrouter","requestId":"162822ed-b085-4de9-95fd-33f1570a988f","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"google/gemma-4-31b-it:free","provider":"openrouter","requestId":"fabf3a75-4158-4520-8774-aea191dd72b8","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mretries the OpenRouter free router when a selected free model is unavailable
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"google/gemma-4-31b-it:free","provider":"openrouter","requestId":"e3b59222-691c-4156-b3c0-3ebcf82d16c4","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"google/gemma-4-31b-it:free","provider":"openrouter","requestId":"6903441c-2752-4363-993e-254a0ac010e9","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstderr[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mretries the OpenRouter free router when a selected free model is unavailable
 [22m[39m/api/chat error: {
@@ -129,15 +129,15 @@ npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to revi
 }
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a specific configuration error when the OpenRouter key is missing
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"d1b1e59b-5e6e-4402-b3d2-1041a9fb7092","route":"/api/chat","status":"accepted","userId":"test-user"}
-[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":1,"errorCode":"missing_openrouter_key","fallbackApplied":false,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"d1b1e59b-5e6e-4402-b3d2-1041a9fb7092","resolvedModelId":"nvidia/nemotron-3-super-120b-a12b:free","resolvedProvider":"openrouter","route":"/api/chat","status":"failed","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"dba948ce-caac-4c7b-80e3-0c36e227e604","route":"/api/chat","status":"accepted","userId":"test-user"}
+[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"missing_openrouter_key","fallbackApplied":false,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"dba948ce-caac-4c7b-80e3-0c36e227e604","resolvedModelId":"nvidia/nemotron-3-super-120b-a12b:free","resolvedProvider":"openrouter","route":"/api/chat","status":"failed","userId":"test-user"}
 
 [90mstderr[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mreturns a specific configuration error when the OpenRouter key is missing
 [22m[39mMissing provider credential for openrouter
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mmaps repeated provider rate limits to a specific client-safe response
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"openrouter/free","provider":"openrouter","requestId":"b5b88b76-725b-4fa6-a24e-6f7f20a30700","route":"/api/chat","status":"accepted","userId":"test-user"}
-[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":1,"errorCode":"provider_rate_limited","fallbackApplied":false,"historyMode":null,"modelId":"openrouter/free","provider":"openrouter","requestId":"b5b88b76-725b-4fa6-a24e-6f7f20a30700","resolvedModelId":"openrouter/free","resolvedProvider":"openrouter","route":"/api/chat","status":"failed","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"openrouter/free","provider":"openrouter","requestId":"0050267a-c5d0-48c0-a698-973eca56decf","route":"/api/chat","status":"accepted","userId":"test-user"}
+[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"provider_rate_limited","fallbackApplied":false,"historyMode":null,"modelId":"openrouter/free","provider":"openrouter","requestId":"0050267a-c5d0-48c0-a698-973eca56decf","resolvedModelId":"openrouter/free","resolvedProvider":"openrouter","route":"/api/chat","status":"failed","userId":"test-user"}
 
 [90mstderr[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mmaps repeated provider rate limits to a specific client-safe response
 [22m[39m/api/chat error: {
@@ -148,33 +148,33 @@ npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to revi
 }
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects chat requests once the per-minute quota is exhausted
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"aedd1617-b230-4736-b35e-947ea0075697","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"97a03099-14a5-4d1c-b695-2b139d45ee62","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects chat requests once the per-minute quota is exhausted
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"chat_quota_exceeded","historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"f5cf0b10-6c6e-4507-844c-9214eb124227","route":"/api/chat","status":"rejected","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"chat_quota_exceeded","historyMode":null,"modelId":"nvidia/nemotron-3-super-120b-a12b:free","provider":"openrouter","requestId":"d395eaa2-b906-474e-94a5-9f57d737ab72","route":"/api/chat","status":"rejected","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects overlapping requests with a specific concurrency error
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-nano-30b-a3b:free","provider":"openrouter","requestId":"e8b4e3fa-4757-4dfc-ba94-e20abcf59254","route":"/api/chat","status":"accepted","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"historyMode":null,"modelId":"nvidia/nemotron-3-nano-30b-a3b:free","provider":"openrouter","requestId":"a71ce5a1-4f6b-4d48-839d-7815823718fe","route":"/api/chat","status":"accepted","userId":"test-user"}
 
 [90mstdout[2m | tests/chat-route.test.ts[2m > [22m[2m/api/chat[2m > [22m[2mrejects overlapping requests with a specific concurrency error
-[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"chat_concurrency_limited","historyMode":null,"modelId":"nvidia/nemotron-3-nano-30b-a3b:free","provider":"openrouter","requestId":"d9a8d6a2-77d4-49d7-8127-368293d54a85","route":"/api/chat","status":"rejected","userId":"test-user"}
+[22m[39m[nodes-llm-audit] {"contextArtifactCount":0,"durationMs":0,"errorCode":"chat_concurrency_limited","historyMode":null,"modelId":"nvidia/nemotron-3-nano-30b-a3b:free","provider":"openrouter","requestId":"7deeead3-9a45-4ed3-8b4f-80562d9d8415","route":"/api/chat","status":"rejected","userId":"test-user"}
 
- [32m✓[39m tests/chat-route.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 75[2mms[22m[39m
- [32m✓[39m tests/thread-composer.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 297[2mms[22m[39m
- [32m✓[39m tests/llm-settings-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 58[2mms[22m[39m
- [32m✓[39m tests/persisted-sessions.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 104[2mms[22m[39m
- [32m✓[39m tests/session-artifacts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 21[2mms[22m[39m
- [32m✓[39m tests/llm-helpers.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
- [32m✓[39m tests/project-arena.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
- [32m✓[39m tests/workspace-surface.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1168[2mms[22m[39m
-     [33m[2m✓[22m[39m opens the LLM Models workspace from Profile [33m 580[2mms[22m[39m
- [32m✓[39m tests/projects-context.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 96[2mms[22m[39m
- [32m✓[39m tests/thread-normalization.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
- [32m✓[39m tests/project-context-builder.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 27[2mms[22m[39m
- [32m✓[39m tests/session-ui-state.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 292[2mms[22m[39m
- [32m✓[39m tests/agent-token-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 55[2mms[22m[39m
- [32m✓[39m tests/canvas-run-manager.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 279[2mms[22m[39m
- [32m✓[39m tests/project-collaboration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m tests/chat-route.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 73[2mms[22m[39m
+ [32m✓[39m tests/thread-composer.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 318[2mms[22m[39m
+ [32m✓[39m tests/llm-settings-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m tests/persisted-sessions.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 103[2mms[22m[39m
+ [32m✓[39m tests/session-artifacts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m tests/llm-helpers.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/project-arena.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/workspace-surface.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 1166[2mms[22m[39m
+     [33m[2m✓[22m[39m opens the LLM Models workspace from Profile [33m 562[2mms[22m[39m
+ [32m✓[39m tests/projects-context.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 93[2mms[22m[39m
+ [32m✓[39m tests/thread-normalization.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/session-ui-state.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 268[2mms[22m[39m
+ [32m✓[39m tests/project-context-builder.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m tests/agent-token-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 59[2mms[22m[39m
+ [32m✓[39m tests/canvas-run-manager.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 278[2mms[22m[39m
+ [32m✓[39m tests/project-collaboration.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 29[2mms[22m[39m
 [90mstderr[2m | tests/llm-control-route.test.ts[2m > [22m[2m/api/llm/control[2m > [22m[2mreturns a generic stop error instead of raw command output
 [22m[39mollama stop failed Error: spawn ENOENT ollama
     at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/llm-control-route.test.ts:126:18
@@ -187,22 +187,17 @@ npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to revi
     at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/llm-control-route.test.ts:130:22
     at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:20
 
- [32m✓[39m tests/llm-control-route.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m tests/llm-control-route.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 38[2mms[22m[39m
  [32m✓[39m tests/llm-user-settings.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 14[2mms[22m[39m
- [32m✓[39m tests/session-artifact-upload-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 65[2mms[22m[39m
- [32m✓[39m tests/project-workspace.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 848[2mms[22m[39m
-     [33m[2m✓[22m[39m shows a visible context CTA in project overview and returns focus to the editor [33m 606[2mms[22m[39m
- [31m❯[39m tests/canvas-prompt-node.test.tsx [2m([22m[2m6 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 440[2mms[22m[39m
-[31m     [31m×[31m renders a canvas draft composer with controls and hint[39m[32m 297[2mms[22m[39m
-     [32m✓[39m supports typing through the draft text callback[32m 26[2mms[22m[39m
-     [32m✓[39m submits on Enter and keeps Shift+Enter for newlines[32m 18[2mms[22m[39m
-     [32m✓[39m submits from the Send button and cancels from Delete draft[32m 31[2mms[22m[39m
-     [32m✓[39m disables editing and submit while busy or when AI is disabled[32m 52[2mms[22m[39m
-     [32m✓[39m shows a canvas-safe draft error[32m 14[2mms[22m[39m
- [32m✓[39m tests/context-builder.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
- [32m✓[39m tests/project-store.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 26[2mms[22m[39m
- [32m✓[39m tests/request-errors.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 45[2mms[22m[39m
- [32m✓[39m tests/admin-users-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m tests/canvas-prompt-node.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[33m 507[2mms[22m[39m
+     [33m[2m✓[22m[39m renders a canvas draft composer with controls and hint [33m 306[2mms[22m[39m
+ [32m✓[39m tests/session-artifact-upload-route.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+ [32m✓[39m tests/context-builder.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/project-workspace.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 928[2mms[22m[39m
+     [33m[2m✓[22m[39m shows a visible context CTA in project overview and returns focus to the editor [33m 649[2mms[22m[39m
+ [32m✓[39m tests/project-store.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m tests/request-errors.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+ [32m✓[39m tests/admin-users-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 53[2mms[22m[39m
 [90mstderr[2m | tests/title-route.test.ts[2m > [22m[2m/api/title[2m > [22m[2mreturns a generic title error instead of raw upstream details
 [22m[39m/api/title error: Error: provider trace here
     at [90m/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mtests/title-route.test.ts:76:44
@@ -216,23 +211,24 @@ npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to revi
     at runWithTimeout [90m(file:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10[90m)[39m
     at [90mfile:///home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2955:64
 
- [32m✓[39m tests/title-route.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 20[2mms[22m[39m
- [32m✓[39m tests/llm-settings.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 305[2mms[22m[39m
- [32m✓[39m tests/api-access.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 58[2mms[22m[39m
- [32m✓[39m tests/thread-branching-runtime.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
- [32m✓[39m tests/block-library.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 596[2mms[22m[39m
- [31m❯[39m tests/account-plan-route.test.ts [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 70[2mms[22m[39m
-[31m     [31m×[31m returns plan, limits, usage, provider key counts, and admin flag[39m[32m 67[2mms[22m[39m
- [32m✓[39m tests/thread-list.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 507[2mms[22m[39m
-     [33m[2m✓[22m[39m suppresses accidental new-session clicks immediately after leaving manage mode [33m 505[2mms[22m[39m
- [32m✓[39m tests/agent-token.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 42[2mms[22m[39m
- [32m✓[39m tests/provider-runtime.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 36[2mms[22m[39m
- [32m✓[39m tests/session-blob-maintenance-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 26[2mms[22m[39m
- [32m✓[39m tests/memory-store.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 25[2mms[22m[39m
- [32m✓[39m tests/app-header.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 299[2mms[22m[39m
+ [32m✓[39m tests/title-route.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m tests/llm-settings.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 353[2mms[22m[39m
+     [33m[2m✓[22m[39m updates the selector pool when the user customizes model availability [33m 309[2mms[22m[39m
+ [32m✓[39m tests/api-access.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m tests/thread-branching-runtime.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/block-library.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 577[2mms[22m[39m
+ [32m✓[39m tests/account-plan-route.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32m✓[39m tests/agent-token.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m tests/thread-list.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 549[2mms[22m[39m
+     [33m[2m✓[22m[39m suppresses accidental new-session clicks immediately after leaving manage mode [33m 547[2mms[22m[39m
+ [32m✓[39m tests/provider-runtime.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m tests/session-blob-maintenance-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m tests/memory-store.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m tests/app-header.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 389[2mms[22m[39m
+     [33m[2m✓[22m[39m uses the main Split control as a reversible toggle [33m 386[2mms[22m[39m
  [32m✓[39m tests/thread-branching.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/agent-work-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 407[2mms[22m[39m
-     [33m[2m✓[22m[39m deletes a saved token from the dashboard activity view [33m 405[2mms[22m[39m
+ [32m✓[39m tests/agent-work-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 460[2mms[22m[39m
+     [33m[2m✓[22m[39m deletes a saved token from the dashboard activity view [33m 458[2mms[22m[39m
 [90mstderr[2m | tests/theme-toggle.test.tsx[2m > [22m[2mThemeToggle[2m > [22m[2mhydrates without recovering when a persisted light theme exists
 [22m[39mThe current testing environment is not configured to support act(...)
 The current testing environment is not configured to support act(...)
@@ -240,231 +236,57 @@ The current testing environment is not configured to support act(...)
 [90mstderr[2m | tests/theme-toggle.test.tsx[2m > [22m[2mThemeToggle[2m > [22m[2mhydrates without recovering when a persisted light theme exists
 [22m[39mThe current testing environment is not configured to support act(...)
 
- [32m✓[39m tests/theme-toggle.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 328[2mms[22m[39m
- [32m✓[39m tests/workspace-split-layout.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 280[2mms[22m[39m
+ [32m✓[39m tests/theme-toggle.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 320[2mms[22m[39m
+ [32m✓[39m tests/workspace-split-layout.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 317[2mms[22m[39m
+     [33m[2m✓[22m[39m persists the main panel view mode per session [33m 314[2mms[22m[39m
  [32m✓[39m tests/artifact-presentation.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
- [32m✓[39m tests/session-blob-store.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 10[2mms[22m[39m
- [32m✓[39m tests/root-page.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 31[2mms[22m[39m
- [32m✓[39m tests/openrouter-deployment-key-policy.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
- [32m✓[39m tests/agent-access-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 410[2mms[22m[39m
-     [33m[2m✓[22m[39m creates a token with an explicit expiry and confirms it was saved [33m 408[2mms[22m[39m
- [32m✓[39m tests/canvas-prompt-artifact.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
  [32m✓[39m tests/canvas-run-scheduler.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
- [32m✓[39m tests/graph-models.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
- [32m✓[39m tests/auth-screen.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+ [32m✓[39m tests/session-blob-store.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/root-page.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m tests/agent-access-workspace.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 452[2mms[22m[39m
+     [33m[2m✓[22m[39m creates a token with an explicit expiry and confirms it was saved [33m 449[2mms[22m[39m
+ [32m✓[39m tests/graph-models.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/openrouter-deployment-key-policy.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/canvas-prompt-artifact.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
  [32m✓[39m tests/llm-settings-store.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/auth-screen.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 94[2mms[22m[39m
  [32m✓[39m tests/e2e-auth.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
- [32m✓[39m tests/post-auth-handoff.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 23[2mms[22m[39m
- [32m✓[39m tests/ollama-provider-policy.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
- [32m✓[39m tests/app-title-sync.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m tests/post-auth-handoff.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m tests/ollama-provider-policy.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/app-title-sync.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 19[2mms[22m[39m
 
-[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
-
-[41m[1m FAIL [22m[49m tests/account-plan-route.test.ts[2m > [22m/api/account/plan[2m > [22mreturns plan, limits, usage, provider key counts, and admin flag
-[31m[1mAssertionError[22m: expected { isAdmin: true, …(4) } to deeply equal { isAdmin: true, …(4) }[39m
-
-[32m- Expected[39m
-[31m+ Received[39m
-
-[33m@@ -1,9 +1,9 @@[39m
-[2m  {[22m
-[2m    "isAdmin": true,[22m
-[2m    "limits": {[22m
-[32m-     "concurrent": 1,[39m
-[31m+     "concurrent": 3,[39m
-[2m      "perDay": 120,[22m
-[2m      "perHour": 40,[22m
-[2m      "perMinute": 8,[22m
-[2m      "plan": "free",[22m
-[2m    },[22m
-
-[36m [2m❯[22m tests/account-plan-route.test.ts:[2m72:34[22m[39m
-    [90m 70|[39m
-    [90m 71|[39m     [34mexpect[39m(response[33m.[39mstatus)[33m.[39m[34mtoBe[39m([34m200[39m)[33m;[39m
-    [90m 72|[39m     [35mawait[39m [34mexpect[39m(response[33m.[39m[34mjson[39m())[33m.[39mresolves[33m.[39m[34mtoEqual[39m({
-    [90m   |[39m                                  [31m^[39m
-    [90m 73|[39m       isAdmin[33m:[39m [35mtrue[39m[33m,[39m
-    [90m 74|[39m       limits[33m:[39m expect[33m.[39m[34mobjectContaining[39m({
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
-
-[41m[1m FAIL [22m[49m tests/canvas-prompt-node.test.tsx[2m > [22mCanvasPromptNode[2m > [22mrenders a canvas draft composer with controls and hint
-[31m[1mTestingLibraryElementError[22m[39m: Unable to find an element with the text: Enter sends, Shift+Enter adds newline. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
-
-Ignored nodes: comments, script, style
-[36m<body>[39m
-  [36m<div>[39m
-    [36m<div[39m
-      [33mclass[39m=[32m"group relative w-[380px] rounded-2xl border bg-slate-950/95 p-px shadow-[0_24px_60px_-34px_rgba(15,118,110,0.42)] transition-all ring-1 ring-white/10"[39m
-    [36m>[39m
-      [36m<div[39m
-        [33mclass[39m=[32m"relative overflow-hidden rounded-[15px] border border-white/8 bg-slate-950/95 px-4 py-3"[39m
-      [36m>[39m
-        [36m<div[39m
-          [33mclass[39m=[32m"pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.18),transparent_36%),linear-gradient(180deg,rgba(10,25,24,0.98),rgba(8,18,22,0.98))]"[39m
-        [36m/>[39m
-        [36m<div[39m
-          [33mclass[39m=[32m"pointer-events-none absolute left-0 top-0 h-full w-1 bg-emerald-500"[39m
-        [36m/>[39m
-        [36m<span[39m
-          [33mdata-testid[39m=[32m"handle-target"[39m
-        [36m/>[39m
-        [36m<span[39m
-          [33mdata-testid[39m=[32m"handle-source"[39m
-        [36m/>[39m
-        [36m<div[39m
-          [33mclass[39m=[32m"relative flex items-start justify-between gap-3"[39m
-        [36m>[39m
-          [36m<div[39m
-            [33mclass[39m=[32m"space-y-2"[39m
-          [36m>[39m
-            [36m<div[39m
-              [33mclass[39m=[32m"flex flex-wrap items-center gap-2"[39m
-            [36m>[39m
-              [36m<span[39m
-                [33mclass[39m=[32m"rounded-full border border-emerald-300/35 bg-emerald-400/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-100"[39m
-              [36m>[39m
-                [0mDraft prompt[0m
-              [36m</span>[39m
-              [36m<span[39m
-                [33mclass[39m=[32m"rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-200/90"[39m
-              [36m>[39m
-                [0mAdd follow-up question[0m
-              [36m</span>[39m
-            [36m</div>[39m
-            [36m<p[39m
-              [33mclass[39m=[32m"text-[11px] leading-5 text-slate-300/88"[39m
-            [36m>[39m
-              [0mAsk a new follow-up question beneath this assistant reply.[0m
-            [36m</p>[39m
-          [36m</div>[39m
-          [36m<span[39m
-            [33mclass[39m=[32m"rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300/90"[39m
-          [36m>[39m
-            [0mEditable[0m
-          [36m</span>[39m
-        [36m</div>[39m
-        [36m<div[39m
-          [33mclass[39m=[32m"relative mt-3 space-y-2"[39m
-        [36m>[39m
-          [36m<textarea[39m
-            [33maria-label[39m=[32m"Draft prompt"[39m
-            [33mclass[39m=[32m"nodrag nowheel min-h-[120px] w-full resize-y rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm leading-5 text-slate-50 outline-none placeholder:text-slate-400/80 focus:border-emerald-300/55 disabled:cursor-not-allowed disabled:opacity-70"[39m
-            [33mplaceholder[39m=[32m"Write a follow-up question..."[39m
-            [33mrows[39m=[32m"5"[39m
-          [36m>[39m
-            [0mInitial prompt[0m
-          [36m</textarea>[39m
-          [36m<div[39m
-            [33mclass[39m=[32m"flex justify-between gap-2 text-[11px] text-slate-300/88"[39m
-          [36m>[39m
-            [36m<span>[39m
-              [0mEnter runs, Shift+Enter adds newline[0m
-            [36m</span>[39m
-          [36m</div>[39m
-        [36m</div>[39m
-        [36m<div[39m
-          [33mclass[39m=[32m"relative mt-3 flex justify-end gap-2"[39m
-        [36m>[39m
-          [36m<button[39m
-            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3 nodrag border border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.08]"[39m
-            [33mdata-slot[39m=[32m"button"[39m
-            [33mtype[39m=[32m"button"[39m
-          [36m>[39m
-            [36m<svg[39m
-              [33maria-hidden[39m=[32m"true"[39m
-              [33mclass[39m=[32m"lucide lucide-trash2 lucide-trash-2 mr-1.5 h-4 w-4"[39m
-              [33mfill[39m=[32m"none"[39m
-              [33mheight[39m=[32m"24"[39m
-              [33mstroke[39m=[32m"currentColor"[39m
-              [33mstroke-linecap[39m=[32m"round"[39m
-              [33mstroke-linejoin[39m=[32m"round"[39m
-              [33mstroke-width[39m=[32m"2"[39m
-              [33mviewBox[39m=[32m"0 0 24 24"[39m
-              [33mwidth[39m=[32m"24"[39m
-              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
-            [36m>[39m
-              [36m<path[39m
-                [33md[39m=[32m"M3 6h18"[39m
-              [36m/>[39m
-              [36m<path[39m
-                [33md[39m=[32m"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"[39m
-              [36m/>[39m
-              [36m<path[39m
-                [33md[39m=[32m"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"[39m
-              [36m/>[39m
-              [36m<line[39m
-                [33mx1[39m=[32m"10"[39m
-                [33mx2[39m=[32m"10"[39m
-                [33my1[39m=[32m"11"[39m
-                [33my2[39m=[32m"17"[39m
-              [36m/>[39m
-              [36m<line[39m
-                [33mx1[39m=[32m"14"[39m
-                [33mx2[39m=[32m"14"[39m
-                [33my1[39m=[32m"11"[39m
-                [33my2[39m=[32m"17"[39m
-              [36m/>[39m
-            [36m</svg>[39m
-            [0m [0m
-            [0mDelete draft[0m
-          [36m</button>[39m
-          [36m<button[39m
-            [33maria-label[39m=[32m"Send prompt node"[39m
-            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-primary/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] h-9 px-4 py-2 has-[>svg]:px-3 nodrag bg-emerald-400 text-slate-950 hover:bg-emerald-300"[39m
-            [33mdata-slot[39m=[32m"button"[39m
-            [33mtype[39m=[32m"button"[39m
-          [36m>[39m
-            [36m<svg[39m
-              [33maria-hidden[39m=[32m"true"[39m
-              [33mclass[39m=[32m"lucide lucide-send-horizontal mr-1.5 h-4 w-4"[39m
-              [33mfill[39m=[32m"none"[39m
-              [33mheight[39m=[32m"24"[39m
-              [33mstroke[39m=[32m"currentColor"[39m
-              [33mstroke-linecap[39m=[32m"round"[39m
-              [33mstroke-linejoin[39m=[32m"round"[39m
-              [33mstroke-width[39m=[32m"2"[39m
-              [33mviewBox[39m=[32m"0 0 24 24"[39m
-              [33mwidth[39m=[32m"24"[39m
-              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
-            [36m>[39m
-              [36m<path[39m
-                [33md[39m=[32m"M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"[39m
-              [36m/>[39m
-              [36m<path[39m
-                [33md[39m=[32m"M6 12h16"[39m
-              [36m/>[39m
-            [36m</svg>[39m
-            [0mRun[0m
-          [36m</button>[39m
-        [36m</div>[39m
-      [36m</div>[39m
-    [36m</div>[39m
-  [36m</div>[39m
-[36m</body>[39m
-[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
-[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
-[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
-[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
-[36m [2m❯[22m tests/canvas-prompt-node.test.tsx:[2m67:19[22m[39m
-    [90m 65|[39m     expect(screen.getByRole("button", { name: "Send prompt node" })).t…
-    [90m 66|[39m     expect(screen.getByRole("button", { name: /Delete draft/i })).toBe…
-    [90m 67|[39m     expect(screen.getByText("Enter sends, Shift+Enter adds newline")).…
-    [90m   |[39m                   [31m^[39m
-    [90m 68|[39m   })[33m;[39m
-    [90m 69|[39m
-
-[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+[2m Test Files [22m [1m[32m55 passed[39m[22m[90m (55)[39m
+[2m      Tests [22m [1m[32m172 passed[39m[22m[90m (172)[39m
+[2m   Start at [22m 09:37:03
+[2m   Duration [22m 15.66s[2m (transform 2.29s, setup 0ms, import 9.76s, tests 8.19s, environment 17.57s)[22m
 
 
-[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m53 passed[39m[22m[90m (55)[39m
-[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m170 passed[39m[22m[90m (172)[39m
-[2m   Start at [22m 09:34:51
-[2m   Duration [22m 15.00s[2m (transform 2.09s, setup 0ms, import 9.15s, tests 7.77s, environment 16.86s)[22m
+> nodes@0.1.0 build
+> next build
 
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+   ▲ Next.js 15.5.20
 
-::error file=/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/account-plan-route.test.ts,title=tests/account-plan-route.test.ts > /api/account/plan > returns plan%2C limits%2C usage%2C provider key counts%2C and admin flag,line=72,column=34::AssertionError: expected { isAdmin: true, …(4) } to deeply equal { isAdmin: true, …(4) }%0A%0A- Expected%0A+ Received%0A%0A@@ -1,9 +1,9 @@%0A  {%0A    "isAdmin": true,%0A    "limits": {%0A-     "concurrent": 1,%0A+     "concurrent": 3,%0A      "perDay": 120,%0A      "perHour": 40,%0A      "perMinute": 8,%0A      "plan": "free",%0A    },%0A%0A ❯ tests/account-plan-route.test.ts:72:34%0A%0A
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 26.8s
+   Linting and checking validity of types ...
 
-::error file=/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/canvas-prompt-node.test.tsx,title=tests/canvas-prompt-node.test.tsx > CanvasPromptNode > renders a canvas draft composer with controls and hint,line=67,column=19::TestingLibraryElementError: Unable to find an element with the text: Enter sends, Shift+Enter adds newline. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.%0A%0AIgnored nodes: comments, script, style%0A<body>%0A  <div>%0A    <div%0A      class="group relative w-[380px] rounded-2xl border bg-slate-950/95 p-px shadow-[0_24px_60px_-34px_rgba(15,118,110,0.42)] transition-all ring-1 ring-white/10"%0A    >%0A      <div%0A        class="relative overflow-hidden rounded-[15px] border border-white/8 bg-slate-950/95 px-4 py-3"%0A      >%0A        <div%0A          class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.18),transparent_36%25),linear-gradient(180deg,rgba(10,25,24,0.98),rgba(8,18,22,0.98))]"%0A        />%0A        <div%0A          class="pointer-events-none absolute left-0 top-0 h-full w-1 bg-emerald-500"%0A        />%0A        <span%0A          data-testid="handle-target"%0A        />%0A        <span%0A          data-testid="handle-source"%0A        />%0A        <div%0A          class="relative flex items-start justify-between gap-3"%0A        >%0A          <div%0A            class="space-y-2"%0A          >%0A            <div%0A              class="flex flex-wrap items-center gap-2"%0A            >%0A              <span%0A                class="rounded-full border border-emerald-300/35 bg-emerald-400/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-100"%0A              >%0A                Draft prompt%0A              </span>%0A              <span%0A                class="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-200/90"%0A              >%0A                Add follow-up question%0A              </span>%0A            </div>%0A            <p%0A              class="text-[11px] leading-5 text-slate-300/88"%0A            >%0A              Ask a new follow-up question beneath this assistant reply.%0A            </p>%0A          </div>%0A          <span%0A            class="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300/90"%0A          >%0A            Editable%0A          </span>%0A        </div>%0A        <div%0A          class="relative mt-3 space-y-2"%0A        >%0A          <textarea%0A            aria-label="Draft prompt"%0A            class="nodrag nowheel min-h-[120px] w-full resize-y rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm leading-5 text-slate-50 outline-none placeholder:text-slate-400/80 focus:border-emerald-300/55 disabled:cursor-not-allowed disabled:opacity-70"%0A            placeholder="Write a follow-up question..."%0A            rows="5"%0A          >%0A            Initial prompt%0A          </textarea>%0A          <div%0A            class="flex justify-between gap-2 text-[11px] text-slate-300/88"%0A          >%0A            <span>%0A              Enter runs, Shift+Enter adds newline%0A            </span>%0A          </div>%0A        </div>%0A        <div%0A          class="relative mt-3 flex justify-end gap-2"%0A        >%0A          <button%0A            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:text-accent-foreground h-9 px-4 py-2 has-[>svg]:px-3 nodrag border border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.08]"%0A            data-slot="button"%0A            type="button"%0A          >%0A            <svg%0A              aria-hidden="true"%0A              class="lucide lucide-trash2 lucide-trash-2 mr-1.5 h-4 w-4"%0A              fill="none"%0A              height="24"%0A              stroke="currentColor"%0A              stroke-linecap="round"%0A              stroke-linejoin="round"%0A              stroke-width="2"%0A              viewBox="0 0 24 24"%0A              width="24"%0A              xmlns="http://www.w3.org/2000/svg"%0A            >%0A              <path%0A                d="M3 6h18"%0A              />%0A              <path%0A                d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"%0A              />%0A              <path%0A                d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"%0A              />%0A              <line%0A                x1="10"%0A                x2="10"%0A                y1="11"%0A                y2="17"%0A              />%0A              <line%0A                x1="14"%0A                x2="14"%0A                y1="11"%0A                y2="17"%0A              />%0A            </svg>%0A             %0A            Delete draft%0A          </button>%0A          <button%0A            aria-label="Send prompt node"%0A            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border border-primary/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] h-9 px-4 py-2 has-[>svg]:px-3 nodrag bg-emerald-400 text-slate-950 hover:bg-emerald-300"%0A            data-slot="button"%0A            type="button"%0A          >%0A            <svg%0A              aria-hidden="true"%0A              class="lucide lucide-send-horizontal mr-1.5 h-4 w-4"%0A              fill="none"%0A              height="24"%0A              stroke="currentColor"%0A              stroke-linecap="round"%0A              stroke-linejoin="round"%0A              stroke-width="2"%0A              viewBox="0 0 24 24"%0A              width="24"%0A              xmlns="http://www.w3.org/2000/svg"%0A            >%0A              <path%0A                d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"%0A              />%0A              <path%0A                d="M6 12h16"%0A              />%0A            </svg>%0A            Run%0A          </button>%0A        </div>%0A      </div>%0A    </div>%0A  </div>%0A</body>%0A ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19%0A ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38%0A ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17%0A ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19%0A ❯ tests/canvas-prompt-node.test.tsx:67:19%0A%0A
+./components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx
+18:3  Warning: 'Code2' is defined but never used.  @typescript-eslint/no-unused-vars
+24:3  Warning: 'ImagePlus' is defined but never used.  @typescript-eslint/no-unused-vars
+35:3  Warning: 'Upload' is defined but never used.  @typescript-eslint/no-unused-vars
+476:7  Warning: 'canvasToolbarButtonClassName' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+522:11  Warning: 'activeSession' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1936:9  Warning: 'handleToolbarArtifactCreate' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+1947:9  Warning: 'handleToolbarUpload' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+Failed to compile.
+
+app/api/canvas-runs/route.ts
+Type error: Route "app/api/canvas-runs/route.ts" does not match the required types of a Next.js Route.
+  "isFreeCanvasModel" is not a valid Route export field.
+
+Next.js build worker exited with code: 1 and signal: null
 Validation failed with exit code 1
-HEAD is now at 9c71c63 fix: isolate canvas concurrency tests [canvas-concurrency-staging] [skip vercel]
+HEAD is now at 59e3922 fix: preserve canvas prompt contracts [canvas-concurrency-staging] [skip vercel]
