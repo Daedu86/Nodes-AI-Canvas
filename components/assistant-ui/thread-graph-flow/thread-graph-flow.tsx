@@ -3,36 +3,23 @@
 import "@xyflow/react/dist/style.css";
 import { useAssistantRuntime } from "@assistant-ui/react";
 import {
-  Background,
-  Controls,
   MarkerType,
-  MiniMap,
-  ReactFlow,
-  type EdgeTypes,
-  type NodeTypes,
   type ReactFlowInstance,
   type Viewport,
 } from "@xyflow/react";
 import {
-  BadgeHelp,
-  Code2,
   Copy as CopyIcon,
   Crosshair,
   FileImage,
   FilePlus2,
   Focus,
-  ImagePlus,
-  ListTodo,
   MoreHorizontal,
-  NotebookPen,
   Plus,
   RotateCcw,
-  Scale,
   Scissors,
   Sparkles,
   Trash2,
   Unlink2,
-  Upload,
 } from "lucide-react";
 import React from "react";
 import { useThreadRepoItems } from "@/components/assistant-ui/use-thread-repo-items";
@@ -54,19 +41,46 @@ import {
   getCanvasBlockDefinition,
   type CanvasBlockDefinition,
 } from "@/components/assistant-ui/thread-graph-flow/block-library";
-import { GraphBranchActions } from "@/components/assistant-ui/thread-graph-flow/graph-branch-actions";
-import { ArtifactGraphNode } from "@/components/assistant-ui/thread-graph-flow/artifact-node";
+import { CanvasStage } from "@/components/assistant-ui/thread-graph-flow/canvas-stage";
 import {
-  getArtifactBadgeLabel,
+  buildImagePreviewDataUrl,
+  estimateDataUrlBytes,
+  getArtifactUploadLimit,
+  getFileStem,
+  isTextLikeFile,
+  trimStoredArtifactContent,
+} from "@/components/assistant-ui/thread-graph-flow/canvas-upload-utils";
+import {
+  artifactAccent,
+  artifactContentLabel,
+  artifactContentPlaceholder,
+  artifactDefaultTitle,
+  artifactTypeLabel,
+  CANVAS_BRANCH_CANCEL_FAILURE,
+  CANVAS_BRANCH_RUN_NOTICE,
+  CANVAS_PROMPT_DRAFT_NODE_ID,
+  canvasToolbarIconButtonClassName,
+  flowFilterLabel,
+  formatByteSize,
+  getSemanticArtifactMeta,
+  isFlowViewport,
+  LegendItem,
+  providerDisplay,
+  readFlowRenderMode,
+  scrollMessageIntoView,
+  semanticArtifactPresets,
+  trimArtifactPreview,
+  type FlowDensityMode,
+  type FlowRenderMode,
+  type FlowSpotlightMode,
+} from "@/components/assistant-ui/thread-graph-flow/canvas-workspace-utils";
+import { GraphBranchActions } from "@/components/assistant-ui/thread-graph-flow/graph-branch-actions";
+import {
   getArtifactLineCount,
   getArtifactStatChips,
 } from "@/components/assistant-ui/thread-graph-flow/artifact-presentation";
-import { CanvasPromptNode } from "@/components/assistant-ui/thread-graph-flow/canvas-prompt-node";
 import { useCanvasRunManager } from "@/components/assistant-ui/thread-graph-flow/use-canvas-run-manager";
-import { ThreadGraphEdge } from "@/components/assistant-ui/thread-graph-flow/thread-graph-edge";
-import { ThreadGraph3D } from "@/components/assistant-ui/thread-graph-flow/thread-graph-3d";
 import { layoutThreadGraphFlow } from "@/components/assistant-ui/thread-graph-flow/thread-graph-layout";
-import { ThreadGraphNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-node";
 import type {
   ThreadGraphFlowEdge,
   ThreadGraphFlowNode,
@@ -102,416 +116,6 @@ import {
   type SessionCanvasEndpoint,
   toLlmContextArtifacts,
 } from "@/lib/session-artifacts";
-import { getProviderLabel } from "@/lib/llm/provider-catalog";
-
-const nodeTypes: NodeTypes = {
-  artifactNode: ArtifactGraphNode,
-  promptNode: CanvasPromptNode,
-  threadNode: ThreadGraphNode,
-};
-
-const edgeTypes: EdgeTypes = {
-  threadEdge: ThreadGraphEdge,
-};
-
-const CANVAS_PROMPT_DRAFT_NODE_ID = "__CANVAS_PROMPT_DRAFT__";
-
-const providerDisplay = (provider?: string | null) => {
-  if (!provider) return undefined;
-  return getProviderLabel(provider);
-};
-
-const scrollMessageIntoView = (messageId: string) => {
-  const element = document.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
-  if (!element) return;
-  element.scrollIntoView({ behavior: "smooth", block: "center" });
-};
-
-const semanticArtifactMeta: Record<
-  SessionArtifactSemanticType,
-  {
-    accent: string;
-    icon: typeof Scale;
-    label: string;
-    placeholder: string;
-    role: string;
-    titlePrefix: string;
-  }
-> = {
-  decision: {
-    accent: "#d97706",
-    icon: Scale,
-    label: "Decision",
-    placeholder: "Decision\nRationale\nRisks\nWhat changes if we choose differently?",
-    role: "Recommendation and rationale",
-    titlePrefix: "Decision",
-  },
-  evidence: {
-    accent: "#0284c7",
-    icon: Crosshair,
-    label: "Evidence",
-    placeholder: "Claim\nSource\nObservation\nWhy it matters",
-    role: "Grounded facts and source notes",
-    titlePrefix: "Evidence",
-  },
-  plan: {
-    accent: "#0f766e",
-    icon: ListTodo,
-    label: "Plan",
-    placeholder: "Goal\nSteps\nDependencies\nStatus",
-    role: "Execution structure and next steps",
-    titlePrefix: "Plan",
-  },
-  table: {
-    accent: "#0891b2",
-    icon: ListTodo,
-    label: "Table",
-    placeholder: "| Column | Value |\n| --- | --- |\n| Example | Ready |",
-    role: "Structured rows and columns",
-    titlePrefix: "Table",
-  },
-  question: {
-    accent: "#db2777",
-    icon: BadgeHelp,
-    label: "Question",
-    placeholder: "Open question\nWhy it is unresolved\nWhat would answer it",
-    role: "Unresolved question worth tracking",
-    titlePrefix: "Question",
-  },
-  draft: {
-    accent: "#7c3aed",
-    icon: NotebookPen,
-    label: "Draft",
-    placeholder: "Working draft\nAudience\nMessage goal\nNotes",
-    role: "Working language or copy in progress",
-    titlePrefix: "Draft",
-  },
-};
-
-const getSemanticArtifactMeta = (semanticType?: SessionArtifactSemanticType | null) =>
-  semanticType ? semanticArtifactMeta[semanticType] : null;
-
-const semanticArtifactPresets = (
-  Object.keys(semanticArtifactMeta) as SessionArtifactSemanticType[]
-).map((semanticType) => ({ semanticType }));
-
-const artifactAccent = (
-  artifact:
-    | SessionArtifact["artifactType"]
-    | Pick<SessionArtifact, "artifactType" | "semanticType">,
-  semanticType?: SessionArtifactSemanticType | null,
-) => {
-  const descriptor =
-    typeof artifact === "string"
-      ? { artifactType: artifact, semanticType: semanticType ?? null }
-      : artifact;
-  if (descriptor.artifactType === "text" && descriptor.semanticType) {
-    return getSemanticArtifactMeta(descriptor.semanticType)?.accent ?? "#7c3aed";
-  }
-  switch (descriptor.artifactType) {
-    case "code":
-      return "#0f766e";
-    case "image":
-      return "#db2777";
-    case "file":
-      return "#2563eb";
-    case "prompt":
-      return "#0f766e";
-    default:
-      return "#7c3aed";
-  }
-};
-
-const artifactTypeLabel = (
-  artifact:
-    | SessionArtifact["artifactType"]
-    | Pick<SessionArtifact, "artifactType" | "semanticType">,
-) => getArtifactBadgeLabel(artifact);
-
-const artifactDefaultTitle = (
-  artifactType: SessionArtifact["artifactType"],
-  existingArtifacts: SessionArtifact[],
-  semanticType?: SessionArtifactSemanticType | null,
-) => {
-  const count =
-    existingArtifacts.filter(
-      (artifact) =>
-        artifact.artifactType === artifactType &&
-        (artifactType !== "text" || (artifact.semanticType ?? null) === (semanticType ?? null)),
-    ).length + 1;
-  const semanticMeta = artifactType === "text" ? getSemanticArtifactMeta(semanticType) : null;
-  switch (artifactType) {
-    case "code":
-      return `Code Context ${count}`;
-    case "image":
-      return `Image Context ${count}`;
-    case "file":
-      return `File Context ${count}`;
-    case "prompt":
-      return `Prompt ${count}`;
-    default:
-      return `${semanticMeta?.titlePrefix ?? "Text Context"} ${count}`;
-  }
-};
-
-const artifactContentLabel = (
-  artifact:
-    | SessionArtifact["artifactType"]
-    | Pick<SessionArtifact, "artifactType" | "semanticType">,
-) => {
-  const descriptor =
-    typeof artifact === "string"
-      ? { artifactType: artifact, semanticType: null as SessionArtifactSemanticType | null }
-      : artifact;
-  if (descriptor.artifactType === "text" && descriptor.semanticType) {
-    return `${getSemanticArtifactMeta(descriptor.semanticType)?.label ?? "Text"} notes`;
-  }
-  switch (descriptor.artifactType) {
-    case "image":
-      return "Notes";
-    case "file":
-      return "Extracted text / notes";
-    case "prompt":
-      return "Prompt";
-    default:
-      return "Content";
-  }
-};
-
-const artifactContentPlaceholder = (
-  artifact:
-    | SessionArtifact["artifactType"]
-    | Pick<SessionArtifact, "artifactType" | "semanticType">,
-) => {
-  const descriptor =
-    typeof artifact === "string"
-      ? { artifactType: artifact, semanticType: null as SessionArtifactSemanticType | null }
-      : artifact;
-  if (descriptor.artifactType === "text" && descriptor.semanticType) {
-    return (
-      getSemanticArtifactMeta(descriptor.semanticType)?.placeholder ??
-      "Write reusable context here..."
-    );
-  }
-  switch (descriptor.artifactType) {
-    case "code":
-      return "Paste code or config here...";
-    case "image":
-      return "Describe what matters about this image...";
-    case "file":
-      return "Review or refine the extracted file text here...";
-    case "prompt":
-      return "Write an independent model instruction...";
-    default:
-      return "Write reusable context here...";
-  }
-};
-
-const formatByteSize = (byteSize?: number | null) => {
-  if (!byteSize || byteSize <= 0) return null;
-  if (byteSize < 1024) return `${byteSize} B`;
-  if (byteSize < 1024 * 1024) return `${(byteSize / 1024).toFixed(byteSize >= 10 * 1024 ? 0 : 1)} KB`;
-  return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-const trimArtifactPreview = (artifact: Pick<SessionArtifact, "artifactType" | "content" | "fileName">) => {
-  const compact = artifact.content.replace(/\s+/g, " ").trim();
-  if (compact.length > 0) return compact;
-  if (artifact.artifactType === "image") {
-    return artifact.fileName ? `Image: ${artifact.fileName}` : "Image artifact";
-  }
-  if (artifact.artifactType === "file") {
-    return artifact.fileName ? `File: ${artifact.fileName}` : "File artifact";
-  }
-  return "Empty artifact";
-};
-
-const getFileStem = (fileName: string) => {
-  const stem = fileName.replace(/\.[^.]+$/, "").trim();
-  return stem.length > 0 ? stem : fileName;
-};
-
-const textLikeExtensions = new Set([
-  "txt",
-  "md",
-  "mdx",
-  "json",
-  "jsonl",
-  "yaml",
-  "yml",
-  "toml",
-  "ini",
-  "csv",
-  "tsv",
-  "xml",
-  "html",
-  "css",
-  "scss",
-  "less",
-  "js",
-  "jsx",
-  "ts",
-  "tsx",
-  "mjs",
-  "cjs",
-  "py",
-  "rb",
-  "go",
-  "rs",
-  "java",
-  "kt",
-  "swift",
-  "cs",
-  "php",
-  "sql",
-  "sh",
-  "ps1",
-  "env",
-  "gitignore",
-  "lock",
-]);
-
-const isTextLikeFile = (file: File) => {
-  const mime = file.type.toLowerCase();
-  if (
-    mime.startsWith("text/") ||
-    mime.includes("json") ||
-    mime.includes("javascript") ||
-    mime.includes("typescript") ||
-    mime.includes("xml") ||
-    mime.includes("yaml") ||
-    mime.includes("markdown") ||
-    mime.includes("csv")
-  ) {
-    return true;
-  }
-
-  const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : file.name.toLowerCase();
-  return extension ? textLikeExtensions.has(extension) : false;
-};
-
-const estimateDataUrlBytes = (dataUrl: string) => {
-  const [, base64 = ""] = dataUrl.split(",", 2);
-  return Math.ceil((base64.length * 3) / 4);
-};
-
-const buildImagePreviewDataUrl = async (
-  file: File,
-  maxBytes: number,
-  maxDimension: number,
-) => {
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const element = new Image();
-      element.onload = () => resolve(element);
-      element.onerror = () => reject(new Error("Failed to load image preview"));
-      element.src = objectUrl;
-    });
-
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-    if (!context) {
-      throw new Error("Failed to prepare image preview canvas");
-    }
-
-    const dimensionCandidates = Array.from(
-      new Set([
-        maxDimension,
-        Math.min(maxDimension, 640),
-        Math.min(maxDimension, 520),
-        Math.min(maxDimension, 420),
-        Math.min(maxDimension, 320),
-      ].filter((value) => value > 0)),
-    );
-    const qualities = [0.74, 0.62, 0.5, 0.38, 0.28];
-
-    let bestDataUrl = "";
-    let bestByteDelta = Number.POSITIVE_INFINITY;
-
-    for (const dimension of dimensionCandidates) {
-      const scale = Math.min(1, dimension / Math.max(image.width, image.height));
-      canvas.width = Math.max(1, Math.round(image.width * scale));
-      canvas.height = Math.max(1, Math.round(image.height * scale));
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-      for (const quality of qualities) {
-        const candidate = canvas.toDataURL("image/webp", quality);
-        const candidateBytes = estimateDataUrlBytes(candidate);
-        if (!bestDataUrl || Math.abs(candidateBytes - maxBytes) < bestByteDelta) {
-          bestDataUrl = candidate;
-          bestByteDelta = Math.abs(candidateBytes - maxBytes);
-        }
-        if (candidateBytes <= maxBytes) {
-          return candidate;
-        }
-      }
-    }
-    return bestDataUrl;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-};
-
-const trimStoredArtifactContent = (value: string, maxChars: number) => {
-  const normalized = value.trim();
-  if (normalized.length <= maxChars) return normalized;
-  return `${normalized.slice(0, Math.max(0, maxChars - 1))}…`;
-};
-
-const getArtifactUploadLimit = (
-  artifactType: "image" | "file",
-  policy: ReturnType<typeof getContextBudgetPolicy>,
-) =>
-  artifactType === "image" ? policy.maxUploadImageBytes : policy.maxUploadFileBytes;
-
-const LegendItem = ({ color, label }: { color: string; label: string }) => (
-  <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
-    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-    <span>{label}</span>
-  </span>
-);
-
-const canvasToolbarButtonClassName =
-  "inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/92 px-3 py-2 text-[11px] font-medium text-foreground/80 transition-colors hover:bg-background";
-
-const canvasToolbarIconButtonClassName =
-  "inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/92 px-3 py-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground";
-
-
-type FlowSpotlightMode = "all" | "assistant" | "user" | "bridge" | "edited";
-type FlowDensityMode = "overview" | "focus";
-type FlowRenderMode = "2d" | "3d";
-
-const flowFilterLabel: Record<FlowSpotlightMode, string> = {
-  all: "All",
-  assistant: "Assistant",
-  user: "User",
-  bridge: "Bridge",
-  edited: "Edited",
-};
-
-const CANVAS_BRANCH_RUN_NOTICE =
-  "Submitting will stop the current run before creating the branch.";
-const CANVAS_BRANCH_CANCEL_FAILURE =
-  "The current assistant run could not be cancelled. Wait for it to finish, then try again.";
-
-const isFlowViewport = (value: Viewport | null): value is Viewport =>
-  !!value &&
-  typeof value.x === "number" &&
-  typeof value.y === "number" &&
-  typeof value.zoom === "number";
-
-const readFlowRenderMode = (storageKey: string): FlowRenderMode => {
-  try {
-    const value = localStorage.getItem(storageKey);
-    if (value === "3d") return "3d";
-    return "2d";
-  } catch {
-    return "2d";
-  }
-};
 
 export function ThreadGraphFlow() {
   const runtime = useAssistantRuntime();
@@ -519,7 +123,7 @@ export function ThreadGraphFlow() {
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
   const { clearRequestError, requestError, setRequestError } = useRequestError();
-  const { activeSession, activeSessionId } = usePersistedSessions();
+  const { activeSessionId } = usePersistedSessions();
   const {
     canvasSelectionId,
     focusedMessageId,
@@ -1933,26 +1537,6 @@ export function ThreadGraphFlow() {
     setToolbarMenu((current) => (current === menu ? null : menu));
   }, []);
 
-  const handleToolbarArtifactCreate = React.useCallback(
-    (
-      artifactType: SessionArtifact["artifactType"],
-      options?: { semanticType?: SessionArtifactSemanticType | null },
-    ) => {
-      setToolbarMenu(null);
-      handleCreateArtifact(artifactType, options);
-    },
-    [handleCreateArtifact],
-  );
-
-  const handleToolbarUpload = React.useCallback((artifactType: "image" | "file") => {
-    setToolbarMenu(null);
-    if (artifactType === "image") {
-      imageUploadInputRef.current?.click();
-      return;
-    }
-    fileUploadInputRef.current?.click();
-  }, []);
-
   const handleImageUploadChange = React.useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -2981,95 +2565,31 @@ export function ThreadGraphFlow() {
         </div>
         ) : null}
         </aside>
-        <div
-          ref={flowViewportRef}
-          className="relative min-h-[28rem] flex-1 lg:min-h-0"
-          onDragOver={handleCanvasDragOver}
-          onDrop={handleCanvasDrop}
-        >
-        {flowRenderMode === "3d" ? (
-          <ThreadGraph3D
-            nodes={decoratedFlowNodes}
-            edges={decoratedFlowEdges}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={applyCanvasSelection}
-          />
-        ) : (
-          <>
-            <ReactFlow
-              key={`flow:${activeSessionId}:${graphStructureSignature}`}
-              nodes={decoratedFlowNodes}
-              edges={decoratedFlowEdges}
-              nodeTypes={nodeTypes}
-              edgeTypes={edgeTypes}
-              fitView={!isFlowViewport(storedViewport)}
-              defaultViewport={storedViewport ?? { x: 0, y: 0, zoom: 1 }}
-              fitViewOptions={{ padding: 0.18 }}
-              minZoom={0.3}
-              maxZoom={1.6}
-              onlyRenderVisibleElements
-              nodesDraggable
-              elementsSelectable
-              proOptions={{ hideAttribution: true }}
-              onInit={setReactFlowInstance}
-              onConnect={handleCanvasConnect}
-              onMoveEnd={(_, viewport) => {
-                setStoredViewport(viewport);
-              }}
-              onNodeDragStop={(_, node) => {
-                const position = { x: node.position.x, y: node.position.y };
-                if (node.data?.kind === "artifact" || node.data?.kind === "canvas-prompt") {
-                  updateArtifact(node.id, { position });
-                } else if (node.data?.kind === "prompt-draft") {
-                  setDraftPosition(position);
-                }
-              }}
-              onSelectionChange={({ nodes: selectedNodes }) => {
-                if (selectedNodes[0]?.id) {
-                  applyCanvasSelection(selectedNodes[0].id);
-                }
-              }}
-              onNodeClick={(_, node) => {
-                applyCanvasSelection(node.id);
-              }}
-              onNodeDoubleClick={(_, node) => {
-                if (node.data.kind === "artifact" || node.data.kind === "canvas-prompt" || node.id === ROOT_NODE_ID) return;
-                applyCanvasSelection(node.id);
-                setViewMode("split");
-                scrollMessageIntoView(node.id);
-              }}
-              onPaneClick={() => applyCanvasSelection(null)}
-              className="overflow-hidden rounded-[32px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.06),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.88),rgba(248,250,252,0.92))] shadow-[0_30px_110px_-60px_rgba(15,23,42,0.5)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.1),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.08),transparent_18%),linear-gradient(180deg,rgba(15,23,42,0.9),rgba(2,6,23,0.92))]"
-              defaultEdgeOptions={{
-                animated: false,
-              }}
-            >
-              <Background color="rgba(148,163,184,0.18)" gap={24} size={1.15} />
-              <MiniMap
-                pannable
-                zoomable
-                className="!pointer-events-none !bottom-5 !right-5 !rounded-[20px] !border !border-white/70 !bg-white/85 !shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] dark:!border-white/10 dark:!bg-slate-950/85"
-                nodeColor={(node) =>
-                  String(
-                    (node.data as { accent?: string } | undefined)?.accent ??
-                      "rgba(100,116,139,0.85)",
-                  )
-                }
-                maskColor="rgba(15,23,42,0.05)"
-              />
-              <Controls
-                className="!bottom-5 !left-5 !right-auto !top-auto [&>button]:!border-white/70 [&>button]:!bg-white/92 [&>button]:!text-foreground [&>button]:!shadow-sm dark:[&>button]:!border-white/10 dark:[&>button]:!bg-slate-950/92"
-                showInteractive={false}
-              />
-            </ReactFlow>
-            <div className="pointer-events-none absolute bottom-5 left-20 z-10 hidden items-center gap-2 md:flex">
-              <div className="pointer-events-auto rounded-full border border-white/70 bg-white/82 px-3 py-1 text-[11px] text-muted-foreground shadow-[0_18px_48px_-36px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
-                Drag nodes directly on the stage. The canvas is the main workspace.
-              </div>
-            </div>
-          </>
-        )}
-        </div>
+        <CanvasStage
+          activeSessionId={activeSessionId}
+          edges={decoratedFlowEdges}
+          flowRenderMode={flowRenderMode}
+          graphStructureSignature={graphStructureSignature}
+          nodes={decoratedFlowNodes}
+          onArtifactPositionChange={(artifactId, position) =>
+            updateArtifact(artifactId, { position })
+          }
+          onCanvasConnect={handleCanvasConnect}
+          onCanvasDragOver={handleCanvasDragOver}
+          onCanvasDrop={handleCanvasDrop}
+          onDraftPositionChange={setDraftPosition}
+          onInit={setReactFlowInstance}
+          onMessageOpen={(messageId) => {
+            applyCanvasSelection(messageId);
+            setViewMode("split");
+            scrollMessageIntoView(messageId);
+          }}
+          onNodeSelect={applyCanvasSelection}
+          onViewportChange={setStoredViewport}
+          selectedNodeId={selectedNodeId}
+          storedViewport={storedViewport}
+          viewportRef={flowViewportRef}
+        />
       </div>
       </div>
     </section>
