@@ -61,6 +61,18 @@ jobs:
           python3 -m py_compile /tmp/apply_canvas_refactor.py
           python3 /tmp/apply_canvas_refactor.py
 
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              "  Copy as CopyIcon,\n  FileImage,",
+              "  Copy as CopyIcon,\n  Crosshair,\n  FileImage,",
+              1,
+          )
+          path.write_text(text, encoding="utf-8")
+          PY
+
           echo "Changed files:"
           git diff --stat
           echo "Main component lines:"
