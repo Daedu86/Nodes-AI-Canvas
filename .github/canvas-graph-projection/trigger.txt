@@ -1,1 +1,0 @@
-apply canvas graph projection extraction

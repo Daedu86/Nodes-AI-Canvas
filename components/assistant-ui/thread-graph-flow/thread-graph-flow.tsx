@@ -27,6 +27,18 @@ import {
   getCanvasBlockDefinition,
   type CanvasBlockDefinition,
 } from "@/components/assistant-ui/thread-graph-flow/block-library";
+import {
+  buildCanvasFilterCounts,
+  buildFocusPathNodeIds,
+  buildGraphStructureSignature,
+  buildRelatedContextIds,
+  buildSelectedLineage,
+  buildTreeStructureSignature,
+  decorateCanvasEdges,
+  decorateCanvasNodes,
+  filterCanvasGraph,
+  resolveCanvasVisibleNodeIds,
+} from "@/components/assistant-ui/thread-graph-flow/canvas-graph-projection";
 import { CanvasArtifactInspector } from "@/components/assistant-ui/thread-graph-flow/canvas-artifact-inspector";
 import { CanvasMessageInspector } from "@/components/assistant-ui/thread-graph-flow/canvas-message-inspector";
 import { CanvasSidebar } from "@/components/assistant-ui/thread-graph-flow/canvas-sidebar";
@@ -385,119 +397,41 @@ export function ThreadGraphFlow() {
     );
   }, [contextLinks, selectedArtifact]);
 
-  const filterCounts = React.useMemo(() => {
-    const counts: Record<FlowSpotlightMode, number> = {
-      all: canvasConversationNodes.length + artifacts.length,
-      assistant: 0,
-      user: 0,
-      bridge: 0,
-      edited: 0,
-    };
-    canvasConversationNodes.forEach((node) => {
-      if (node.role === "assistant") counts.assistant += 1;
-      if (node.role === "user") counts.user += 1;
-      if (node.isBridge) counts.bridge += 1;
-      if (node.editedFromId) counts.edited += 1;
-    });
-    return counts;
-  }, [artifacts.length, canvasConversationNodes]);
+  const filterCounts = React.useMemo(
+  () => buildCanvasFilterCounts(canvasConversationNodes, artifacts.length),
+  [artifacts.length, canvasConversationNodes],
+);
 
-  const matchesSpotlight = React.useCallback(
-    (node: ThreadGraphNodeModel) => {
-      switch (spotlight) {
-        case "assistant":
-          return node.role === "assistant";
-        case "user":
-          return node.role === "user";
-        case "bridge":
-          return Boolean(node.isBridge);
-        case "edited":
-          return Boolean(node.editedFromId);
-        default:
-          return true;
-      }
-    },
-    [spotlight],
-  );
+  const selectedLineage = React.useMemo(
+  () =>
+    buildSelectedLineage({
+      canvasConversationNodes,
+      nodeIndex,
+      selectedArtifactId: selectedArtifact?.id ?? null,
+      selectedNodeId,
+    }),
+  [canvasConversationNodes, nodeIndex, selectedArtifact, selectedNodeId],
+);
 
-  const selectedLineage = React.useMemo(() => {
-    if (!selectedNodeId || selectedArtifact) return new Set<string>();
-    const lineage = new Set<string>([selectedNodeId]);
-
-    let currentId: string | null = selectedNodeId;
-    while (currentId) {
-      const currentNode = nodeIndex.get(currentId);
-      const parentId = currentNode?.parentId ?? null;
-      if (!parentId || lineage.has(parentId)) break;
-      lineage.add(parentId);
-      currentId = parentId;
-    }
-
-    const queue = [selectedNodeId];
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (!current) continue;
-      canvasConversationNodes.forEach((node) => {
-        if (node.parentId === current && !lineage.has(node.id)) {
-          lineage.add(node.id);
-          queue.push(node.id);
-        }
-      });
-    }
-
-    return lineage;
-  }, [canvasConversationNodes, nodeIndex, selectedArtifact, selectedNodeId]);
-
-  const focusPathNodeIds = React.useMemo(() => {
-    if (!selectedNodeId) return new Set<string>();
-
-    const focusIds = new Set<string>([selectedNodeId]);
-
-    const addAncestors = (startId: string | null) => {
-      let currentId = startId;
-      while (currentId) {
-        if (focusIds.has(currentId)) {
-          const parentId = nodeIndex.get(currentId)?.parentId ?? null;
-          if (!parentId || focusIds.has(parentId)) {
-            break;
-          }
-        }
-        focusIds.add(currentId);
-        const parentId = nodeIndex.get(currentId)?.parentId ?? null;
-        if (!parentId) break;
-        currentId = parentId;
-      }
-    };
-
-    if (selectedArtifact) {
-      selectedContextLinkedMessageIds.forEach((messageId) => {
-        focusIds.add(messageId);
-        addAncestors(messageId);
-      });
-      return focusIds;
-    }
-
-    addAncestors(selectedNodeId);
-
-    canvasConversationNodes.forEach((node) => {
-      if (node.parentId === selectedNodeId) {
-        focusIds.add(node.id);
-      }
-    });
-
-    selectedContextArtifactIds.forEach((artifactId) => {
-      focusIds.add(artifactId);
-    });
-
-    return focusIds;
-  }, [
-    nodeIndex,
+  const focusPathNodeIds = React.useMemo(
+  () =>
+    buildFocusPathNodeIds({
+      canvasConversationNodes,
+      nodeIndex,
+      selectedArtifactId: selectedArtifact?.id ?? null,
+      selectedContextArtifactIds,
+      selectedContextLinkedMessageIds,
+      selectedNodeId,
+    }),
+  [
     canvasConversationNodes,
+    nodeIndex,
     selectedArtifact,
     selectedContextArtifactIds,
     selectedContextLinkedMessageIds,
     selectedNodeId,
-  ]);
+  ],
+);
 
   const handleCancelRun = React.useCallback(() => {
     clearRequestError();
@@ -721,12 +655,14 @@ export function ThreadGraphFlow() {
     selectedMessageNode?.id,
   ]);
 
-  const relatedContextIds = React.useMemo(() => {
-    const related = new Set<string>();
-    selectedContextArtifactIds.forEach((id) => related.add(id));
-    selectedContextLinkedMessageIds.forEach((id) => related.add(id));
-    return related;
-  }, [selectedContextArtifactIds, selectedContextLinkedMessageIds]);
+  const relatedContextIds = React.useMemo(
+  () =>
+    buildRelatedContextIds(
+      selectedContextArtifactIds,
+      selectedContextLinkedMessageIds,
+    ),
+  [selectedContextArtifactIds, selectedContextLinkedMessageIds],
+);
 
   const baseConversationNodes = React.useMemo<ThreadGraphFlowNode[]>(() => {
     return canvasConversationNodes.map((node) => {
@@ -1063,110 +999,74 @@ export function ThreadGraphFlow() {
     ],
   );
 
-  const visibleNodeIds = React.useMemo(() => {
-    if (densityMode !== "focus" || !selectedNodeId) {
-      return null;
-    }
-    return focusPathNodeIds;
-  }, [densityMode, focusPathNodeIds, selectedNodeId]);
+  const visibleNodeIds = React.useMemo(
+  () =>
+    resolveCanvasVisibleNodeIds({
+      densityMode,
+      focusPathNodeIds,
+      selectedNodeId,
+    }),
+  [densityMode, focusPathNodeIds, selectedNodeId],
+);
 
-  const visibleFlowNodes = React.useMemo(
-    () =>
-      visibleNodeIds
-        ? flowNodes.filter((node) => visibleNodeIds.has(node.id))
-        : flowNodes,
-    [flowNodes, visibleNodeIds],
-  );
+const { nodes: visibleFlowNodes, edges: visibleFlowEdges } = React.useMemo(
+  () => filterCanvasGraph(flowNodes, flowEdges, visibleNodeIds),
+  [flowEdges, flowNodes, visibleNodeIds],
+);
 
-  const visibleFlowEdges = React.useMemo(
-    () =>
-      visibleNodeIds
-        ? flowEdges.filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target))
-        : flowEdges,
-    [flowEdges, visibleNodeIds],
-  );
-
-  const decoratedFlowNodes = React.useMemo<ThreadGraphFlowNode[]>(() => {
-    return visibleFlowNodes.map((node) => {
-      const originalNode = nodeIndex.get(node.id);
-      const filterMatched = originalNode ? matchesSpotlight(originalNode) : true;
-      const emphasis: NonNullable<ThreadGraphFlowNode["data"]["emphasis"]> =
-        selectedNodeId == null
-          ? filterMatched || spotlight === "all" || node.data.kind === "artifact"
-            ? "normal"
-            : "muted"
-          : node.id === selectedNodeId
-            ? "selected"
-            : selectedLineage.has(node.id) || relatedContextIds.has(node.id)
-              ? "lineage"
-              : "muted";
-
-      return {
-        ...node,
-        data: {
-          ...node.data,
-          emphasis,
-          filterMatched,
-        },
-      };
-    });
-  }, [
-    matchesSpotlight,
+  const decoratedFlowNodes = React.useMemo<ThreadGraphFlowNode[]>(
+  () =>
+    decorateCanvasNodes({
+      nodeIndex,
+      relatedContextIds,
+      selectedLineage,
+      selectedNodeId,
+      spotlight,
+      visibleFlowNodes,
+    }),
+  [
     nodeIndex,
     relatedContextIds,
     selectedLineage,
     selectedNodeId,
     spotlight,
     visibleFlowNodes,
-  ]);
+  ],
+);
 
-  const decoratedFlowEdges = React.useMemo<ThreadGraphFlowEdge[]>(() => {
-    return visibleFlowEdges.map((edge) => {
-      const sourceInLineage = selectedLineage.has(edge.source) || relatedContextIds.has(edge.source);
-      const targetInLineage = selectedLineage.has(edge.target) || relatedContextIds.has(edge.target);
-      const sourceMatched = decoratedFlowNodes.find((node) => node.id === edge.source)?.data.filterMatched ?? true;
-      const targetMatched = decoratedFlowNodes.find((node) => node.id === edge.target)?.data.filterMatched ?? true;
-
-      const emphasis: "normal" | "selected" | "lineage" | "muted" =
-        selectedNodeId == null
-          ? spotlight === "all" || (sourceMatched && targetMatched) || edge.data?.tone === "context"
-            ? "normal"
-            : "muted"
-          : sourceInLineage && targetInLineage
-            ? edge.target === selectedNodeId || edge.source === selectedNodeId
-              ? "selected"
-              : "lineage"
-            : "muted";
-
-      return {
-        ...edge,
-        data: {
-          ...edge.data,
-          emphasis,
-        },
-      };
-    });
-  }, [decoratedFlowNodes, relatedContextIds, selectedLineage, selectedNodeId, spotlight, visibleFlowEdges]);
+  const decoratedFlowEdges = React.useMemo<ThreadGraphFlowEdge[]>(
+  () =>
+    decorateCanvasEdges({
+      decoratedFlowNodes,
+      relatedContextIds,
+      selectedLineage,
+      selectedNodeId,
+      spotlight,
+      visibleFlowEdges,
+    }),
+  [
+    decoratedFlowNodes,
+    relatedContextIds,
+    selectedLineage,
+    selectedNodeId,
+    spotlight,
+    visibleFlowEdges,
+  ],
+);
 
   const graphStructureSignature = React.useMemo(
-    () =>
-      [
-        decoratedFlowNodes
-          .map((node) => `${node.id}:${String(node.data.branchId ?? "")}:${node.data.kind ?? "message"}`)
-          .join("|"),
-        decoratedFlowEdges.map((edge) => `${edge.id}:${edge.source}->${edge.target}`).join("|"),
-      ].join("::"),
-    [decoratedFlowEdges, decoratedFlowNodes],
-  );
+  () => buildGraphStructureSignature(decoratedFlowNodes, decoratedFlowEdges),
+  [decoratedFlowEdges, decoratedFlowNodes],
+);
 
   const treeStructureSignature = React.useMemo(
-    () =>
-      [
-        canvasConversationNodes.map((node) => `${node.id}:${String(node.branchId ?? "")}`).join("|"),
-        baseConversationEdges.map((edge) => `${edge.source}->${edge.target}`).join("|"),
-      ].join("::"),
-    [baseConversationEdges, canvasConversationNodes],
-  );
+  () =>
+    buildTreeStructureSignature(
+      canvasConversationNodes,
+      baseConversationEdges,
+    ),
+  [baseConversationEdges, canvasConversationNodes],
+);
 
   React.useEffect(() => {
     if (!reactFlowInstance || decoratedFlowNodes.length === 0) return;
