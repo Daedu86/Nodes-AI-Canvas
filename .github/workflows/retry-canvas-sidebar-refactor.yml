@@ -50,6 +50,67 @@ jobs:
               if 'npx playwright install' not in line
               and 'npx playwright test' not in line
           ) + '\n'
+
+          fixup = r'''python3 - <<'PYFIX'
+          from pathlib import Path
+          import re
+
+          flow_path = Path("components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx")
+          flow = flow_path.read_text(encoding="utf-8")
+          flow, toolbar_count = re.subn(
+              r'\n  const toggleToolbarMenu = React\.useCallback\(\(menu: "add" \| "tools"\) => \{\n    setToolbarMenu\(\(current\) => \(current === menu \? null : menu\)\);\n  \}, \[\]\);\n',
+              '\n',
+              flow,
+              count=1,
+          )
+          flow, semantic_count = re.subn(
+              r'\n  const selectedArtifactSemanticMeta = React\.useMemo\(\n    \(\) =>\n      selectedArtifact\?\.artifactType === "text"\n        \? getSemanticArtifactMeta\(selectedArtifact\.semanticType \?\? null\)\n        : null,\n    \[selectedArtifact\],\n  \);\n',
+              '\n',
+              flow,
+              count=1,
+          )
+          flow = flow.replace(
+              '                selectedMessageNode={selectedMessageNode}\n',
+              '',
+              1,
+          )
+          if toolbar_count != 1 or semantic_count != 1:
+              raise RuntimeError(
+                  f"Expected one toolbar and semantic cleanup, got {toolbar_count=} {semantic_count=}"
+              )
+          flow_path.write_text(flow, encoding="utf-8")
+
+          message_path = Path("components/assistant-ui/thread-graph-flow/canvas-message-inspector.tsx")
+          message = message_path.read_text(encoding="utf-8")
+          message = message.replace(
+              '  selectedMessageNode: ThreadGraphNodeModel;\n',
+              '',
+              1,
+          )
+          message = message.replace(
+              '  selectedMessageNode,\n',
+              '',
+              1,
+          )
+          message = message.replace(
+              'import {\n  ROOT_NODE_ID,\n  type Node as ThreadGraphNodeModel,\n} from "@/components/assistant-ui/thread-graph/graph-types";',
+              'import { ROOT_NODE_ID } from "@/components/assistant-ui/thread-graph/graph-types";',
+              1,
+          )
+          reset_label = '<span>Reset view</span>'
+          reset_index = message.index(reset_label)
+          click_index = message.rfind('onClick={onClearFocus}', 0, reset_index)
+          if click_index < 0:
+              raise RuntimeError('Reset-view click handler marker not found')
+          message = (
+              message[:click_index]
+              + 'onClick={onResetView}'
+              + message[click_index + len('onClick={onClearFocus}'):]
+          )
+          message_path.write_text(message, encoding="utf-8")
+          PYFIX
+          '''
+          script = script.replace('\nnpm ci\n', '\n' + fixup + '\nnpm ci\n', 1)
           script = script.replace(
               'rm -f .github/workflows/apply-canvas-sidebar-refactor.yml',
               'rm -f .github/workflows/apply-canvas-sidebar-refactor.yml\n'
