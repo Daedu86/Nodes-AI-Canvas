@@ -1,0 +1,10 @@
+/tmp/apply_canvas_refactor.py: OK
+Traceback (most recent call last):
+  File "/tmp/apply_canvas_refactor.py", line 5, in <module>
+    ROOT = Path(__file__).resolve().parents[2]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/usr/lib/python3.12/pathlib.py", line 281, in __getitem__
+    raise IndexError(idx)
+IndexError: 2
+Validation failed with exit code 1
+HEAD is now at 88c2e84 chore: validate canvas refactor [canvas-refactor-staging] [skip vercel]
