@@ -72,6 +72,7 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           hook_path = Path(
               "components/assistant-ui/thread-graph-flow/use-canvas-branch-controller.ts"
@@ -119,42 +120,18 @@ jobs:
               1,
           )
 
-          text = text.replace(
-              '''  const pendingDraftSubmissionRef = React.useRef(false);
-          ''',
-              "",
-              1,
-          )
-          text = text.replace(
-              '''  const pendingOutputRunRef = React.useRef<{
-            beforeNodeIds: Set<string>;
-            sourcePromptId: string;
-            artifactIds: string[];
-          } | null>(null);
-          ''',
-              "",
-              1,
-          )
-          text = text.replace(
-              '''  const canvasConversationNodesRef = React.useRef<ThreadGraphNodeModel[]>([]);
-            const requestErrorRef = React.useRef<string | null>(requestError);
-
-            React.useEffect(() => {
-              requestErrorRef.current = requestError;
-            }, [requestError]);
-
-          ''',
-              "",
-              1,
-          )
-          text = text.replace(
-              '''  React.useEffect(() => {
-            canvasConversationNodesRef.current = canvasConversationNodes;
-          }, [canvasConversationNodes]);
-          ''',
-              "",
-              1,
-          )
+          cleanup_patterns = [
+              r'\n\s*const pendingDraftSubmissionRef = React\.useRef\(false\);\n',
+              r'\n\s*const pendingOutputRunRef = React\.useRef<\{.*?\}\s*\|\s*null>\(null\);\n',
+              r'\n\s*const canvasConversationNodesRef = React\.useRef<ThreadGraphNodeModel\[\]>\(\[\]\);\n',
+              r'\n\s*const requestErrorRef = React\.useRef<string \| null>\(requestError\);\n',
+              r'\n\s*React\.useEffect\(\(\) => \{\s*requestErrorRef\.current = requestError;\s*\}, \[requestError\]\);\n',
+              r'\n\s*React\.useEffect\(\(\) => \{\s*canvasConversationNodesRef\.current = canvasConversationNodes;\s*\}, \[canvasConversationNodes\]\);\n',
+          ]
+          for pattern in cleanup_patterns:
+              text, count = re.subn(pattern, "\n", text, count=1, flags=re.S)
+              if count != 1:
+                  raise RuntimeError(f"Expected one cleanup match for {pattern!r}, got {count}")
 
           start = text.index("  const handleCancelRun = React.useCallback(() => {")
           end = text.index("  const applyCanvasSelection = React.useCallback(", start)
@@ -184,6 +161,16 @@ jobs:
 
           '''
           text = text[:start] + controller + text[end:]
+
+          stale_names = (
+              "pendingDraftSubmissionRef",
+              "pendingOutputRunRef",
+              "canvasConversationNodesRef",
+              "requestErrorRef",
+          )
+          remaining = [name for name in stale_names if name in text]
+          if remaining:
+              raise RuntimeError(f"Stale branch-controller names remain: {remaining}")
 
           path.write_text(text, encoding="utf-8")
           print(f"thread-graph-flow.tsx: {len(text.splitlines())} lines")
