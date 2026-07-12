@@ -1,0 +1,37 @@
+name: Phase 10 Vercel diagnostic
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Publish Vercel failure descriptions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          publish_detail() {
+            local source_sha="$1"
+            local label="$2"
+            local json description state target encoded
+            json=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${source_sha}/status")
+            description=$(printf '%s' "$json" | jq -r '.statuses[] | select(.context == "Vercel") | .description // "no description"' | head -1)
+            state=$(printf '%s' "$json" | jq -r '.statuses[] | select(.context == "Vercel") | .state // "unknown"' | head -1)
+            target=$(printf '%s' "$json" | jq -r '.statuses[] | select(.context == "Vercel") | .target_url // "no target"' | head -1)
+            encoded=$(printf '%s' "${state}: ${description} | ${target}" | cut -c1-120 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${CURRENT_SHA}" \
+              -f state=failure \
+              -f context="diag10/vercel-${label}/${encoded}" \
+              -f description="Vercel ${label}: ${state}"
+          }
+          publish_detail b00eb587fbc4a4c6695cd6802da3df1540a289b2 first
+          publish_detail c267c24a9a9bd390568bdf59060e69019f0b2fb4 retry
