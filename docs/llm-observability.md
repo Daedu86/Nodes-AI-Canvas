@@ -70,7 +70,7 @@ Accepted and rejected events contain:
 - Quota reservation duration.
 - Retry delay for rejected requests.
 
-No account identifier is attached to these values.
+No account identifier is attached to these values. The metrics property on an accepted quota grant is optional at the public type boundary so existing direct consumers and test doubles remain source-compatible; the real governor always supplies it.
 
 ## Cancellation and lease release
 
@@ -100,4 +100,4 @@ Exception messages are excluded because provider errors can echo request content
 
 ## Release validation
 
-The production build validates the lifecycle event schema, aggregate usage normalization, first-chunk and first-token timing tracker, quota metrics, abort propagation, idempotent lease release, and privacy-focused regression tests. Implementation and corrective commits use `[skip vercel]`; this release commit is the successful production candidate for the phase.
+The production build validates the lifecycle event schema, aggregate usage normalization, first-chunk and first-token timing tracker, quota metrics, abort propagation, idempotent lease release, compatibility of the existing quota-grant contract, and privacy-focused regression tests. Implementation and corrective commits use `[skip vercel]`; this release commit is the production candidate for the phase.
