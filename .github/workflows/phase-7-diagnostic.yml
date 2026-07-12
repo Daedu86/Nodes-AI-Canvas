@@ -1,0 +1,111 @@
+name: Phase 7 diagnostic
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --fund=false
+      - name: Diagnose
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          publish() {
+            local state="$1" context="$2" description="$3"
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" \
+              -f state="$state" -f context="$context" -f description="$description"
+          }
+
+          set +e
+          npx eslint . --format json > lint.json 2> lint.stderr
+          lint_code=$?
+          if [ "$lint_code" -eq 0 ]; then
+            publish success 'diag7/lint/ok' 'Lint passed'
+          else
+            node <<'NODE' > lint-summary.txt
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const results = JSON.parse(fs.readFileSync('lint.json', 'utf8'));
+          for (const result of results) {
+            for (const m of result.messages.filter((x) => x.severity === 2)) {
+              console.log(`${path.relative(process.cwd(), result.filePath)}:${m.line ?? 0}:${m.column ?? 0}:${m.ruleId ?? 'unknown'}:${m.message}`);
+            }
+          }
+          NODE
+            index=1
+            while IFS= read -r line && [ "$index" -le 8 ]; do
+              encoded=$(printf '%s' "$line" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              publish failure "diag7/lint${index}/${encoded}" "Lint failed (${lint_code})"
+              index=$((index + 1))
+            done < lint-summary.txt
+          fi
+
+          npm run typecheck > typecheck.log 2>&1
+          type_code=$?
+          if [ "$type_code" -eq 0 ]; then
+            publish success 'diag7/typecheck/ok' 'Typecheck passed'
+          else
+            grep -E 'error TS[0-9]+:' typecheck.log | head -8 > type-summary.txt
+            index=1
+            while IFS= read -r line && [ "$index" -le 8 ]; do
+              encoded=$(printf '%s' "$line" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              publish failure "diag7/type${index}/${encoded}" "Typecheck failed (${type_code})"
+              index=$((index + 1))
+            done < type-summary.txt
+          fi
+
+          npm run test:unit > unit.log 2>&1
+          unit_code=$?
+          if [ "$unit_code" -eq 0 ]; then
+            publish success 'diag7/unit/ok' 'Unit tests passed'
+          else
+            summary=$(tail -20 unit.log | tr '\n\r' '  ' | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+            publish failure "diag7/unit/${summary}" "Unit tests failed (${unit_code})"
+          fi
+
+          npm run build > build.log 2>&1
+          build_code=$?
+          if [ "$build_code" -eq 0 ]; then
+            publish success 'diag7/build/ok' 'Build passed'
+          else
+            summary=$(grep -E 'Type error:|Failed to compile|Error:' build.log | head -2 | tr '\n\r' '  ' | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+            publish failure "diag7/build/${summary}" "Build failed (${build_code})"
+          fi
+
+          npm audit --omit=dev --json > audit-prod.json 2>/dev/null
+          node <<'NODE' > audit-prod.txt
+          const a = require('./audit-prod.json');
+          const v = a.metadata?.vulnerabilities ?? {};
+          console.log(`critical=${v.critical ?? 0},high=${v.high ?? 0},moderate=${v.moderate ?? 0},low=${v.low ?? 0}`);
+          NODE
+          prod=$(cat audit-prod.txt)
+          if grep -Eq 'critical=[1-9]|high=[1-9]' audit-prod.txt; then publish failure "diag7/audit-prod/${prod}" 'Production audit has high/critical issues'; else publish success "diag7/audit-prod/${prod}" 'Production audit acceptable'; fi
+
+          npm audit --json > audit-all.json 2>/dev/null
+          node <<'NODE' > audit-all.txt
+          const a = require('./audit-all.json');
+          const v = a.metadata?.vulnerabilities ?? {};
+          console.log(`critical=${v.critical ?? 0},high=${v.high ?? 0},moderate=${v.moderate ?? 0},low=${v.low ?? 0}`);
+          NODE
+          all=$(cat audit-all.txt)
+          publish success "diag7/audit-all/${all}" 'Full audit inventory'
+
+          exit 0
