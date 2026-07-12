@@ -12,6 +12,7 @@ import {
   listSessions,
   patchSession,
 } from "../lib/session-store";
+import { isSessionVersionConflictError } from "../lib/session-version-conflict";
 
 describe("session-store", () => {
   let tempDir = "";
@@ -100,17 +101,24 @@ describe("session-store", () => {
 
     expect(created.title).toBe("Test Session");
     expect(created.messageCount).toBe(2);
+    expect(created.version).toBe(1);
 
     const listed = await listSessions();
     expect(listed).toHaveLength(1);
     expect(listed[0]?.id).toBe(created.id);
+    expect(listed[0]?.version).toBe(1);
 
-    const patched = await patchSession(created.id, {
-      title: "Renamed Session",
-      archived: true,
-    });
+    const patched = await patchSession(
+      created.id,
+      {
+        title: "Renamed Session",
+        archived: true,
+      },
+      { expectedVersion: created.version },
+    );
     expect(patched.title).toBe("Renamed Session");
     expect(patched.archived).toBe(true);
+    expect(patched.version).toBe(2);
 
     const hidden = await listSessions();
     expect(hidden).toHaveLength(0);
@@ -118,6 +126,7 @@ describe("session-store", () => {
     const archived = await listSessions({ includeArchived: true });
     expect(archived).toHaveLength(1);
     expect(archived[0]?.archived).toBe(true);
+    expect(archived[0]?.version).toBe(2);
 
     const loaded = await getSession(created.id);
     expect(loaded.title).toBe("Renamed Session");
@@ -134,6 +143,50 @@ describe("session-store", () => {
       position: { x: 180, y: 60 },
     });
     expect(loaded.contextLinks).toHaveLength(1);
+    expect(loaded.version).toBe(2);
+  });
+
+  it("rejects a stale session patch and returns the current document", async () => {
+    const created = await createSession({ title: "Versioned" });
+    const updated = await patchSession(
+      created.id,
+      { title: "First update" },
+      { expectedVersion: created.version },
+    );
+
+    let conflict: unknown = null;
+    try {
+      await patchSession(
+        created.id,
+        { title: "Stale update" },
+        { expectedVersion: created.version },
+      );
+    } catch (error) {
+      conflict = error;
+    }
+
+    expect(isSessionVersionConflictError(conflict)).toBe(true);
+    if (!isSessionVersionConflictError(conflict)) {
+      throw new Error("Expected a session version conflict");
+    }
+    expect(conflict.expectedVersion).toBe(1);
+    expect(conflict.currentSession).toMatchObject({
+      id: created.id,
+      title: "First update",
+      version: updated.version,
+    });
+  });
+
+  it("serializes simultaneous file-backed patches", async () => {
+    const created = await createSession({ title: "Concurrent" });
+    const results = await Promise.allSettled([
+      patchSession(created.id, { title: "A" }, { expectedVersion: created.version }),
+      patchSession(created.id, { title: "B" }, { expectedVersion: created.version }),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    expect((await getSession(created.id)).version).toBe(2);
   });
 
   it("deletes a durable session", async () => {
@@ -195,30 +248,36 @@ describe("session-store", () => {
     });
 
     const blobRef = `${created.id}/notes.txt`;
-    await patchSession(created.id, {
-      artifacts: [
-        {
-          id: "artifact-blob",
-          artifactType: "file",
-          blobRef,
-          title: "Notes",
-          content: "Persisted notes",
-          fileName: "notes.txt",
-          mimeType: "text/plain",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ],
-    });
+    const withBlob = await patchSession(
+      created.id,
+      {
+        artifacts: [
+          {
+            id: "artifact-blob",
+            artifactType: "file",
+            blobRef,
+            title: "Notes",
+            content: "Persisted notes",
+            fileName: "notes.txt",
+            mimeType: "text/plain",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      },
+      { expectedVersion: created.version },
+    );
 
     const absoluteBlobPath = path.join(tempBlobDir, blobRef);
     await mkdir(path.dirname(absoluteBlobPath), { recursive: true });
     await writeFile(absoluteBlobPath, "blob");
     await access(absoluteBlobPath);
 
-    await patchSession(created.id, {
-      artifacts: [],
-    });
+    await patchSession(
+      created.id,
+      { artifacts: [] },
+      { expectedVersion: withBlob.version },
+    );
 
     await expect(access(absoluteBlobPath)).rejects.toThrow();
   });
@@ -242,32 +301,36 @@ describe("session-store", () => {
     });
 
     const referencedBlobRef = `${created.id}/deduped-hash`;
-    await patchSession(created.id, {
-      artifacts: [
-        {
-          id: "artifact-blob",
-          artifactType: "file",
-          blobRef: referencedBlobRef,
-          title: "Notes",
-          content: "Persisted notes",
-          fileName: "notes.txt",
-          mimeType: "text/plain",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: "artifact-blob-2",
-          artifactType: "image",
-          blobRef: referencedBlobRef,
-          title: "Duplicate ref",
-          content: "Same original reused",
-          fileName: "notes.png",
-          mimeType: "image/png",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ],
-    });
+    await patchSession(
+      created.id,
+      {
+        artifacts: [
+          {
+            id: "artifact-blob",
+            artifactType: "file",
+            blobRef: referencedBlobRef,
+            title: "Notes",
+            content: "Persisted notes",
+            fileName: "notes.txt",
+            mimeType: "text/plain",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            id: "artifact-blob-2",
+            artifactType: "image",
+            blobRef: referencedBlobRef,
+            title: "Duplicate ref",
+            content: "Same original reused",
+            fileName: "notes.png",
+            mimeType: "image/png",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      },
+      { expectedVersion: created.version },
+    );
 
     const referencedBlobPath = path.join(tempBlobDir, referencedBlobRef);
     const orphanBlobPath = path.join(tempBlobDir, created.id, "orphan-hash");
