@@ -28,9 +28,23 @@ export async function createSession(input: SessionCreateInput = {}) {
 export async function patchSession(
   sessionId: string,
   patch: SessionPatch,
-  options: SessionPatchOptions,
+  optionsOrOwnerId?: SessionPatchOptions | string,
 ) {
-  return getSessionRepository().patchSession(sessionId, patch, options);
+  const repository = getSessionRepository();
+  if (
+    typeof optionsOrOwnerId === "object" &&
+    optionsOrOwnerId !== null &&
+    "expectedVersion" in optionsOrOwnerId
+  ) {
+    return repository.patchSession(sessionId, patch, optionsOrOwnerId);
+  }
+
+  const ownerId = typeof optionsOrOwnerId === "string" ? optionsOrOwnerId : undefined;
+  const current = await repository.getSession(sessionId, ownerId);
+  return repository.patchSession(sessionId, patch, {
+    expectedVersion: current.version,
+    ownerId,
+  });
 }
 
 export async function deleteSession(sessionId: string, ownerId?: string) {
