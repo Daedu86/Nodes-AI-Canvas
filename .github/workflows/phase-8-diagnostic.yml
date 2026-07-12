@@ -1,0 +1,98 @@
+name: Phase 8 diagnostic
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: phase-8-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+  VERCEL_ENV: preview
+  NODES_PERSISTENCE_BACKEND: file
+  AUTH_ENABLE_DEV_CREDENTIALS: "0"
+  OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
+  OPENROUTER_REQUIRE_USER_KEY: "1"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Mark diagnostic started
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=pending -f context='diag8/started' -f description='Phase 8 validation started'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --fund=false
+
+      - name: Lint
+        id: lint
+        continue-on-error: true
+        run: npm run format:check
+
+      - name: Typecheck
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Session schema evolution tests
+        id: targeted
+        continue-on-error: true
+        run: npx vitest run tests/session-schema-evolution.test.ts
+
+      - name: Complete unit suite
+        id: unit
+        continue-on-error: true
+        run: npm run test:unit
+
+      - name: Production build
+        id: build
+        continue-on-error: true
+        run: npm run build
+
+      - name: Publish results
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          LINT: ${{ steps.lint.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          TARGETED: ${{ steps.targeted.outcome }}
+          UNIT: ${{ steps.unit.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+        shell: bash
+        run: |
+          publish() {
+            if [ "$2" = "success" ]; then state=success; else state=failure; fi
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" \
+              -f state="$state" -f context="diag8/$1" -f description="$1: $2"
+          }
+          publish lint "$LINT"
+          publish typecheck "$TYPECHECK"
+          publish targeted "$TARGETED"
+          publish unit "$UNIT"
+          publish build "$BUILD"
+
+          if [ "$LINT" != "success" ] || [ "$TYPECHECK" != "success" ] || [ "$TARGETED" != "success" ] || [ "$UNIT" != "success" ] || [ "$BUILD" != "success" ]; then
+            exit 1
+          fi
