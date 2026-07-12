@@ -96,8 +96,8 @@ Diagnostic error logs contain only:
 - Normalized application error code and HTTP status.
 - Exception class name, when available.
 
-Exception messages are excluded because provider errors can echo request content or credentials.
+Exception messages are excluded because provider errors can echo request content or credentials. String sanitization avoids control-character regular expressions so the module remains compatible with the repository lint policy.
 
 ## Release validation
 
-The production build validates the lifecycle event schema, aggregate usage normalization, first-chunk and first-token timing tracker, quota metrics, abort propagation, idempotent lease release, and privacy-focused regression tests. Implementation commits use `[skip vercel]`; this release commit is the single production deployment for the phase.
+The production build validates the lifecycle event schema, aggregate usage normalization, first-chunk and first-token timing tracker, quota metrics, abort propagation, idempotent lease release, and privacy-focused regression tests. Implementation and corrective commits use `[skip vercel]`; this release commit is the successful production candidate for the phase.
