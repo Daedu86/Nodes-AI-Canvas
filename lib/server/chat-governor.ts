@@ -1,14 +1,13 @@
+import { randomUUID } from "node:crypto";
 import { reservePersistentChatUsage, __resetChatUsageStoreForTests } from "@/lib/chat-usage-store";
 import { createEmptyChatUsageSnapshot, type ChatUsageSnapshot } from "@/lib/chat-usage";
+import { __resetFileChatConcurrencyForTests } from "@/lib/persistence/file/file-chat-concurrency-repository";
+import { getChatConcurrencyRepository } from "@/lib/persistence/repositories";
 import { getChatQuotaLimits, type ChatQuotaLimits, type UserPlan } from "@/lib/user-plan";
-
-type ChatConcurrencyState = {
-  active: number;
-};
 
 type ChatQuotaGrant = {
   headers: Headers;
-  release: () => void;
+  release: () => Promise<void>;
 };
 
 type ChatQuotaRejection = {
@@ -23,14 +22,21 @@ type ChatQuotaResult =
   | { ok: true; grant: ChatQuotaGrant }
   | { ok: false; rejection: ChatQuotaRejection };
 
-const getChatGovernorStore = () => {
-  const globalState = globalThis as typeof globalThis & {
-    __nodesChatGovernorStore?: Map<string, ChatConcurrencyState>;
-  };
-  if (!globalState.__nodesChatGovernorStore) {
-    globalState.__nodesChatGovernorStore = new Map();
-  }
-  return globalState.__nodesChatGovernorStore;
+const DEFAULT_CHAT_LEASE_TTL_SECONDS = 120;
+const MIN_CHAT_LEASE_TTL_SECONDS = 30;
+const MAX_CHAT_LEASE_TTL_SECONDS = 600;
+
+const getChatLeaseTtlMs = () => {
+  const configured = Number(process.env.NODES_CHAT_LEASE_TTL_SECONDS);
+  const seconds = Number.isFinite(configured)
+    ? Math.floor(configured)
+    : DEFAULT_CHAT_LEASE_TTL_SECONDS;
+  return (
+    Math.min(
+      MAX_CHAT_LEASE_TTL_SECONDS,
+      Math.max(MIN_CHAT_LEASE_TTL_SECONDS, seconds),
+    ) * 1_000
+  );
 };
 
 const buildHeaders = ({
@@ -64,49 +70,72 @@ const buildHeaders = ({
   return headers;
 };
 
+const releaseLeaseSafely = async (ownerId: string, leaseId: string) => {
+  try {
+    await getChatConcurrencyRepository().releaseLease(ownerId, leaseId);
+  } catch (error) {
+    console.error("Failed to release chat concurrency lease", {
+      error,
+      leaseId,
+      ownerId,
+    });
+  }
+};
+
 export async function reserveChatQuota(
   userId: string,
   userPlan: UserPlan,
   now = Date.now(),
 ): Promise<ChatQuotaResult> {
   const limits = getChatQuotaLimits(userPlan);
-  const store = getChatGovernorStore();
-  const state = store.get(userId) ?? {
-    active: 0,
-  };
+  const leaseId = randomUUID();
+  const concurrency = await getChatConcurrencyRepository().reserveLease({
+    concurrentLimit: limits.concurrent,
+    expiresAt: now + getChatLeaseTtlMs(),
+    leaseId,
+    now,
+    ownerId: userId,
+  });
 
-  if (state.active >= limits.concurrent) {
+  if (!concurrency.granted) {
     const headers = buildHeaders({
-      active: state.active,
+      active: concurrency.activeCount,
       limits,
       snapshot: createEmptyChatUsageSnapshot(now),
     });
-    headers.set("Retry-After", "5");
+    headers.set("Retry-After", String(concurrency.retryAfterSeconds));
     return {
       ok: false,
       rejection: {
         code: "chat_concurrency_limited",
         headers,
         message: "The assistant is still responding. Wait for it to finish or cancel the current run.",
-        retryAfterSeconds: 5,
+        retryAfterSeconds: concurrency.retryAfterSeconds,
         status: 429,
       },
     };
   }
 
-  const usage = await reservePersistentChatUsage(
-    userId,
-    {
-      perDay: limits.perDay,
-      perHour: limits.perHour,
-      perMinute: limits.perMinute,
-    },
-    now,
-  );
+  let usage;
+  try {
+    usage = await reservePersistentChatUsage(
+      userId,
+      {
+        perDay: limits.perDay,
+        perHour: limits.perHour,
+        perMinute: limits.perMinute,
+      },
+      now,
+    );
+  } catch (error) {
+    await releaseLeaseSafely(userId, leaseId);
+    throw error;
+  }
 
   if (!usage.allowed) {
+    await releaseLeaseSafely(userId, leaseId);
     const headers = buildHeaders({
-      active: state.active,
+      active: Math.max(0, concurrency.activeCount - 1),
       limits,
       snapshot: usage.snapshot,
     });
@@ -123,35 +152,24 @@ export async function reserveChatQuota(
     };
   }
 
-  state.active += 1;
-  store.set(userId, state);
-
-  let released = false;
+  let releasePromise: Promise<void> | null = null;
   return {
     ok: true,
     grant: {
       headers: buildHeaders({
-        active: state.active,
+        active: concurrency.activeCount,
         limits,
         snapshot: usage.snapshot,
       }),
       release: () => {
-        if (released) return;
-        released = true;
-        const current = store.get(userId);
-        if (!current) return;
-        current.active = Math.max(0, current.active - 1);
-        if (current.active === 0) {
-          store.delete(userId);
-          return;
-        }
-        store.set(userId, current);
+        releasePromise ??= releaseLeaseSafely(userId, leaseId);
+        return releasePromise;
       },
     },
   };
 }
 
 export async function __resetChatGovernorForTests() {
-  getChatGovernorStore().clear();
+  __resetFileChatConcurrencyForTests();
   await __resetChatUsageStoreForTests();
 }
