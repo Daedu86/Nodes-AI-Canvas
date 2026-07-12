@@ -8,6 +8,6 @@ export const maxDuration = 60;
 
 export async function POST(req: Request): Promise<Response> {
   const guarded = await requireLocalApiUser(req);
-  if (guarded.response instanceof Response) return guarded.response;
+  if ("response" in guarded) return guarded.response;
   return handleChatPost(req, guarded.user);
 }
