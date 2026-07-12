@@ -5,9 +5,25 @@ import {
   validateArtifactUpload,
 } from "@/lib/artifact-upload-policy";
 import { formatBytes } from "@/lib/context-budget";
+import {
+  getSingleArtifactUploadFile,
+  validateArtifactUploadRequestHeaders,
+} from "@/lib/server/artifact-upload-request";
+import { reserveArtifactUploadQuota } from "@/lib/server/artifact-upload-governor";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 export const runtime = "nodejs";
+
+const textResponse = (
+  message: string,
+  status: number,
+  headers?: HeadersInit,
+) => {
+  const responseHeaders = new Headers(headers);
+  responseHeaders.set("Cache-Control", "no-store");
+  responseHeaders.set("Content-Type", "text/plain; charset=utf-8");
+  return new Response(message, { status, headers: responseHeaders });
+};
 
 type RouteParams = {
   params: Promise<{
@@ -19,26 +35,61 @@ export async function POST(req: Request, context: RouteParams) {
   const guarded = await requireLocalApiUser(req);
   if ("response" in guarded) return guarded.response;
 
+  const requestValidation = validateArtifactUploadRequestHeaders(req.headers);
+  if (!requestValidation.ok) {
+    return textResponse(requestValidation.message, requestValidation.status);
+  }
+
   const { sessionId } = await context.params;
+  let quotaHeaders = new Headers({ "Cache-Control": "no-store" });
 
   try {
     try {
       await getSession(sessionId, guarded.user.id);
     } catch {
-      return new Response("Session not found", { status: 404 });
+      return textResponse("Session not found", 404);
     }
 
-    const formData = await req.formData();
-    const file = formData.get("file");
-    if (!(file instanceof File)) {
-      return new Response("Missing file", { status: 400 });
+    const quota = await reserveArtifactUploadQuota(
+      guarded.user.id,
+      requestValidation.contentLength,
+    );
+    if (!quota.ok) {
+      return Response.json(
+        {
+          code: quota.rejection.code,
+          error: quota.rejection.message,
+        },
+        {
+          status: quota.rejection.status,
+          headers: quota.rejection.headers,
+        },
+      );
+    }
+    quotaHeaders = quota.headers;
+
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch {
+      return textResponse("Malformed multipart upload body.", 400, quotaHeaders);
+    }
+
+    const file = getSingleArtifactUploadFile(formData);
+    if (!file) {
+      return textResponse(
+        "Artifact uploads must contain exactly one file field.",
+        400,
+        quotaHeaders,
+      );
     }
 
     const hardLimit = getSessionArtifactMaxBlobBytes();
     if (file.size > hardLimit) {
-      return new Response(
+      return textResponse(
         `Artifact too large. Selected file is ${formatBytes(file.size)} and the maximum is ${formatBytes(hardLimit)}.`,
-        { status: 413 },
+        413,
+        quotaHeaders,
       );
     }
 
@@ -49,32 +100,35 @@ export async function POST(req: Request, context: RouteParams) {
       fileName: file.name,
     });
     if (!validation.ok) {
-      return new Response(validation.message, { status: validation.status });
+      return textResponse(validation.message, validation.status, quotaHeaders);
     }
 
     const saved = await saveSessionArtifactBlob({
       sessionId,
       ownerId: guarded.user.id,
-      fileName: file.name,
+      fileName: validation.fileName,
       bytes,
       mimeType: validation.mimeType,
     });
 
-    return Response.json({
-      blobRef: saved.blobRef,
-      byteSize: file.size,
-      deduplicated: saved.deduplicated,
-      fileName: file.name,
-      mimeType: validation.mimeType,
-      storageQuotaBytes: saved.storageQuotaBytes,
-      storageUsedBytes: saved.storageUsedBytes,
-    });
+    return Response.json(
+      {
+        blobRef: saved.blobRef,
+        byteSize: bytes.byteLength,
+        deduplicated: saved.deduplicated,
+        fileName: validation.fileName,
+        mimeType: validation.mimeType,
+        storageQuotaBytes: saved.storageQuotaBytes,
+        storageUsedBytes: saved.storageUsedBytes,
+      },
+      { headers: quotaHeaders },
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Artifact upload failed";
     if (message.toLowerCase().includes("storage quota exceeded")) {
-      return new Response("Artifact storage quota exceeded.", { status: 413 });
+      return textResponse("Artifact storage quota exceeded.", 413, quotaHeaders);
     }
     console.error("Artifact upload failed", error);
-    return new Response("Artifact upload failed", { status: 500 });
+    return textResponse("Artifact upload failed", 500, quotaHeaders);
   }
 }
