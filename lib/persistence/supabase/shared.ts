@@ -19,6 +19,7 @@ import type {
   SessionBlobMaintenance,
 } from "@/lib/session-blob-store";
 import type { ProjectRecord } from "@/lib/persistence/project-repository";
+import { isValidSessionVersion } from "@/lib/session-version-conflict";
 
 export const emptyBlobMaintenance = (): SessionBlobMaintenance => ({
   deduplicatedBlobLinks: 0,
@@ -55,6 +56,11 @@ export const ensureData = <T>(data: T | null, error: { message?: string } | null
   return data;
 };
 
+const normalizeSessionVersion = (value: unknown) => {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return isValidSessionVersion(parsed) ? parsed : 1;
+};
+
 type SessionRow = {
   archived: boolean;
   artifacts_json: unknown;
@@ -64,6 +70,7 @@ type SessionRow = {
   snapshot_json: unknown;
   title: string | null;
   updated_at: string;
+  version: number | string;
 };
 
 export const toSessionDocumentFromRow = (row: SessionRow): SessionDocument => {
@@ -74,6 +81,7 @@ export const toSessionDocumentFromRow = (row: SessionRow): SessionDocument => {
     archived: row.archived,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    version: normalizeSessionVersion(row.version),
     snapshot,
     artifacts: normalizeSessionArtifactsDocument(row.artifacts_json),
     contextLinks: normalizeSessionContextLinksDocument(row.context_links_json),
@@ -89,6 +97,7 @@ export const toSessionSummaryFromRow = (row: SessionRow): SessionSummary => {
     archived: row.archived,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    version: normalizeSessionVersion(row.version),
     messageCount: getSessionMessageCount(snapshot),
   };
 };
