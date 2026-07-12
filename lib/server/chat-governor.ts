@@ -18,7 +18,7 @@ import {
 
 export type ChatQuotaGrant = {
   headers: Headers;
-  metrics: LlmQuotaMetrics;
+  metrics?: LlmQuotaMetrics;
   release: () => Promise<void>;
 };
 
