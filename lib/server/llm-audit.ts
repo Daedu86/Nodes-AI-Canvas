@@ -1,138 +1,359 @@
 import type { Provider, ResolvedModelConfig } from "@/lib/llm/config";
-import type { AuthenticatedUser } from "@/lib/server/auth-user";
+import type { LlmStreamTimingSnapshot } from "@/lib/server/chat/stream-metrics";
+import type { UserPlan } from "@/lib/user-plan";
 
-type LlmAuditStatus = "accepted" | "completed" | "failed" | "rejected";
+type LlmAuditStatus =
+  | "accepted"
+  | "attempting"
+  | "cancelled"
+  | "completed"
+  | "failed"
+  | "fallback"
+  | "rejected"
+  | "streaming";
 
-type LlmAuditEvent = {
-  contextArtifactCount?: number;
-  durationMs?: number;
-  errorCode?: string | null;
-  fallbackApplied?: boolean;
-  historyMode?: string | null;
-  modelId: string;
-  provider: Provider;
-  requestId: string;
-  resolvedModelId?: string;
-  resolvedProvider?: Provider;
-  route: string;
-  status: LlmAuditStatus;
-  totalTokens?: number | null;
-  userId: string;
+type LlmAuditEventName =
+  | "request_accepted"
+  | "request_cancelled"
+  | "request_completed"
+  | "request_failed"
+  | "request_rejected"
+  | "attempt_started"
+  | "fallback_applied"
+  | "first_token";
+
+export type LlmQuotaMetrics = {
+  active: number;
+  concurrentLimit: number;
+  plan: UserPlan;
+  remainingDay: number;
+  remainingHour: number;
+  remainingMinute: number;
+  reservationMs: number;
+  retryAfterSeconds: number | null;
 };
 
-type LlmAuditContext = {
+export type LlmUsageMetrics = {
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  reasoningTokens: number | null;
+  textTokens: number | null;
+  totalTokens: number | null;
+};
+
+export type LlmAuditContext = {
+  actorType: "agent" | "user";
   contextArtifactCount: number;
   historyMode: string | null;
+  messageCount: number;
   requested: ResolvedModelConfig;
   requestId: string;
   route: string;
+  sentMessageCount: number;
   startedAt: number;
-  user: AuthenticatedUser;
+  toolCount: number;
+};
+
+type LlmAuditMetrics = Partial<LlmStreamTimingSnapshot> & {
+  attemptCount?: number;
+  attemptDurationMs?: number;
+};
+
+type LlmAuditEvent = {
+  actorType: LlmAuditContext["actorType"];
+  contextArtifactCount: number;
+  errorCode?: string;
+  event: LlmAuditEventName;
+  fallbackApplied?: boolean;
+  fallbackFrom?: ResolvedModelConfig;
+  fallbackTo?: ResolvedModelConfig;
+  finishReason?: string | null;
+  historyMode: string | null;
+  messageCount: number;
+  metrics?: LlmAuditMetrics;
+  quota?: LlmQuotaMetrics;
+  requestId: string;
+  requested: ResolvedModelConfig;
+  resolved?: ResolvedModelConfig;
+  route: string;
+  schemaVersion: 1;
+  sentMessageCount: number;
+  source: "nodes-llm-observability";
+  status: LlmAuditStatus;
+  timestamp: string;
+  toolCount: number;
+  usage?: LlmUsageMetrics;
+  cancellationSource?: "client" | "runtime";
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+
+const getFiniteNumber = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const sanitizeString = (value: string, maxLength = 256) =>
+  value.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, maxLength);
+
+const sanitizeModel = (model: ResolvedModelConfig): ResolvedModelConfig => ({
+  modelId: sanitizeString(model.modelId),
+  provider: model.provider,
+});
+
+const sanitizeMetrics = (metrics: LlmAuditMetrics | undefined) => {
+  if (!metrics) return undefined;
+  return Object.fromEntries(
+    Object.entries(metrics).map(([key, value]) => [
+      key,
+      typeof value === "number" && Number.isFinite(value)
+        ? Math.max(0, Math.round(value))
+        : value ?? null,
+    ]),
+  ) as LlmAuditMetrics;
+};
+
+const createBaseEvent = (
+  context: LlmAuditContext,
+  event: LlmAuditEventName,
+  status: LlmAuditStatus,
+): LlmAuditEvent => ({
+  actorType: context.actorType,
+  contextArtifactCount: context.contextArtifactCount,
+  event,
+  historyMode: context.historyMode,
+  messageCount: context.messageCount,
+  requestId: context.requestId,
+  requested: sanitizeModel(context.requested),
+  route: sanitizeString(context.route, 128),
+  schemaVersion: 1,
+  sentMessageCount: context.sentMessageCount,
+  source: "nodes-llm-observability",
+  status,
+  timestamp: new Date().toISOString(),
+  toolCount: context.toolCount,
+});
+
+const emitAudit = (event: LlmAuditEvent) => {
+  if (process.env.NODES_LLM_OBSERVABILITY === "0") return;
+  console.info(JSON.stringify(event));
 };
 
 export function createLlmAuditContext(options: {
+  actorType?: LlmAuditContext["actorType"];
   contextArtifactCount?: number;
   historyMode?: string | null;
+  messageCount?: number;
   requested: ResolvedModelConfig;
   route: string;
-  user: AuthenticatedUser;
+  sentMessageCount?: number;
+  toolCount?: number;
 }) {
   const requestId =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   return {
+    actorType: options.actorType ?? "user",
     contextArtifactCount: options.contextArtifactCount ?? 0,
     historyMode: options.historyMode ?? null,
+    messageCount: options.messageCount ?? 0,
     requested: options.requested,
     requestId,
     route: options.route,
+    sentMessageCount: options.sentMessageCount ?? 0,
     startedAt: Date.now(),
-    user: options.user,
+    toolCount: options.toolCount ?? 0,
   } satisfies LlmAuditContext;
 }
 
-function emitAudit(event: LlmAuditEvent) {
-  console.info("[nodes-llm-audit]", JSON.stringify(event));
+export function getLlmUsageMetrics(event: unknown): LlmUsageMetrics {
+  const usage = asRecord(asRecord(event)?.usage);
+  const inputDetails = asRecord(usage?.inputTokenDetails);
+  const outputDetails = asRecord(usage?.outputTokenDetails);
+  return {
+    cacheReadTokens: getFiniteNumber(inputDetails?.cacheReadTokens),
+    cacheWriteTokens: getFiniteNumber(inputDetails?.cacheWriteTokens),
+    inputTokens: getFiniteNumber(usage?.inputTokens),
+    outputTokens: getFiniteNumber(usage?.outputTokens),
+    reasoningTokens: getFiniteNumber(outputDetails?.reasoningTokens),
+    textTokens: getFiniteNumber(outputDetails?.textTokens),
+    totalTokens: getFiniteNumber(usage?.totalTokens),
+  };
 }
 
-export function logLlmAuditAccepted(context: LlmAuditContext) {
+export function getLlmFinishReason(event: unknown) {
+  const value = asRecord(event)?.finishReason;
+  return typeof value === "string" ? sanitizeString(value, 64) : null;
+}
+
+export function getSafeErrorName(error: unknown) {
+  const record = asRecord(error);
+  const value = error instanceof Error ? error.name : record?.name;
+  return typeof value === "string" && value.trim()
+    ? sanitizeString(value.trim(), 96)
+    : null;
+}
+
+export function logLlmAuditAccepted(
+  context: LlmAuditContext,
+  options?: { quota?: LlmQuotaMetrics },
+) {
   emitAudit({
-    contextArtifactCount: context.contextArtifactCount,
-    historyMode: context.historyMode,
-    modelId: context.requested.modelId,
-    provider: context.requested.provider,
-    requestId: context.requestId,
-    route: context.route,
-    status: "accepted",
-    userId: context.user.id,
+    ...createBaseEvent(context, "request_accepted", "accepted"),
+    metrics: sanitizeMetrics({ durationMs: Date.now() - context.startedAt }),
+    quota: options?.quota,
   });
 }
 
 export function logLlmAuditRejected(
   context: LlmAuditContext,
-  errorCode: string,
-  durationMs: number,
+  options: {
+    durationMs: number;
+    errorCode: string;
+    quota?: LlmQuotaMetrics;
+  },
 ) {
   emitAudit({
-    contextArtifactCount: context.contextArtifactCount,
-    durationMs,
-    errorCode,
-    historyMode: context.historyMode,
-    modelId: context.requested.modelId,
-    provider: context.requested.provider,
-    requestId: context.requestId,
-    route: context.route,
-    status: "rejected",
-    userId: context.user.id,
+    ...createBaseEvent(context, "request_rejected", "rejected"),
+    errorCode: sanitizeString(options.errorCode, 96),
+    metrics: sanitizeMetrics({ durationMs: options.durationMs }),
+    quota: options.quota,
+  });
+}
+
+export function logLlmAuditAttemptStarted(
+  context: LlmAuditContext,
+  resolved: ResolvedModelConfig,
+  options: { attemptNumber: number; fallbackApplied: boolean },
+) {
+  emitAudit({
+    ...createBaseEvent(context, "attempt_started", "attempting"),
+    fallbackApplied: options.fallbackApplied,
+    metrics: sanitizeMetrics({ attemptCount: options.attemptNumber }),
+    resolved: sanitizeModel(resolved),
+  });
+}
+
+export function logLlmAuditFallback(
+  context: LlmAuditContext,
+  from: ResolvedModelConfig,
+  to: ResolvedModelConfig,
+  options: {
+    attemptDurationMs: number;
+    attemptNumber: number;
+    errorCode: string;
+  },
+) {
+  emitAudit({
+    ...createBaseEvent(context, "fallback_applied", "fallback"),
+    errorCode: sanitizeString(options.errorCode, 96),
+    fallbackApplied: true,
+    fallbackFrom: sanitizeModel(from),
+    fallbackTo: sanitizeModel(to),
+    metrics: sanitizeMetrics({
+      attemptCount: options.attemptNumber,
+      attemptDurationMs: options.attemptDurationMs,
+    }),
+    resolved: sanitizeModel(to),
+  });
+}
+
+export function logLlmAuditFirstToken(
+  context: LlmAuditContext,
+  resolved: ResolvedModelConfig,
+  options: {
+    attemptNumber: number;
+    fallbackApplied: boolean;
+    timing: LlmStreamTimingSnapshot;
+  },
+) {
+  emitAudit({
+    ...createBaseEvent(context, "first_token", "streaming"),
+    fallbackApplied: options.fallbackApplied,
+    metrics: sanitizeMetrics({
+      ...options.timing,
+      attemptCount: options.attemptNumber,
+    }),
+    resolved: sanitizeModel(resolved),
   });
 }
 
 export function logLlmAuditFailed(
   context: LlmAuditContext,
   resolved: ResolvedModelConfig,
-  errorCode: string,
-  fallbackApplied: boolean,
-  durationMs: number,
+  options: {
+    attemptCount: number;
+    errorCode: string;
+    fallbackApplied: boolean;
+    timing: LlmStreamTimingSnapshot;
+  },
 ) {
   emitAudit({
-    contextArtifactCount: context.contextArtifactCount,
-    durationMs,
-    errorCode,
-    fallbackApplied,
-    historyMode: context.historyMode,
-    modelId: context.requested.modelId,
-    provider: context.requested.provider,
-    requestId: context.requestId,
-    resolvedModelId: resolved.modelId,
-    resolvedProvider: resolved.provider,
-    route: context.route,
-    status: "failed",
-    userId: context.user.id,
+    ...createBaseEvent(context, "request_failed", "failed"),
+    errorCode: sanitizeString(options.errorCode, 96),
+    fallbackApplied: options.fallbackApplied,
+    metrics: sanitizeMetrics({
+      ...options.timing,
+      attemptCount: options.attemptCount,
+    }),
+    resolved: sanitizeModel(resolved),
+  });
+}
+
+export function logLlmAuditCancelled(
+  context: LlmAuditContext,
+  resolved: ResolvedModelConfig,
+  options: {
+    attemptCount: number;
+    cancellationSource: "client" | "runtime";
+    fallbackApplied: boolean;
+    timing: LlmStreamTimingSnapshot;
+  },
+) {
+  emitAudit({
+    ...createBaseEvent(context, "request_cancelled", "cancelled"),
+    cancellationSource: options.cancellationSource,
+    fallbackApplied: options.fallbackApplied,
+    metrics: sanitizeMetrics({
+      ...options.timing,
+      attemptCount: options.attemptCount,
+    }),
+    resolved: sanitizeModel(resolved),
   });
 }
 
 export function logLlmAuditCompleted(
   context: LlmAuditContext,
   resolved: ResolvedModelConfig,
-  options?: {
+  options: {
+    attemptCount?: number;
     fallbackApplied?: boolean;
-    totalTokens?: number | null;
-  },
+    finishReason?: string | null;
+    timing?: LlmStreamTimingSnapshot;
+    usage?: LlmUsageMetrics;
+  } = {},
 ) {
-  emitAudit({
-    contextArtifactCount: context.contextArtifactCount,
+  const defaultTiming: LlmStreamTimingSnapshot = {
     durationMs: Date.now() - context.startedAt,
-    fallbackApplied: options?.fallbackApplied ?? false,
-    historyMode: context.historyMode,
-    modelId: context.requested.modelId,
-    provider: context.requested.provider,
-    requestId: context.requestId,
-    resolvedModelId: resolved.modelId,
-    resolvedProvider: resolved.provider,
-    route: context.route,
-    status: "completed",
-    totalTokens: options?.totalTokens ?? null,
-    userId: context.user.id,
+    providerDurationMs: Date.now() - context.startedAt,
+    providerTimeToFirstChunkMs: null,
+    providerTimeToFirstTokenMs: null,
+    timeToFirstChunkMs: null,
+    timeToFirstTokenMs: null,
+  };
+  emitAudit({
+    ...createBaseEvent(context, "request_completed", "completed"),
+    fallbackApplied: options.fallbackApplied ?? false,
+    finishReason: options.finishReason ?? null,
+    metrics: sanitizeMetrics({
+      ...(options.timing ?? defaultTiming),
+      attemptCount: options.attemptCount ?? 1,
+    }),
+    resolved: sanitizeModel(resolved),
+    usage: options.usage,
   });
 }

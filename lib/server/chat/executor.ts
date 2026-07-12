@@ -20,9 +20,21 @@ import {
   getMissingProviderCredential,
 } from "@/lib/llm/provider-runtime";
 import type { LlmRequestOverrides } from "@/lib/llm/request-overrides";
+import type { ChatQuotaGrant } from "@/lib/server/chat-governor";
 import {
+  createLlmStreamTimingTracker,
+  type LlmStreamTimingSnapshot,
+} from "@/lib/server/chat/stream-metrics";
+import {
+  getLlmFinishReason,
+  getLlmUsageMetrics,
+  getSafeErrorName,
+  logLlmAuditAttemptStarted,
+  logLlmAuditCancelled,
   logLlmAuditCompleted,
   logLlmAuditFailed,
+  logLlmAuditFallback,
+  logLlmAuditFirstToken,
 } from "@/lib/server/llm-audit";
 import {
   CHAT_REQUEST_ID_HEADER,
@@ -30,31 +42,18 @@ import {
 } from "@/lib/server/chat/request";
 import type { UserPlan } from "@/lib/user-plan";
 
-export type ChatQuotaGrant = {
-  headers: Headers;
-  release: () => Promise<void>;
-};
+export type { ChatQuotaGrant } from "@/lib/server/chat-governor";
 
 type ChatAuditContext = Parameters<typeof logLlmAuditCompleted>[0];
 
 type ExecuteChatRequestOptions = {
+  abortSignal?: AbortSignal;
   auditContext: ChatAuditContext;
   quotaGrant: ChatQuotaGrant;
   request: PreparedChatRequest;
   requestOverrides: LlmRequestOverrides;
   userPlan: UserPlan;
 };
-
-const getTotalTokens = (event: unknown) =>
-  event &&
-  typeof event === "object" &&
-  "usage" in event &&
-  event.usage &&
-  typeof event.usage === "object" &&
-  "totalTokens" in event.usage &&
-  typeof event.usage.totalTokens === "number"
-    ? event.usage.totalTokens
-    : null;
 
 const isFallbackApplied = (
   currentModel: ResolvedModelConfig,
@@ -100,6 +99,41 @@ const createModelMessages = (
     : modelMessages;
 };
 
+const createUnstartedTiming = (
+  auditContext: ChatAuditContext,
+): LlmStreamTimingSnapshot => {
+  const durationMs = Date.now() - auditContext.startedAt;
+  return {
+    durationMs,
+    providerDurationMs: durationMs,
+    providerTimeToFirstChunkMs: null,
+    providerTimeToFirstTokenMs: null,
+    timeToFirstChunkMs: null,
+    timeToFirstTokenMs: null,
+  };
+};
+
+const logSafeAttemptError = (options: {
+  auditContext: ChatAuditContext;
+  error: unknown;
+  errorCode: string;
+  model: ResolvedModelConfig;
+  status: number;
+}) => {
+  console.error(
+    JSON.stringify({
+      errorCode: options.errorCode,
+      errorName: getSafeErrorName(options.error),
+      event: "llm_attempt_error",
+      modelId: options.model.modelId,
+      provider: options.model.provider,
+      requestId: options.auditContext.requestId,
+      source: "nodes-llm-observability",
+      status: options.status,
+    }),
+  );
+};
+
 const createMockResponse = async ({
   auditContext,
   quotaGrant,
@@ -113,7 +147,11 @@ const createMockResponse = async ({
     provider: resolved.provider,
   });
   await quotaGrant.release();
-  logLlmAuditCompleted(auditContext, resolved);
+  logLlmAuditCompleted(auditContext, resolved, {
+    attemptCount: 1,
+    finishReason: "mock",
+    timing: createUnstartedTiming(auditContext),
+  });
 
   const headers = new Headers(response.headers);
   headers.set(CHAT_REQUEST_ID_HEADER, auditContext.requestId);
@@ -128,6 +166,7 @@ const createMockResponse = async ({
 export async function executeChatRequest(
   options: ExecuteChatRequestOptions,
 ): Promise<Response> {
+  const abortSignal = options.abortSignal ?? new AbortController().signal;
   const {
     auditContext,
     quotaGrant,
@@ -153,11 +192,21 @@ export async function executeChatRequest(
 
   for (let index = 0; index < attemptChain.length; index += 1) {
     const currentModel = attemptChain[index]!;
+    const attemptNumber = index + 1;
     const fallbackApplied = isFallbackApplied(
       currentModel,
       request.requestedModel,
       index,
     );
+    const attemptStartedAt = Date.now();
+    const timingTracker = createLlmStreamTimingTracker({
+      attemptStartedAt,
+      requestStartedAt: auditContext.startedAt,
+    });
+    logLlmAuditAttemptStarted(auditContext, currentModel, {
+      attemptNumber,
+      fallbackApplied,
+    });
 
     const missingCredential = getMissingProviderCredential(
       currentModel.provider,
@@ -165,15 +214,13 @@ export async function executeChatRequest(
       { userPlan },
     );
     if (missingCredential) {
-      console.error(`Missing provider credential for ${currentModel.provider}`);
       await quotaGrant.release();
-      logLlmAuditFailed(
-        auditContext,
-        currentModel,
-        missingCredential.code,
+      logLlmAuditFailed(auditContext, currentModel, {
+        attemptCount: attemptNumber,
+        errorCode: missingCredential.code,
         fallbackApplied,
-        Date.now() - auditContext.startedAt,
-      );
+        timing: timingTracker.snapshot(),
+      });
       return createRequestErrorResponse({
         code: missingCredential.code,
         headers: { [CHAT_REQUEST_ID_HEADER]: auditContext.requestId },
@@ -188,21 +235,36 @@ export async function executeChatRequest(
         if (finalized) return;
         finalized = true;
         void quotaGrant.release();
-        logLlmAuditFailed(
-          auditContext,
-          currentModel,
+        logLlmAuditFailed(auditContext, currentModel, {
+          attemptCount: attemptNumber,
           errorCode,
           fallbackApplied,
-          Date.now() - auditContext.startedAt,
-        );
+          timing: timingTracker.snapshot(),
+        });
       };
-      const finalizeSuccess = (totalTokens?: number | null) => {
+      const finalizeCancellation = (
+        cancellationSource: "client" | "runtime",
+      ) => {
+        if (finalized) return;
+        finalized = true;
+        void quotaGrant.release();
+        logLlmAuditCancelled(auditContext, currentModel, {
+          attemptCount: attemptNumber,
+          cancellationSource,
+          fallbackApplied,
+          timing: timingTracker.snapshot(),
+        });
+      };
+      const finalizeSuccess = (event: unknown) => {
         if (finalized) return;
         finalized = true;
         void quotaGrant.release();
         logLlmAuditCompleted(auditContext, currentModel, {
+          attemptCount: attemptNumber,
           fallbackApplied,
-          totalTokens: totalTokens ?? null,
+          finishReason: getLlmFinishReason(event),
+          timing: timingTracker.snapshot(),
+          usage: getLlmUsageMetrics(event),
         });
       };
 
@@ -212,18 +274,42 @@ export async function executeChatRequest(
         { userPlan },
       ) as Parameters<typeof streamText>[0]["model"];
       const result = streamText({
+        abortSignal,
         model,
         messages: createModelMessages(request, currentModel),
         system: request.system,
         tools: toolset,
         timeout: currentModel.provider === "openrouter" ? 45_000 : 30_000,
-        onError: (error) => {
-          console.error(error);
+        onChunk: (event: unknown) => {
+          const observation = timingTracker.observe(event);
+          if (observation.firstTokenObserved) {
+            logLlmAuditFirstToken(auditContext, currentModel, {
+              attemptNumber,
+              fallbackApplied,
+              timing: observation.snapshot,
+            });
+          }
+        },
+        onAbort: () => {
+          finalizeCancellation(abortSignal.aborted ? "client" : "runtime");
+        },
+        onError: (error: unknown) => {
           const classified = classifyRequestError(error, currentModel);
-          finalizeFailure(classified.code);
+          logSafeAttemptError({
+            auditContext,
+            error,
+            errorCode: classified.code,
+            model: currentModel,
+            status: classified.status,
+          });
+          if (abortSignal.aborted) {
+            finalizeCancellation("client");
+          } else {
+            finalizeFailure(classified.code);
+          }
         },
         onFinish: (event: unknown) => {
-          finalizeSuccess(getTotalTokens(event));
+          finalizeSuccess(event);
         },
       });
       const headers = new Headers(
@@ -244,12 +330,30 @@ export async function executeChatRequest(
     } catch (error) {
       const classified = classifyRequestError(error, currentModel);
       lastError = classified;
-      console.error("/api/chat error:", {
-        provider: currentModel.provider,
-        modelId: currentModel.modelId,
-        code: classified.code,
+      logSafeAttemptError({
+        auditContext,
+        error,
+        errorCode: classified.code,
+        model: currentModel,
         status: classified.status,
       });
+
+      if (abortSignal.aborted) {
+        await quotaGrant.release();
+        logLlmAuditCancelled(auditContext, currentModel, {
+          attemptCount: attemptNumber,
+          cancellationSource: "client",
+          fallbackApplied,
+          timing: timingTracker.snapshot(),
+        });
+        return createRequestErrorResponse({
+          ...classified,
+          headers: {
+            [CHAT_REQUEST_ID_HEADER]: auditContext.requestId,
+            ...Object.fromEntries(quotaGrant.headers.entries()),
+          },
+        });
+      }
 
       const hasFallbackCandidate = index < attemptChain.length - 1;
       const shouldRetry =
@@ -260,17 +364,26 @@ export async function executeChatRequest(
           classified.code === "provider_unavailable");
 
       if (shouldRetry) {
+        logLlmAuditFallback(
+          auditContext,
+          currentModel,
+          attemptChain[index + 1]!,
+          {
+            attemptDurationMs: Date.now() - attemptStartedAt,
+            attemptNumber,
+            errorCode: classified.code,
+          },
+        );
         continue;
       }
 
       await quotaGrant.release();
-      logLlmAuditFailed(
-        auditContext,
-        currentModel,
-        classified.code,
+      logLlmAuditFailed(auditContext, currentModel, {
+        attemptCount: attemptNumber,
+        errorCode: classified.code,
         fallbackApplied,
-        Date.now() - auditContext.startedAt,
-      );
+        timing: timingTracker.snapshot(),
+      });
       return createRequestErrorResponse({
         ...classified,
         headers: {
@@ -283,14 +396,14 @@ export async function executeChatRequest(
 
   await quotaGrant.release();
   if (lastError) {
-    logLlmAuditFailed(
-      auditContext,
-      primaryModel,
-      lastError.code,
-      primaryModel.modelId !== request.requestedModel.modelId ||
+    logLlmAuditFailed(auditContext, primaryModel, {
+      attemptCount: attemptChain.length,
+      errorCode: lastError.code,
+      fallbackApplied:
+        primaryModel.modelId !== request.requestedModel.modelId ||
         primaryModel.provider !== request.requestedModel.provider,
-      Date.now() - auditContext.startedAt,
-    );
+      timing: createUnstartedTiming(auditContext),
+    });
   }
 
   return createRequestErrorResponse(

@@ -2,13 +2,12 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
 } from "ai";
-import {
-  createRequestErrorResponse,
-} from "@/lib/llm/request-errors";
+import { createRequestErrorResponse } from "@/lib/llm/request-errors";
 import { getUserModelOverrides } from "@/lib/llm/provider-runtime";
 import { reserveChatQuota } from "@/lib/server/chat-governor";
 import {
   createLlmAuditContext,
+  getSafeErrorName,
   logLlmAuditAccepted,
   logLlmAuditFailed,
   logLlmAuditRejected,
@@ -40,11 +39,14 @@ export async function handleChatPost(
 
   const request = prepareChatRequest(parsed.body);
   const auditContext = createLlmAuditContext({
+    actorType: user.isAgent ? "agent" : "user",
     contextArtifactCount: request.contextArtifacts.length,
     historyMode: request.historyMode ?? null,
+    messageCount: request.messages.length,
     requested: request.requestedModel,
     route: "/api/chat",
-    user,
+    sentMessageCount: request.messagesToSend.length,
+    toolCount: Object.keys(request.tools ?? {}).length,
   });
 
   if (request.messagesToSend.length === 0) {
@@ -57,11 +59,11 @@ export async function handleChatPost(
   ]);
   const quota = await reserveChatQuota(user.id, userPlan);
   if (!quota.ok) {
-    logLlmAuditRejected(
-      auditContext,
-      quota.rejection.code,
-      Date.now() - auditContext.startedAt,
-    );
+    logLlmAuditRejected(auditContext, {
+      durationMs: Date.now() - auditContext.startedAt,
+      errorCode: quota.rejection.code,
+      quota: quota.rejection.metrics,
+    });
     return createRequestErrorResponse({
       code: quota.rejection.code,
       headers: {
@@ -73,9 +75,10 @@ export async function handleChatPost(
     });
   }
 
-  logLlmAuditAccepted(auditContext);
+  logLlmAuditAccepted(auditContext, { quota: quota.grant.metrics });
   try {
     return await executeChatRequest({
+      abortSignal: req.signal,
       auditContext,
       quotaGrant: quota.grant,
       request,
@@ -84,14 +87,28 @@ export async function handleChatPost(
     });
   } catch (error) {
     await quota.grant.release();
-    console.error("Unexpected /api/chat orchestration error", error);
-    logLlmAuditFailed(
-      auditContext,
-      request.requestedModel,
-      "backend_unavailable",
-      false,
-      Date.now() - auditContext.startedAt,
+    const durationMs = Date.now() - auditContext.startedAt;
+    console.error(
+      JSON.stringify({
+        errorName: getSafeErrorName(error),
+        event: "chat_orchestration_failed",
+        requestId: auditContext.requestId,
+        source: "nodes-llm-observability",
+      }),
     );
+    logLlmAuditFailed(auditContext, request.requestedModel, {
+      attemptCount: 0,
+      errorCode: "backend_unavailable",
+      fallbackApplied: false,
+      timing: {
+        durationMs,
+        providerDurationMs: durationMs,
+        providerTimeToFirstChunkMs: null,
+        providerTimeToFirstTokenMs: null,
+        timeToFirstChunkMs: null,
+        timeToFirstTokenMs: null,
+      },
+    });
     return createRequestErrorResponse({
       code: "backend_unavailable",
       headers: {
