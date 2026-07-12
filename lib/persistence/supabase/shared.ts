@@ -20,6 +20,10 @@ import type {
 } from "@/lib/session-blob-store";
 import type { ProjectRecord } from "@/lib/persistence/project-repository";
 import { isValidSessionVersion } from "@/lib/session-version-conflict";
+import {
+  resolveMaterializedMessageCount,
+  resolveSessionSchemaVersion,
+} from "@/lib/persistence/session-schema-version";
 
 export const emptyBlobMaintenance = (): SessionBlobMaintenance => ({
   deduplicatedBlobLinks: 0,
@@ -63,17 +67,20 @@ const normalizeSessionVersion = (value: unknown) => {
 
 type SessionRow = {
   archived: boolean;
-  artifacts_json: unknown;
-  context_links_json: unknown;
+  artifacts_json?: unknown;
+  context_links_json?: unknown;
   created_at: string;
   id: string;
-  snapshot_json: unknown;
+  message_count?: number | string | null;
+  schema_version?: number | string | null;
+  snapshot_json?: unknown;
   title: string | null;
   updated_at: string;
   version: number | string;
 };
 
 export const toSessionDocumentFromRow = (row: SessionRow): SessionDocument => {
+  resolveSessionSchemaVersion(row.schema_version);
   const snapshot = normalizeSessionThreadExport(row.snapshot_json);
   return {
     id: row.id,
@@ -85,12 +92,15 @@ export const toSessionDocumentFromRow = (row: SessionRow): SessionDocument => {
     snapshot,
     artifacts: normalizeSessionArtifactsDocument(row.artifacts_json),
     contextLinks: normalizeSessionContextLinksDocument(row.context_links_json),
-    messageCount: getSessionMessageCount(snapshot),
+    messageCount: resolveMaterializedMessageCount(
+      row.message_count,
+      () => getSessionMessageCount(snapshot),
+    ),
   };
 };
 
 export const toSessionSummaryFromRow = (row: SessionRow): SessionSummary => {
-  const snapshot = normalizeSessionThreadExport(row.snapshot_json);
+  resolveSessionSchemaVersion(row.schema_version);
   return {
     id: row.id,
     title: row.title,
@@ -98,7 +108,10 @@ export const toSessionSummaryFromRow = (row: SessionRow): SessionSummary => {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     version: normalizeSessionVersion(row.version),
-    messageCount: getSessionMessageCount(snapshot),
+    messageCount: resolveMaterializedMessageCount(
+      row.message_count,
+      () => getSessionMessageCount(normalizeSessionThreadExport(row.snapshot_json)),
+    ),
   };
 };
 

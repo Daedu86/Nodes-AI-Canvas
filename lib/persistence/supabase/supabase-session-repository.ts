@@ -1,4 +1,5 @@
 import type { SessionRepository } from "@/lib/persistence/session-repository";
+import { CURRENT_SESSION_SCHEMA_VERSION } from "@/lib/persistence/session-schema-version";
 import { getSupabasePersistenceClient } from "@/lib/persistence/supabase/client";
 import {
   ensureData,
@@ -22,8 +23,10 @@ import {
   SessionVersionConflictError,
 } from "@/lib/session-version-conflict";
 
-const sessionSelect =
-  "id,title,archived,version,snapshot_json,artifacts_json,context_links_json,created_at,updated_at";
+const sessionDocumentSelect =
+  "id,title,archived,version,schema_version,message_count,snapshot_json,artifacts_json,context_links_json,created_at,updated_at";
+const sessionSummarySelect =
+  "id,title,archived,version,schema_version,message_count,created_at,updated_at";
 
 const isMissingSessionError = (error: unknown) =>
   error instanceof Error && error.message === "Session not found";
@@ -55,7 +58,7 @@ export const supabaseSessionRepository: SessionRepository = {
     const ownerId = requireOwnerId(options.ownerId);
     let query = client
       .from("sessions")
-      .select(sessionSelect)
+      .select(sessionSummarySelect)
       .eq("owner_id", ownerId)
       .order("updated_at", { ascending: false });
 
@@ -72,7 +75,7 @@ export const supabaseSessionRepository: SessionRepository = {
     const client = getSupabasePersistenceClient();
     const { data, error } = await client
       .from("sessions")
-      .select(sessionSelect)
+      .select(sessionDocumentSelect)
       .eq("id", sessionId)
       .eq("owner_id", requireOwnerId(ownerId))
       .maybeSingle();
@@ -92,6 +95,7 @@ export const supabaseSessionRepository: SessionRepository = {
           : null,
       archived: false,
       version: 1,
+      schema_version: CURRENT_SESSION_SCHEMA_VERSION,
       snapshot_json: normalizeSessionThreadExport(
         input.snapshot ?? EMPTY_SESSION_THREAD_EXPORT,
       ),
@@ -102,7 +106,7 @@ export const supabaseSessionRepository: SessionRepository = {
     const { data, error } = await client
       .from("sessions")
       .insert(payload)
-      .select(sessionSelect)
+      .select(sessionDocumentSelect)
       .single();
 
     const row = ensureData(data, error, "Failed to create session");
@@ -132,6 +136,13 @@ export const supabaseSessionRepository: SessionRepository = {
     }
     if (patch.contextLinks !== undefined) {
       patchPayload.contextLinks = normalizeSessionContextLinksDocument(patch.contextLinks);
+    }
+    if (
+      patch.snapshot !== undefined ||
+      patch.artifacts !== undefined ||
+      patch.contextLinks !== undefined
+    ) {
+      patchPayload.schemaVersion = CURRENT_SESSION_SCHEMA_VERSION;
     }
 
     const { data, error } = await client.rpc("patch_session_with_blob_reconciliation", {
