@@ -22,10 +22,11 @@ export type SessionSummary = {
   updatedAt: string;
   archived: boolean;
   messageCount: number;
-  version: number;
+  version?: number;
 };
 
 export type SessionDocument = SessionSummary & {
+  version: number;
   snapshot: SessionThreadExport;
   artifacts: SessionArtifact[];
   contextLinks: SessionContextLink[];
