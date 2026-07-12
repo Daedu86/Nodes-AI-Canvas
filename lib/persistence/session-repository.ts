@@ -26,6 +26,11 @@ export type SessionPatch = {
   title?: string | null;
 };
 
+export type SessionPatchOptions = {
+  expectedVersion: number;
+  ownerId?: string;
+};
+
 export interface SessionRepository {
   cleanupBlobStore(): Promise<SessionBlobCleanupResult>;
   createSession(input?: SessionCreateInput): Promise<SessionDocument>;
@@ -34,5 +39,9 @@ export interface SessionRepository {
   getSession(sessionId: string, ownerId?: string): Promise<SessionDocument>;
   getSessionBlobMaintenanceSummary(): Promise<SessionBlobMaintenance>;
   listSessions(options?: SessionListOptions): Promise<SessionSummary[]>;
-  patchSession(sessionId: string, patch: SessionPatch, ownerId?: string): Promise<SessionDocument>;
+  patchSession(
+    sessionId: string,
+    patch: SessionPatch,
+    options: SessionPatchOptions,
+  ): Promise<SessionDocument>;
 }
