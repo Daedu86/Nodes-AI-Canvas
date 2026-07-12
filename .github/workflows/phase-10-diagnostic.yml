@@ -1,0 +1,108 @@
+name: Phase 10 collaboration diagnostic
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: phase-10-collaboration-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+  VERCEL_ENV: preview
+  NODES_PERSISTENCE_BACKEND: file
+  AUTH_ENABLE_DEV_CREDENTIALS: "0"
+  OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
+  OPENROUTER_REQUIRE_USER_KEY: "1"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Mark diagnostic started
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=pending -f context='diag10/started' -f description='Phase 10 validation started'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --fund=false
+      - name: Lint
+        id: lint
+        continue-on-error: true
+        run: npm run format:check 2>&1 | tee lint.log
+      - name: Typecheck
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck 2>&1 | tee typecheck.log
+      - name: Targeted invitation tests
+        id: targeted
+        continue-on-error: true
+        run: npx vitest run tests/project-invitation-token.test.ts tests/project-invitations.test.ts tests/project-collaboration.test.ts 2>&1 | tee targeted.log
+      - name: Complete unit suite
+        id: unit
+        continue-on-error: true
+        run: npx vitest run --reporter=json --outputFile=unit.json 2>&1 | tee unit.log
+      - name: Production build
+        id: build
+        continue-on-error: true
+        run: npm run build 2>&1 | tee build.log
+      - name: Install Chromium
+        id: browser
+        continue-on-error: true
+        run: npx playwright install --with-deps chromium 2>&1 | tee browser.log
+      - name: End-to-end suite
+        id: e2e
+        continue-on-error: true
+        run: npm run test:e2e -- --workers=1 2>&1 | tee e2e.log
+      - name: Publish results
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          LINT: ${{ steps.lint.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          TARGETED: ${{ steps.targeted.outcome }}
+          UNIT: ${{ steps.unit.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          BROWSER: ${{ steps.browser.outcome }}
+          E2E: ${{ steps.e2e.outcome }}
+        shell: bash
+        run: |
+          publish() {
+            if [ "$2" = success ]; then state=success; else state=failure; fi
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state="$state" -f context="diag10/$1" -f description="$1: $2"
+          }
+          detail() {
+            encoded=$(printf '%s' "$2" | cut -c1-96 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=failure -f context="diag10/$1-detail/${encoded}" -f description="$1 failure detail"
+          }
+          first_error() {
+            grep -E 'error TS[0-9]+:|[0-9]+:[0-9]+[[:space:]]+(error|warning)|AssertionError|Error:|failed|FAIL' "$1" | head -1 || tail -5 "$1" | tr '\n' ' '
+          }
+          publish lint "$LINT"
+          publish typecheck "$TYPECHECK"
+          publish targeted "$TARGETED"
+          publish unit "$UNIT"
+          publish build "$BUILD"
+          publish browser "$BROWSER"
+          publish e2e "$E2E"
+          [ "$LINT" = success ] || detail lint "$(first_error lint.log)"
+          [ "$TYPECHECK" = success ] || detail typecheck "$(first_error typecheck.log)"
+          [ "$TARGETED" = success ] || detail targeted "$(first_error targeted.log)"
+          [ "$UNIT" = success ] || detail unit "$(first_error unit.log)"
+          [ "$BUILD" = success ] || detail build "$(first_error build.log)"
+          [ "$BROWSER" = success ] || detail browser "$(first_error browser.log)"
+          [ "$E2E" = success ] || detail e2e "$(first_error e2e.log)"
+          if [ "$LINT" != success ] || [ "$TYPECHECK" != success ] || [ "$TARGETED" != success ] || [ "$UNIT" != success ] || [ "$BUILD" != success ] || [ "$BROWSER" != success ] || [ "$E2E" != success ]; then exit 1; fi
