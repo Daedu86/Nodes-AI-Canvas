@@ -18,6 +18,21 @@ const maxUploadFileBytes = 8 * 1024 * 1024;
 const desiredBucketConfig = {
   public: false,
   fileSizeLimit: maxUploadFileBytes,
+  allowedMimeTypes: [
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/gif",
+    "image/avif",
+    "application/pdf",
+    "application/json",
+    "text/plain",
+    "text/markdown",
+    "text/csv",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ],
 };
 
 const client = createClient(supabaseUrl, supabaseServiceRoleKey, {
@@ -44,7 +59,7 @@ const main = async () => {
     }
 
     console.log(
-      `Bucket already exists: ${storageBucket}. Reconciled config (private, ${maxUploadFileBytes} byte limit).`,
+      `Bucket already exists: ${storageBucket}. Reconciled private access, MIME allowlist, and ${maxUploadFileBytes} byte limit.`,
     );
     return;
   }
@@ -56,7 +71,7 @@ const main = async () => {
   }
 
   console.log(
-    `Created bucket: ${storageBucket} (private, ${maxUploadFileBytes} byte limit).`,
+    `Created bucket: ${storageBucket} (private, MIME-restricted, ${maxUploadFileBytes} byte limit).`,
   );
 };
 

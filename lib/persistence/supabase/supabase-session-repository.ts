@@ -13,9 +13,9 @@ import {
   normalizeSessionThreadExport,
 } from "@/lib/session-documents";
 import {
-  deleteSessionBlobDir,
+  cleanupOrphanedSessionBlobs,
   getSessionBlobMaintenance,
-  reconcileSessionArtifactBlobs,
+  processSessionBlobDeleteQueue,
 } from "@/lib/session-blob-store";
 import {
   isValidSessionVersion,
@@ -27,6 +27,27 @@ const sessionSelect =
 
 const isMissingSessionError = (error: unknown) =>
   error instanceof Error && error.message === "Session not found";
+
+const processBlobQueueBestEffort = async () => {
+  try {
+    await processSessionBlobDeleteQueue({ limit: 100, scanStorage: false });
+  } catch (error) {
+    console.error("Failed to process queued artifact deletions", error);
+  }
+};
+
+const getReferencedBlobRefs = async () => {
+  const client = getSupabasePersistenceClient();
+  const { data, error } = await client.from("sessions").select("artifacts_json");
+  if (error) {
+    throw new Error(error.message || "Failed to read session artifact references");
+  }
+  return (data ?? []).flatMap((row) =>
+    normalizeSessionArtifactsDocument(row.artifacts_json)
+      .map((artifact) => artifact.blobRef)
+      .filter((blobRef): blobRef is string => Boolean(blobRef)),
+  );
+};
 
 export const supabaseSessionRepository: SessionRepository = {
   async listSessions(options = {}) {
@@ -100,58 +121,58 @@ export const supabaseSessionRepository: SessionRepository = {
       throw new SessionVersionConflictError(options.expectedVersion, current);
     }
 
-    const update: Record<string, unknown> = {
-      version: options.expectedVersion + 1,
-    };
-    if (patch.archived !== undefined) update.archived = patch.archived;
-    if (patch.title !== undefined) {
-      update.title =
-        typeof patch.title === "string" && patch.title.trim().length > 0
-          ? patch.title.trim()
-          : null;
+    const patchPayload: Record<string, unknown> = {};
+    if (patch.archived !== undefined) patchPayload.archived = patch.archived;
+    if (patch.title !== undefined) patchPayload.title = patch.title;
+    if (patch.snapshot !== undefined) {
+      patchPayload.snapshot = normalizeSessionThreadExport(patch.snapshot);
     }
-    if (patch.snapshot !== undefined) update.snapshot_json = normalizeSessionThreadExport(patch.snapshot);
-    if (patch.artifacts !== undefined) update.artifacts_json = normalizeSessionArtifactsDocument(patch.artifacts);
+    if (patch.artifacts !== undefined) {
+      patchPayload.artifacts = normalizeSessionArtifactsDocument(patch.artifacts);
+    }
     if (patch.contextLinks !== undefined) {
-      update.context_links_json = normalizeSessionContextLinksDocument(patch.contextLinks);
+      patchPayload.contextLinks = normalizeSessionContextLinksDocument(patch.contextLinks);
     }
 
-    const { data, error } = await client
-      .from("sessions")
-      .update(update)
-      .eq("id", sessionId)
-      .eq("owner_id", ownerId)
-      .eq("version", options.expectedVersion)
-      .select(sessionSelect)
-      .maybeSingle();
-
+    const { data, error } = await client.rpc("patch_session_with_blob_reconciliation", {
+      p_expected_version: options.expectedVersion,
+      p_now: new Date().toISOString(),
+      p_owner_id: ownerId,
+      p_patch: patchPayload,
+      p_session_id: sessionId,
+    });
     if (error) {
       throw new Error(error.message || "Failed to update session");
     }
-    if (!data) {
+
+    const row = Array.isArray(data) ? data[0] : null;
+    if (!row) {
       const latest = await this.getSession(sessionId, ownerId);
       throw new SessionVersionConflictError(options.expectedVersion, latest);
     }
 
-    const next = toSessionDocumentFromRow(data);
+    const next = toSessionDocumentFromRow(row);
     if (patch.artifacts !== undefined) {
-      await reconcileSessionArtifactBlobs(current.artifacts, next.artifacts);
+      await processBlobQueueBestEffort();
     }
     return next;
   },
 
   async deleteSession(sessionId, ownerId) {
     const client = getSupabasePersistenceClient();
-    await this.getSession(sessionId, ownerId);
-    const { error } = await client
-      .from("sessions")
-      .delete()
-      .eq("id", sessionId)
-      .eq("owner_id", requireOwnerId(ownerId));
+    const normalizedOwnerId = requireOwnerId(ownerId);
+    const { data, error } = await client.rpc("delete_session_with_blob_reconciliation", {
+      p_now: new Date().toISOString(),
+      p_owner_id: normalizedOwnerId,
+      p_session_id: sessionId,
+    });
     if (error) {
       throw new Error(error.message || "Failed to delete session");
     }
-    await deleteSessionBlobDir(sessionId);
+    if (data !== true) {
+      throw new Error("Session not found");
+    }
+    await processBlobQueueBestEffort();
   },
 
   async deleteSessions(sessionIds, ownerId) {
@@ -168,14 +189,10 @@ export const supabaseSessionRepository: SessionRepository = {
   },
 
   async getSessionBlobMaintenanceSummary() {
-    return getSessionBlobMaintenance([]);
+    return getSessionBlobMaintenance(await getReferencedBlobRefs());
   },
 
   async cleanupBlobStore() {
-    return {
-      deletedBlobCount: 0,
-      deletedBytes: 0,
-      maintenance: await getSessionBlobMaintenance([]),
-    };
+    return cleanupOrphanedSessionBlobs(await getReferencedBlobRefs());
   },
 };

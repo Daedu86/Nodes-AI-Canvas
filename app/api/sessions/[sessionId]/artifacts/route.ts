@@ -1,10 +1,10 @@
 import { getSession } from "@/lib/session-store";
 import { saveSessionArtifactBlob } from "@/lib/session-blob-store";
 import {
-  DEFAULT_MAX_UPLOAD_FILE_BYTES,
-  DEFAULT_MAX_UPLOAD_IMAGE_BYTES,
-  formatBytes,
-} from "@/lib/context-budget";
+  getSessionArtifactMaxBlobBytes,
+  validateArtifactUpload,
+} from "@/lib/artifact-upload-policy";
+import { formatBytes } from "@/lib/context-budget";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 export const runtime = "nodejs";
@@ -34,30 +34,46 @@ export async function POST(req: Request, context: RouteParams) {
       return new Response("Missing file", { status: 400 });
     }
 
-    const isImage = (file.type || "").startsWith("image/");
-    const maxUploadBytes = isImage ? DEFAULT_MAX_UPLOAD_IMAGE_BYTES : DEFAULT_MAX_UPLOAD_FILE_BYTES;
-    if (file.size > maxUploadBytes) {
+    const hardLimit = getSessionArtifactMaxBlobBytes();
+    if (file.size > hardLimit) {
       return new Response(
-        `Artifact too large. Selected ${isImage ? "image" : "file"} is ${formatBytes(file.size)} and the limit is ${formatBytes(maxUploadBytes)}.`,
+        `Artifact too large. Selected file is ${formatBytes(file.size)} and the maximum is ${formatBytes(hardLimit)}.`,
         { status: 413 },
       );
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
+    const validation = validateArtifactUpload({
+      bytes,
+      declaredMimeType: file.type || null,
+      fileName: file.name,
+    });
+    if (!validation.ok) {
+      return new Response(validation.message, { status: validation.status });
+    }
+
     const saved = await saveSessionArtifactBlob({
       sessionId,
+      ownerId: guarded.user.id,
       fileName: file.name,
       bytes,
-      mimeType: file.type || null,
+      mimeType: validation.mimeType,
     });
 
     return Response.json({
       blobRef: saved.blobRef,
       byteSize: file.size,
+      deduplicated: saved.deduplicated,
       fileName: file.name,
-      mimeType: file.type || null,
+      mimeType: validation.mimeType,
+      storageQuotaBytes: saved.storageQuotaBytes,
+      storageUsedBytes: saved.storageUsedBytes,
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Artifact upload failed";
+    if (message.toLowerCase().includes("storage quota exceeded")) {
+      return new Response("Artifact storage quota exceeded.", { status: 413 });
+    }
     console.error("Artifact upload failed", error);
     return new Response("Artifact upload failed", { status: 500 });
   }
