@@ -3,9 +3,15 @@ import type {
   SessionCreateInput,
   SessionListOptions,
   SessionPatch,
+  SessionPatchOptions,
 } from "@/lib/persistence/session-repository";
 
-export type { SessionCreateInput, SessionListOptions, SessionPatch };
+export type {
+  SessionCreateInput,
+  SessionListOptions,
+  SessionPatch,
+  SessionPatchOptions,
+};
 
 export async function listSessions(options: SessionListOptions = {}) {
   return getSessionRepository().listSessions(options);
@@ -19,8 +25,12 @@ export async function createSession(input: SessionCreateInput = {}) {
   return getSessionRepository().createSession(input);
 }
 
-export async function patchSession(sessionId: string, patch: SessionPatch, ownerId?: string) {
-  return getSessionRepository().patchSession(sessionId, patch, ownerId);
+export async function patchSession(
+  sessionId: string,
+  patch: SessionPatch,
+  options: SessionPatchOptions,
+) {
+  return getSessionRepository().patchSession(sessionId, patch, options);
 }
 
 export async function deleteSession(sessionId: string, ownerId?: string) {
