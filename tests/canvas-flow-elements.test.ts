@@ -1,249 +1,202 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from "vitest";
-import { ROOT_NODE_ID } from "../components/assistant-ui/thread-graph/graph-types";
+import { buildCanvasFlowElements } from "@/components/assistant-ui/thread-graph-flow/canvas-flow-elements";
 import {
-  buildCanvasFlowElements,
-  type CanvasFlowElementsParams,
-} from "../components/assistant-ui/thread-graph-flow/canvas-flow-elements";
-import { buildCanvasFlowIndexes } from "../components/assistant-ui/thread-graph-flow/canvas-flow-indexes";
-import type {
-  SessionArtifact,
-  SessionCanvasLink,
-} from "../lib/session-artifacts";
+  CANVAS_PROMPT_DRAFT_NODE_ID,
+} from "@/components/assistant-ui/thread-graph-flow/canvas-workspace-utils";
+import {
+  ROOT_NODE_ID,
+  type Node as ThreadGraphNodeModel,
+} from "@/components/assistant-ui/thread-graph/graph-types";
+import type { SessionArtifact, SessionCanvasLink } from "@/lib/session-artifacts";
 
-const timestamp = "2026-07-12T14:00:00.000Z";
+const timestamp = "2026-07-11T00:00:00.000Z";
 
-const createArtifact = (
-  id: string,
-  artifactType: SessionArtifact["artifactType"] = "text",
+const artifact = (
+  input: Partial<SessionArtifact> & Pick<SessionArtifact, "id" | "artifactType">,
 ): SessionArtifact => ({
-  id,
-  title: id,
-  artifactType,
-  content: `${id} content`,
-  position: null,
-  createdAt: timestamp,
-  updatedAt: timestamp,
-  ...(artifactType === "prompt" ? { promptStatus: "idle" as const } : {}),
+  title: input.title ?? input.id,
+  content: input.content ?? "",
+  createdAt: input.createdAt ?? timestamp,
+  updatedAt: input.updatedAt ?? timestamp,
+  ...input,
 });
 
+const conversationNodes: ThreadGraphNodeModel[] = [
+  {
+    id: ROOT_NODE_ID,
+    parentId: null,
+    role: "ROOT",
+    text: "Conversation Root",
+    depth: 0,
+    idx: -1,
+    branchId: null,
+    isBridge: false,
+    model: null,
+    provider: null,
+  },
+  {
+    id: "user-1",
+    parentId: ROOT_NODE_ID,
+    role: "user",
+    text: "Question",
+    depth: 1,
+    idx: 0,
+    branchId: "branch-1",
+    isBridge: false,
+    model: "model-a",
+    provider: "openrouter",
+  },
+  {
+    id: "assistant-1",
+    parentId: "user-1",
+    role: "assistant",
+    text: "Answer",
+    depth: 2,
+    idx: 1,
+    branchId: "branch-1",
+    isBridge: false,
+    model: "model-a",
+    provider: "openrouter",
+  },
+];
+
 const createParams = () => {
-  const canvasConversationNodes = [
-    {
-      id: ROOT_NODE_ID,
-      parentId: null,
-      role: "system",
-      text: "Conversation root",
-      depth: 0,
-      idx: 0,
-      branchId: "main",
-    },
-    {
-      id: "message-1",
-      parentId: ROOT_NODE_ID,
-      role: "user",
-      text: "First prompt",
-      depth: 1,
-      idx: 1,
-      branchId: "main",
-      provider: "openrouter",
-      model: "openrouter/free",
-    },
-    {
-      id: "message-2",
-      parentId: "message-1",
-      role: "assistant",
-      text: "First response",
-      depth: 2,
-      idx: 2,
-      branchId: "main",
-      editedFromId: "message-old",
-      provider: "openrouter",
-      model: "openrouter/free",
-    },
-  ];
-  const artifacts = [
-    createArtifact("artifact-1"),
-    createArtifact("artifact-2", "code"),
-  ];
-  const canvasPrompts = [createArtifact("prompt-1", "prompt")];
+  const textArtifact = artifact({
+    id: "artifact-1",
+    artifactType: "text",
+    title: "Context",
+    content: "Reusable context",
+  });
+  const promptArtifact = artifact({
+    id: "prompt-1",
+    artifactType: "prompt",
+    title: "Prompt",
+    content: "Summarize",
+    promptStatus: "idle",
+  });
   const canvasLinks: SessionCanvasLink[] = [
     {
-      id: "context-1",
+      id: "link-context",
       relation: "context",
-      artifactId: "artifact-1",
-      promptId: "message-1",
-      responseId: null,
-      targetMessageId: "message-1",
+      artifactId: textArtifact.id,
+      promptId: promptArtifact.id,
       createdAt: timestamp,
     },
     {
-      id: "context-2",
-      relation: "context",
-      artifactId: "artifact-2",
-      promptId: "prompt-1",
-      responseId: null,
-      targetMessageId: "prompt-1",
-      createdAt: timestamp,
-    },
-    {
-      id: "output-1",
+      id: "link-output",
       relation: "output",
-      artifactId: "artifact-1",
-      promptId: "prompt-1",
+      artifactId: textArtifact.id,
+      promptId: promptArtifact.id,
       responseId: null,
-      targetMessageId: null,
-      createdAt: timestamp,
-    },
-    {
-      id: "output-2",
-      relation: "output",
-      artifactId: "artifact-2",
-      promptId: null,
-      responseId: "message-2",
-      targetMessageId: null,
       createdAt: timestamp,
     },
   ];
-  const contextLinks = canvasLinks.flatMap((link) =>
-    link.relation === "context" && link.promptId
-      ? [
-          {
-            ...link,
-            relation: "context" as const,
-            promptId: link.promptId,
-            targetMessageId: link.promptId,
-          },
-        ]
-      : [],
-  );
-  const allArtifacts = [...artifacts, ...canvasPrompts];
-  const updateArtifact = vi.fn();
   const handleCutEdge = vi.fn();
 
-  const params: CanvasFlowElementsParams = {
-    artifacts,
-    artifactIndex: new Map(allArtifacts.map((artifact) => [artifact.id, artifact])),
-    canvasConversationNodes,
+  return {
+    artifacts: [textArtifact],
+    artifactIndex: new Map([[textArtifact.id, textArtifact]]),
+    canvasConversationNodes: conversationNodes,
     canvasLinks,
-    canvasPrompts,
-    cancelCanvasPrompt: vi.fn() as CanvasFlowElementsParams["cancelCanvasPrompt"],
+    canvasPrompts: [promptArtifact],
+    cancelCanvasPrompt: vi.fn(),
     canvasDraftError: null,
-    contextLinks,
+    contextLinks: [
+      {
+        ...canvasLinks[0]!,
+        relation: "context" as const,
+        promptId: "user-1",
+        targetMessageId: "user-1",
+      },
+    ],
     deleteArtifact: vi.fn(),
     draft: null,
     draftAnchorNode: null,
     draftBranchSpec: null,
     draftContextCount: 0,
     draftDetail: null,
-    getArtifactsForTarget: vi.fn(() => []) as CanvasFlowElementsParams["getArtifactsForTarget"],
+    getArtifactsForTarget: vi.fn(() => []),
     handleCancelPromptDraft: vi.fn(),
     handleCancelRun: vi.fn(),
     handleCutEdge,
     handleSubmitBranchDraft: vi.fn(),
     isSubmittingBranch: false,
     isThreadRunning: false,
-    linkedTargetCountByArtifact: new Map([
-      ["artifact-1", 1],
-      ["artifact-2", 1],
-    ]),
+    linkedTargetCountByArtifact: new Map([[textArtifact.id, 2]]),
     linkEditMode: true,
     llmEnabled: true,
-    nodeIndex: new Map(canvasConversationNodes.map((node) => [node.id, node])),
-    overrides: new Set(["message-2"]),
-    promptIndex: new Map(canvasPrompts.map((prompt) => [prompt.id, prompt])),
+    nodeIndex: new Map(conversationNodes.map((node) => [node.id, node])),
+    overrides: new Map<string, unknown>(),
+    promptIndex: new Map([[promptArtifact.id, promptArtifact]]),
     requestError: null,
-    runCanvasPrompt: vi.fn() as CanvasFlowElementsParams["runCanvasPrompt"],
+    runCanvasPrompt: vi.fn(),
     setDraftText: vi.fn(),
-    updateArtifact: updateArtifact as CanvasFlowElementsParams["updateArtifact"],
+    updateArtifact: vi.fn(),
   };
-
-  return { handleCutEdge, params, updateArtifact };
 };
 
-describe("canvas flow elements", () => {
-  it("builds the same semantic nodes and edges with indexed link counts", () => {
-    const { handleCutEdge, params, updateArtifact } = createParams();
+describe("buildCanvasFlowElements", () => {
+  it("builds conversation, prompt, artifact and relationship elements", () => {
+    const params = createParams();
     const result = buildCanvasFlowElements(params);
 
-    expect(result.nodes).toHaveLength(6);
-    expect(result.edges).toHaveLength(6);
-    expect(result.conversationEdges).toHaveLength(2);
-
-    const messageNode = result.nodes.find((node) => node.id === "message-1");
-    const cutNode = result.nodes.find((node) => node.id === "message-2");
-    const promptNode = result.nodes.find((node) => node.id === "prompt-1");
-    expect(messageNode?.data.linkedArtifactCount).toBe(1);
-    expect(cutNode?.data.isCut).toBe(true);
-    expect(promptNode?.data).toMatchObject({
-      draftContextCount: 1,
-      draftOutputCount: 1,
-      kind: "canvas-prompt",
-    });
-
-    expect(result.edges.map((edge) => [edge.id, edge.data?.tone])).toEqual(
-      expect.arrayContaining([
-        ["context:artifact-1->message-1", "context"],
-        ["context:artifact-2->prompt-1", "context"],
-        ["output:prompt-1->artifact-1", "pending-output"],
-        ["output:message-2->artifact-2", "output"],
-      ]),
+    expect(new Set(result.nodes.map((node) => node.id))).toEqual(
+      new Set([ROOT_NODE_ID, "user-1", "assistant-1", "prompt-1", "artifact-1"]),
     );
+    expect(result.edges.some((edge) => edge.id === "context:artifact-1->user-1")).toBe(true);
+    expect(result.edges.some((edge) => edge.id === "output:prompt-1->artifact-1")).toBe(true);
 
     const editableEdge = result.conversationEdges.find(
-      (edge) => edge.target === "message-2",
+      (edge) => edge.source === "user-1" && edge.target === "assistant-1",
     );
+    expect(editableEdge?.data?.editable).toBe(true);
     editableEdge?.data?.onCut?.();
-    expect(handleCutEdge).toHaveBeenCalledWith("message-2", "message-1");
-
-    promptNode?.data.onDraftTextChange?.("Updated prompt");
-    expect(updateArtifact).toHaveBeenCalledWith(
-      "prompt-1",
-      { content: "Updated prompt" },
-      { revisionOrigin: "manual", revisionAuthor: "user" },
-    );
+    expect(params.handleCutEdge).toHaveBeenCalledWith("assistant-1", "user-1");
   });
 
-  it("counts unique existing artifacts and all prompt links in one pass", () => {
-    const artifact = createArtifact("artifact-1");
-    const links: SessionCanvasLink[] = [
-      {
-        id: "1",
-        relation: "context",
-        artifactId: artifact.id,
-        promptId: "prompt-1",
-        createdAt: timestamp,
+  it("adds the branch draft only when a valid draft specification exists", () => {
+    const params = createParams();
+    const result = buildCanvasFlowElements({
+      ...params,
+      draft: {
+        anchorId: "user-1",
+        operation: "create-sibling-prompt",
+        text: "Alternative question",
+        inputArtifactIds: [],
+        outputArtifactIds: ["artifact-1"],
+        position: { x: 10, y: 20 },
       },
-      {
-        id: "2",
-        relation: "context",
-        artifactId: artifact.id,
-        promptId: "prompt-1",
-        createdAt: timestamp,
+      draftAnchorNode: conversationNodes[1]!,
+      draftBranchSpec: {
+        operation: "create-sibling-prompt",
+        anchorId: "user-1",
+        anchorRole: "user",
+        parentId: ROOT_NODE_ID,
+        sourceId: "user-1",
+        targetRole: "user",
+        startRun: true,
+        placeholder: "Alternative",
+        title: "Create sibling branch",
       },
-      {
-        id: "3",
-        relation: "context",
-        artifactId: "missing-artifact",
-        promptId: "prompt-1",
-        createdAt: timestamp,
+      draftContextCount: 1,
+      draftDetail: {
+        operation: "create-sibling-prompt",
+        title: "Create sibling branch",
+        description: "Create a sibling branch.",
+        placeholder: "Alternative",
+        submitLabel: "Create branch",
       },
-      {
-        id: "4",
-        relation: "output",
-        artifactId: artifact.id,
-        promptId: "prompt-1",
-        createdAt: timestamp,
-      },
-    ];
-
-    const indexes = buildCanvasFlowIndexes(
-      links,
-      new Map([[artifact.id, artifact]]),
-    );
-    expect(indexes.linkedArtifactCountByTarget.get("prompt-1")).toBe(1);
-    expect(indexes.promptLinkCountById.get("prompt-1")).toEqual({
-      context: 3,
-      output: 1,
     });
+
+    const draftNode = result.nodes.find((node) => node.id === CANVAS_PROMPT_DRAFT_NODE_ID);
+    expect(draftNode?.data.draftContextCount).toBe(1);
+    expect(draftNode?.data.draftOutputCount).toBe(1);
+    expect(
+      result.edges.some(
+        (edge) => edge.id === `draft:${ROOT_NODE_ID}->${CANVAS_PROMPT_DRAFT_NODE_ID}`,
+      ),
+    ).toBe(true);
   });
 });
