@@ -33,14 +33,18 @@ Preparation outside Dagre is now linear in the graph input: `O(N + A + P + L)`.
 
 ## Regression coverage
 
-`tests/canvas-flow-elements.test.ts` verifies:
+The existing `tests/canvas-flow-elements.test.ts` suite remains intact and verifies:
 
 - Conversation, prompt, and artifact node semantics.
 - Context, output, pending-output, and conversation edges.
 - Editable edge callbacks.
-- Prompt callbacks.
-- Unique artifact counts and prompt link counts.
-- Dangling artifact links do not inflate visible linked-artifact counts.
+- Branch draft nodes and edges.
+
+`tests/canvas-flow-indexes.test.ts` adds coverage for:
+
+- Unique artifact counts by target.
+- Input and output counts by canvas prompt.
+- Dangling artifact links not inflating visible linked-artifact counts.
 
 ## Reproducible benchmark
 
@@ -62,4 +66,4 @@ The benchmark validates the graph shape on every iteration so an optimization ca
 
 ## Release validation
 
-The production build validates the decomposed builder, layout module, regression suite, and benchmark fixture under the repository's strict TypeScript configuration. The implementation commit uses `[skip vercel]`; this release commit is the single production deployment for the phase.
+The production build validates the decomposed builder, layout module, preserved regression suite, new index tests, and benchmark fixture under the repository's strict TypeScript configuration. Implementation and correction commits use `[skip vercel]`; this release commit is the final production validation for the phase.
