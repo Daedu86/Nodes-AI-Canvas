@@ -11,7 +11,7 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 55
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
@@ -21,119 +21,71 @@ jobs:
       OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
       OPENROUTER_REQUIRE_USER_KEY: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --no-audit --fund=false
-      - name: Diagnose
+      - name: Diagnose non-browser gates
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.sha }}
         shell: bash
         run: |
           publish() {
-            local state="$1" context="$2" description="$3"
             gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" \
-              -f state="$state" -f context="$context" -f description="$description"
+              -f state="$1" -f context="$2" -f description="$3"
           }
           encode() {
             printf '%s' "$1" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '='
           }
+          run_gate() {
+            local name="$1" command="$2" log="$3"
+            set +e
+            bash -lc "$command" > "$log" 2>&1
+            local code=$?
+            set -e
+            if [ "$code" -eq 0 ]; then
+              publish success "diag7/${name}/ok" "${name} passed"
+            else
+              local summary
+              summary=$(grep -E 'error TS[0-9]+:|Type error:|Failed to compile|AssertionError|FAIL|Error:' "$log" | head -3 | tr '\n\r' '  ')
+              [ -n "$summary" ] || summary=$(tail -8 "$log" | tr '\n\r' '  ')
+              publish failure "diag7/${name}/$(encode "$summary")" "${name} failed (${code})"
+            fi
+          }
 
+          set -e
+          run_gate lint "npm run format:check" lint.log
+          run_gate typecheck "npm run typecheck" typecheck.log
+          run_gate unit "npm run test:unit" unit.log
+          run_gate coverage "npm run test:coverage" coverage.log
+          run_gate critical-coverage "npm run test:critical-coverage" critical.log
+          run_gate build "npm run build" build.log
+          run_gate audit-production "npm run audit:production" audit-production.log
+          run_gate audit-all "npm run audit:all" audit-all.log
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run and publish E2E status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        shell: bash
+        run: |
           set +e
-          npx eslint . --format json > lint.json 2> lint.stderr
-          lint_code=$?
-          if [ "$lint_code" -eq 0 ]; then
-            publish success 'diag7/lint/ok' 'Lint passed'
+          npm run test:e2e -- --workers=1 > e2e.log 2>&1
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" \
+              -f state=success -f context='diag7/e2e/ok' -f description='E2E passed'
           else
-            node <<'NODE' > lint-summary.txt
-          const fs = require('node:fs');
-          const path = require('node:path');
-          const results = JSON.parse(fs.readFileSync('lint.json', 'utf8'));
-          for (const result of results) {
-            for (const m of result.messages.filter((x) => x.severity === 2)) {
-              console.log(`${path.relative(process.cwd(), result.filePath)}:${m.line ?? 0}:${m.column ?? 0}:${m.ruleId ?? 'unknown'}:${m.message}`);
-            }
-          }
-          NODE
-            index=1
-            while IFS= read -r line && [ "$index" -le 8 ]; do
-              publish failure "diag7/lint${index}/$(encode "$line")" "Lint failed (${lint_code})"
-              index=$((index + 1))
-            done < lint-summary.txt
+            summary=$(grep -E '^[[:space:]]*[0-9]+\)|Error:|Timed out|failed' e2e.log | head -3 | tr '\n\r' '  ')
+            [ -n "$summary" ] || summary=$(tail -12 e2e.log | tr '\n\r' '  ')
+            encoded=$(printf '%s' "$summary" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" \
+              -f state=failure -f context="diag7/e2e/${encoded}" -f description="E2E failed (${code})"
           fi
-
-          npm run typecheck > typecheck.log 2>&1
-          type_code=$?
-          if [ "$type_code" -eq 0 ]; then
-            publish success 'diag7/typecheck/ok' 'Typecheck passed'
-          else
-            grep -E 'error TS[0-9]+:' typecheck.log | head -8 > type-summary.txt
-            index=1
-            while IFS= read -r line && [ "$index" -le 8 ]; do
-              publish failure "diag7/type${index}/$(encode "$line")" "Typecheck failed (${type_code})"
-              index=$((index + 1))
-            done < type-summary.txt
-          fi
-
-          npx vitest run --reporter=json --outputFile=unit.json > unit.log 2>&1
-          unit_code=$?
-          if [ "$unit_code" -eq 0 ]; then
-            publish success 'diag7/unit/ok' 'Unit tests passed'
-          else
-            node <<'NODE' > unit-summary.txt
-          const fs = require('node:fs');
-          const path = require('node:path');
-          let data = {};
-          try { data = JSON.parse(fs.readFileSync('unit.json', 'utf8')); } catch {}
-          for (const result of (data.testResults ?? []).filter((entry) => entry.status === 'failed')) {
-            const file = path.basename(result.name ?? 'unknown');
-            const assertions = (result.assertionResults ?? []).filter((test) => test.status === 'failed');
-            if (assertions.length === 0) {
-              const message = String(result.message ?? result.failureMessage ?? 'suite failed').split('\n')[0];
-              console.log(`${file}:${message}`);
-            }
-            for (const test of assertions) {
-              const message = String(test.failureMessages?.[0] ?? 'failed').split('\n')[0];
-              console.log(`${file}:${test.fullName ?? test.title}:${message}`);
-            }
-          }
-          NODE
-            if [ ! -s unit-summary.txt ]; then tail -30 unit.log > unit-summary.txt; fi
-            index=1
-            while IFS= read -r line && [ "$index" -le 8 ]; do
-              publish failure "diag7/unit${index}/$(encode "$line")" "Unit tests failed (${unit_code})"
-              index=$((index + 1))
-            done < unit-summary.txt
-          fi
-
-          npm run build > build.log 2>&1
-          build_code=$?
-          if [ "$build_code" -eq 0 ]; then
-            publish success 'diag7/build/ok' 'Build passed'
-          else
-            summary=$(grep -E 'Type error:|Failed to compile|Error:' build.log | head -2 | tr '\n\r' '  ')
-            publish failure "diag7/build/$(encode "$summary")" "Build failed (${build_code})"
-          fi
-
-          npm audit --omit=dev --json > audit-prod.json 2>/dev/null
-          node <<'NODE' > audit-prod.txt
-          const a = require('./audit-prod.json');
-          const v = a.metadata?.vulnerabilities ?? {};
-          console.log(`critical=${v.critical ?? 0},high=${v.high ?? 0},moderate=${v.moderate ?? 0},low=${v.low ?? 0}`);
-          NODE
-          prod=$(cat audit-prod.txt)
-          if grep -Eq 'critical=[1-9]|high=[1-9]' audit-prod.txt; then publish failure "diag7/audit-prod/${prod}" 'Production audit has high/critical issues'; else publish success "diag7/audit-prod/${prod}" 'Production audit acceptable'; fi
-
-          npm audit --json > audit-all.json 2>/dev/null
-          node <<'NODE' > audit-all.txt
-          const a = require('./audit-all.json');
-          const v = a.metadata?.vulnerabilities ?? {};
-          console.log(`critical=${v.critical ?? 0},high=${v.high ?? 0},moderate=${v.moderate ?? 0},low=${v.low ?? 0}`);
-          NODE
-          all=$(cat audit-all.txt)
-          publish success "diag7/audit-all/${all}" 'Full audit inventory'
-
           exit 0
