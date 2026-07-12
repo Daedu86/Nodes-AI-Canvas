@@ -46,7 +46,7 @@ jobs:
       - name: Run E2E
         id: e2e
         continue-on-error: true
-        run: npm run test:e2e -- --workers=1 2>&1 | tee e2e.log
+        run: npm run test:e2e -- --workers=1 --max-failures=1 2>&1 | tee e2e.log
 
       - name: Publish E2E result
         if: always()
