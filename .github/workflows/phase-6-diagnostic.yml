@@ -26,19 +26,29 @@ jobs:
         shell: bash
         run: |
           set +e
-          npm run lint > lint.log 2>&1
+          npx eslint . --format json > lint.json 2> lint.stderr
           code=$?
           if [ "$code" -eq 0 ]; then
             gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=success -f context='diag/lint/ok' -f description='Lint passed'
           else
-            mapfile -t lines < <(grep -E '(^|[[:space:]])(error|Error):|[0-9]+:[0-9]+[[:space:]]+Error' lint.log | head -3)
-            if [ "${#lines[@]}" -eq 0 ]; then mapfile -t lines < <(tail -3 lint.log); fi
+            node <<'NODE' > lint-summary.txt
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const results = JSON.parse(fs.readFileSync('lint.json', 'utf8'));
+          for (const result of results) {
+            for (const message of result.messages.filter((entry) => entry.severity === 2)) {
+              const file = path.relative(process.cwd(), result.filePath);
+              console.log(`${file}:${message.line ?? 0}:${message.column ?? 0}:${message.ruleId ?? 'unknown'}:${message.message}`);
+            }
+          }
+          NODE
+            if [ ! -s lint-summary.txt ]; then tail -5 lint.stderr > lint-summary.txt; fi
             index=1
-            for line in "${lines[@]}"; do
-              clean=$(printf '%s' "$line" | tr '\n\r/' '   ' | cut -c1-78)
-              gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=failure -f context="diag/lint${index}/${clean}" -f description="Lint failed (${code})"
+            while IFS= read -r line && [ "$index" -le 5 ]; do
+              encoded=$(printf '%s' "$line" | cut -c1-60 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=failure -f context="diag/lint${index}/${encoded}" -f description="Lint failed (${code})"
               index=$((index + 1))
-            done
+            done < lint-summary.txt
           fi
       - name: Run typecheck and publish summaries
         env:
@@ -52,12 +62,12 @@ jobs:
           if [ "$code" -eq 0 ]; then
             gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=success -f context='diag/typecheck/ok' -f description='Typecheck passed'
           else
-            mapfile -t lines < <(grep -E 'error TS[0-9]+:' typecheck.log | head -3)
-            if [ "${#lines[@]}" -eq 0 ]; then mapfile -t lines < <(tail -3 typecheck.log); fi
+            grep -E 'error TS[0-9]+:' typecheck.log | head -5 > type-summary.txt
+            if [ ! -s type-summary.txt ]; then tail -5 typecheck.log > type-summary.txt; fi
             index=1
-            for line in "${lines[@]}"; do
-              clean=$(printf '%s' "$line" | tr '\n\r/' '   ' | cut -c1-78)
-              gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=failure -f context="diag/type${index}/${clean}" -f description="Typecheck failed (${code})"
+            while IFS= read -r line && [ "$index" -le 5 ]; do
+              encoded=$(printf '%s' "$line" | cut -c1-60 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=failure -f context="diag/type${index}/${encoded}" -f description="Typecheck failed (${code})"
               index=$((index + 1))
-            done
+            done < type-summary.txt
           fi
