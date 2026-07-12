@@ -47,3 +47,7 @@ Validation errors return JSON with a stable error code and a bounded list of fie
 ```
 
 The same safe message is copied to the existing `x-nodes-error-message` header so the current Assistant UI error surface can display it without parsing the response body.
+
+## Release validation
+
+The production build validates the separated Node.js modules together with the existing Assistant UI and AI SDK transport. Unit coverage exercises accepted envelopes, unknown fields, invalid providers and history modes, malformed messages, request precedence, and malformed JSON responses.
