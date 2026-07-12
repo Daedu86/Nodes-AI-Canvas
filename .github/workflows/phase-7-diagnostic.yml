@@ -3,6 +3,7 @@ name: Phase 7 diagnostic
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,7 +12,7 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 45
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
@@ -21,71 +22,69 @@ jobs:
       OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
       OPENROUTER_REQUIRE_USER_KEY: "1"
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Mark verifier started
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=pending -f context='diag7/started' -f description='Phase 7 verifier started'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci --no-audit --fund=false
-      - name: Diagnose non-browser gates
+
+      - name: Install dependencies
+        run: npm ci --no-audit --fund=false
+
+      - name: Run core gates
+        id: core
+        continue-on-error: true
+        run: |
+          npm run format:check
+          npm run typecheck
+          npm run test:unit
+          npm run test:coverage
+          npm run test:critical-coverage
+          npm run build
+          npm run audit:production
+          npm run audit:all
+
+      - name: Publish core result
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.sha }}
-        shell: bash
+          OUTCOME: ${{ steps.core.outcome }}
         run: |
-          publish() {
-            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" \
-              -f state="$1" -f context="$2" -f description="$3"
-          }
-          encode() {
-            printf '%s' "$1" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '='
-          }
-          run_gate() {
-            local name="$1" command="$2" log="$3"
-            set +e
-            bash -lc "$command" > "$log" 2>&1
-            local code=$?
-            set -e
-            if [ "$code" -eq 0 ]; then
-              publish success "diag7/${name}/ok" "${name} passed"
-            else
-              local summary
-              summary=$(grep -E 'error TS[0-9]+:|Type error:|Failed to compile|AssertionError|FAIL|Error:' "$log" | head -3 | tr '\n\r' '  ')
-              [ -n "$summary" ] || summary=$(tail -8 "$log" | tr '\n\r' '  ')
-              publish failure "diag7/${name}/$(encode "$summary")" "${name} failed (${code})"
-            fi
-          }
-
-          set -e
-          run_gate lint "npm run format:check" lint.log
-          run_gate typecheck "npm run typecheck" typecheck.log
-          run_gate unit "npm run test:unit" unit.log
-          run_gate coverage "npm run test:coverage" coverage.log
-          run_gate critical-coverage "npm run test:critical-coverage" critical.log
-          run_gate build "npm run build" build.log
-          run_gate audit-production "npm run audit:production" audit-production.log
-          run_gate audit-all "npm run audit:all" audit-all.log
+          if [ "$OUTCOME" = "success" ]; then state=success; else state=failure; fi
+          gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state="$state" -f context='diag7/core' -f description="Core gates: ${OUTCOME}"
 
       - name: Install Playwright browser
+        if: steps.core.outcome == 'success'
         run: npx playwright install --with-deps chromium
 
-      - name: Run and publish E2E status
+      - name: Run E2E
+        id: e2e
+        if: steps.core.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:e2e -- --workers=1
+
+      - name: Publish E2E result
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.sha }}
-        shell: bash
+          CORE: ${{ steps.core.outcome }}
+          E2E: ${{ steps.e2e.outcome }}
         run: |
-          set +e
-          npm run test:e2e -- --workers=1 > e2e.log 2>&1
-          code=$?
-          if [ "$code" -eq 0 ]; then
-            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" \
-              -f state=success -f context='diag7/e2e/ok' -f description='E2E passed'
+          if [ "$CORE" != "success" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=error -f context='diag7/e2e' -f description='E2E skipped because core failed'
+          elif [ "$E2E" = "success" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=success -f context='diag7/e2e' -f description='E2E passed'
           else
-            summary=$(grep -E '^[[:space:]]*[0-9]+\)|Error:|Timed out|failed' e2e.log | head -3 | tr '\n\r' '  ')
-            [ -n "$summary" ] || summary=$(tail -12 e2e.log | tr '\n\r' '  ')
-            encoded=$(printf '%s' "$summary" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
-            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" \
-              -f state=failure -f context="diag7/e2e/${encoded}" -f description="E2E failed (${code})"
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=failure -f context='diag7/e2e' -f description="E2E: ${E2E}"
           fi
-          exit 0
