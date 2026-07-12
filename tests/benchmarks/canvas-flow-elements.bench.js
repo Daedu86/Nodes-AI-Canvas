@@ -1,20 +1,10 @@
 import { bench, describe } from "vitest";
 import { ROOT_NODE_ID } from "../../components/assistant-ui/thread-graph/graph-types";
-import {
-  buildCanvasFlowElements,
-  type CanvasFlowElementsParams,
-} from "../../components/assistant-ui/thread-graph-flow/canvas-flow-elements";
-import type {
-  SessionArtifact,
-  SessionCanvasLink,
-} from "../../lib/session-artifacts";
+import { buildCanvasFlowElements } from "../../components/assistant-ui/thread-graph-flow/canvas-flow-elements";
 
 const timestamp = "2026-07-12T14:00:00.000Z";
 
-const createArtifact = (
-  id: string,
-  artifactType: SessionArtifact["artifactType"],
-): SessionArtifact => ({
+const createArtifact = (id, artifactType) => ({
   id,
   title: id,
   artifactType,
@@ -22,10 +12,10 @@ const createArtifact = (
   position: null,
   createdAt: timestamp,
   updatedAt: timestamp,
-  ...(artifactType === "prompt" ? { promptStatus: "idle" as const } : {}),
+  ...(artifactType === "prompt" ? { promptStatus: "idle" } : {}),
 });
 
-const createBenchmarkParams = (): CanvasFlowElementsParams => {
+const createBenchmarkParams = () => {
   const canvasConversationNodes = Array.from({ length: 1_000 }, (_, index) => {
     if (index === 0) {
       return {
@@ -63,7 +53,7 @@ const createBenchmarkParams = (): CanvasFlowElementsParams => {
     createArtifact(`prompt-${index}`, "prompt"),
   );
   const allArtifacts = [...artifacts, ...canvasPrompts];
-  const canvasLinks: SessionCanvasLink[] = [];
+  const canvasLinks = [];
 
   for (let index = 0; index < 1_000; index += 1) {
     const promptId =
@@ -99,14 +89,14 @@ const createBenchmarkParams = (): CanvasFlowElementsParams => {
       ? [
           {
             ...link,
-            relation: "context" as const,
+            relation: "context",
             promptId: link.promptId,
             targetMessageId: link.promptId,
           },
         ]
       : [],
   );
-  const linkedTargetCountByArtifact = new Map<string, number>();
+  const linkedTargetCountByArtifact = new Map();
   for (const link of contextLinks) {
     linkedTargetCountByArtifact.set(
       link.artifactId,
@@ -121,7 +111,7 @@ const createBenchmarkParams = (): CanvasFlowElementsParams => {
     canvasConversationNodes,
     canvasLinks,
     canvasPrompts,
-    cancelCanvasPrompt: noOp as CanvasFlowElementsParams["cancelCanvasPrompt"],
+    cancelCanvasPrompt: noOp,
     canvasDraftError: null,
     contextLinks,
     deleteArtifact: noOp,
@@ -130,7 +120,7 @@ const createBenchmarkParams = (): CanvasFlowElementsParams => {
     draftBranchSpec: null,
     draftContextCount: 0,
     draftDetail: null,
-    getArtifactsForTarget: (() => []) as CanvasFlowElementsParams["getArtifactsForTarget"],
+    getArtifactsForTarget: () => [],
     handleCancelPromptDraft: noOp,
     handleCancelRun: noOp,
     handleCutEdge: noOp,
@@ -148,9 +138,9 @@ const createBenchmarkParams = (): CanvasFlowElementsParams => {
     ),
     promptIndex: new Map(canvasPrompts.map((prompt) => [prompt.id, prompt])),
     requestError: null,
-    runCanvasPrompt: noOp as CanvasFlowElementsParams["runCanvasPrompt"],
+    runCanvasPrompt: noOp,
     setDraftText: noOp,
-    updateArtifact: noOp as CanvasFlowElementsParams["updateArtifact"],
+    updateArtifact: noOp,
   };
 };
 
