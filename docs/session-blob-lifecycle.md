@@ -32,4 +32,12 @@ The bucket remains private and accepts only the MIME types supported by the uplo
 
 Administrators can inspect the current metrics with `GET /api/admin/session-blobs` and execute cleanup with `POST /api/admin/session-blobs`.
 
-The `session-blob-gc` Supabase Edge Function is intended for scheduled cleanup. It reconciles the bucket restrictions, scans for orphaned objects, processes up to 10,000 queued deletions per invocation, and records failures for retry.
+The `session-blob-gc` Supabase Edge Function is scheduled daily at 03:20 UTC. It reconciles the bucket restrictions, scans for orphaned objects, processes up to 10,000 queued deletions per invocation, and records failures for retry. Its invocation endpoint and publishable key are encrypted in Supabase Vault rather than committed to source control.
+
+## Production verification
+
+The release verification exercised the complete registry transition:
+
+`pending -> active -> deleting -> processing -> removed`
+
+It also executed the scheduled Edge Function successfully against the production bucket and confirmed that no temporary sessions, blob rows, or deletion jobs remained afterward.
