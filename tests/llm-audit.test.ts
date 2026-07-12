@@ -11,7 +11,8 @@ const requested = {
   provider: "openrouter" as const,
 };
 
-const parseEvent = (call: unknown[]) => JSON.parse(String(call[0])) as Record<string, unknown>;
+const parseEvent = (call: unknown[]) =>
+  JSON.parse(String(call[0])) as Record<string, unknown>;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -100,10 +101,15 @@ describe("LLM observability", () => {
     expect(serialized).not.toContain("prompt");
   });
 
-  it("extracts only normalized token counters from SDK completion events", () => {
+  it("prefers aggregate SDK usage and discards raw provider payloads", () => {
     expect(
       getLlmUsageMetrics({
         usage: {
+          inputTokens: 20,
+          outputTokens: 10,
+          totalTokens: 30,
+        },
+        totalUsage: {
           inputTokens: 120,
           inputTokenDetails: {
             cacheReadTokens: 40,
