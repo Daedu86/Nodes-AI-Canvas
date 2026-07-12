@@ -58,7 +58,7 @@ jobs:
       - name: Repository coverage
         id: coverage
         continue-on-error: true
-        run: npm run test:coverage
+        run: npm run test:coverage 2>&1 | tee coverage.log
 
       - name: Critical coverage
         id: critical
@@ -132,14 +132,18 @@ jobs:
           NODE
             detail unit "$(cat unit-detail.txt)"
           fi
+          if [ "$COVERAGE" != "success" ]; then
+            line=$(grep -E 'ERROR: Coverage|Coverage for (lines|functions|statements|branches)' coverage.log | head -1)
+            detail coverage "${line:-$(tail -5 coverage.log | tr '\n' ' ')}"
+          fi
 
       - name: Install Playwright browser
-        if: steps.lint.outcome == 'success' && steps.typecheck.outcome == 'success' && steps.unit.outcome == 'success' && steps.coverage.outcome == 'success' && steps.critical.outcome == 'success' && steps.build.outcome == 'success'
+        if: steps.lint.outcome == 'success' && steps.typecheck.outcome == 'success' && steps.unit.outcome == 'success' && steps.critical.outcome == 'success' && steps.build.outcome == 'success'
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E
         id: e2e
-        if: steps.lint.outcome == 'success' && steps.typecheck.outcome == 'success' && steps.unit.outcome == 'success' && steps.coverage.outcome == 'success' && steps.critical.outcome == 'success' && steps.build.outcome == 'success'
+        if: steps.lint.outcome == 'success' && steps.typecheck.outcome == 'success' && steps.unit.outcome == 'success' && steps.critical.outcome == 'success' && steps.build.outcome == 'success'
         continue-on-error: true
         run: npm run test:e2e -- --workers=1
 
