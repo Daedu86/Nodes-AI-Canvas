@@ -64,3 +64,18 @@ All invitation responses use `Cache-Control: no-store`.
 ## Delivery
 
 The application does not currently have a transactional email provider configured. Owners deliver invitation links by copying them from the collaboration screen. This avoids pretending an email was delivered when no mail transport exists and keeps the security lifecycle independent from a future email provider.
+
+## Production database verification
+
+The production migration was tested with temporary project, invitation, and membership rows:
+
+- A pending invitation created a member placeholder with `user_id` and `accepted_at` both null.
+- A different authenticated email was rejected without changing invitation state.
+- The matching account accepted the invitation and bound the membership to its stable user identifier.
+- Reusing the accepted token was rejected.
+- Reissuing an invitation revoked the previous pending token and replaced the pending member role.
+- Revoking the replacement token removed only the pending member and preserved accepted members.
+- Deleting the temporary project removed invitations and memberships through cascades.
+- Final checks found no temporary rows, no pending membership with an access identity, and no accepted identity without an acceptance timestamp.
+
+The invitation table has RLS enabled. `anon`, `authenticated`, and `public` have no direct table or invitation-function access; only `service_role` can execute the lifecycle functions. Two follow-up migrations qualify PL/pgSQL references discovered by the transaction tests, ensuring a reproducible final function definition.
