@@ -48,12 +48,12 @@ jobs:
       - name: Lint
         id: lint
         continue-on-error: true
-        run: npm run format:check
+        run: npm run format:check 2>&1 | tee lint.log
 
       - name: Typecheck
         id: typecheck
         continue-on-error: true
-        run: npm run typecheck
+        run: npm run typecheck 2>&1 | tee typecheck.log
 
       - name: Session schema evolution tests
         id: targeted
@@ -63,7 +63,7 @@ jobs:
       - name: Complete unit suite
         id: unit
         continue-on-error: true
-        run: npm run test:unit
+        run: npx vitest run --reporter=json --outputFile=unit.json 2>&1 | tee unit.log
 
       - name: Production build
         id: build
@@ -87,11 +87,38 @@ jobs:
             gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" \
               -f state="$state" -f context="diag8/$1" -f description="$1: $2"
           }
+          detail() {
+            encoded=$(printf '%s' "$2" | cut -c1-96 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" \
+              -f state=failure -f context="diag8/$1-detail/${encoded}" -f description="$1 failure detail"
+          }
+
           publish lint "$LINT"
           publish typecheck "$TYPECHECK"
           publish targeted "$TARGETED"
           publish unit "$UNIT"
           publish build "$BUILD"
+
+          if [ "$LINT" != "success" ]; then
+            line=$(grep -E '[0-9]+:[0-9]+[[:space:]]+(error|warning)' lint.log | head -1)
+            detail lint "${line:-$(tail -5 lint.log | tr '\n' ' ')}"
+          fi
+          if [ "$TYPECHECK" != "success" ]; then
+            line=$(grep -E 'error TS[0-9]+:' typecheck.log | head -1)
+            detail typecheck "${line:-$(tail -5 typecheck.log | tr '\n' ' ')}"
+          fi
+          if [ "$UNIT" != "success" ]; then
+            node <<'NODE' > unit-detail.txt
+          const fs = require('node:fs');
+          const path = require('node:path');
+          let data = {};
+          try { data = JSON.parse(fs.readFileSync('unit.json', 'utf8')); } catch {}
+          const result = (data.testResults ?? []).find((entry) => entry.status === 'failed');
+          const assertion = result?.assertionResults?.find((entry) => entry.status === 'failed');
+          console.log(`${path.basename(result?.name ?? 'unknown')}:${assertion?.fullName ?? 'suite'}:${String(assertion?.failureMessages?.[0] ?? result?.message ?? 'failed').split('\n')[0]}`);
+          NODE
+            detail unit "$(cat unit-detail.txt)"
+          fi
 
           if [ "$LINT" != "success" ] || [ "$TYPECHECK" != "success" ] || [ "$TARGETED" != "success" ] || [ "$UNIT" != "success" ] || [ "$BUILD" != "success" ]; then
             exit 1
