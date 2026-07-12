@@ -62,8 +62,8 @@ The benchmark builds and lays out a deterministic graph containing:
 - 1,300 resulting nodes.
 - 2,999 resulting edges.
 
-The benchmark validates the graph shape on every iteration so an optimization cannot improve timing by silently dropping elements.
+The benchmark validates the graph shape on every iteration so an optimization cannot improve timing by silently dropping elements. It is stored as a standalone Vitest JavaScript benchmark so the production Next.js typecheck remains limited to application and regression-test TypeScript.
 
 ## Release validation
 
-The production build validates the decomposed builder, layout module, preserved regression suite, new index tests, and benchmark fixture under the repository's strict TypeScript configuration. Implementation and correction commits use `[skip vercel]`; this release commit is the final production validation for the phase.
+The production build validates the decomposed builder, layout module, preserved regression suite, and new index tests under the repository's strict TypeScript configuration. The benchmark remains independently executable through Vitest. Implementation and correction commits use `[skip vercel]`; this release commit is the final production validation for the phase.
