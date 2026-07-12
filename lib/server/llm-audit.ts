@@ -88,6 +88,8 @@ type LlmAuditEvent = {
   usage?: LlmUsageMetrics;
 };
 
+const LOG_PREFIX = "[nodes-llm-audit]";
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   typeof value === "object" && value !== null
     ? (value as Record<string, unknown>)
@@ -150,7 +152,7 @@ const createBaseEvent = (
 
 const emitAudit = (event: LlmAuditEvent) => {
   if (process.env.NODES_LLM_OBSERVABILITY === "0") return;
-  console.info(JSON.stringify(event));
+  console.info(LOG_PREFIX, JSON.stringify(event));
 };
 
 export function createLlmAuditContext(options: {

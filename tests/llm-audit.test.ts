@@ -12,7 +12,7 @@ const requested = {
 };
 
 const parseEvent = (call: unknown[]) =>
-  JSON.parse(String(call[0])) as Record<string, unknown>;
+  JSON.parse(String(call[1] ?? call[0])) as Record<string, unknown>;
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -69,6 +69,8 @@ describe("LLM observability", () => {
     });
 
     expect(info).toHaveBeenCalledTimes(2);
+    expect(info.mock.calls[0]?.[0]).toBe("[nodes-llm-audit]");
+    expect(info.mock.calls[1]?.[0]).toBe("[nodes-llm-audit]");
     const accepted = parseEvent(info.mock.calls[0]!);
     const completed = parseEvent(info.mock.calls[1]!);
     expect(accepted).toMatchObject({

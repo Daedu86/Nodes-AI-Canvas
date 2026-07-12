@@ -29,6 +29,12 @@ vi.mock("../lib/user-plan-store", () => ({
 
 import { DELETE, POST } from "../app/api/agents/token/route";
 
+const requireResponse = (response: Response | undefined) => {
+  expect(response).toBeInstanceOf(Response);
+  if (!response) throw new Error("Expected the route to return a Response.");
+  return response;
+};
+
 describe("/api/agents/token", () => {
   beforeEach(() => {
     requireLocalApiUserMock.mockReset();
@@ -65,17 +71,19 @@ describe("/api/agents/token", () => {
   it("mints a token with an explicit expiry after persisting its record", async () => {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const response = await POST(
-      new Request("http://localhost/api/agents/token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          expiresAt,
-          label: "CI bot",
+    const response = requireResponse(
+      await POST(
+        new Request("http://localhost/api/agents/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            expiresAt,
+            label: "CI bot",
+          }),
         }),
-      }),
+      ),
     );
 
     expect(response.status).toBe(200);
@@ -98,12 +106,14 @@ describe("/api/agents/token", () => {
   it("does not expose a token when its authoritative record cannot be saved", async () => {
     upsertAgentTokenRecordMock.mockResolvedValue(false);
 
-    const response = await POST(
-      new Request("http://localhost/api/agents/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: "CI bot" }),
-      }),
+    const response = requireResponse(
+      await POST(
+        new Request("http://localhost/api/agents/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label: "CI bot" }),
+        }),
+      ),
     );
 
     expect(response.status).toBe(503);
@@ -117,11 +127,13 @@ describe("/api/agents/token", () => {
   it("requires the dedicated agent token secret", async () => {
     isAgentTokenConfiguredMock.mockReturnValue(false);
 
-    const response = await POST(
-      new Request("http://localhost/api/agents/token", {
-        method: "POST",
-        body: JSON.stringify({}),
-      }),
+    const response = requireResponse(
+      await POST(
+        new Request("http://localhost/api/agents/token", {
+          method: "POST",
+          body: JSON.stringify({}),
+        }),
+      ),
     );
 
     expect(response.status).toBe(503);
@@ -132,10 +144,12 @@ describe("/api/agents/token", () => {
   });
 
   it("revokes an existing token", async () => {
-    const response = await DELETE(
-      new Request("http://localhost/api/agents/token?tokenId=token-1", {
-        method: "DELETE",
-      }),
+    const response = requireResponse(
+      await DELETE(
+        new Request("http://localhost/api/agents/token?tokenId=token-1", {
+          method: "DELETE",
+        }),
+      ),
     );
 
     expect(response.status).toBe(200);
@@ -159,21 +173,25 @@ describe("/api/agents/token", () => {
       },
     });
 
-    const postResponse = await POST(
-      new Request("http://localhost/api/agents/token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({}),
-      }),
+    const postResponse = requireResponse(
+      await POST(
+        new Request("http://localhost/api/agents/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        }),
+      ),
     );
     expect(postResponse.status).toBe(403);
 
-    const deleteResponse = await DELETE(
-      new Request("http://localhost/api/agents/token?tokenId=token-1", {
-        method: "DELETE",
-      }),
+    const deleteResponse = requireResponse(
+      await DELETE(
+        new Request("http://localhost/api/agents/token?tokenId=token-1", {
+          method: "DELETE",
+        }),
+      ),
     );
     expect(deleteResponse.status).toBe(403);
   });
@@ -182,16 +200,18 @@ describe("/api/agents/token", () => {
     getUserPlanMock.mockResolvedValue("free");
     countActiveAgentTokensMock.mockResolvedValue(1);
 
-    const response = await POST(
-      new Request("http://localhost/api/agents/token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          label: "Second agent",
+    const response = requireResponse(
+      await POST(
+        new Request("http://localhost/api/agents/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            label: "Second agent",
+          }),
         }),
-      }),
+      ),
     );
 
     expect(response.status).toBe(400);
