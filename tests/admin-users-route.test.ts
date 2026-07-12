@@ -15,6 +15,12 @@ vi.mock("../lib/server/admin-users", () => ({
 
 import { GET, PATCH } from "../app/api/admin/users/route";
 
+const requireResponse = (response: Response | undefined) => {
+  expect(response).toBeInstanceOf(Response);
+  if (!response) throw new Error("Expected the route to return a Response.");
+  return response;
+};
+
 describe("/api/admin/users", () => {
   beforeEach(() => {
     requireAdminApiUserMock.mockReset();
@@ -33,7 +39,13 @@ describe("/api/admin/users", () => {
         counts: { agentTokens: 0, projects: 2, sessions: 4 },
         createdAt: "2026-04-20T10:00:00.000Z",
         lastActivityAt: "2026-04-20T12:00:00.000Z",
-        limits: { concurrent: 1, perDay: 120, perHour: 40, perMinute: 8, plan: "free" },
+        limits: {
+          concurrent: 1,
+          perDay: 120,
+          perHour: 40,
+          perMinute: 8,
+          plan: "free",
+        },
         ownerId: "user-1",
         plan: "free",
         providers: { ollamaKeyCount: 0, openrouterKeyCount: 1 },
@@ -50,7 +62,9 @@ describe("/api/admin/users", () => {
   });
 
   it("lists admin-visible users", async () => {
-    const response = await GET(new Request("http://localhost/api/admin/users"));
+    const response = requireResponse(
+      await GET(new Request("http://localhost/api/admin/users")),
+    );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -63,15 +77,19 @@ describe("/api/admin/users", () => {
   });
 
   it("validates ownerId on patch", async () => {
-    const response = await PATCH(
-      new Request("http://localhost/api/admin/users", {
-        body: JSON.stringify({ plan: "paid" }),
-        method: "PATCH",
-      }),
+    const response = requireResponse(
+      await PATCH(
+        new Request("http://localhost/api/admin/users", {
+          body: JSON.stringify({ plan: "paid" }),
+          method: "PATCH",
+        }),
+      ),
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "ownerId is required." });
+    await expect(response.json()).resolves.toEqual({
+      error: "ownerId is required.",
+    });
   });
 
   it("updates a user plan", async () => {
@@ -79,7 +97,13 @@ describe("/api/admin/users", () => {
       counts: { agentTokens: 0, projects: 2, sessions: 4 },
       createdAt: "2026-04-20T10:00:00.000Z",
       lastActivityAt: "2026-04-20T12:00:00.000Z",
-      limits: { concurrent: 2, perDay: 600, perHour: 120, perMinute: 24, plan: "paid" },
+      limits: {
+        concurrent: 2,
+        perDay: 600,
+        perHour: 120,
+        perMinute: 24,
+        plan: "paid",
+      },
       ownerId: "user-1",
       plan: "paid",
       providers: { ollamaKeyCount: 0, openrouterKeyCount: 1 },
@@ -93,11 +117,13 @@ describe("/api/admin/users", () => {
       },
     });
 
-    const response = await PATCH(
-      new Request("http://localhost/api/admin/users", {
-        body: JSON.stringify({ ownerId: "user-1", plan: "paid" }),
-        method: "PATCH",
-      }),
+    const response = requireResponse(
+      await PATCH(
+        new Request("http://localhost/api/admin/users", {
+          body: JSON.stringify({ ownerId: "user-1", plan: "paid" }),
+          method: "PATCH",
+        }),
+      ),
     );
 
     expect(updateAdminUserPlanMock).toHaveBeenCalledWith("user-1", "paid");

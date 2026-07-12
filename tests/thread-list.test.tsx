@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 
-import React from "react";
+import React, {
+  type ButtonHTMLAttributes,
+  type ReactNode,
+} from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -38,6 +41,11 @@ const projectsContext = {
   selectProject: vi.fn(),
 };
 
+type TooltipIconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  children?: ReactNode;
+  tooltip: string;
+};
+
 vi.mock("@/components/context/persisted-sessions", () => ({
   usePersistedSessions: () => persistedSessionsContext,
 }));
@@ -55,7 +63,11 @@ vi.mock("@/components/context/workspace-surface", () => ({
 vi.mock("@/components/assistant-ui/tooltip-icon-button", async () => {
   const ReactModule = await import("react");
   return {
-    TooltipIconButton: ({ children, tooltip, ...props }: any) =>
+    TooltipIconButton: ({
+      children,
+      tooltip,
+      ...props
+    }: TooltipIconButtonProps) =>
       ReactModule.createElement(
         "button",
         {

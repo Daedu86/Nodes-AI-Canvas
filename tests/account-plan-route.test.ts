@@ -28,6 +28,12 @@ vi.mock("../lib/server/admin-access", () => ({
 
 import { GET } from "../app/api/account/plan/route";
 
+const requireResponse = (response: Response | undefined) => {
+  expect(response).toBeInstanceOf(Response);
+  if (!response) throw new Error("Expected the route to return a Response.");
+  return response;
+};
+
 describe("/api/account/plan", () => {
   beforeEach(() => {
     requireLocalApiUserMock.mockReset();
@@ -55,10 +61,14 @@ describe("/api/account/plan", () => {
     getLlmSettingsMock.mockResolvedValue({
       providers: {
         ollama: {
-          apiKeys: [{ id: "ollama-1", key: "ollama-key", name: "Ollama", createdAt: "" }],
+          apiKeys: [
+            { id: "ollama-1", key: "ollama-key", name: "Ollama", createdAt: "" },
+          ],
         },
         openrouter: {
-          apiKeys: [{ id: "or-1", key: "or-key", name: "OpenRouter", createdAt: "" }],
+          apiKeys: [
+            { id: "or-1", key: "or-key", name: "OpenRouter", createdAt: "" },
+          ],
         },
       },
     });
@@ -66,7 +76,9 @@ describe("/api/account/plan", () => {
   });
 
   it("returns plan, limits, usage, provider key counts, and admin flag", async () => {
-    const response = await GET(new Request("http://localhost/api/account/plan"));
+    const response = requireResponse(
+      await GET(new Request("http://localhost/api/account/plan")),
+    );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({

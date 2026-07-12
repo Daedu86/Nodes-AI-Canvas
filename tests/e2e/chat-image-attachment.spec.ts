@@ -6,6 +6,16 @@ const PIXEL_PNG_BASE64 =
 
 type Page = import("@playwright/test").Page;
 
+type CapturedChatRequest = {
+  url: string;
+  postData?: unknown;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+
 const DEV_AUTH_EMAIL = process.env.AUTH_DEV_EMAIL || "demo@nodes.local";
 const DEV_AUTH_PASSWORD = process.env.AUTH_DEV_PASSWORD || "dev-password";
 const PLAYWRIGHT_BASE_URL =
@@ -54,7 +64,9 @@ async function ensureSignedIn(page: Page) {
     return;
   }
 
-  const loginButton = page.getByRole("button", { name: "Sign in with local dev credentials" });
+  const loginButton = page.getByRole("button", {
+    name: "Sign in with local dev credentials",
+  });
   if (await loginButton.isVisible().catch(() => false)) {
     await page.locator("#dev-email").fill(DEV_AUTH_EMAIL);
     await page.locator("#dev-password").fill(DEV_AUTH_PASSWORD);
@@ -65,12 +77,20 @@ async function ensureSignedIn(page: Page) {
 
 async function createAndOpenSession(page: Page) {
   await ensureSignedIn(page);
-  const created = await fetchAppJson<{ session: { id: string } }>(page, "/api/sessions", {
-    method: "POST",
-    body: JSON.stringify({}),
+  const created = await fetchAppJson<{ session: { id: string } }>(
+    page,
+    "/api/sessions",
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+  await page.goto(`/?sessionId=${created.session.id}`, {
+    waitUntil: "domcontentloaded",
   });
-  await page.goto(`/?sessionId=${created.session.id}`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByPlaceholder("Write a message...")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByPlaceholder("Write a message...")).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -82,7 +102,7 @@ test("attaching an image includes it in the sent message", async ({ page }) => {
   const filePath = test.info().outputPath("pixel.png");
   await fs.writeFile(filePath, Buffer.from(PIXEL_PNG_BASE64, "base64"));
 
-  const chatRequests: Array<{ url: string; postData?: any }> = [];
+  const chatRequests: CapturedChatRequest[] = [];
   const chatRequestBodies: string[] = [];
   page.on("request", (req) => {
     if (req.method() !== "POST") return;
@@ -110,7 +130,11 @@ test("attaching an image includes it in the sent message", async ({ page }) => {
 
   // Preview shows before send.
   await expect(page.getByTestId("composer-image-preview")).toBeVisible();
-  await expect(page.getByTestId("composer-image-preview").getByRole("img", { name: "pixel.png" })).toBeVisible();
+  await expect(
+    page
+      .getByTestId("composer-image-preview")
+      .getByRole("img", { name: "pixel.png" }),
+  ).toBeVisible();
 
   // Send (no manual text) should auto-generate a prompt and include the image.
   const sendButton = page.getByRole("button", { name: "Send" });
@@ -136,29 +160,34 @@ test("attaching an image includes it in the sent message", async ({ page }) => {
 
   // Assert the request included an image part.
   expect(chatRequests.length).toBeGreaterThan(0);
-  const last = chatRequests.at(-1)?.postData;
+  const last = asRecord(chatRequests.at(-1)?.postData);
   const messages = Array.isArray(last?.messages) ? last.messages : [];
-  const lastUser = [...messages].reverse().find((m: any) => m?.role === "user");
-  const parts = Array.isArray(lastUser?.parts)
-    ? lastUser.parts
-    : Array.isArray(lastUser?.content)
-      ? lastUser.content
+  const lastUser = [...messages]
+    .reverse()
+    .find((message) => asRecord(message)?.role === "user");
+  const lastUserRecord = asRecord(lastUser);
+  const parts = Array.isArray(lastUserRecord?.parts)
+    ? lastUserRecord.parts
+    : Array.isArray(lastUserRecord?.content)
+      ? lastUserRecord.content
       : [];
   expect(Array.isArray(parts)).toBeTruthy();
-  const hasImage =
-    Array.isArray(parts) &&
-    parts.some((p: any) => {
-      if (p?.type === "image" && typeof p.image === "string") return true;
-      if (
-        p?.type === "file" &&
-        typeof p.url === "string" &&
-        typeof p.mediaType === "string" &&
-        p.mediaType.startsWith("image/")
-      ) {
-        return true;
-      }
-      return false;
-    });
+  const hasImage = parts.some((part) => {
+    const record = asRecord(part);
+    if (!record) return false;
+    if (record.type === "image" && typeof record.image === "string") {
+      return true;
+    }
+    if (
+      record.type === "file" &&
+      typeof record.url === "string" &&
+      typeof record.mediaType === "string" &&
+      record.mediaType.startsWith("image/")
+    ) {
+      return true;
+    }
+    return false;
+  });
   expect(hasImage).toBeTruthy();
 });
 
@@ -174,14 +203,18 @@ test("send is blocked while an image is still preparing", async ({ page }) => {
   // (This guards the race where users click Send before FileReader resolves.)
   await page.getByRole("button", { name: "Send" }).click();
   const alert = page.getByTestId("composer-error");
-  await expect(alert).toContainText(/preparing the image attachment|text-only|Could not send/i);
+  await expect(alert).toContainText(
+    /preparing the image attachment|text-only|Could not send/i,
+  );
 });
 
-test("attaching an image does not auto-send when text is already typed", async ({ page }) => {
+test("attaching an image does not auto-send when text is already typed", async ({
+  page,
+}) => {
   const filePath = test.info().outputPath("pixel.png");
   await fs.writeFile(filePath, Buffer.from(PIXEL_PNG_BASE64, "base64"));
 
-  const chatRequests: Array<{ url: string; postData?: any }> = [];
+  const chatRequests: CapturedChatRequest[] = [];
   page.on("request", (req) => {
     if (req.method() !== "POST") return;
     if (!req.url().includes("/api/chat")) return;
