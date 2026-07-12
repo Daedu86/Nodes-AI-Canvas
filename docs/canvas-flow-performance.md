@@ -40,6 +40,7 @@ Preparation outside Dagre is now linear in the graph input: `O(N + A + P + L)`.
 - Editable edge callbacks.
 - Prompt callbacks.
 - Unique artifact counts and prompt link counts.
+- Dangling artifact links do not inflate visible linked-artifact counts.
 
 ## Reproducible benchmark
 
@@ -58,3 +59,7 @@ The benchmark builds and lays out a deterministic graph containing:
 - 2,999 resulting edges.
 
 The benchmark validates the graph shape on every iteration so an optimization cannot improve timing by silently dropping elements.
+
+## Release validation
+
+The production build validates the decomposed builder, layout module, regression suite, and benchmark fixture under the repository's strict TypeScript configuration. The implementation commit uses `[skip vercel]`; this release commit is the single production deployment for the phase.
