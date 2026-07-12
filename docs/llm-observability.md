@@ -1,6 +1,6 @@
 # LLM observability
 
-The chat route emits structured JSON lifecycle events that can be queried in Vercel runtime logs or forwarded to another log sink.
+The chat and independent canvas-run routes emit structured JSON lifecycle events that can be queried in Vercel runtime logs or forwarded to another log sink.
 
 ## Privacy boundary
 
@@ -19,18 +19,20 @@ Set `NODES_LLM_OBSERVABILITY=0` to disable lifecycle events and AI SDK telemetry
 
 ## Event lifecycle
 
-A normal streamed request produces:
+A normal streamed chat request produces:
 
 1. `request_accepted` after quota and concurrency reservation.
 2. `attempt_started` for each provider/model attempt.
 3. `first_token` when the first non-empty text or reasoning delta arrives.
 4. `request_completed` when the stream finishes.
 
+Independent canvas runs use the same lifecycle except that their non-streaming execution has no first-token event.
+
 Other outcomes produce:
 
 - `request_rejected` for concurrency or usage limits.
 - `fallback_applied` before retrying a supported OpenRouter failure with the next model.
-- `request_cancelled` when the client aborts or the streaming runtime aborts.
+- `request_cancelled` when the client aborts or the generation runtime aborts.
 - `request_failed` for terminal provider, credential, or backend failures.
 
 ## Latency fields
@@ -44,7 +46,7 @@ Terminal and first-token events include:
 - `providerTimeToFirstChunkMs`: provider-attempt-relative first chunk time.
 - `providerTimeToFirstTokenMs`: provider-attempt-relative first token time.
 
-This separation prevents authentication, settings lookup, and quota reservation time from being attributed to the model provider.
+This separation prevents authentication, settings lookup, and quota reservation time from being attributed to the model provider. Non-streaming canvas runs report total and provider duration while first-chunk and first-token fields remain null.
 
 ## Usage fields
 
@@ -74,7 +76,7 @@ No account identifier is attached to these values. The metrics property on an ac
 
 ## Cancellation and lease release
 
-The Next.js request abort signal is passed to `streamText`. Client disconnects and explicit cancellations therefore stop the provider request and release the distributed concurrency lease through the same idempotent finalizer used for success and failure.
+The Next.js request abort signal is passed to both `streamText` and `generateText`. Client disconnects and explicit cancellations therefore stop the provider request and release the distributed concurrency lease through the same idempotent finalizer used for success and failure.
 
 Cancellation events classify the source as:
 
@@ -83,7 +85,7 @@ Cancellation events classify the source as:
 
 ## AI SDK telemetry
 
-Each provider attempt enables the AI SDK telemetry hook with the function identifier `nodes.chat`. Metadata is limited to the request ID, provider, model ID, attempt number, and fallback state.
+Each provider attempt enables the AI SDK telemetry hook. Streamed chat uses `nodes.chat`; independent canvas runs use `nodes.canvas-run`. Metadata is limited to the request ID, provider, model ID, attempt number, and fallback state.
 
 `recordInputs` and `recordOutputs` are both disabled. A deployment that registers an OpenTelemetry exporter can therefore receive timing spans without storing prompts, responses, tool payloads, or artifact content.
 
@@ -100,4 +102,4 @@ Exception messages are excluded because provider errors can echo request content
 
 ## Release validation
 
-The production build validates the lifecycle event schema, aggregate usage normalization, first-chunk and first-token timing tracker, quota metrics, abort propagation, idempotent lease release, compatibility of the existing quota-grant contract, and privacy-focused regression tests. Implementation and corrective commits use `[skip vercel]`; this release commit is the production candidate for the phase.
+The production build validates the chat and canvas-run lifecycle integrations, aggregate usage normalization, first-chunk and first-token timing tracker, quota metrics, abort propagation, idempotent lease release, compatibility of the existing quota-grant contract, and privacy-focused regression tests. A temporary diagnostic workflow was removed before release. Implementation and corrective commits use `[skip vercel]`; this release commit is the only successful production deployment for the phase.
