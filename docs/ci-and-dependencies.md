@@ -72,4 +72,4 @@ Repository administrators should select these names in the `main` branch protect
 
 ## Release verification
 
-A temporary push-only diagnostic workflow validates the same commands and publishes concise commit statuses while this CI migration is being introduced. It is removed before the phase release so the permanent workflows remain the sole source of future checks. All non-browser gates are healthy; the temporary verifier is now reduced to an isolated Playwright run that publishes the first failing test and message.
+A temporary push-only diagnostic workflow validates the same commands and publishes concise commit statuses while this CI migration is being introduced. It is removed before the phase release so the permanent workflows remain the sole source of future checks. All non-browser gates are healthy; the temporary verifier is now running Playwright with `--max-failures=1` so the first remaining browser regression can be corrected precisely.
