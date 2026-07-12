@@ -72,4 +72,4 @@ Repository administrators should select these names in the `main` branch protect
 
 ## Release verification
 
-A temporary push-only diagnostic workflow validates the same commands and publishes concise commit statuses while this CI migration is being introduced. It is removed before the phase release so the permanent workflows remain the sole source of future checks.
+A temporary push-only diagnostic workflow validates the same commands and publishes concise commit statuses while this CI migration is being introduced. It is removed before the phase release so the permanent workflows remain the sole source of future checks. The verifier first publishes `diag7/started`, which confirms that GitHub scheduled the workflow before any project command executes.
