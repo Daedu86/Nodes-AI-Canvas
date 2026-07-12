@@ -12,7 +12,7 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
@@ -40,36 +40,80 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --fund=false
 
-      - name: Run core gates
-        id: core
+      - name: Lint
+        id: lint
         continue-on-error: true
-        run: |
-          npm run format:check
-          npm run typecheck
-          npm run test:unit
-          npm run test:coverage
-          npm run test:critical-coverage
-          npm run build
-          npm run audit:production
-          npm run audit:all
+        run: npm run format:check
 
-      - name: Publish core result
+      - name: Typecheck
+        id: typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Unit tests
+        id: unit
+        continue-on-error: true
+        run: npm run test:unit
+
+      - name: Repository coverage
+        id: coverage
+        continue-on-error: true
+        run: npm run test:coverage
+
+      - name: Critical coverage
+        id: critical
+        continue-on-error: true
+        run: npm run test:critical-coverage
+
+      - name: Build
+        id: build
+        continue-on-error: true
+        run: npm run build
+
+      - name: Production audit
+        id: auditprod
+        continue-on-error: true
+        run: npm run audit:production
+
+      - name: Full audit
+        id: auditall
+        continue-on-error: true
+        run: npm run audit:all
+
+      - name: Publish core results
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.sha }}
-          OUTCOME: ${{ steps.core.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          UNIT: ${{ steps.unit.outcome }}
+          COVERAGE: ${{ steps.coverage.outcome }}
+          CRITICAL: ${{ steps.critical.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          AUDIT_PROD: ${{ steps.auditprod.outcome }}
+          AUDIT_ALL: ${{ steps.auditall.outcome }}
         run: |
-          if [ "$OUTCOME" = "success" ]; then state=success; else state=failure; fi
-          gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state="$state" -f context='diag7/core' -f description="Core gates: ${OUTCOME}"
+          publish() {
+            if [ "$2" = "success" ]; then state=success; else state=failure; fi
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state="$state" -f context="diag7/$1" -f description="$1: $2"
+          }
+          publish lint "$LINT"
+          publish typecheck "$TYPECHECK"
+          publish unit "$UNIT"
+          publish coverage "$COVERAGE"
+          publish critical-coverage "$CRITICAL"
+          publish build "$BUILD"
+          publish audit-production "$AUDIT_PROD"
+          publish audit-all "$AUDIT_ALL"
 
       - name: Install Playwright browser
-        if: steps.core.outcome == 'success'
+        if: steps.lint.outcome == 'success' && steps.typecheck.outcome == 'success' && steps.unit.outcome == 'success' && steps.coverage.outcome == 'success' && steps.critical.outcome == 'success' && steps.build.outcome == 'success'
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E
         id: e2e
-        if: steps.core.outcome == 'success'
+        if: steps.lint.outcome == 'success' && steps.typecheck.outcome == 'success' && steps.unit.outcome == 'success' && steps.coverage.outcome == 'success' && steps.critical.outcome == 'success' && steps.build.outcome == 'success'
         continue-on-error: true
         run: npm run test:e2e -- --workers=1
 
@@ -78,13 +122,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.sha }}
-          CORE: ${{ steps.core.outcome }}
           E2E: ${{ steps.e2e.outcome }}
         run: |
-          if [ "$CORE" != "success" ]; then
-            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=error -f context='diag7/e2e' -f description='E2E skipped because core failed'
-          elif [ "$E2E" = "success" ]; then
-            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=success -f context='diag7/e2e' -f description='E2E passed'
-          else
-            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=failure -f context='diag7/e2e' -f description="E2E: ${E2E}"
-          fi
+          if [ "$E2E" = "success" ]; then state=success; description='E2E passed'; elif [ "$E2E" = "skipped" ]; then state=error; description='E2E skipped because a core gate failed'; else state=failure; description="E2E: ${E2E}"; fi
+          gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state="$state" -f context='diag7/e2e' -f description="$description"
