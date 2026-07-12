@@ -15,7 +15,7 @@ Observability events never contain:
 
 Requests are correlated only through the random `requestId` already returned in the `x-nodes-request-id` response header. The event records only whether the caller was a user or an agent.
 
-Set `NODES_LLM_OBSERVABILITY=0` to disable lifecycle events. Observability is enabled by default.
+Set `NODES_LLM_OBSERVABILITY=0` to disable lifecycle events and AI SDK telemetry. Observability is enabled by default.
 
 ## Event lifecycle
 
@@ -48,7 +48,7 @@ This separation prevents authentication, settings lookup, and quota reservation 
 
 ## Usage fields
 
-Completed events normalize the AI SDK usage object into counters only:
+Completed events normalize the aggregate AI SDK usage object into counters only:
 
 - `inputTokens`
 - `outputTokens`
@@ -58,7 +58,7 @@ Completed events normalize the AI SDK usage object into counters only:
 - `cacheReadTokens`
 - `cacheWriteTokens`
 
-Raw provider usage and provider metadata are intentionally discarded.
+Aggregate `totalUsage` is preferred over the last-step `usage` value. Raw provider usage and provider metadata are intentionally discarded.
 
 ## Quota fields
 
@@ -81,6 +81,12 @@ Cancellation events classify the source as:
 - `client`: the incoming request signal was aborted.
 - `runtime`: the AI SDK or provider runtime aborted independently, including internal timeouts.
 
+## AI SDK telemetry
+
+Each provider attempt enables the AI SDK telemetry hook with the function identifier `nodes.chat`. Metadata is limited to the request ID, provider, model ID, attempt number, and fallback state.
+
+`recordInputs` and `recordOutputs` are both disabled. A deployment that registers an OpenTelemetry exporter can therefore receive timing spans without storing prompts, responses, tool payloads, or artifact content.
+
 ## Error diagnostics
 
 Diagnostic error logs contain only:
@@ -91,3 +97,7 @@ Diagnostic error logs contain only:
 - Exception class name, when available.
 
 Exception messages are excluded because provider errors can echo request content or credentials.
+
+## Release validation
+
+The production build validates the lifecycle event schema, aggregate usage normalization, first-chunk and first-token timing tracker, quota metrics, abort propagation, idempotent lease release, and privacy-focused regression tests. Implementation commits use `[skip vercel]`; this release commit is the single production deployment for the phase.
