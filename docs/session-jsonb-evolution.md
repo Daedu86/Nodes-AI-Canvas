@@ -58,6 +58,8 @@ The production migration was verified transactionally with a temporary session:
 - Deleting the temporary session removed its ledger rows through the foreign-key cascade.
 - Final checks found no invalid schema versions, message-count mismatches, untracked current versions, or temporary verification rows.
 
+Both version-1 constraints are validated, the ledger trigger is enabled, and the generated column is active. `anon` and `authenticated` have no table privileges on `session_changes`; `service_role` has only the required read/write privileges. Supabase advisors reported no new phase-specific warning or error. The informational RLS-without-policy notice is expected because the ledger is intentionally server-only.
+
 ## Future evolution sequence
 
 1. Deploy readers that understand the next schema version.
