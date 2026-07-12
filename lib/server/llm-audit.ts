@@ -1,26 +1,6 @@
-import type { Provider, ResolvedModelConfig } from "@/lib/llm/config";
+import type { ResolvedModelConfig } from "@/lib/llm/config";
 import type { LlmStreamTimingSnapshot } from "@/lib/server/chat/stream-metrics";
 import type { UserPlan } from "@/lib/user-plan";
-
-type LlmAuditStatus =
-  | "accepted"
-  | "attempting"
-  | "cancelled"
-  | "completed"
-  | "failed"
-  | "fallback"
-  | "rejected"
-  | "streaming";
-
-type LlmAuditEventName =
-  | "request_accepted"
-  | "request_cancelled"
-  | "request_completed"
-  | "request_failed"
-  | "request_rejected"
-  | "attempt_started"
-  | "fallback_applied"
-  | "first_token";
 
 export type LlmQuotaMetrics = {
   active: number;
@@ -61,6 +41,26 @@ type LlmAuditMetrics = Partial<LlmStreamTimingSnapshot> & {
   attemptDurationMs?: number;
 };
 
+type LlmAuditStatus =
+  | "accepted"
+  | "attempting"
+  | "cancelled"
+  | "completed"
+  | "failed"
+  | "fallback"
+  | "rejected"
+  | "streaming";
+
+type LlmAuditEventName =
+  | "attempt_started"
+  | "fallback_applied"
+  | "first_token"
+  | "request_accepted"
+  | "request_cancelled"
+  | "request_completed"
+  | "request_failed"
+  | "request_rejected";
+
 type LlmAuditEvent = {
   actorType: LlmAuditContext["actorType"];
   cancellationSource?: "client" | "runtime";
@@ -96,15 +96,26 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const getFiniteNumber = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
-const sanitizeString = (value: string, maxLength = 256) =>
-  value.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, maxLength);
+const sanitizeString = (value: string, maxLength = 256) => {
+  let sanitized = "";
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code >= 32 && code !== 127) sanitized += character;
+    if (sanitized.length >= maxLength) break;
+  }
+  return sanitized;
+};
 
-const sanitizeModel = (model: ResolvedModelConfig): ResolvedModelConfig => ({
+const sanitizeModel = (
+  model: ResolvedModelConfig,
+): ResolvedModelConfig => ({
   modelId: sanitizeString(model.modelId),
   provider: model.provider,
 });
 
-const sanitizeMetrics = (metrics: LlmAuditMetrics | undefined) => {
+const sanitizeMetrics = (
+  metrics: LlmAuditMetrics | undefined,
+): LlmAuditMetrics | undefined => {
   if (!metrics) return undefined;
   return Object.fromEntries(
     Object.entries(metrics).map(([key, value]) => [
@@ -349,9 +360,10 @@ export function logLlmAuditCompleted(
     usage?: LlmUsageMetrics;
   } = {},
 ) {
+  const durationMs = Date.now() - context.startedAt;
   const defaultTiming: LlmStreamTimingSnapshot = {
-    durationMs: Date.now() - context.startedAt,
-    providerDurationMs: Date.now() - context.startedAt,
+    durationMs,
+    providerDurationMs: durationMs,
     providerTimeToFirstChunkMs: null,
     providerTimeToFirstTokenMs: null,
     timeToFirstChunkMs: null,
