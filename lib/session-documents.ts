@@ -22,6 +22,7 @@ export type SessionSummary = {
   updatedAt: string;
   archived: boolean;
   messageCount: number;
+  version: number;
 };
 
 export type SessionDocument = SessionSummary & {
