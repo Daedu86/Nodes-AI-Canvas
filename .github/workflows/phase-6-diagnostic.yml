@@ -1,0 +1,63 @@
+name: Phase 6 diagnostic
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run lint and publish summaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set +e
+          npm run lint > lint.log 2>&1
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=success -f context='diag/lint/ok' -f description='Lint passed'
+          else
+            mapfile -t lines < <(grep -E '(^|[[:space:]])(error|Error):|[0-9]+:[0-9]+[[:space:]]+Error' lint.log | head -3)
+            if [ "${#lines[@]}" -eq 0 ]; then mapfile -t lines < <(tail -3 lint.log); fi
+            index=1
+            for line in "${lines[@]}"; do
+              clean=$(printf '%s' "$line" | tr '\n\r/' '   ' | cut -c1-78)
+              gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=failure -f context="diag/lint${index}/${clean}" -f description="Lint failed (${code})"
+              index=$((index + 1))
+            done
+          fi
+      - name: Run typecheck and publish summaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > typecheck.log 2>&1
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=success -f context='diag/typecheck/ok' -f description='Typecheck passed'
+          else
+            mapfile -t lines < <(grep -E 'error TS[0-9]+:' typecheck.log | head -3)
+            if [ "${#lines[@]}" -eq 0 ]; then mapfile -t lines < <(tail -3 typecheck.log); fi
+            index=1
+            for line in "${lines[@]}"; do
+              clean=$(printf '%s' "$line" | tr '\n\r/' '   ' | cut -c1-78)
+              gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=failure -f context="diag/type${index}/${clean}" -f description="Typecheck failed (${code})"
+              index=$((index + 1))
+            done
+          fi
