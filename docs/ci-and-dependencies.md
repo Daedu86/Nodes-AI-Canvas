@@ -69,3 +69,7 @@ The workflows create stable job names suitable for required status checks:
 - `Analyze JavaScript and TypeScript`
 
 Repository administrators should select these names in the `main` branch protection or ruleset settings. Workflow definitions cannot independently mark themselves as required checks.
+
+## Release verification
+
+A temporary push-only diagnostic workflow validates the same commands and publishes concise commit statuses while this CI migration is being introduced. It is removed before the phase release so the permanent workflows remain the sole source of future checks.
