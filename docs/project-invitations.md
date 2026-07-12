@@ -28,7 +28,7 @@ Pending users have no role until acceptance. Agent tokens cannot accept human co
 The owner can:
 
 1. Create an invitation with viewer or editor role.
-2. Copy the one-time link from the collaboration screen.
+2. Copy the one-time link from the collaboration screen or the existing Share control.
 3. Reissue the invitation, invalidating the previous link.
 4. Revoke a pending invitation.
 5. Change roles or remove accepted members.
@@ -63,7 +63,7 @@ All invitation responses use `Cache-Control: no-store`.
 
 ## Delivery
 
-The application does not currently have a transactional email provider configured. Owners deliver invitation links by copying them from the collaboration screen. This avoids pretending an email was delivered when no mail transport exists and keeps the security lifecycle independent from a future email provider.
+The application does not currently have a transactional email provider configured. Owners deliver invitation links by copying them from the collaboration screen or Share control. This avoids pretending an email was delivered when no mail transport exists and keeps the security lifecycle independent from a future email provider.
 
 ## Production database verification
 
@@ -79,3 +79,26 @@ The production migration was tested with temporary project, invitation, and memb
 - Final checks found no temporary rows, no pending membership with an access identity, and no accepted identity without an acceptance timestamp.
 
 The invitation table has RLS enabled. `anon`, `authenticated`, and `public` have no direct table or invitation-function access; only `service_role` can execute the lifecycle functions. Two follow-up migrations qualify PL/pgSQL references discovered by the transaction tests, ensuring a reproducible final function definition.
+
+The migration history for this phase is:
+
+- `20260712213323_project_invitations_and_membership_binding`
+- `20260712215111_fix_project_invitation_acceptance_ambiguity`
+- `20260712215156_fix_project_invitation_member_upsert`
+- `20260712222320_index_project_member_invitations`
+
+The final migration adds a covering index for `project_members.invitation_id`, clearing the new unindexed-foreign-key advisor notice. Remaining advisor notices are informational, pre-existing, or expected for newly created indexes that have not yet accumulated production usage.
+
+## Release verification
+
+A temporary GitHub-hosted diagnostic validated the complete final phase state. The following gates passed:
+
+- ESLint with zero warnings.
+- Strict TypeScript checking.
+- Targeted token, invitation-lifecycle, and collaboration tests.
+- Complete Vitest unit suite.
+- Next.js production build.
+- Chromium installation.
+- Complete Playwright end-to-end suite with one worker.
+
+Playwright verified that pending recipients cannot access a project, public previews mask the recipient email, a mismatched account cannot accept, the correct account receives its editor role and stable user binding, and an accepted token cannot be reused. The temporary diagnostic workflow was deleted before this release commit.
