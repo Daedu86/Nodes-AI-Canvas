@@ -31,10 +31,13 @@ export function isAdminUser(user: Pick<AuthenticatedUser, "email" | "id">) {
   return (email.length > 0 && allowedEmails.has(email)) || allowedUserIds.has(id);
 }
 
-export async function requireAdminApiUser(req: Request): Promise<
-  | { response: Response; user?: never }
-  | { response?: never; user: AuthenticatedUser }
-> {
+export type AdminApiUserResult =
+  | { response: Response }
+  | { user: AuthenticatedUser };
+
+export async function requireAdminApiUser(
+  req: Request,
+): Promise<AdminApiUserResult> {
   const guarded = await requireLocalApiUser(req);
   if ("response" in guarded) {
     return guarded;

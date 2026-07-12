@@ -15,6 +15,9 @@ const projectStoreDir = path.join(
   `playwright-project-store-${process.pid}`,
 );
 const isCi = process.env.CI === "1" || process.env.CI === "true";
+const playwrightAuthSecret =
+  process.env.AUTH_SECRET ??
+  "ci-playwright-auth-key-7e2f4c8a9b1d6f3e5c7a2b4d8f0e1c3a";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -50,12 +53,13 @@ export default defineConfig({
       AUTH_DEV_EMAIL: process.env.AUTH_DEV_EMAIL ?? "demo@nodes.local",
       AUTH_DEV_NAME: process.env.AUTH_DEV_NAME ?? "Local Developer",
       AUTH_DEV_PASSWORD: process.env.AUTH_DEV_PASSWORD ?? "dev-password",
-      AUTH_SECRET: process.env.AUTH_SECRET ?? "playwright-auth-secret",
+      AUTH_SECRET: playwrightAuthSecret,
       ALLOW_E2E_AUTH_OVERRIDE: "1",
       E2E_MOCK_LLM: "1",
       E2E_AUTH_USER_EMAIL: "e2e@nodes.local",
       E2E_AUTH_USER_ID: "e2e-user",
       E2E_AUTH_USER_NAME: "E2E User",
+      NODES_PERSISTENCE_BACKEND: "file",
       NODES_PLAN_FREE_CHAT_LIMIT_PER_MINUTE:
         process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_MINUTE ?? "60",
       NODES_PLAN_FREE_CHAT_LIMIT_PER_HOUR:
@@ -66,7 +70,7 @@ export default defineConfig({
       DEFAULT_MODEL: "nvidia/nemotron-3-super-120b-a12b:free",
       NEXT_PUBLIC_DEFAULT_MODEL: "nvidia/nemotron-3-super-120b-a12b:free",
       NEXT_PUBLIC_DEFAULT_PROVIDER: "openrouter",
-      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET ?? "playwright-auth-secret",
+      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? playwrightAuthSecret,
       NEXTAUTH_URL: baseURL,
       PORT: String(port),
       PROJECT_STORE_DIR: projectStoreDir,

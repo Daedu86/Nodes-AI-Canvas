@@ -18,14 +18,19 @@ vi.mock("@/lib/session-store", () => ({
 
 import { POST } from "../app/api/sessions/[sessionId]/artifacts/route";
 
+const validPngBytes = () =>
+  new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+
 describe("/api/sessions/[sessionId]/artifacts", () => {
   beforeEach(() => {
     getSessionMock.mockResolvedValue({
       id: "session-123",
     });
     saveSessionArtifactBlobMock.mockResolvedValue({
-      absolutePath: "C:\\temp\\blob",
       blobRef: "session-123/diagram.png",
+      deduplicated: false,
+      storageQuotaBytes: 100 * 1024 * 1024,
+      storageUsedBytes: 9,
     });
   });
 
@@ -36,7 +41,10 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
   it("returns 404 when the session does not exist", async () => {
     getSessionMock.mockRejectedValueOnce(new Error("missing"));
     const formData = new FormData();
-    formData.append("file", new File([new Uint8Array([1])], "diagram.png", { type: "image/png" }));
+    formData.append(
+      "file",
+      new File([validPngBytes()], "diagram.png", { type: "image/png" }),
+    );
 
     const response = await POST(
       new Request("http://localhost/api/sessions/session-123/artifacts", {
@@ -82,8 +90,8 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
     expect(saveSessionArtifactBlobMock).not.toHaveBeenCalled();
   });
 
-  it("stores uploads that are under the size cap", async () => {
-    const bytes = new Uint8Array([1, 2, 3, 4]);
+  it("stores validated uploads that are under the size cap", async () => {
+    const bytes = validPngBytes();
     const formData = new FormData();
     formData.append("file", new File([bytes], "diagram.png", { type: "image/png" }));
 
@@ -99,22 +107,24 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
     expect(getSessionMock).toHaveBeenCalledWith("session-123", "test-user");
     expect(saveSessionArtifactBlobMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        bytes: expect.any(Uint8Array),
         fileName: "diagram.png",
+        mimeType: "image/png",
+        ownerId: "test-user",
         sessionId: "session-123",
       }),
     );
-    expect(saveSessionArtifactBlobMock.mock.calls[0]?.[0]?.bytes).toBeInstanceOf(Uint8Array);
-    expect(Array.from(saveSessionArtifactBlobMock.mock.calls[0]?.[0]?.bytes ?? [])).toEqual([
-      1,
-      2,
-      3,
-      4,
-    ]);
+    expect(Array.from(saveSessionArtifactBlobMock.mock.calls[0]?.[0]?.bytes ?? [])).toEqual(
+      Array.from(bytes),
+    );
     await expect(response.json()).resolves.toMatchObject({
       blobRef: "session-123/diagram.png",
-      byteSize: 4,
+      byteSize: bytes.byteLength,
+      deduplicated: false,
       fileName: "diagram.png",
       mimeType: "image/png",
+      storageQuotaBytes: 100 * 1024 * 1024,
+      storageUsedBytes: bytes.byteLength,
     });
   });
 });

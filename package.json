@@ -21,9 +21,12 @@
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:critical-coverage": "vitest run --coverage --config vitest.critical.config.ts",
     "test:e2e": "playwright test",
     "benchmark:canvas": "vitest bench --run tests/benchmarks/canvas-flow-elements.bench.js",
-    "check": "npm run format:check && npm run typecheck && npm run test:coverage",
+    "audit:production": "npm audit --omit=dev --audit-level=high",
+    "audit:all": "npm audit --audit-level=critical",
+    "check": "npm run format:check && npm run typecheck && npm run test:coverage && npm run test:critical-coverage",
     "test:ci": "npm run check && npm run test:e2e -- --workers=1"
   },
   "dependencies": {
