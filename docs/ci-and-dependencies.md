@@ -72,4 +72,4 @@ Repository administrators should select these names in the `main` branch protect
 
 ## Release verification
 
-A temporary push-only diagnostic workflow validates the same commands and publishes concise commit statuses while this CI migration is being introduced. It is removed before the phase release so the permanent workflows remain the sole source of future checks. The verifier publishes one state per gate, reports the exact global coverage threshold failure, and allows E2E to run once all non-coverage core gates are healthy.
+A temporary push-only diagnostic workflow validates the same commands and publishes concise commit statuses while this CI migration is being introduced. It is removed before the phase release so the permanent workflows remain the sole source of future checks. All non-browser gates are currently healthy; the verifier now publishes the first Playwright failure so the remaining E2E regression can be corrected precisely.
