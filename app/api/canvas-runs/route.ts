@@ -1,4 +1,3 @@
-
 "use strict";
 
 import { generateText, type ModelMessage } from "ai";
@@ -22,11 +21,16 @@ import {
   getUserModelOverrides,
 } from "@/lib/llm/provider-runtime";
 import { reserveChatQuota } from "@/lib/server/chat-governor";
+import type { LlmStreamTimingSnapshot } from "@/lib/server/chat/stream-metrics";
 import {
   createLlmAuditContext,
+  getLlmUsageMetrics,
   logLlmAuditAccepted,
+  logLlmAuditAttemptStarted,
+  logLlmAuditCancelled,
   logLlmAuditCompleted,
   logLlmAuditFailed,
+  logLlmAuditFallback,
   logLlmAuditRejected,
 } from "@/lib/server/llm-audit";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
@@ -70,6 +74,21 @@ const normalizeOutputTypes = (value: unknown) =>
       )
     : [];
 
+const createAttemptTiming = (
+  requestStartedAt: number,
+  attemptStartedAt: number,
+): LlmStreamTimingSnapshot => {
+  const completedAt = Date.now();
+  return {
+    durationMs: Math.max(0, completedAt - requestStartedAt),
+    providerDurationMs: Math.max(0, completedAt - attemptStartedAt),
+    providerTimeToFirstChunkMs: null,
+    providerTimeToFirstTokenMs: null,
+    timeToFirstChunkMs: null,
+    timeToFirstTokenMs: null,
+  };
+};
+
 export async function POST(req: Request) {
   const guarded = await requireLocalApiUser(req);
   if ("response" in guarded) return guarded.response;
@@ -83,7 +102,10 @@ export async function POST(req: Request) {
 
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   if (!prompt) {
-    return Response.json({ error: "A canvas prompt is required." }, { status: 400 });
+    return Response.json(
+      { error: "A canvas prompt is required." },
+      { status: 400 },
+    );
   }
 
   const contextArtifacts = normalizeLlmContextArtifacts(body.contextArtifacts);
@@ -96,11 +118,14 @@ export async function POST(req: Request) {
   const primaryModel = resolveModelConfig(body);
   const attempts = getModelAttemptChain(primaryModel).filter(isFreeCanvasModel);
   const auditContext = createLlmAuditContext({
+    actorType: guarded.user.isAgent ? "agent" : "user",
     contextArtifactCount: contextArtifacts.length,
     historyMode: "canvas-independent",
+    messageCount: 1,
     requested: requestedModel,
     route: "/api/canvas-runs",
-    user: guarded.user,
+    sentMessageCount: 1,
+    toolCount: 0,
   });
 
   if (attempts.length === 0) {
@@ -112,11 +137,11 @@ export async function POST(req: Request) {
 
   const quota = await reserveChatQuota(guarded.user.id, userPlan);
   if (!quota.ok) {
-    logLlmAuditRejected(
-      auditContext,
-      quota.rejection.code,
-      Date.now() - auditContext.startedAt,
-    );
+    logLlmAuditRejected(auditContext, {
+      durationMs: Date.now() - auditContext.startedAt,
+      errorCode: quota.rejection.code,
+      quota: quota.rejection.metrics,
+    });
     return createRequestErrorResponse({
       code: quota.rejection.code,
       headers: {
@@ -128,13 +153,22 @@ export async function POST(req: Request) {
     });
   }
 
-  logLlmAuditAccepted(auditContext);
+  logLlmAuditAccepted(auditContext, { quota: quota.grant.metrics });
 
   if (isE2eMockLlmEnabled()) {
     const resolved = attempts[0]!;
-    quota.grant.release();
-    logLlmAuditCompleted(auditContext, resolved);
-    const headers = new Headers(createResolvedModelHeaders({ resolved, fallbackApplied: false }));
+    await quota.grant.release();
+    logLlmAuditCompleted(auditContext, resolved, {
+      attemptCount: 1,
+      finishReason: "mock",
+      timing: createAttemptTiming(
+        auditContext.startedAt,
+        auditContext.startedAt,
+      ),
+    });
+    const headers = new Headers(
+      createResolvedModelHeaders({ resolved, fallbackApplied: false }),
+    );
     headers.set(REQUEST_ID_HEADER, auditContext.requestId);
     quota.grant.headers.forEach((value, key) => headers.set(key, value));
     return Response.json(
@@ -153,22 +187,33 @@ export async function POST(req: Request) {
 
   for (let index = 0; index < attempts.length; index += 1) {
     const currentModel = attempts[index]!;
+    const attemptNumber = index + 1;
+    const attemptStartedAt = Date.now();
     const fallbackApplied =
       index > 0 ||
       currentModel.modelId !== requestedModel.modelId ||
       currentModel.provider !== requestedModel.provider;
-    const missingCredential = getMissingProviderCredential(currentModel.provider, requestOverrides, {
-      userPlan,
+    logLlmAuditAttemptStarted(auditContext, currentModel, {
+      attemptNumber,
+      fallbackApplied,
     });
+
+    const missingCredential = getMissingProviderCredential(
+      currentModel.provider,
+      requestOverrides,
+      { userPlan },
+    );
     if (missingCredential) {
-      quota.grant.release();
-      logLlmAuditFailed(
-        auditContext,
-        currentModel,
-        missingCredential.code,
+      await quota.grant.release();
+      logLlmAuditFailed(auditContext, currentModel, {
+        attemptCount: attemptNumber,
+        errorCode: missingCredential.code,
         fallbackApplied,
-        Date.now() - auditContext.startedAt,
-      );
+        timing: createAttemptTiming(
+          auditContext.startedAt,
+          attemptStartedAt,
+        ),
+      });
       return createRequestErrorResponse({
         code: missingCredential.code,
         headers: { [REQUEST_ID_HEADER]: auditContext.requestId },
@@ -178,31 +223,60 @@ export async function POST(req: Request) {
     }
 
     try {
-      const model = createLanguageModel(currentModel, requestOverrides, { userPlan }) as Parameters<
-        typeof generateText
-      >[0]["model"];
-      const artifactContextMessage = buildContextArtifactsUserMessage(contextArtifacts, {
-        modelId: currentModel.modelId,
-        provider: currentModel.provider,
-      });
+      const model = createLanguageModel(
+        currentModel,
+        requestOverrides,
+        { userPlan },
+      ) as Parameters<typeof generateText>[0]["model"];
+      const artifactContextMessage = buildContextArtifactsUserMessage(
+        contextArtifacts,
+        {
+          modelId: currentModel.modelId,
+          provider: currentModel.provider,
+        },
+      );
       const messages: ModelMessage[] = [
-        ...(artifactContextMessage ? [artifactContextMessage satisfies ModelMessage] : []),
+        ...(artifactContextMessage
+          ? [artifactContextMessage satisfies ModelMessage]
+          : []),
         { role: "user", content: promptText },
       ];
       const result = await generateText({
         abortSignal: req.signal,
+        experimental_telemetry: {
+          functionId: "nodes.canvas-run",
+          isEnabled: process.env.NODES_LLM_OBSERVABILITY !== "0",
+          metadata: {
+            attemptNumber,
+            fallbackApplied,
+            modelId: currentModel.modelId,
+            provider: currentModel.provider,
+            requestId: auditContext.requestId,
+          },
+          recordInputs: false,
+          recordOutputs: false,
+        },
         messages,
         model,
         system: body.system,
         timeout: currentModel.provider === "openrouter" ? 45_000 : 30_000,
       });
-      quota.grant.release();
+      await quota.grant.release();
       logLlmAuditCompleted(auditContext, currentModel, {
+        attemptCount: attemptNumber,
         fallbackApplied,
-        totalTokens: result.usage?.totalTokens ?? null,
+        finishReason: result.finishReason,
+        timing: createAttemptTiming(
+          auditContext.startedAt,
+          attemptStartedAt,
+        ),
+        usage: getLlmUsageMetrics({ totalUsage: result.usage }),
       });
       const headers = new Headers(
-        createResolvedModelHeaders({ resolved: currentModel, fallbackApplied }),
+        createResolvedModelHeaders({
+          resolved: currentModel,
+          fallbackApplied,
+        }),
       );
       headers.set(REQUEST_ID_HEADER, auditContext.requestId);
       quota.grant.headers.forEach((value, key) => headers.set(key, value));
@@ -219,6 +293,26 @@ export async function POST(req: Request) {
     } catch (error) {
       const classified = classifyRequestError(error, currentModel);
       lastError = classified;
+      if (req.signal.aborted) {
+        await quota.grant.release();
+        logLlmAuditCancelled(auditContext, currentModel, {
+          attemptCount: attemptNumber,
+          cancellationSource: "client",
+          fallbackApplied,
+          timing: createAttemptTiming(
+            auditContext.startedAt,
+            attemptStartedAt,
+          ),
+        });
+        return createRequestErrorResponse({
+          ...classified,
+          headers: {
+            [REQUEST_ID_HEADER]: auditContext.requestId,
+            ...Object.fromEntries(quota.grant.headers.entries()),
+          },
+        });
+      }
+
       const hasFallback = index < attempts.length - 1;
       const shouldRetry =
         currentModel.provider === "openrouter" &&
@@ -226,12 +320,24 @@ export async function POST(req: Request) {
         (classified.code === "model_unavailable" ||
           classified.code === "provider_rate_limited" ||
           classified.code === "provider_unavailable");
-      if (shouldRetry) continue;
+      if (shouldRetry) {
+        logLlmAuditFallback(
+          auditContext,
+          currentModel,
+          attempts[index + 1]!,
+          {
+            attemptDurationMs: Date.now() - attemptStartedAt,
+            attemptNumber,
+            errorCode: classified.code,
+          },
+        );
+        continue;
+      }
       break;
     }
   }
 
-  quota.grant.release();
+  await quota.grant.release();
   const failure =
     lastError ??
     ({
@@ -239,13 +345,17 @@ export async function POST(req: Request) {
       message: "No free-tier canvas model is currently available.",
       status: 503,
     } as const);
-  logLlmAuditFailed(
-    auditContext,
-    primaryModel,
-    failure.code,
-    primaryModel.modelId !== requestedModel.modelId || primaryModel.provider !== requestedModel.provider,
-    Date.now() - auditContext.startedAt,
-  );
+  logLlmAuditFailed(auditContext, primaryModel, {
+    attemptCount: attempts.length,
+    errorCode: failure.code,
+    fallbackApplied:
+      primaryModel.modelId !== requestedModel.modelId ||
+      primaryModel.provider !== requestedModel.provider,
+    timing: createAttemptTiming(
+      auditContext.startedAt,
+      auditContext.startedAt,
+    ),
+  });
   return createRequestErrorResponse({
     ...failure,
     headers: {
