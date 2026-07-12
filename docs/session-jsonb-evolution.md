@@ -47,6 +47,17 @@ The ledger does not duplicate snapshots or message bodies. It is transactionally
 
 The table is server-only: RLS is enabled, `anon` and `authenticated` have no privileges, and only `service_role` can select or insert.
 
+## Database verification
+
+The production migration was verified transactionally with a temporary session:
+
+- Insert version 1 generated `message_count = 2` and a `created` ledger entry.
+- Updating the snapshot generated version 2, `message_count = 3`, and an `updated` entry listing only `snapshot` as changed.
+- Repeating the update with stale expected version 1 returned zero rows and preserved version 2.
+- An invalid version 1 snapshot shape was rejected by the check constraint.
+- Deleting the temporary session removed its ledger rows through the foreign-key cascade.
+- Final checks found no invalid schema versions, message-count mismatches, untracked current versions, or temporary verification rows.
+
 ## Future evolution sequence
 
 1. Deploy readers that understand the next schema version.
