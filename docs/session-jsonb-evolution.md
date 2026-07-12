@@ -31,6 +31,8 @@ It no longer downloads `snapshot_json`, `artifacts_json`, or `context_links_json
 
 The mapper retains a compatibility fallback: rows without `message_count` derive the count from `snapshot_json`, and rows without `schema_version` are interpreted as version 1. An unknown positive schema version is rejected explicitly so an older deployment cannot silently normalize and overwrite a future document shape.
 
+On the production rows present during the migration, the approximate summary projection decreased from 1,184 bytes to 160 bytes, saving 1,024 bytes or about 86%. The reduction grows as session snapshots become larger.
+
 ## Change ledger
 
 `session_changes` records one row per session version with:
@@ -59,6 +61,18 @@ The production migration was verified transactionally with a temporary session:
 - Final checks found no invalid schema versions, message-count mismatches, untracked current versions, or temporary verification rows.
 
 Both version-1 constraints are validated, the ledger trigger is enabled, and the generated column is active. `anon` and `authenticated` have no table privileges on `session_changes`; `service_role` has only the required read/write privileges. Supabase advisors reported no new phase-specific warning or error. The informational RLS-without-policy notice is expected because the ledger is intentionally server-only.
+
+## Release verification
+
+Before release, a temporary GitHub-hosted diagnostic executed the following gates against the complete phase state:
+
+- ESLint with zero warnings.
+- Strict TypeScript checking.
+- Dedicated JSONB schema-evolution tests.
+- Complete Vitest unit suite.
+- Next.js production build using the preview-safe CI environment.
+
+All gates passed. The temporary workflow was deleted before this release commit.
 
 ## Future evolution sequence
 
