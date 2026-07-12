@@ -13,6 +13,7 @@ import {
 import type {
   SessionCreateInput,
   SessionPatch,
+  SessionPatchOptions,
   SessionRepository,
 } from "@/lib/persistence/session-repository";
 import {
@@ -21,6 +22,10 @@ import {
   getSessionBlobMaintenance,
   reconcileSessionArtifactBlobs,
 } from "@/lib/session-blob-store";
+import {
+  isValidSessionVersion,
+  SessionVersionConflictError,
+} from "@/lib/session-version-conflict";
 
 type StoredSession = Omit<SessionDocument, "messageCount"> & {
   ownerId: string | null;
@@ -47,6 +52,9 @@ const getSessionFilePath = (sessionId: string) => {
 const normalizeOwnerId = (value: unknown) =>
   typeof value === "string" && value.length > 0 ? value : null;
 
+const normalizeVersion = (value: unknown) =>
+  isValidSessionVersion(value) ? value : 1;
+
 const toStoredSession = (
   session: SessionDocument,
   ownerId: string | null,
@@ -65,6 +73,7 @@ const toSessionDocument = (storedSession: StoredSession): SessionDocument => {
   const snapshot = normalizeSessionThreadExport(session.snapshot);
   return {
     ...session,
+    version: normalizeVersion(session.version),
     snapshot,
     artifacts: normalizeSessionArtifactsDocument(session.artifacts),
     contextLinks: normalizeSessionContextLinksDocument(session.contextLinks),
@@ -85,6 +94,36 @@ const isMissingSessionError = (error: unknown) =>
     error !== null &&
     "code" in error &&
     error.code === "ENOENT");
+
+const getSessionWriteLocks = () => {
+  const globalState = globalThis as typeof globalThis & {
+    __nodesSessionWriteLocks?: Map<string, Promise<void>>;
+  };
+  if (!globalState.__nodesSessionWriteLocks) {
+    globalState.__nodesSessionWriteLocks = new Map();
+  }
+  return globalState.__nodesSessionWriteLocks;
+};
+
+async function withSessionWriteLock<T>(sessionId: string, task: () => Promise<T>) {
+  const locks = getSessionWriteLocks();
+  const previous = locks.get(sessionId) ?? Promise.resolve();
+  let release = () => {};
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const queued = previous.then(() => current);
+  locks.set(sessionId, queued);
+  await previous;
+  try {
+    return await task();
+  } finally {
+    release();
+    if (locks.get(sessionId) === queued) {
+      locks.delete(sessionId);
+    }
+  }
+}
 
 async function ensureStoreDir() {
   await fs.mkdir(getSessionStoreDir(), { recursive: true });
@@ -116,6 +155,7 @@ async function readSessionDocumentFromPath(filePath: string): Promise<StoredSess
           ? parsed.updatedAt
           : new Date().toISOString(),
       ownerId: normalizeOwnerId(parsed.ownerId),
+      version: normalizeVersion(parsed.version),
       snapshot,
       artifacts: normalizeSessionArtifactsDocument(parsed.artifacts),
       contextLinks: normalizeSessionContextLinksDocument(parsed.contextLinks),
@@ -196,6 +236,7 @@ export const fileSessionRepository: SessionRepository = {
         void unusedOwnerId;
         return {
           ...session,
+          version: normalizeVersion(session.version),
           messageCount: getSessionMessageCount(snapshot),
         };
       });
@@ -216,6 +257,7 @@ export const fileSessionRepository: SessionRepository = {
       createdAt: now,
       updatedAt: now,
       ownerId: normalizeOwnerId(input.ownerId),
+      version: 1,
       snapshot: normalizeSessionThreadExport(input.snapshot ?? EMPTY_SESSION_THREAD_EXPORT),
       artifacts: normalizeSessionArtifactsDocument(input.artifacts),
       contextLinks: normalizeSessionContextLinksDocument(input.contextLinks),
@@ -224,36 +266,48 @@ export const fileSessionRepository: SessionRepository = {
     return toSessionDocument(session);
   },
 
-  async patchSession(sessionId, patch: SessionPatch, ownerId) {
-    const current = await getStoredSession(sessionId, ownerId);
-    const next: StoredSession = {
-      id: current.id,
-      title:
-        patch.title === undefined
-          ? current.title
-          : typeof patch.title === "string" && patch.title.trim().length
-            ? patch.title.trim()
-            : null,
-      archived: patch.archived ?? current.archived,
-      createdAt: current.createdAt,
-      updatedAt: new Date().toISOString(),
-      ownerId: current.ownerId,
-      snapshot:
-        patch.snapshot === undefined
-          ? current.snapshot
-          : normalizeSessionThreadExport(patch.snapshot),
-      artifacts:
-        patch.artifacts === undefined
-          ? current.artifacts
-          : normalizeSessionArtifactsDocument(patch.artifacts),
-      contextLinks:
-        patch.contextLinks === undefined
-          ? current.contextLinks
-          : normalizeSessionContextLinksDocument(patch.contextLinks),
-    };
-    await reconcileSessionArtifactBlobs(current.artifacts, next.artifacts);
-    await writeSessionDocument(next);
-    return toSessionDocument(next);
+  async patchSession(
+    sessionId,
+    patch: SessionPatch,
+    options: SessionPatchOptions,
+  ) {
+    return withSessionWriteLock(sessionId, async () => {
+      const current = await getStoredSession(sessionId, options.ownerId);
+      const currentDocument = toSessionDocument(current);
+      if (currentDocument.version !== options.expectedVersion) {
+        throw new SessionVersionConflictError(options.expectedVersion, currentDocument);
+      }
+
+      const next: StoredSession = {
+        id: current.id,
+        title:
+          patch.title === undefined
+            ? current.title
+            : typeof patch.title === "string" && patch.title.trim().length
+              ? patch.title.trim()
+              : null,
+        archived: patch.archived ?? current.archived,
+        createdAt: current.createdAt,
+        updatedAt: new Date().toISOString(),
+        ownerId: current.ownerId,
+        version: currentDocument.version + 1,
+        snapshot:
+          patch.snapshot === undefined
+            ? current.snapshot
+            : normalizeSessionThreadExport(patch.snapshot),
+        artifacts:
+          patch.artifacts === undefined
+            ? current.artifacts
+            : normalizeSessionArtifactsDocument(patch.artifacts),
+        contextLinks:
+          patch.contextLinks === undefined
+            ? current.contextLinks
+            : normalizeSessionContextLinksDocument(patch.contextLinks),
+      };
+      await reconcileSessionArtifactBlobs(current.artifacts, next.artifacts);
+      await writeSessionDocument(next);
+      return toSessionDocument(next);
+    });
   },
 
   async deleteSession(sessionId, ownerId) {
