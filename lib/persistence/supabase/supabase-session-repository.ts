@@ -17,9 +17,13 @@ import {
   getSessionBlobMaintenance,
   reconcileSessionArtifactBlobs,
 } from "@/lib/session-blob-store";
+import {
+  isValidSessionVersion,
+  SessionVersionConflictError,
+} from "@/lib/session-version-conflict";
 
 const sessionSelect =
-  "id,title,archived,snapshot_json,artifacts_json,context_links_json,created_at,updated_at";
+  "id,title,archived,version,snapshot_json,artifacts_json,context_links_json,created_at,updated_at";
 
 const isMissingSessionError = (error: unknown) =>
   error instanceof Error && error.message === "Session not found";
@@ -66,6 +70,7 @@ export const supabaseSessionRepository: SessionRepository = {
           ? input.title.trim()
           : null,
       archived: false,
+      version: 1,
       snapshot_json: normalizeSessionThreadExport(
         input.snapshot ?? EMPTY_SESSION_THREAD_EXPORT,
       ),
@@ -83,10 +88,21 @@ export const supabaseSessionRepository: SessionRepository = {
     return toSessionDocumentFromRow(row);
   },
 
-  async patchSession(sessionId, patch, ownerId) {
+  async patchSession(sessionId, patch, options) {
     const client = getSupabasePersistenceClient();
+    const ownerId = requireOwnerId(options.ownerId);
+    if (!isValidSessionVersion(options.expectedVersion)) {
+      throw new Error("A positive expected session version is required.");
+    }
+
     const current = await this.getSession(sessionId, ownerId);
-    const update: Record<string, unknown> = {};
+    if (current.version !== options.expectedVersion) {
+      throw new SessionVersionConflictError(options.expectedVersion, current);
+    }
+
+    const update: Record<string, unknown> = {
+      version: options.expectedVersion + 1,
+    };
     if (patch.archived !== undefined) update.archived = patch.archived;
     if (patch.title !== undefined) {
       update.title =
@@ -104,12 +120,20 @@ export const supabaseSessionRepository: SessionRepository = {
       .from("sessions")
       .update(update)
       .eq("id", sessionId)
-      .eq("owner_id", requireOwnerId(ownerId))
+      .eq("owner_id", ownerId)
+      .eq("version", options.expectedVersion)
       .select(sessionSelect)
       .maybeSingle();
 
-    const row = ensureData(data, error, "Session not found");
-    const next = toSessionDocumentFromRow(row);
+    if (error) {
+      throw new Error(error.message || "Failed to update session");
+    }
+    if (!data) {
+      const latest = await this.getSession(sessionId, ownerId);
+      throw new SessionVersionConflictError(options.expectedVersion, latest);
+    }
+
+    const next = toSessionDocumentFromRow(data);
     if (patch.artifacts !== undefined) {
       await reconcileSessionArtifactBlobs(current.artifacts, next.artifacts);
     }
