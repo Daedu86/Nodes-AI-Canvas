@@ -10,6 +10,10 @@ import { requireLocalApiUser } from "@/lib/server/request-guards";
 import { recordAgentEvent } from "@/lib/server/agent-work";
 import { getSession, patchSession } from "@/lib/session-store";
 import { normalizeSessionThreadExport, type SessionThreadExport } from "@/lib/session-documents";
+import {
+  isSessionVersionConflictError,
+  SESSION_VERSION_CONFLICT_CODE,
+} from "@/lib/session-version-conflict";
 import { getUserPlan } from "@/lib/user-plan-store";
 
 export const runtime = "nodejs";
@@ -54,6 +58,21 @@ const appendToSnapshot = (
     },
   ],
 });
+
+const createSessionConflictResponse = (error: unknown) => {
+  if (!isSessionVersionConflictError(error)) {
+    return null;
+  }
+  return NextResponse.json(
+    {
+      code: SESSION_VERSION_CONFLICT_CODE,
+      error: "The session changed while the agent was working.",
+      expectedVersion: error.expectedVersion,
+      session: error.currentSession,
+    },
+    { status: 409 },
+  );
+};
 
 export async function POST(req: Request) {
   const guarded = await requireLocalApiUser(req);
@@ -102,7 +121,7 @@ export async function POST(req: Request) {
   const { modelId, provider } = resolveModelConfig({ model: body.model, provider: body.provider });
   const missingCredential = getMissingProviderCredential(provider, requestOverrides, { userPlan });
   if (missingCredential) {
-    quota.grant.release();
+    await quota.grant.release();
     await recordAgentEvent({
       actor,
       eventType: "chat.failed",
@@ -128,11 +147,20 @@ export async function POST(req: Request) {
   });
   const snapshotWithUser = appendToSnapshot(baseSnapshot, userMessage);
 
-  // Persist the prompt immediately so it doesn't get lost if the provider fails mid-run.
+  let sessionWithPrompt: Awaited<ReturnType<typeof patchSession>>;
   try {
-    await patchSession(sessionId, { snapshot: snapshotWithUser }, guarded.user.id);
-  } catch {
-    quota.grant.release();
+    sessionWithPrompt = await patchSession(
+      sessionId,
+      { snapshot: snapshotWithUser },
+      {
+        expectedVersion: session.version,
+        ownerId: guarded.user.id,
+      },
+    );
+  } catch (error) {
+    await quota.grant.release();
+    const conflictResponse = createSessionConflictResponse(error);
+    if (conflictResponse) return conflictResponse;
     return NextResponse.json({ error: "Unable to persist session prompt." }, { status: 500 });
   }
 
@@ -185,7 +213,14 @@ export async function POST(req: Request) {
       ],
     };
 
-    await patchSession(sessionId, { snapshot: nextSnapshot }, guarded.user.id);
+    await patchSession(
+      sessionId,
+      { snapshot: nextSnapshot },
+      {
+        expectedVersion: sessionWithPrompt.version,
+        ownerId: guarded.user.id,
+      },
+    );
 
     await recordAgentEvent({
       actor,
@@ -204,6 +239,9 @@ export async function POST(req: Request) {
       resolved: { provider, modelId },
     });
   } catch (error) {
+    const conflictResponse = createSessionConflictResponse(error);
+    if (conflictResponse) return conflictResponse;
+
     const classified = classifyRequestError(error, { provider, modelId });
     await recordAgentEvent({
       actor,
@@ -215,6 +253,6 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ error: classified.message, code: classified.code }, { status: classified.status });
   } finally {
-    quota.grant.release();
+    await quota.grant.release();
   }
 }
