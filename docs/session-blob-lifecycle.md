@@ -34,6 +34,8 @@ Administrators can inspect the current metrics with `GET /api/admin/session-blob
 
 The `session-blob-gc` Supabase Edge Function is scheduled daily at 03:20 UTC. It reconciles the bucket restrictions, scans for orphaned objects, processes up to 10,000 queued deletions per invocation, and records failures for retry. Its invocation endpoint and publishable key are encrypted in Supabase Vault rather than committed to source control.
 
+The Deno Edge Function has its own compiler configuration and is excluded from the Next.js TypeScript project. This keeps the two runtime type systems isolated while preserving strict checks in each environment.
+
 ## Production verification
 
 The release verification exercised the complete registry transition:
