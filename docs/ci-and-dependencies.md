@@ -72,4 +72,16 @@ Repository administrators should select these names in the `main` branch protect
 
 ## Release verification
 
-A temporary push-only diagnostic workflow validates the same commands and publishes concise commit statuses while this CI migration is being introduced. It is removed before the phase release so the permanent workflows remain the sole source of future checks. All non-browser gates are healthy; the temporary verifier is now running Playwright with `--max-failures=1` so the first remaining browser regression can be corrected precisely.
+The phase 7 release was verified on GitHub-hosted Ubuntu runners on July 12, 2026. The following gates passed from the same repository state:
+
+- ESLint with zero warnings.
+- Strict TypeScript checking.
+- Complete Vitest unit suite.
+- Repository-wide coverage thresholds.
+- Critical-module coverage thresholds.
+- Next.js production build using preview-safe environment validation.
+- Production dependency audit with zero critical, high, moderate, or low findings.
+- Full lockfile audit with zero critical, high, moderate, or low findings.
+- Complete Playwright Chromium suite with one worker.
+
+The temporary diagnostic workflow used to establish this baseline was deleted before release. Permanent CI, CodeQL, and Dependabot configuration remain as the ongoing validation and maintenance system.
