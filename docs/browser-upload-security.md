@@ -66,6 +66,32 @@ The database registration function independently revalidates the private bucket,
 
 The `session-artifacts` bucket remains private, capped at 8 MB per object, and restricted to the same MIME allowlist. It has no browser-facing Storage policies: uploads and downloads continue through authenticated application routes and the server-only service role. The service credential is never exposed to browser code.
 
-## Verification
+## Production database verification
 
-The phase includes unit tests for request admission, rate limiting, CSP/header construction, spoofed names and MIME types, image dimensions, active PDFs, malformed OOXML, unsafe archive paths, complete UTF-8 validation, and JSON depth. Playwright verifies the delivered browser headers, absence of CSP violations during page bootstrap, rejection of a misleading `.html` upload, and acceptance of a bounded `.txt` artifact.
+The migration `20260712193845_harden_browser_and_artifact_uploads` was exercised against the production Supabase project with temporary data:
+
+- Two upload reservations were accepted and a third was rejected with the expected retry window.
+- Minute and hourly usage windows reset correctly.
+- A coherent private-bucket `.txt` registration succeeded.
+- Mismatched extensions, invalid content-addressed references, and unavailable/public buckets were rejected.
+- The usage table has RLS enabled and no `anon` or `authenticated` table privileges.
+- The reservation function is executable only by `service_role`.
+- The artifact bucket remains private with the 8 MB limit and exact MIME allowlist.
+- No browser-facing Storage policy grants direct access to the bucket.
+- All temporary sessions, blob metadata, queue entries, and quota rows were removed.
+
+Supabase security and performance advisors reported no new phase-specific warning or error. Existing notices outside this phase remain unchanged.
+
+## Release verification
+
+A temporary GitHub-hosted diagnostic validated the complete phase state before release. The following gates passed:
+
+- ESLint with zero warnings.
+- Strict TypeScript checking.
+- Targeted browser and upload security tests.
+- Complete Vitest unit suite.
+- Next.js production build.
+- Chromium installation.
+- Complete Playwright end-to-end suite with one worker.
+
+Playwright verified the delivered nonce-bound CSP and defensive headers without bootstrap violations. It also confirmed rejection of a misleading `.html` upload and successful processing of one bounded `.txt` artifact. The temporary diagnostic workflow was deleted before this release commit.
