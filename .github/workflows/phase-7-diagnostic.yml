@@ -15,6 +15,11 @@ jobs:
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
+      VERCEL_ENV: preview
+      NODES_PERSISTENCE_BACKEND: file
+      AUTH_ENABLE_DEV_CREDENTIALS: "0"
+      OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
+      OPENROUTER_REQUIRE_USER_KEY: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -72,13 +77,29 @@ jobs:
             done < type-summary.txt
           fi
 
-          npm run test:unit > unit.log 2>&1
+          npx vitest run --reporter=json --outputFile=unit.json > unit.log 2>&1
           unit_code=$?
           if [ "$unit_code" -eq 0 ]; then
             publish success 'diag7/unit/ok' 'Unit tests passed'
           else
-            summary=$(tail -20 unit.log | tr '\n\r' '  ' | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
-            publish failure "diag7/unit/${summary}" "Unit tests failed (${unit_code})"
+            node <<'NODE' > unit-summary.txt
+          const fs = require('node:fs');
+          let data = {};
+          try { data = JSON.parse(fs.readFileSync('unit.json', 'utf8')); } catch {}
+          const failed = (data.testResults ?? []).filter((result) => result.status === 'failed');
+          for (const result of failed) {
+            const assertions = (result.assertionResults ?? []).filter((test) => test.status === 'failed');
+            if (assertions.length === 0) console.log(`${result.name}:suite failed`);
+            for (const test of assertions) console.log(`${result.name}:${test.fullName ?? test.title}:failed`);
+          }
+          NODE
+            if [ ! -s unit-summary.txt ]; then tail -30 unit.log > unit-summary.txt; fi
+            index=1
+            while IFS= read -r line && [ "$index" -le 8 ]; do
+              encoded=$(printf '%s' "$line" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+              publish failure "diag7/unit${index}/${encoded}" "Unit tests failed (${unit_code})"
+              index=$((index + 1))
+            done < unit-summary.txt
           fi
 
           npm run build > build.log 2>&1
