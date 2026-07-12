@@ -41,9 +41,11 @@ type ProjectsContextValue = {
   selectProject: (projectId: string) => Promise<void>;
 };
 
-type ProjectsListResponse = { projects: ProjectSummary[] };
+type ProjectsListResponse = {
+  projects: ProjectSummary[];
+};
+
 type ProjectResponse = {
-  error?: string;
   inviteUrl?: string;
   project: ProjectDocument;
 };
@@ -51,34 +53,44 @@ type ProjectResponse = {
 const buildActiveProjectKey = (userId: string | null) =>
   userId ? `nodes.active-project-id.${userId}` : "nodes.active-project-id.v1";
 const AUTO_OPEN_PROJECT_SESSION_THRESHOLD = 10;
+
 const ProjectsContext = React.createContext<ProjectsContextValue | null>(null);
 
 const readStoredActiveProjectId = (userId: string | null) => {
-  try { return localStorage.getItem(buildActiveProjectKey(userId)); } catch { return null; }
+  try {
+    return localStorage.getItem(buildActiveProjectKey(userId));
+  } catch {
+    return null;
+  }
 };
 
 const writeStoredActiveProjectId = (userId: string | null, projectId: string | null) => {
   try {
-    const key = buildActiveProjectKey(userId);
-    if (projectId) localStorage.setItem(key, projectId);
-    else localStorage.removeItem(key);
+    const storageKey = buildActiveProjectKey(userId);
+    if (!projectId) {
+      localStorage.removeItem(storageKey);
+      return;
+    }
+    localStorage.setItem(storageKey, projectId);
   } catch {
-    // Ignore storage errors.
+    // ignore storage errors
   }
 };
 
 async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit) {
   const response = await fetch(input, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
-  const body = (await response.json().catch(() => ({}))) as T & { error?: string };
   if (!response.ok) {
-    const error = new Error(body.error || `Request failed: ${response.status}`) as Error & { status?: number };
+    const error = new Error(`Request failed: ${response.status}`) as Error & { status?: number };
     error.status = response.status;
     throw error;
   }
-  return body;
+  return (await response.json()) as T;
 }
 
 async function exposeInvitationLink(inviteUrl: string) {
@@ -98,12 +110,13 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
   const activeProjectRef = React.useRef<ProjectDocument | null>(null);
   const patchQueueRef = React.useRef<Promise<ProjectDocument | null>>(Promise.resolve(null));
 
-  React.useEffect(() => { activeProjectRef.current = activeProject; }, [activeProject]);
+  React.useEffect(() => {
+    activeProjectRef.current = activeProject;
+  }, [activeProject]);
 
   const loadProject = React.useCallback(async (projectId: string) => {
     const data = await fetchJson<ProjectResponse>(`/api/projects/${projectId}`);
     setActiveProject(data.project);
-    activeProjectRef.current = data.project;
     writeStoredActiveProjectId(userId, data.project.id);
     return data.project;
   }, [userId]);
@@ -116,8 +129,11 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     let mounted = true;
+
     const bootstrap = async () => {
-      if (status === "loading") return;
+      if (status === "loading") {
+        return;
+      }
       setIsReady(false);
       try {
         if (!userId) {
@@ -128,21 +144,30 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
           }
           return;
         }
-        const loaded = await refreshProjects();
+        const loadedProjects = await refreshProjects();
+        const shouldStayInWorkspace = hasPostAuthChatHandoff();
         const preferredId = readStoredActiveProjectId(userId);
-        const preferred = preferredId
-          ? loaded.find((project) => project.id === preferredId) ?? null
+        const preferredProject = preferredId
+          ? loadedProjects.find((project) => project.id === preferredId) ?? null
           : null;
-        if (
-          hasPostAuthChatHandoff() ||
-          (preferred && preferred.sessionCount >= AUTO_OPEN_PROJECT_SESSION_THRESHOLD)
+
+        if (shouldStayInWorkspace) {
+          if (mounted) {
+            setActiveProject(null);
+            writeStoredActiveProjectId(userId, null);
+          }
+        } else if (
+          preferredProject &&
+          preferredProject.sessionCount >= AUTO_OPEN_PROJECT_SESSION_THRESHOLD
         ) {
           if (mounted) {
             setActiveProject(null);
             writeStoredActiveProjectId(userId, null);
           }
-        } else if (preferredId && loaded.some((project) => project.id === preferredId)) {
-          try { await loadProject(preferredId); } catch {
+        } else if (preferredId && loadedProjects.some((project) => project.id === preferredId)) {
+          try {
+            await loadProject(preferredId);
+          } catch {
             if (mounted) {
               setActiveProject(null);
               writeStoredActiveProjectId(userId, null);
@@ -153,22 +178,31 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
           writeStoredActiveProjectId(userId, null);
         }
       } finally {
-        if (mounted) setIsReady(true);
+        if (mounted) {
+          setIsReady(true);
+        }
       }
     };
+
     void bootstrap();
-    return () => { mounted = false; };
+
+    return () => {
+      mounted = false;
+    };
   }, [loadProject, refreshProjects, status, userId]);
 
   const clearActiveProject = React.useCallback(() => {
     setActiveProject(null);
-    activeProjectRef.current = null;
     writeStoredActiveProjectId(userId, null);
   }, [userId]);
 
   const selectProject = React.useCallback(async (projectId: string) => {
     setIsReady(false);
-    try { await loadProject(projectId); } finally { setIsReady(true); }
+    try {
+      await loadProject(projectId);
+    } finally {
+      setIsReady(true);
+    }
   }, [loadProject]);
 
   const createProject = React.useCallback(async (input?: {
@@ -183,29 +217,49 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         body: JSON.stringify(input ?? {}),
       });
-      setProjects((previous) => [data.project, ...previous]);
+      setProjects((prev) => [data.project, ...prev]);
       setActiveProject(data.project);
-      activeProjectRef.current = data.project;
       writeStoredActiveProjectId(userId, data.project.id);
       return data.project;
-    } finally { setIsReady(true); }
+    } finally {
+      setIsReady(true);
+    }
   }, [userId]);
 
   const deleteProjects = React.useCallback(async (projectIds: string[]) => {
-    const uniqueIds = [...new Set(projectIds)].filter(Boolean);
-    if (uniqueIds.length === 0) return;
-    const activeId = activeProjectRef.current?.id ?? null;
-    const deletingActive = activeId !== null && uniqueIds.includes(activeId);
-    if (deletingActive) clearActiveProject();
+    const uniqueProjectIds = [...new Set(projectIds)].filter((projectId) => projectId.length > 0);
+    if (uniqueProjectIds.length === 0) return;
+    const currentActiveProjectId = activeProjectRef.current?.id ?? null;
+    const deletingActiveProject =
+      currentActiveProjectId !== null && uniqueProjectIds.includes(currentActiveProjectId);
+
+    if (deletingActiveProject) {
+      activeProjectRef.current = null;
+      setActiveProject(null);
+      writeStoredActiveProjectId(userId, null);
+    }
+
     const response = await fetch("/api/projects", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectIds: uniqueIds }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ projectIds: uniqueProjectIds }),
     });
-    if (!response.ok && response.status !== 404) throw new Error(`Request failed: ${response.status}`);
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`Request failed: ${response.status}`);
+    }
+
     const remaining = await refreshProjects();
-    if (deletingActive && remaining[0]) await loadProject(remaining[0].id);
-  }, [clearActiveProject, loadProject, refreshProjects]);
+    if (deletingActiveProject) {
+      const nextProjectId = remaining[0]?.id ?? null;
+      if (nextProjectId) {
+        await loadProject(nextProjectId);
+      } else {
+        clearActiveProject();
+      }
+    }
+  }, [clearActiveProject, loadProject, refreshProjects, userId]);
 
   const deleteProject = React.useCallback(async (projectId: string) => {
     await deleteProjects([projectId]);
@@ -216,9 +270,10 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       method: "PATCH",
       body: JSON.stringify({ title }),
     });
-    setProjects((previous) => previous.map((project) => project.id === projectId ? data.project : project));
-    setActiveProject((previous) => previous?.id === projectId ? data.project : previous);
-    if (activeProjectRef.current?.id === projectId) activeProjectRef.current = data.project;
+    setProjects((prev) =>
+      prev.map((project) => (project.id === projectId ? data.project : project)),
+    );
+    setActiveProject((prev) => (prev?.id === projectId ? data.project : prev));
   }, []);
 
   const saveActiveProjectPatch = React.useCallback((patch: {
@@ -237,13 +292,16 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify(patch),
       });
       setActiveProject(data.project);
+      setProjects((prev) =>
+        prev.map((project) => (project.id === data.project.id ? data.project : project)),
+      );
       activeProjectRef.current = data.project;
-      setProjects((previous) => previous.map((project) => project.id === data.project.id ? data.project : project));
       return data.project;
     };
-    const next = patchQueueRef.current.then(enqueue, enqueue);
-    patchQueueRef.current = next.catch(() => null);
-    return next;
+
+    const nextPatch = patchQueueRef.current.then(enqueue, enqueue);
+    patchQueueRef.current = nextPatch.catch(() => null);
+    return nextPatch;
   }, []);
 
   const saveActiveProjectMember = React.useCallback(async (input: {
@@ -256,10 +314,14 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       method: "POST",
       body: JSON.stringify(input),
     });
-    if (data.inviteUrl) await exposeInvitationLink(data.inviteUrl);
+    if (data.inviteUrl) {
+      await exposeInvitationLink(data.inviteUrl);
+    }
     setActiveProject(data.project);
+    setProjects((prev) =>
+      prev.map((project) => (project.id === data.project.id ? data.project : project)),
+    );
     activeProjectRef.current = data.project;
-    setProjects((previous) => previous.map((project) => project.id === data.project.id ? data.project : project));
     return data.project;
   }, []);
 
@@ -271,8 +333,10 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ email }),
     });
     setActiveProject(data.project);
+    setProjects((prev) =>
+      prev.map((project) => (project.id === data.project.id ? data.project : project)),
+    );
     activeProjectRef.current = data.project;
-    setProjects((previous) => previous.map((project) => project.id === data.project.id ? data.project : project));
     return data.project;
   }, []);
 
@@ -312,6 +376,8 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
 
 export function useProjects() {
   const context = React.useContext(ProjectsContext);
-  if (!context) throw new Error("useProjects must be used within ProjectsProvider");
+  if (!context) {
+    throw new Error("useProjects must be used within ProjectsProvider");
+  }
   return context;
 }
