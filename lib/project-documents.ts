@@ -6,14 +6,20 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 export const PROJECT_COLLABORATOR_ROLES = ["editor", "viewer"] as const;
 export const PROJECT_ACCESS_ROLES = ["owner", ...PROJECT_COLLABORATOR_ROLES] as const;
+export const PROJECT_MEMBER_STATUSES = ["pending", "accepted"] as const;
 
 export type ProjectCollaboratorRole = (typeof PROJECT_COLLABORATOR_ROLES)[number];
 export type ProjectAccessRole = (typeof PROJECT_ACCESS_ROLES)[number];
+export type ProjectMemberStatus = (typeof PROJECT_MEMBER_STATUSES)[number];
 
 export type ProjectMember = {
+  acceptedAt: string | null;
   addedAt: string;
   email: string;
+  invitationId: string | null;
   role: ProjectCollaboratorRole;
+  status: ProjectMemberStatus;
+  userId: string | null;
 };
 
 export type ProjectSummary = {
@@ -59,13 +65,32 @@ export const normalizeProjectDocument = (value: unknown): ProjectDocument | null
           ? (entry.role as ProjectCollaboratorRole)
           : null;
       if (!email || !role) return [];
+      const addedAt =
+        typeof entry.addedAt === "string" && entry.addedAt.length > 0
+          ? entry.addedAt
+          : new Date().toISOString();
+      const invitationId =
+        typeof entry.invitationId === "string" && entry.invitationId.length > 0
+          ? entry.invitationId
+          : null;
+      const userId =
+        typeof entry.userId === "string" && entry.userId.length > 0
+          ? entry.userId
+          : null;
+      const explicitAcceptedAt =
+        typeof entry.acceptedAt === "string" && entry.acceptedAt.length > 0
+          ? entry.acceptedAt
+          : null;
+      const acceptedAt = explicitAcceptedAt ?? (!invitationId ? addedAt : null);
+      const status: ProjectMemberStatus = acceptedAt ? "accepted" : "pending";
       return [{
-        addedAt:
-          typeof entry.addedAt === "string" && entry.addedAt.length > 0
-            ? entry.addedAt
-            : new Date().toISOString(),
+        acceptedAt,
+        addedAt,
         email,
+        invitationId,
         role,
+        status,
+        userId,
       }];
     })
     : [];

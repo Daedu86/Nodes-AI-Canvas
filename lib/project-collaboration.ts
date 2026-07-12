@@ -52,16 +52,11 @@ const hydrateProjectDocument = async (
   ]);
   const sessionIds = new Set(project.sessionIds);
   const memoryIds = new Set(project.memoryIds);
-  const attachedSessions = sessions
-    .filter((session): session is Exclude<(typeof sessions)[number], null> => session !== null)
-    .filter((session) => sessionIds.has(session.id));
-  const attachedMemoryItems = memoryItems.filter((item) => memoryIds.has(item.id));
-
   return {
     accessRole: project.accessRole,
     arenaWinnerBranchKey: project.arenaWinnerBranchKey,
     arenaWinnerSessionId: project.arenaWinnerSessionId,
-    attachedMemoryItems,
+    attachedMemoryItems: memoryItems.filter((item) => memoryIds.has(item.id)),
     createdAt: project.createdAt,
     globalContext: project.globalContext,
     id: project.id,
@@ -69,7 +64,9 @@ const hydrateProjectDocument = async (
     memoryIds: project.memoryIds,
     sessionCount: project.sessionCount,
     sessionIds: project.sessionIds,
-    sessions: attachedSessions,
+    sessions: sessions
+      .filter((session): session is Exclude<(typeof sessions)[number], null> => session !== null)
+      .filter((session) => sessionIds.has(session.id)),
     title: project.title,
     updatedAt: project.updatedAt,
   };
@@ -102,10 +99,7 @@ export async function createProjectForUser(
   input: ProjectCreateInput,
   user: AuthenticatedUser,
 ): Promise<ProjectDocument> {
-  const created = await createProject({
-    ...input,
-    ownerId: user.id,
-  });
+  const created = await createProject({ ...input, ownerId: user.id });
   return getProjectForUser(created.id, user);
 }
 
@@ -116,11 +110,9 @@ export async function patchProjectForUser(
 ): Promise<ProjectDocument> {
   const project = await getProjectForUser(projectId, user);
   assertEditable(project);
-
   if (project.accessRole !== "owner" && patchTouchesOwnerOnlyFields(patch)) {
     throw new ProjectAccessError("Only the project owner can change attached sessions or typed nodes.", 403);
   }
-
   const updated = await patchProject(
     projectId,
     patch,
@@ -128,7 +120,6 @@ export async function patchProjectForUser(
       ? user.id
       : (await getProjectRecordForActor(projectId, toProjectActor(user))).ownerId,
   );
-
   return getProjectForUser(updated.id, user);
 }
 
@@ -139,7 +130,23 @@ export async function upsertProjectMemberForUser(
 ): Promise<ProjectDocument> {
   const project = await getProjectForUser(projectId, user);
   assertOwner(project);
-  await upsertProjectMember(projectId, member, user.id);
+  const email = member.email.trim().toLowerCase();
+  const accepted = project.members.find(
+    (entry) => entry.email === email && entry.status === "accepted",
+  );
+  if (!accepted) {
+    throw new ProjectAccessError(
+      "New collaborators must accept a project invitation before membership is active.",
+      409,
+    );
+  }
+  await upsertProjectMember(projectId, {
+    acceptedAt: accepted.acceptedAt,
+    email,
+    invitationId: accepted.invitationId,
+    role: member.role,
+    userId: accepted.userId,
+  }, user.id);
   return getProjectForUser(projectId, user);
 }
 

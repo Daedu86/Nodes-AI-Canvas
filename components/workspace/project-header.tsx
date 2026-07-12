@@ -21,10 +21,13 @@ export function ProjectHeader() {
 
   const handleBackToSessions = () => {
     clearActiveProject();
-    if (!activeSessionId || typeof window === "undefined") {
-      return;
-    }
+    if (!activeSessionId || typeof window === "undefined") return;
     window.location.assign(`/?sessionId=${encodeURIComponent(activeSessionId)}`);
+  };
+
+  const handleOpenCollaboration = () => {
+    if (!activeProject || typeof window === "undefined") return;
+    window.location.assign(`/projects/${encodeURIComponent(activeProject.id)}/collaboration`);
   };
 
   return (
@@ -47,6 +50,11 @@ export function ProjectHeader() {
         <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-1 text-[11px] font-medium text-violet-700">
           {activeProject?.sessionCount ?? 0} session{activeProject?.sessionCount === 1 ? "" : "s"}
         </span>
+        {accessRole === "owner" ? (
+          <Button type="button" variant="outline" size="sm" onClick={handleOpenCollaboration}>
+            Collaborate
+          </Button>
+        ) : null}
         <Button type="button" variant="outline" size="sm" onClick={handleBackToSessions}>
           Back to sessions
         </Button>

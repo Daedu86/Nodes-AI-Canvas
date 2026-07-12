@@ -35,8 +35,11 @@ export type ProjectPatch = {
 };
 
 export type ProjectMemberInput = {
+  acceptedAt?: string | null;
   email: string;
+  invitationId?: string | null;
   role: ProjectCollaboratorRole;
+  userId?: string | null;
 };
 
 export interface ProjectRepository {

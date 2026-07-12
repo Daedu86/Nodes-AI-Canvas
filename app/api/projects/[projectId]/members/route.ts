@@ -1,84 +1,115 @@
+import { z } from "zod";
+import { ProjectAccessError } from "@/lib/project-collaboration";
 import {
-  ProjectAccessError,
-  removeProjectMemberForUser,
-  upsertProjectMemberForUser,
-} from "@/lib/project-collaboration";
+  createProjectInvitationForUser,
+  ProjectInvitationError,
+  removeProjectMemberOrInvitationForUser,
+  updateAcceptedProjectMemberForUser,
+} from "@/lib/project-invitation-service";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
-import { notifyProjectMemberAdded } from "@/lib/server/project-notifications";
+import { getPublicAppOrigin } from "@/lib/server/public-app-origin";
+
+const memberSchema = z.object({
+  email: z.string().trim().min(3).max(254),
+  role: z.enum(["editor", "viewer"]),
+}).strict();
+
+const removeSchema = z.object({
+  email: z.string().trim().min(3).max(254),
+}).strict();
 
 type RouteParams = {
-  params: Promise<{
-    projectId: string;
-  }>;
-};
-
-type UpsertProjectMemberBody = {
-  email?: unknown;
-  role?: unknown;
-};
-
-type DeleteProjectMemberBody = {
-  email?: unknown;
+  params: Promise<{ projectId: string }>;
 };
 
 export const runtime = "nodejs";
 
+const errorResponse = (error: unknown) => {
+  if (error instanceof ProjectInvitationError) {
+    return Response.json(
+      { code: error.code, error: error.message },
+      { status: error.status, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  if (error instanceof ProjectAccessError) {
+    return Response.json(
+      { code: "project_access_denied", error: error.message },
+      { status: error.status, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  return Response.json(
+    { code: "project_not_found", error: "Project not found" },
+    { status: 404, headers: { "Cache-Control": "no-store" } },
+  );
+};
+
 export async function POST(req: Request, context: RouteParams) {
   const guarded = await requireLocalApiUser(req);
   if ("response" in guarded) return guarded.response;
-
-  const { projectId } = await context.params;
-  const body = (await req.json().catch(() => ({}))) as UpsertProjectMemberBody;
-  const email =
-    typeof body.email === "string" && body.email.trim().length > 0
-      ? body.email.trim().toLowerCase()
-      : "";
-  const role = body.role === "editor" || body.role === "viewer" ? body.role : null;
-
-  if (!email || !role) {
-    return new Response("Member email and role are required.", { status: 400 });
+  const parsed = memberSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return Response.json(
+      { code: "invalid_project_member", error: "Member email and role are required." },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
   }
-
+  const { projectId } = await context.params;
   try {
-    const project = await upsertProjectMemberForUser(projectId, { email, role }, guarded.user);
-    await notifyProjectMemberAdded({
-      projectId: project.id,
-      projectTitle: project.title,
-      actor: guarded.user,
-      memberEmail: email,
-      memberRole: role,
-    });
-    return Response.json({ project });
-  } catch (error) {
-    if (error instanceof ProjectAccessError) {
-      return new Response(error.message, { status: error.status });
+    try {
+      const project = await updateAcceptedProjectMemberForUser({
+        email: parsed.data.email,
+        projectId,
+        role: parsed.data.role,
+        user: guarded.user,
+      });
+      return Response.json(
+        { project },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    } catch (error) {
+      if (!(error instanceof ProjectInvitationError) || error.code !== "member_not_accepted") {
+        throw error;
+      }
     }
-    return new Response("Project not found", { status: 404 });
+
+    const result = await createProjectInvitationForUser({
+      appOrigin: getPublicAppOrigin(req),
+      email: parsed.data.email,
+      projectId,
+      role: parsed.data.role,
+      user: guarded.user,
+    });
+    return Response.json(result, {
+      status: 201,
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    return errorResponse(error);
   }
 }
 
 export async function DELETE(req: Request, context: RouteParams) {
   const guarded = await requireLocalApiUser(req);
   if ("response" in guarded) return guarded.response;
-
-  const { projectId } = await context.params;
-  const body = (await req.json().catch(() => ({}))) as DeleteProjectMemberBody;
-  const email =
-    typeof body.email === "string" && body.email.trim().length > 0
-      ? body.email.trim().toLowerCase()
-      : "";
-
-  if (!email) {
-    return new Response("Member email is required.", { status: 400 });
+  const parsed = removeSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return Response.json(
+      { code: "invalid_project_member", error: "Member email is required." },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
   }
-
+  const { projectId } = await context.params;
   try {
-    const project = await removeProjectMemberForUser(projectId, email, guarded.user);
-    return Response.json({ project });
+    const project = await removeProjectMemberOrInvitationForUser({
+      email: parsed.data.email,
+      projectId,
+      user: guarded.user,
+    });
+    return Response.json(
+      { project },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
-    if (error instanceof ProjectAccessError) {
-      return new Response(error.message, { status: error.status });
-    }
-    return new Response("Project not found", { status: 404 });
+    return errorResponse(error);
   }
 }

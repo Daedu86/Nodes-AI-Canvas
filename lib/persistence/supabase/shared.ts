@@ -122,9 +122,12 @@ type ProjectRelationRow = {
 };
 
 type ProjectMemberRow = {
+  accepted_at?: string | null;
   created_at?: string | null;
+  invitation_id?: string | null;
   role?: string | null;
   user_email?: string | null;
+  user_id?: string | null;
 };
 
 type ProjectRow = {
@@ -153,13 +156,32 @@ export const toProjectMembersFromRow = (row: ProjectRow): ProjectMember[] =>
           ? (entry.role as ProjectCollaboratorRole)
           : null;
       if (!email || !role) return [];
+      const addedAt =
+        typeof entry.created_at === "string" && entry.created_at.length > 0
+          ? entry.created_at
+          : new Date().toISOString();
+      const invitationId =
+        typeof entry.invitation_id === "string" && entry.invitation_id.length > 0
+          ? entry.invitation_id
+          : null;
+      const userId =
+        typeof entry.user_id === "string" && entry.user_id.length > 0
+          ? entry.user_id
+          : null;
+      const acceptedAt =
+        typeof entry.accepted_at === "string" && entry.accepted_at.length > 0
+          ? entry.accepted_at
+          : invitationId
+            ? null
+            : addedAt;
       return [{
-        addedAt:
-          typeof entry.created_at === "string" && entry.created_at.length > 0
-            ? entry.created_at
-            : new Date().toISOString(),
+        acceptedAt,
+        addedAt,
         email,
+        invitationId,
         role,
+        status: acceptedAt ? "accepted" as const : "pending" as const,
+        userId,
       }];
     })
     .sort((a, b) => a.email.localeCompare(b.email));
