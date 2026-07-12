@@ -21,7 +21,7 @@ import type { ThreadGraphFlowNode } from "@/components/assistant-ui/thread-graph
 export type CanvasModelVisual = {
   accent: string;
   modelLabel: string;
-  providerLabel: string;
+  providerLabel: string | undefined;
 };
 
 export const createCanvasModelVisualResolver = () => {
@@ -38,7 +38,7 @@ export const createCanvasModelVisualResolver = () => {
       model: node.model,
       provider: node.provider,
     });
-    const visual = {
+    const visual: CanvasModelVisual = {
       accent: palette.swatch,
       modelLabel: getGraphModelLabel(node.model, node.provider),
       providerLabel: providerDisplay(node.provider),
