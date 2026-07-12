@@ -38,6 +38,9 @@ jobs:
             gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" \
               -f state="$state" -f context="$context" -f description="$description"
           }
+          encode() {
+            printf '%s' "$1" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '='
+          }
 
           set +e
           npx eslint . --format json > lint.json 2> lint.stderr
@@ -57,8 +60,7 @@ jobs:
           NODE
             index=1
             while IFS= read -r line && [ "$index" -le 8 ]; do
-              encoded=$(printf '%s' "$line" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
-              publish failure "diag7/lint${index}/${encoded}" "Lint failed (${lint_code})"
+              publish failure "diag7/lint${index}/$(encode "$line")" "Lint failed (${lint_code})"
               index=$((index + 1))
             done < lint-summary.txt
           fi
@@ -71,8 +73,7 @@ jobs:
             grep -E 'error TS[0-9]+:' typecheck.log | head -8 > type-summary.txt
             index=1
             while IFS= read -r line && [ "$index" -le 8 ]; do
-              encoded=$(printf '%s' "$line" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
-              publish failure "diag7/type${index}/${encoded}" "Typecheck failed (${type_code})"
+              publish failure "diag7/type${index}/$(encode "$line")" "Typecheck failed (${type_code})"
               index=$((index + 1))
             done < type-summary.txt
           fi
@@ -84,20 +85,26 @@ jobs:
           else
             node <<'NODE' > unit-summary.txt
           const fs = require('node:fs');
+          const path = require('node:path');
           let data = {};
           try { data = JSON.parse(fs.readFileSync('unit.json', 'utf8')); } catch {}
-          const failed = (data.testResults ?? []).filter((result) => result.status === 'failed');
-          for (const result of failed) {
+          for (const result of (data.testResults ?? []).filter((entry) => entry.status === 'failed')) {
+            const file = path.basename(result.name ?? 'unknown');
             const assertions = (result.assertionResults ?? []).filter((test) => test.status === 'failed');
-            if (assertions.length === 0) console.log(`${result.name}:suite failed`);
-            for (const test of assertions) console.log(`${result.name}:${test.fullName ?? test.title}:failed`);
+            if (assertions.length === 0) {
+              const message = String(result.message ?? result.failureMessage ?? 'suite failed').split('\n')[0];
+              console.log(`${file}:${message}`);
+            }
+            for (const test of assertions) {
+              const message = String(test.failureMessages?.[0] ?? 'failed').split('\n')[0];
+              console.log(`${file}:${test.fullName ?? test.title}:${message}`);
+            }
           }
           NODE
             if [ ! -s unit-summary.txt ]; then tail -30 unit.log > unit-summary.txt; fi
             index=1
             while IFS= read -r line && [ "$index" -le 8 ]; do
-              encoded=$(printf '%s' "$line" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
-              publish failure "diag7/unit${index}/${encoded}" "Unit tests failed (${unit_code})"
+              publish failure "diag7/unit${index}/$(encode "$line")" "Unit tests failed (${unit_code})"
               index=$((index + 1))
             done < unit-summary.txt
           fi
@@ -107,8 +114,8 @@ jobs:
           if [ "$build_code" -eq 0 ]; then
             publish success 'diag7/build/ok' 'Build passed'
           else
-            summary=$(grep -E 'Type error:|Failed to compile|Error:' build.log | head -2 | tr '\n\r' '  ' | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
-            publish failure "diag7/build/${summary}" "Build failed (${build_code})"
+            summary=$(grep -E 'Type error:|Failed to compile|Error:' build.log | head -2 | tr '\n\r' '  ')
+            publish failure "diag7/build/$(encode "$summary")" "Build failed (${build_code})"
           fi
 
           npm audit --omit=dev --json > audit-prod.json 2>/dev/null
