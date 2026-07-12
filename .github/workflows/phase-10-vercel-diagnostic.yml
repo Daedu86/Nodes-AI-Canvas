@@ -11,7 +11,7 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Publish Vercel failure descriptions
         env:
@@ -35,3 +35,33 @@ jobs:
           }
           publish_detail b00eb587fbc4a4c6695cd6802da3df1540a289b2 first
           publish_detail c267c24a9a9bd390568bdf59060e69019f0b2fb4 retry
+
+      - name: Inspect failed deployment through Vercel CLI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_SHA: ${{ github.sha }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${CURRENT_SHA}" \
+              -f state=failure \
+              -f context='diag10/vercel-token/missing' \
+              -f description='VERCEL_TOKEN repository secret is not configured'
+            exit 0
+          fi
+
+          set +e
+          npx --yes vercel@latest inspect dpl_DWD7sTTxH6wp8f9DMpef3D98Tw22 \
+            --logs --scope daedu86s-projects --token "$VERCEL_TOKEN" > inspect.log 2>&1
+          code=$?
+          set -e
+
+          summary=$(grep -E 'Error:|error|failed|fatal' inspect.log | head -3 | tr '\n\r' '  ')
+          [ -n "$summary" ] || summary=$(tail -10 inspect.log | tr '\n\r' '  ')
+          encoded=$(printf '%s' "$summary" | cut -c1-160 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+          if [ "$code" -eq 0 ]; then state=success; else state=failure; fi
+          gh api "repos/${GITHUB_REPOSITORY}/statuses/${CURRENT_SHA}" \
+            -f state="$state" \
+            -f context="diag10/vercel-cli/${encoded}" \
+            -f description="Vercel CLI inspect exited ${code}"
