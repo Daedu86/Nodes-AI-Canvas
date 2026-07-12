@@ -15,6 +15,11 @@ const ARTIFACT_LANE_X = -420;
 const ARTIFACT_START_Y = 60;
 const ARTIFACT_GAP_Y = 272;
 
+type SizedFlowNode = {
+  node: ThreadGraphFlowNode;
+  size: { width: number; height: number };
+};
+
 const getNodeSize = (node: ThreadGraphFlowNode) => {
   const kind = node.data?.kind;
   if (kind === "root") return { ...ROOT_NODE_SIZE };
@@ -32,9 +37,18 @@ export const layoutThreadGraphFlow = (
   sourceNodes: ThreadGraphFlowNode[],
   sourceEdges: ThreadGraphFlowEdge[],
 ) => {
-  const conversationNodes = sourceNodes.filter((node) => node.data.kind !== "artifact");
-  const artifactNodes = sourceNodes.filter((node) => node.data.kind === "artifact");
-  const treeEdges = sourceEdges.filter(isConversationTreeEdge);
+  const conversationNodes: SizedFlowNode[] = [];
+  const artifactNodes: SizedFlowNode[] = [];
+
+  for (const node of sourceNodes) {
+    const sizedNode = { node, size: getNodeSize(node) };
+    if (node.data.kind === "artifact") {
+      artifactNodes.push(sizedNode);
+    } else {
+      conversationNodes.push(sizedNode);
+    }
+  }
+
   const graph = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
   graph.setGraph({
     rankdir: "LR",
@@ -44,12 +58,17 @@ export const layoutThreadGraphFlow = (
     marginy: 48,
   });
 
-  conversationNodes.forEach((node) => graph.setNode(node.id, getNodeSize(node)));
-  treeEdges.forEach((edge) => graph.setEdge(edge.source, edge.target));
+  for (const { node, size } of conversationNodes) {
+    graph.setNode(node.id, size);
+  }
+  for (const edge of sourceEdges) {
+    if (isConversationTreeEdge(edge)) {
+      graph.setEdge(edge.source, edge.target);
+    }
+  }
   dagre.layout(graph);
 
-  const laidOutConversationNodes = conversationNodes.map((node) => {
-    const size = getNodeSize(node);
+  const laidOutConversationNodes = conversationNodes.map(({ node, size }) => {
     const dagrePosition = graph.node(node.id) as { x: number; y: number } | undefined;
     const storedDraftPosition =
       node.data.kind === "prompt-draft" ? node.data.position ?? null : null;
@@ -59,7 +78,10 @@ export const layoutThreadGraphFlow = (
       position:
         storedDraftPosition ??
         (dagrePosition
-          ? { x: dagrePosition.x - size.width / 2, y: dagrePosition.y - size.height / 2 }
+          ? {
+              x: dagrePosition.x - size.width / 2,
+              y: dagrePosition.y - size.height / 2,
+            }
           : node.position),
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
@@ -67,9 +89,11 @@ export const layoutThreadGraphFlow = (
     } satisfies ThreadGraphFlowNode;
   });
 
-  const laidOutArtifactNodes = artifactNodes.map((node, index) => {
-    const size = getNodeSize(node);
-    const fallbackPosition = { x: ARTIFACT_LANE_X, y: ARTIFACT_START_Y + index * ARTIFACT_GAP_Y };
+  const laidOutArtifactNodes = artifactNodes.map(({ node, size }, index) => {
+    const fallbackPosition = {
+      x: ARTIFACT_LANE_X,
+      y: ARTIFACT_START_Y + index * ARTIFACT_GAP_Y,
+    };
     return {
       ...node,
       draggable: true,
