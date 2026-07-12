@@ -275,6 +275,19 @@ export async function executeChatRequest(
       ) as Parameters<typeof streamText>[0]["model"];
       const result = streamText({
         abortSignal,
+        experimental_telemetry: {
+          functionId: "nodes.chat",
+          isEnabled: process.env.NODES_LLM_OBSERVABILITY !== "0",
+          metadata: {
+            attemptNumber,
+            fallbackApplied,
+            modelId: currentModel.modelId,
+            provider: currentModel.provider,
+            requestId: auditContext.requestId,
+          },
+          recordInputs: false,
+          recordOutputs: false,
+        },
         model,
         messages: createModelMessages(request, currentModel),
         system: request.system,

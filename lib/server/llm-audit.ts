@@ -63,6 +63,7 @@ type LlmAuditMetrics = Partial<LlmStreamTimingSnapshot> & {
 
 type LlmAuditEvent = {
   actorType: LlmAuditContext["actorType"];
+  cancellationSource?: "client" | "runtime";
   contextArtifactCount: number;
   errorCode?: string;
   event: LlmAuditEventName;
@@ -85,7 +86,6 @@ type LlmAuditEvent = {
   timestamp: string;
   toolCount: number;
   usage?: LlmUsageMetrics;
-  cancellationSource?: "client" | "runtime";
 };
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -171,15 +171,21 @@ export function createLlmAuditContext(options: {
 }
 
 export function getLlmUsageMetrics(event: unknown): LlmUsageMetrics {
-  const usage = asRecord(asRecord(event)?.usage);
+  const eventRecord = asRecord(event);
+  const usage =
+    asRecord(eventRecord?.totalUsage) ?? asRecord(eventRecord?.usage);
   const inputDetails = asRecord(usage?.inputTokenDetails);
   const outputDetails = asRecord(usage?.outputTokenDetails);
   return {
-    cacheReadTokens: getFiniteNumber(inputDetails?.cacheReadTokens),
+    cacheReadTokens:
+      getFiniteNumber(inputDetails?.cacheReadTokens) ??
+      getFiniteNumber(usage?.cachedInputTokens),
     cacheWriteTokens: getFiniteNumber(inputDetails?.cacheWriteTokens),
     inputTokens: getFiniteNumber(usage?.inputTokens),
     outputTokens: getFiniteNumber(usage?.outputTokens),
-    reasoningTokens: getFiniteNumber(outputDetails?.reasoningTokens),
+    reasoningTokens:
+      getFiniteNumber(outputDetails?.reasoningTokens) ??
+      getFiniteNumber(usage?.reasoningTokens),
     textTokens: getFiniteNumber(outputDetails?.textTokens),
     totalTokens: getFiniteNumber(usage?.totalTokens),
   };
@@ -192,7 +198,13 @@ export function getLlmFinishReason(event: unknown) {
 
 export function getSafeErrorName(error: unknown) {
   const record = asRecord(error);
-  const value = error instanceof Error ? error.name : record?.name;
+  const nested = asRecord(record?.error);
+  const value =
+    error instanceof Error
+      ? error.name
+      : typeof record?.name === "string"
+        ? record.name
+        : nested?.name;
   return typeof value === "string" && value.trim()
     ? sanitizeString(value.trim(), 96)
     : null;
