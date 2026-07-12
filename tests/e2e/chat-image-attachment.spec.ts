@@ -119,16 +119,13 @@ test("attaching an image includes it in the sent message", async ({ page }) => {
     }
   });
 
-  // Switch to a vision-capable model so image parts are accepted.
   await page.getByRole("combobox", { name: "Model" }).selectOption({
     label: "OpenRouter · Nemotron Nano 12B V2 VL (free)",
   });
 
-  // Attach image.
   await page.getByRole("button", { name: "Attach image" }).click();
   await page.getByTestId("chat-image-input").setInputFiles(filePath);
 
-  // Preview shows before send.
   await expect(page.getByTestId("composer-image-preview")).toBeVisible();
   await expect(
     page
@@ -136,7 +133,6 @@ test("attaching an image includes it in the sent message", async ({ page }) => {
       .getByRole("img", { name: "pixel.png" }),
   ).toBeVisible();
 
-  // Send (no manual text) should auto-generate a prompt and include the image.
   const sendButton = page.getByRole("button", { name: "Send" });
   await expect(sendButton).toBeEnabled();
 
@@ -150,15 +146,14 @@ test("attaching an image includes it in the sent message", async ({ page }) => {
 
   await sendButton.click();
 
-  // Preview should clear after send.
   await expect(page.getByTestId("composer-image-preview")).toHaveCount(0);
-
   await chatRequestPromise;
+  expect(
+    chatRequestBodies.some((body) => body.includes("data:image/png;base64,")),
+  ).toBe(true);
 
-  // The user message bubble should render the attached image (not just the composer preview).
   await expect(page.locator('img[alt="pixel.png"]').first()).toBeVisible();
 
-  // Assert the request included an image part.
   expect(chatRequests.length).toBeGreaterThan(0);
   const last = asRecord(chatRequests.at(-1)?.postData);
   const messages = Array.isArray(last?.messages) ? last.messages : [];
@@ -199,8 +194,6 @@ test("send is blocked while an image is still preparing", async ({ page }) => {
   await page.getByRole("button", { name: "Attach image" }).click();
   await page.getByTestId("chat-image-input").setInputFiles(filePath);
 
-  // Immediately try sending; if preparation is still in-flight, a user-facing error should appear.
-  // (This guards the race where users click Send before FileReader resolves.)
   await page.getByRole("button", { name: "Send" }).click();
   const alert = page.getByTestId("composer-error");
   await expect(alert).toContainText(
@@ -225,7 +218,6 @@ test("attaching an image does not auto-send when text is already typed", async (
     }
   });
 
-  // Switch to a vision-capable model so image parts are accepted.
   await page.getByRole("combobox", { name: "Model" }).selectOption({
     label: "OpenRouter · Nemotron Nano 12B V2 VL (free)",
   });
@@ -233,7 +225,6 @@ test("attaching an image does not auto-send when text is already typed", async (
   const composer = page.getByPlaceholder("Write a message...");
   await composer.fill("Describe this image, please.");
 
-  // Attach image should NOT submit the composer form automatically.
   await page.getByRole("button", { name: "Attach image" }).click();
   await page.getByTestId("chat-image-input").setInputFiles(filePath);
 
