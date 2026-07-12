@@ -145,7 +145,7 @@ jobs:
         id: e2e
         if: steps.lint.outcome == 'success' && steps.typecheck.outcome == 'success' && steps.unit.outcome == 'success' && steps.critical.outcome == 'success' && steps.build.outcome == 'success'
         continue-on-error: true
-        run: npm run test:e2e -- --workers=1
+        run: npm run test:e2e -- --workers=1 2>&1 | tee e2e.log
 
       - name: Publish E2E result
         if: always()
@@ -153,6 +153,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.sha }}
           E2E: ${{ steps.e2e.outcome }}
+        shell: bash
         run: |
-          if [ "$E2E" = "success" ]; then state=success; description='E2E passed'; elif [ "$E2E" = "skipped" ]; then state=error; description='E2E skipped because a core gate failed'; else state=failure; description="E2E: ${E2E}"; fi
-          gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state="$state" -f context='diag7/e2e' -f description="$description"
+          if [ "$E2E" = "success" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=success -f context='diag7/e2e' -f description='E2E passed'
+          elif [ "$E2E" = "skipped" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=error -f context='diag7/e2e' -f description='E2E skipped because a core gate failed'
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=failure -f context='diag7/e2e' -f description="E2E: ${E2E}"
+            line=$(grep -E '^[[:space:]]*[0-9]+\)|Error:|Timed out|failed' e2e.log | head -2 | tr '\n' ' ')
+            encoded=$(printf '%s' "${line:-$(tail -8 e2e.log | tr '\n' ' ')}" | cut -c1-72 | base64 -w0 | tr '+/' '-_' | tr -d '=')
+            gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}" -f state=failure -f context="diag7/e2e-detail/${encoded}" -f description='E2E failure detail'
+          fi
