@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Github, Globe, KeyRound, LockKeyhole, Mail, Network } from "lucide-react";
+import { GitFork, Globe, KeyRound, LockKeyhole, Mail, Network } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { getCanonicalAppOrigin } from "@/lib/auth/canonical-app-url";
@@ -59,8 +59,7 @@ export function AuthScreen({
 
   useEffect(() => {
     const canonicalOrigin = getCanonicalAppOrigin(canonicalAppUrl);
-    if (!canonicalOrigin) return;
-    if (window.location.origin === canonicalOrigin) return;
+    if (!canonicalOrigin || window.location.origin === canonicalOrigin) return;
     const current = new URL(window.location.href);
     const target = new URL(`${current.pathname}${current.search}${current.hash}`, canonicalOrigin);
     window.location.replace(target.toString());
@@ -88,13 +87,11 @@ export function AuthScreen({
     event.preventDefault();
     setMagicLinkSent(false);
     setError(null);
-
     const normalized = magicLinkEmail.trim();
     if (!normalized) {
       setError("Enter an email address to receive a sign-in link.");
       return;
     }
-
     setIsMagicLinkSubmitting(true);
     const result = await signIn("email", {
       email: normalized,
@@ -102,25 +99,21 @@ export function AuthScreen({
       redirect: false,
     });
     setIsMagicLinkSubmitting(false);
-
     if (result?.error) {
       setError("Unable to send a sign-in link. Check the email provider configuration.");
       return;
     }
-
     setMagicLinkSent(true);
   };
 
   const handleAgentToken = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-
     const normalized = agentToken.trim();
     if (!normalized) {
       setError("Paste an agent token to continue.");
       return;
     }
-
     setIsAgentSubmitting(true);
     const result = await signIn("agent-token", {
       token: normalized,
@@ -128,12 +121,10 @@ export function AuthScreen({
       redirect: false,
     });
     setIsAgentSubmitting(false);
-
     if (result?.error) {
       setError("Invalid agent token.");
       return;
     }
-
     window.location.assign(callbackUrl);
   };
 
@@ -150,39 +141,28 @@ export function AuthScreen({
               Sign in to work with branches, projects, and shared AI context.
             </h1>
             <p className="max-w-2xl text-base leading-7 text-slate-200/88">
-              Nodes is a decision workspace for exploring multiple AI paths before
-              you commit. Authentication now scopes sessions, projects, memory,
-              and artifacts to the current user.
+              Nodes is a decision workspace for exploring multiple AI paths before you commit.
+              Authentication now scopes sessions, projects, memory, and artifacts to the current user.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm font-medium text-white">Branch with intent</p>
-              <p className="mt-2 text-sm leading-6 text-slate-200/88">
-                Explore multiple directions without losing the thread.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm font-medium text-white">Compare in Arena</p>
-              <p className="mt-2 text-sm leading-6 text-slate-200/88">
-                Review sessions, branches, and merge nodes in one place.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm font-medium text-white">Keep ownership clear</p>
-              <p className="mt-2 text-sm leading-6 text-slate-200/88">
-                Your sessions, projects, memory, and artifacts stay scoped to your account.
-              </p>
-            </div>
+            {[
+              ["Branch with intent", "Explore multiple directions without losing the thread."],
+              ["Compare in Arena", "Review sessions, branches, and merge nodes in one place."],
+              ["Keep ownership clear", "Your sessions, projects, memory, and artifacts stay scoped to your account."],
+            ].map(([title, description]) => (
+              <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-sm font-medium text-white">{title}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-200/88">{description}</p>
+              </div>
+            ))}
           </div>
         </section>
 
         <section className="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-2xl backdrop-blur">
           <div className="space-y-5">
             <div>
-              <p className="text-sm font-medium uppercase tracking-[0.22em] text-slate-300/90">
-                Authentication
-              </p>
+              <p className="text-sm font-medium uppercase tracking-[0.22em] text-slate-300/90">Authentication</p>
               <h2 className="mt-2 text-2xl font-semibold text-white">Access Nodes</h2>
             </div>
 
@@ -194,25 +174,15 @@ export function AuthScreen({
 
             <div className="grid gap-3">
               {googleConfigured ? (
-                <Button
-                  type="button"
-                  size="lg"
-                  className="w-full justify-center"
-                  onClick={() => void signIn("google", { callbackUrl })}
-                >
+                <Button type="button" size="lg" className="w-full justify-center" onClick={() => void signIn("google", { callbackUrl })}>
                   <Globe className="size-4" />
                   Continue with Google
                 </Button>
               ) : null}
 
               {githubConfigured ? (
-                <Button
-                  type="button"
-                  size="lg"
-                  className="w-full justify-center"
-                  onClick={() => void signIn("github", { callbackUrl })}
-                >
-                  <Github className="size-4" />
+                <Button type="button" size="lg" className="w-full justify-center" onClick={() => void signIn("github", { callbackUrl })}>
+                  <GitFork className="size-4" />
                   Continue with GitHub
                 </Button>
               ) : null}
@@ -220,75 +190,38 @@ export function AuthScreen({
               {emailConfigured ? (
                 <form className="space-y-3" onSubmit={handleMagicLink}>
                   <div className="space-y-2">
-                    <label className="text-sm text-slate-200/90" htmlFor="magic-email">
-                      Email magic link
-                    </label>
-                    <Input
-                      id="magic-email"
-                      value={magicLinkEmail}
-                      onChange={(event) => setMagicLinkEmail(event.target.value)}
-                      autoComplete="email"
-                      placeholder="you@example.com"
-                    />
+                    <label className="text-sm text-slate-200/90" htmlFor="magic-email">Email magic link</label>
+                    <Input id="magic-email" value={magicLinkEmail} onChange={(event) => setMagicLinkEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" />
                   </div>
-                  <Button
-                    type="submit"
-                    size="lg"
-                    variant="outline"
-                    className="w-full"
-                    disabled={isMagicLinkSubmitting}
-                  >
+                  <Button type="submit" size="lg" variant="outline" className="w-full" disabled={isMagicLinkSubmitting}>
                     <Mail className="size-4" />
                     {isMagicLinkSubmitting ? "Sending..." : "Send sign-in link"}
                   </Button>
-                  {magicLinkSent ? (
-                    <p className="text-xs leading-5 text-slate-200/88">
-                      Check your email for a sign-in link.
-                    </p>
-                  ) : null}
+                  {magicLinkSent ? <p className="text-xs leading-5 text-slate-200/88">Check your email for a sign-in link.</p> : null}
                 </form>
               ) : null}
 
               {agentTokenLoginEnabled ? (
                 <form className="mt-4 space-y-3 border-t border-white/10 pt-4" onSubmit={handleAgentToken}>
                   <div className="space-y-2">
-                    <label className="text-sm text-slate-200/90" htmlFor="agent-token">
-                      Agent token
-                    </label>
-                    <Input
-                      id="agent-token"
-                      type="password"
-                      value={agentToken}
-                      onChange={(event) => setAgentToken(event.target.value)}
-                      autoComplete="off"
-                      placeholder="Paste a token minted from Profile > Agent Access"
-                    />
+                    <label className="text-sm text-slate-200/90" htmlFor="agent-token">Agent token</label>
+                    <Input id="agent-token" type="password" value={agentToken} onChange={(event) => setAgentToken(event.target.value)} autoComplete="off" placeholder="Paste a token minted from Profile > Agent Access" />
                   </div>
-                  <Button
-                    type="submit"
-                    size="lg"
-                    variant="outline"
-                    className="w-full"
-                    disabled={isAgentSubmitting}
-                  >
+                  <Button type="submit" size="lg" variant="outline" className="w-full" disabled={isAgentSubmitting}>
                     <KeyRound className="size-4" />
                     {isAgentSubmitting ? "Signing in..." : "Continue with agent token"}
                   </Button>
-                  <p className="text-xs leading-5 text-slate-300/90">
-                    For bots and automations. Tokens expire and can be rotated in the dashboard.
-                  </p>
+                  <p className="text-xs leading-5 text-slate-300/90">For bots and automations. Tokens expire and can be rotated in the dashboard.</p>
                 </form>
               ) : null}
             </div>
 
             {!googleConfigured && !githubConfigured && !emailConfigured ? (
               <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                <p className="text-sm font-medium text-slate-200">
-                  No public sign-in provider is configured in this environment.
-                </p>
+                <p className="text-sm font-medium text-slate-200">No public sign-in provider is configured in this environment.</p>
                 <p className="mt-2 text-sm leading-6 text-slate-200/84">
                   Configure OAuth (<code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_GITHUB_*</code>,{" "}
-                  <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_GOOGLE_*</code>) or email magic links (
+                  <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_GOOGLE_*</code>) or email magic links ({" "}
                   <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_EMAIL_SERVER</code>,{" "}
                   <code className="rounded bg-black/30 px-1.5 py-0.5 text-slate-200">AUTH_EMAIL_FROM</code>).
                 </p>
@@ -298,28 +231,12 @@ export function AuthScreen({
             {devCredentialsEnabled ? (
               <form className="space-y-4" onSubmit={handleDevLogin}>
                 <div className="space-y-2">
-                  <label className="text-sm text-slate-200/90" htmlFor="dev-email">
-                    Local dev email
-                  </label>
-                  <Input
-                    id="dev-email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    autoComplete="username"
-                  />
+                  <label className="text-sm text-slate-200/90" htmlFor="dev-email">Local dev email</label>
+                  <Input id="dev-email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="username" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm text-slate-200/90" htmlFor="dev-password">
-                    Local dev password
-                  </label>
-                  <Input
-                    id="dev-password"
-                    type="password"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    autoComplete="current-password"
-                    placeholder="Use AUTH_DEV_PASSWORD or the local dev default"
-                  />
+                  <label className="text-sm text-slate-200/90" htmlFor="dev-password">Local dev password</label>
+                  <Input id="dev-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" placeholder="Use AUTH_DEV_PASSWORD or the local dev default" />
                 </div>
                 {error ? <p className="text-sm text-rose-300">{error}</p> : null}
                 <Button type="submit" size="lg" variant="outline" className="w-full" disabled={isSubmitting}>
@@ -331,8 +248,7 @@ export function AuthScreen({
 
             {!googleConfigured && !githubConfigured && !emailConfigured && !devCredentialsEnabled ? (
               <p className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                No authentication provider is configured yet. Add GitHub OAuth or enable local
-                dev credentials in your environment.
+                No authentication provider is configured yet. Add GitHub OAuth or enable local dev credentials in your environment.
               </p>
             ) : null}
           </div>
