@@ -21,7 +21,7 @@ env:
   AUTH_ENABLE_DEV_CREDENTIALS: "0"
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
-  PHASE2_REVISION: "16"
+  PHASE2_REVISION: "17"
   PLAYWRIGHT_RUN_ID: phase2-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
@@ -76,6 +76,7 @@ jobs:
             components/context/persisted-session-runtime-bridge.tsx \
             components/context/session-artifacts.tsx \
             components/workspace/project-workspace.tsx \
+            lib/assistant-edit-runtime.ts \
             lib/session-persist-sync.ts \
             lib/session-runtime-snapshot.ts \
             tests/e2e/smoke.spec.ts \
@@ -200,7 +201,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: phase2-last-regression-repair
+          name: phase2-final-repair
           path: |
             phase2-*-report.json
             phase2-*-stderr.log
@@ -236,6 +237,7 @@ jobs:
               phase2-artifact-status.json \
               phase2-compatible-status.json \
               phase2-regression-status.json \
+              phase2-apply-failure.log \
               phase2-artifact-static-tail.log \
               phase2-publish-failure.log \
               phase2-assistant-ui-api.txt \
@@ -252,14 +254,15 @@ jobs:
               components/context/persisted-session-runtime-bridge.tsx \
               components/context/session-artifacts.tsx \
               components/workspace/project-workspace.tsx \
+              lib/assistant-edit-runtime.ts \
               lib/session-persist-sync.ts \
               lib/session-runtime-snapshot.ts \
               tests/e2e/smoke.spec.ts \
               tests/session-runtime-snapshot.test.ts
-            git commit -m "fix: stabilize Canvas state, rendering, and persistence [skip vercel]"
+            git commit -m "fix: complete phase 2 Canvas and persistence stabilization [skip vercel]"
           else
             git add phase2-e2e-summary.json
-            git commit -m "test: record final phase 2 regression result [skip vercel]"
+            git commit -m "test: record completed phase 2 repair result [skip vercel]"
             git reset --hard HEAD
             git clean -fd
           fi
