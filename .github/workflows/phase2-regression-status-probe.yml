@@ -1,0 +1,39 @@
+name: Phase 2 regression status probe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/phase2-regression-status-probe.yml
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Capture diagnostic status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run list \
+            --workflow "Phase 2 E2E diagnostic" \
+            --limit 3 \
+            --json databaseId,status,conclusion,headSha,createdAt,updatedAt,url \
+            > phase2-regression-status.json
+      - name: Publish and remove probe
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/phase2-regression-status-probe.yml
+          git add phase2-regression-status.json
+          git commit -m "test: record full phase 2 regression status [skip vercel]"
+          git pull --rebase origin main
+          git push origin HEAD:main
