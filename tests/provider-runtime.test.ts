@@ -28,6 +28,13 @@ const restoreEnvironment = (key: string, value: string | undefined) => {
   else process.env[key] = value;
 };
 
+const createFetchMock = () =>
+  vi.fn<typeof fetch>(async (input, init) => {
+    void input;
+    void init;
+    return new Response(null, { status: 200 });
+  });
+
 const gemmaConfig = {
   modelId: "google/gemma-4-31b-it:free",
   provider: "openrouter" as const,
@@ -56,14 +63,12 @@ describe("provider runtime", () => {
   });
 
   it("injects OpenRouter fallback models into POST request bodies for non-router models", async () => {
-    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    const fetchMock = createFetchMock();
     vi.stubGlobal("fetch", fetchMock);
 
     createLanguageModel(
       gemmaConfig,
-      {
-        openrouterApiKey: "user-key",
-      },
+      { openrouterApiKey: "user-key" },
       { userPlan: "free" },
     );
 
@@ -80,46 +85,38 @@ describe("provider runtime", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const forwardedInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
-    expect(JSON.parse(String(forwardedInit.body))).toMatchObject({
+    const forwardedInit = fetchMock.mock.calls[0]?.[1];
+    expect(JSON.parse(String(forwardedInit?.body))).toMatchObject({
       model: gemmaConfig.modelId,
       models: ["openrouter/free"],
     });
   });
 
   it("does not inject fallback models for the OpenRouter free router", async () => {
-    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    const fetchMock = createFetchMock();
     vi.stubGlobal("fetch", fetchMock);
 
     createLanguageModel(
-      {
-        modelId: "openrouter/free",
-        provider: "openrouter",
-      },
-      {
-        openrouterApiKey: "user-key",
-      },
+      { modelId: "openrouter/free", provider: "openrouter" },
+      { openrouterApiKey: "user-key" },
       { userPlan: "free" },
     );
 
     const settings = createOpenAIMock.mock.calls[0]?.[0] as { fetch?: typeof fetch };
     await settings.fetch?.("https://openrouter.ai/api/v1/responses", {
       method: "POST",
-      body: JSON.stringify({
-        model: "openrouter/free",
-        stream: true,
-      }),
+      body: JSON.stringify({ model: "openrouter/free", stream: true }),
     });
 
-    const forwardedInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
-    expect(JSON.parse(String(forwardedInit.body))).toEqual({
+    const forwardedInit = fetchMock.mock.calls[0]?.[1];
+    expect(JSON.parse(String(forwardedInit?.body))).toEqual({
       model: "openrouter/free",
       stream: true,
     });
   });
 
   it("passes through requests that must not be rewritten", async () => {
-    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    const fetchMock = createFetchMock();
     vi.stubGlobal("fetch", fetchMock);
 
     createLanguageModel(
@@ -150,9 +147,9 @@ describe("provider runtime", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).body).toBe("{");
-    expect((fetchMock.mock.calls[2]?.[1] as RequestInit).body).toBe(existingModelsBody);
-    expect((fetchMock.mock.calls[3]?.[1] as RequestInit).body).toBe(differentModelBody);
+    expect(fetchMock.mock.calls[1]?.[1]?.body).toBe("{");
+    expect(fetchMock.mock.calls[2]?.[1]?.body).toBe(existingModelsBody);
+    expect(fetchMock.mock.calls[3]?.[1]?.body).toBe(differentModelBody);
   });
 
   it("selects active, first, legacy, or empty user credentials in order", async () => {
@@ -218,10 +215,7 @@ describe("provider runtime", () => {
   it("enforces plan-aware provider credential policy", () => {
     expect(
       getMissingProviderCredential("openrouter", {}, { userPlan: "free" }),
-    ).toMatchObject({
-      code: "missing_openrouter_key",
-      status: 401,
-    });
+    ).toMatchObject({ code: "missing_openrouter_key", status: 401 });
 
     expect(
       getMissingProviderCredential(
