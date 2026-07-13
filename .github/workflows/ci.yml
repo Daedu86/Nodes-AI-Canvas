@@ -123,10 +123,17 @@ jobs:
         run: npm run audit:all
 
   e2e:
-    name: End-to-end
+    name: End-to-end (shard ${{ matrix.shard }}/2)
     needs: [quality, build]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: [1, 2]
+    env:
+      PLAYWRIGHT_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}-shard-${{ matrix.shard }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -144,13 +151,13 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: End-to-end tests
-        run: npm run test:e2e -- --workers=1
+        run: npm run test:e2e -- --workers=1 --shard=${{ matrix.shard }}/2 --pass-with-no-tests
 
       - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-artifacts
+          name: playwright-artifacts-${{ matrix.shard }}-of-2
           path: |
             test-results
             playwright-report
