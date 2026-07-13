@@ -34,10 +34,14 @@ const normalizePersistableRuntimeMessage = (
   message: Record<string, unknown>,
 ): PersistableRuntimeMessage | null => {
   if (typeof message.id !== "string" || message.id.length === 0) return null;
+  const messageId = message.id;
   const metadata = isRecord(message.metadata) ? message.metadata : null;
 
   if (metadata?.isOptimistic !== true) {
-    return message as PersistableRuntimeMessage;
+    return {
+      ...message,
+      id: messageId,
+    };
   }
 
   // AI SDK 7 responses remain marked optimistic in react-ai-sdk 1.3.x even
@@ -51,8 +55,9 @@ const normalizePersistableRuntimeMessage = (
   delete nextMetadata.isOptimistic;
   return {
     ...message,
+    id: messageId,
     metadata: nextMetadata,
-  } as PersistableRuntimeMessage;
+  };
 };''',
 )
 
