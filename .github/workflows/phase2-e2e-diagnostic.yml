@@ -21,6 +21,7 @@ env:
   AUTH_ENABLE_DEV_CREDENTIALS: "0"
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
+  PHASE2_REVISION: "2"
   PLAYWRIGHT_RUN_ID: phase2-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
@@ -44,7 +45,7 @@ jobs:
         run: npm ci --no-audit --fund=false
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       - name: Run complete Playwright suite
         id: playwright
