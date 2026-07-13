@@ -21,7 +21,7 @@ env:
   AUTH_ENABLE_DEV_CREDENTIALS: "0"
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
-  PHASE2_REVISION: "4"
+  PHASE2_REVISION: "5"
   PLAYWRIGHT_RUN_ID: phase2-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
@@ -51,12 +51,13 @@ jobs:
         run: |
           npx eslint \
             components/context/persisted-session-runtime-bridge.tsx \
-            tests/session-run-end-persistence.test.ts \
+            lib/session-runtime-snapshot.ts \
+            tests/session-runtime-snapshot.test.ts \
             --fix
           git diff --check
           npm run format:check
           npm run typecheck
-          npx vitest run tests/session-run-end-persistence.test.ts
+          npx vitest run tests/session-runtime-snapshot.test.ts
 
       - name: Install Chromium
         run: npx playwright install chromium
@@ -168,7 +169,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: phase2-run-end-persistence
+          name: phase2-visible-runtime-persistence
           path: |
             phase2-*-report.json
             phase2-*-stderr.log
@@ -189,6 +190,7 @@ jobs:
           if [ "$exit_code" = "0" ]; then
             git rm -f --ignore-unmatch \
               .github/workflows/phase2-e2e-diagnostic.yml \
+              .github/workflows/phase2-runtime-source-probe.yml \
               scripts/apply-phase2-persistence-fix.py \
               phase2-status.json \
               phase2-assistant-ui-api.txt \
@@ -196,11 +198,12 @@ jobs:
               phase2-e2e-summary.json
             git add \
               components/context/persisted-session-runtime-bridge.tsx \
-              tests/session-run-end-persistence.test.ts
-            git commit -m "fix: persist assistant messages after AI SDK run completion [skip vercel]"
+              lib/session-runtime-snapshot.ts \
+              tests/session-runtime-snapshot.test.ts
+            git commit -m "fix: persist the complete visible Assistant UI branch [skip vercel]"
           else
             git add phase2-e2e-summary.json
-            git commit -m "test: record delayed persistence E2E result [skip vercel]"
+            git commit -m "test: record visible runtime persistence E2E result [skip vercel]"
           fi
 
           git pull --rebase origin main
