@@ -18,10 +18,25 @@ import {
   PROJECT_MEMORY_TYPE_ORDER,
   formatProjectMemoryTypeLabel,
 } from "@/lib/project-memory-meta";
-import type { ProjectDocument } from "@/lib/project-documents";
 import type { SessionDocument, SessionSummary } from "@/lib/session-documents";
 import { ProjectCanvas, type ProjectCanvasSelection } from "@/components/workspace/project-canvas";
 import { ProjectArena } from "@/components/workspace/project-arena";
+import { ProjectSectionCard } from "@/components/workspace/project-section-card";
+import {
+  formatMemoryTitle,
+  formatProjectTitle,
+  formatProjectWinnerLabel,
+  formatSessionTitle,
+  formatUpdatedAt,
+  summarizePreviewText,
+  summarizeSelectionForTypedNode,
+} from "@/components/workspace/project-workspace-utils";
+import {
+  PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD,
+  type ArenaCompareMode,
+  type ProjectInspectorTab,
+  useResetProjectWorkspaceState,
+} from "@/components/workspace/use-project-workspace-reset";
 import {
   buildProjectArenaBranchEntries,
   type ProjectArenaBranchEntry,
@@ -37,75 +52,7 @@ import {
   getProjectContextSourcePreview,
 } from "@/lib/project-context-builder";
 
-type ArenaCompareMode = "sessions" | "branches";
-type ProjectInspectorTab = "context" | "arena" | "nodes" | "sessions" | "focus";
-
 const encoder = new TextEncoder();
-const PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD = 10;
-
-const formatProjectTitle = (title: string | null) => title?.trim() || "Untitled Project";
-const formatSessionTitle = (title: string | null) => title?.trim() || "Untitled Session";
-const formatMemoryTitle = (title: string) => title.trim() || "Untitled Memory";
-const formatProjectWinnerLabel = ({
-  branchCatalog,
-  memberSessions,
-  project,
-}: {
-  branchCatalog: ProjectArenaBranchEntry[];
-  memberSessions: SessionDocument[];
-  project: ProjectDocument;
-}) => {
-  if (project.arenaWinnerBranchKey) {
-    return branchCatalog.find((entry) => entry.key === project.arenaWinnerBranchKey)?.title ?? "Branch winner";
-  }
-  if (project.arenaWinnerSessionId) {
-    return memberSessions.find((session) => session.id === project.arenaWinnerSessionId)?.title?.trim() || "Session winner";
-  }
-  return "Not set";
-};
-
-const formatUpdatedAt = (value: string) => {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(value));
-  } catch {
-    return value;
-  }
-};
-
-const summarizePreviewText = (value: string, maxLength = 220) => {
-  const compact = value.replace(/\s+/g, " ").trim();
-  if (!compact) return "";
-  if (compact.length <= maxLength) return compact;
-  return `${compact.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
-};
-
-const summarizeSelectionForTypedNode = (selection: ProjectCanvasSelection) => {
-  if (!selection) return "";
-  const prefix = selection.kind === "edge" ? `Canvas branch: ${selection.label}` : `Canvas focus: ${selection.label}`;
-  return `${prefix}\n\n${selection.preview}`.trim();
-};
-
-const SectionCard = ({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) => (
-  <section className="rounded-2xl border border-border/60 bg-background/80 px-4 py-4 shadow-sm">
-    <div className="space-y-1">
-      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-      {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
-    </div>
-    <div className="mt-3">{children}</div>
-  </section>
-);
-
 export function ProjectWorkspace() {
   const {
     activeProject,
@@ -147,31 +94,28 @@ export function ProjectWorkspace() {
     [activeProject?.sessionIds.length],
   );
 
-  React.useEffect(() => {
-    setTitleDraft(activeProject?.title ?? "");
-    setGlobalContextDraft(activeProject?.globalContext ?? "");
-    setSelectedCanvasItem(null);
-    setContextSaveState("idle");
-    setMemoryActionState("idle");
-    setMemoryTitleDraft("Arena synthesis");
-    setMemoryTypeDraft("summary");
-    setMemoryContentDraft("");
-    setMemoryActionMessage("Create a typed node and attach it to this project.");
-    setMemberEmailDraft("");
-    setMemberRoleDraft("viewer");
-    setMemberActionState("idle");
-    setMemberActionMessage("Share this project with editors or viewers.");
-    setWorkspaceMode(
-      (activeProject?.sessionIds.length ?? 0) >= PROJECT_CANVAS_AUTOSTART_SESSION_THRESHOLD
-        ? "arena"
-        : "canvas",
-    );
-    setArenaCompareMode("sessions");
-    setArenaSessionIds([]);
-    setArenaBranchKeys([]);
-    setSelectedContextSourceIds([]);
-    setInspectorTab("context");
-  }, [activeProject?.globalContext, activeProject?.id, activeProject?.sessionIds.length, activeProject?.title]);
+  useResetProjectWorkspaceState({
+    activeProject,
+    setArenaBranchKeys,
+    setArenaCompareMode,
+    setArenaSessionIds,
+    setContextSaveState,
+    setGlobalContextDraft,
+    setInspectorTab,
+    setMemberActionMessage,
+    setMemberActionState,
+    setMemberEmailDraft,
+    setMemberRoleDraft,
+    setMemoryActionMessage,
+    setMemoryActionState,
+    setMemoryContentDraft,
+    setMemoryTitleDraft,
+    setMemoryTypeDraft,
+    setSelectedCanvasItem,
+    setSelectedContextSourceIds,
+    setTitleDraft,
+    setWorkspaceMode,
+  });
 
   const memberSessions = React.useMemo<SessionDocument[]>(
     () => activeProject?.sessions ?? [],
@@ -881,7 +825,7 @@ export function ProjectWorkspace() {
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       <div className="flex w-[380px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-border/60 bg-muted/20 px-4 py-4">
-        <SectionCard
+        <ProjectSectionCard
           title="Project Overview"
           description="Projects aggregate multiple saved sessions into one persistent canvas."
         >
@@ -1103,7 +1047,7 @@ export function ProjectWorkspace() {
               ) : null}
             </div>
           </div>
-        </SectionCard>
+        </ProjectSectionCard>
 
         <section className="rounded-2xl border border-border/60 bg-background/80 px-3 py-3 shadow-sm">
           <div className="grid grid-cols-2 gap-2">
@@ -1153,7 +1097,7 @@ export function ProjectWorkspace() {
         </section>
 
         {inspectorTab === "context" ? (
-        <SectionCard
+        <ProjectSectionCard
           title="Global Context"
           description="Shared guidance that applies across every session inside this project."
         >
@@ -1322,11 +1266,11 @@ export function ProjectWorkspace() {
               </div>
             </div>
           </div>
-        </SectionCard>
+        </ProjectSectionCard>
         ) : null}
 
         {inspectorTab === "sessions" ? (
-        <SectionCard
+        <ProjectSectionCard
           title="Project Sessions"
           description="These saved sessions feed the combined project canvas."
         >
@@ -1377,11 +1321,11 @@ export function ProjectWorkspace() {
               </div>
             ))}
           </div>
-        </SectionCard>
+        </ProjectSectionCard>
         ) : null}
 
         {inspectorTab === "arena" ? (
-        <SectionCard
+        <ProjectSectionCard
           title="Project Arena"
           description="Compare whole sessions or concrete root branches side by side and synthesize a lead direction."
         >
@@ -1509,11 +1453,11 @@ export function ProjectWorkspace() {
               </div>
             ) : null}
           </div>
-        </SectionCard>
+        </ProjectSectionCard>
         ) : null}
 
         {inspectorTab === "nodes" ? (
-        <SectionCard
+        <ProjectSectionCard
           title="Typed Nodes"
           description="Create question, draft, critique, decision, summary, and evidence nodes that live on the project canvas."
         >
@@ -1776,11 +1720,11 @@ export function ProjectWorkspace() {
               )}
             </div>
           </div>
-        </SectionCard>
+        </ProjectSectionCard>
         ) : null}
 
         {inspectorTab === "sessions" ? (
-        <SectionCard
+        <ProjectSectionCard
           title="Add More Sessions"
           description="Pull more saved sessions into the same global project canvas."
         >
@@ -1823,11 +1767,11 @@ export function ProjectWorkspace() {
               </div>
             ))}
           </div>
-        </SectionCard>
+        </ProjectSectionCard>
         ) : null}
 
         {inspectorTab === "focus" ? (
-        <SectionCard
+        <ProjectSectionCard
           title="Canvas Focus"
           description="Inspect what you last selected on the aggregated project canvas."
         >
@@ -1942,7 +1886,7 @@ export function ProjectWorkspace() {
               Click a node or branch in the canvas to inspect it here.
             </p>
           )}
-        </SectionCard>
+        </ProjectSectionCard>
         ) : null}
       </div>
 
