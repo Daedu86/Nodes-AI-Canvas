@@ -39,7 +39,7 @@ Those can stay browser-local even after cloud migration.
 
 This keeps the migration small because the app already has server-side auth and ownership checks.
 
-## Env flags
+## Environment flags
 
 Keep the current local filesystem backend until Supabase is configured:
 
@@ -51,6 +51,8 @@ Switch to cloud metadata persistence when these are present:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_SESSION_ARTIFACTS_BUCKET=session-artifacts`
+
+See [.env.example](../.env.example) for the complete configuration reference and [deploying.md](deploying.md) for production requirements.
 
 ## Why the SQL schema is shaped this way
 
@@ -71,7 +73,7 @@ That gets Nodes to the cloud without a full domain-model rewrite.
 
 ## Tables
 
-Defined in [schema.sql](C:\Users\daedu\Documents\Playground\AI Canvas\supabase\schema.sql):
+Defined in [supabase/schema.sql](../supabase/schema.sql):
 
 - `sessions`
 - `projects`
@@ -99,17 +101,17 @@ And one private storage bucket:
 
 ## Important production change
 
-Today the API is guarded as local-first via:
+The API boundary is implemented in:
 
-- [api-access.ts](C:\Users\daedu\Documents\Playground\AI Canvas\lib\server\api-access.ts)
-- [request-guards.ts](C:\Users\daedu\Documents\Playground\AI Canvas\lib\server\request-guards.ts)
+- [lib/server/api-access.ts](../lib/server/api-access.ts)
+- [lib/server/request-guards.ts](../lib/server/request-guards.ts)
 
-For a cloud deployment, the production posture should become:
+For a cloud deployment, the production posture should be:
 
 - authenticated user required
 - ownership enforced server-side
 - remote API allowed in production
-- cross-site mutating requests still blocked by the API guard
+- cross-site mutating requests blocked by the API guard
 
 Do not keep the app file-backed and simply toggle `ALLOW_REMOTE_API=1`; that would deploy the UI before the persistence layer is actually cloud-ready.
 
@@ -127,9 +129,9 @@ Implemented:
 
 Still intentionally lightweight:
 
-- blob cleanup/maintenance against cloud storage
-- file-backed repositories still exist as a local fallback
-- there are no browser-side RLS policies yet because the app currently uses Auth.js plus server-side Supabase access
+- blob cleanup and maintenance against cloud storage
+- file-backed repositories remain as a local fallback
+- there are no browser-side RLS policies because the application currently uses Auth.js with server-side Supabase access
 
 ## Migration command
 
@@ -144,16 +146,16 @@ If some older local files were created before ownership existed, set:
 
 - `SUPABASE_MIGRATION_OWNER_ID`
 
-so ownerless sessions, projects, and memory rows can be assigned to a real user id during import.
+so ownerless sessions, projects, and memory rows can be assigned to a real user ID during import.
 
 ## Important limitation
 
-This repo can automate:
+This repository can automate:
 
-- creating/verifying the `session-artifacts` bucket
+- creating or verifying the `session-artifacts` bucket
 - migrating local data into an existing Supabase project
 
 It does **not** create the Supabase project itself. Project creation still requires:
 
 - your authenticated Supabase dashboard session
-- or your own Supabase management credentials outside this repo
+- or your own Supabase management credentials outside this repository
