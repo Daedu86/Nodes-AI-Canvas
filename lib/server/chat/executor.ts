@@ -278,20 +278,13 @@ export async function executeChatRequest(
         experimental_telemetry: {
           functionId: "nodes.chat",
           isEnabled: process.env.NODES_LLM_OBSERVABILITY !== "0",
-          attributes: {
-            attemptNumber,
-            fallbackApplied,
-            modelId: currentModel.modelId,
-            provider: currentModel.provider,
-            requestId: auditContext.requestId,
-          },
           recordInputs: false,
           recordOutputs: false,
         },
         model,
         messages: createModelMessages(request, currentModel),
         system: request.system,
-        tools: toolset,
+        tools: toolset as Parameters<typeof streamText>[0]["tools"],
         timeout: currentModel.provider === "openrouter" ? 45_000 : 30_000,
         onChunk: (event: unknown) => {
           const observation = timingTracker.observe(event);
