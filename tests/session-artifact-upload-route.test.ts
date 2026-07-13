@@ -19,7 +19,11 @@ vi.mock("@/lib/session-store", () => ({
 import { POST } from "../app/api/sessions/[sessionId]/artifacts/route";
 
 const validPngBytes = () =>
-  new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+  new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  ]);
 
 const createUploadRequest = (formData: FormData) =>
   new Request("http://localhost/api/sessions/session-123/artifacts", {
@@ -37,7 +41,7 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
       blobRef: "session-123/diagram.png",
       deduplicated: false,
       storageQuotaBytes: 100 * 1024 * 1024,
-      storageUsedBytes: 9,
+      storageUsedBytes: validPngBytes().byteLength,
     });
   });
 
@@ -84,7 +88,7 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
     );
 
     expect(response.status).toBe(413);
-    await expect(response.text()).resolves.toContain("Artifact too large.");
+    await expect(response.text()).resolves.toContain("Artifact exceeds the 6 MB upload limit");
     expect(saveSessionArtifactBlobMock).not.toHaveBeenCalled();
   });
 
