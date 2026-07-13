@@ -1,0 +1,99 @@
+<svg width="1200" height="420" viewBox="0 0 1200 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="background" x1="68" y1="20" x2="1130" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#172554"/>
+      <stop offset="0.48" stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1E293B"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#818CF8"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#020617" flood-opacity="0.45"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0L10 5L0 10V0Z" fill="#7DD3FC"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="420" rx="36" fill="url(#background)"/>
+  <circle cx="148" cy="48" r="180" fill="#2563EB" fill-opacity="0.14"/>
+  <circle cx="1080" cy="362" r="220" fill="#7C3AED" fill-opacity="0.12"/>
+
+  <text x="70" y="67" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">From exploration to a reusable decision</text>
+  <text x="70" y="98" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="16">Nodes keeps alternatives, evidence, comparison, and memory in one visual workflow.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="64" y="142" width="242" height="206" rx="24" fill="url(#card)" stroke="#38BDF8" stroke-opacity="0.28"/>
+    <rect x="344" y="142" width="242" height="206" rx="24" fill="url(#card)" stroke="#38BDF8" stroke-opacity="0.28"/>
+    <rect x="624" y="142" width="242" height="206" rx="24" fill="url(#card)" stroke="#818CF8" stroke-opacity="0.32"/>
+    <rect x="904" y="142" width="242" height="206" rx="24" fill="url(#card)" stroke="#A78BFA" stroke-opacity="0.34"/>
+  </g>
+
+  <path d="M306 245H334" stroke="#7DD3FC" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M586 245H614" stroke="#7DD3FC" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M866 245H894" stroke="#A5B4FC" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+  <g>
+    <circle cx="102" cy="184" r="20" fill="#0EA5E9" fill-opacity="0.18" stroke="#38BDF8"/>
+    <path d="M94 184H110M102 176V192" stroke="#E0F2FE" stroke-width="2.5" stroke-linecap="round"/>
+    <text x="132" y="181" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Branch</text>
+    <text x="132" y="205" fill="#7DD3FC" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600">Explore alternatives</text>
+    <circle cx="111" cy="254" r="9" fill="#38BDF8"/>
+    <circle cx="174" cy="228" r="9" fill="#F8FAFC"/>
+    <circle cx="174" cy="280" r="9" fill="#F8FAFC"/>
+    <circle cx="238" cy="254" r="9" fill="#818CF8"/>
+    <path d="M120 251L165 231M120 257L165 277M183 228L229 251M183 280L229 257" stroke="#64748B" stroke-width="3" stroke-linecap="round"/>
+    <text x="88" y="325" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="14">Keep every path without</text>
+    <text x="88" y="344" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="14">copying context into new chats.</text>
+  </g>
+
+  <g>
+    <circle cx="382" cy="184" r="20" fill="#0EA5E9" fill-opacity="0.18" stroke="#38BDF8"/>
+    <rect x="373" y="175" width="18" height="18" rx="4" stroke="#E0F2FE" stroke-width="2"/>
+    <path d="M377 181H387M377 186H384" stroke="#E0F2FE" stroke-width="2" stroke-linecap="round"/>
+    <text x="412" y="181" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Canvas</text>
+    <text x="412" y="205" fill="#7DD3FC" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600">Preserve context</text>
+    <rect x="378" y="229" width="70" height="48" rx="10" fill="#082F49" stroke="#38BDF8"/>
+    <rect x="482" y="248" width="70" height="48" rx="10" fill="#312E81" stroke="#818CF8"/>
+    <path d="M448 253H482" stroke="#7DD3FC" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="465" cy="253" r="4" fill="#F8FAFC"/>
+    <text x="391" y="258" fill="#E0F2FE" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="600">Evidence</text>
+    <text x="496" y="277" fill="#E0E7FF" font-family="Inter, Arial, sans-serif" font-size="12" font-weight="600">Decision</text>
+    <text x="368" y="325" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="14">Pin evidence, plans, drafts,</text>
+    <text x="368" y="344" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="14">files, and decisions beside chat.</text>
+  </g>
+
+  <g>
+    <circle cx="662" cy="184" r="20" fill="#6366F1" fill-opacity="0.18" stroke="#818CF8"/>
+    <path d="M653 178H671M653 184H667M653 190H663" stroke="#E0E7FF" stroke-width="2.4" stroke-linecap="round"/>
+    <text x="692" y="181" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Arena</text>
+    <text x="692" y="205" fill="#A5B4FC" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600">Compare explicitly</text>
+    <rect x="657" y="229" width="78" height="72" rx="12" fill="#172554" stroke="#60A5FA"/>
+    <rect x="755" y="229" width="78" height="72" rx="12" fill="#312E81" stroke="#A78BFA"/>
+    <path d="M676 249H716M676 260H708M774 249H814M774 260H807" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="794" cy="284" r="9" fill="#A78BFA"/>
+    <path d="M790 284L793 287L799 280" stroke="#F8FAFC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="648" y="325" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="14">Review branches or sessions</text>
+    <text x="648" y="344" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="14">side by side and choose a winner.</text>
+  </g>
+
+  <g>
+    <circle cx="942" cy="184" r="20" fill="#8B5CF6" fill-opacity="0.18" stroke="#A78BFA"/>
+    <path d="M934 184C934 178 938 175 942 175C946 175 950 178 950 184C950 190 946 193 942 193C938 193 934 190 934 184Z" stroke="#F3E8FF" stroke-width="2"/>
+    <path d="M938 184H946" stroke="#F3E8FF" stroke-width="2" stroke-linecap="round"/>
+    <text x="972" y="181" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Memory</text>
+    <text x="972" y="205" fill="#C4B5FD" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600">Carry the outcome forward</text>
+    <rect x="939" y="231" width="172" height="66" rx="14" fill="#2E1065" stroke="#A78BFA"/>
+    <path d="M960 251H1087M960 263H1068M960 275H1092" stroke="#DDD6FE" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="1075" cy="312" r="13" fill="url(#accent)"/>
+    <path d="M1069 312L1073 316L1081 307" stroke="#F8FAFC" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="928" y="344" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="14">Promote the rationale and result</text>
+    <text x="928" y="363" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="14">into reusable project context.</text>
+  </g>
+</svg>
