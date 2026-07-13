@@ -12,12 +12,12 @@ def replace_once(path: str, old: str, new: str) -> None:
 
 replace_once(
     "components/context/persisted-session-runtime-bridge.tsx",
-    '''import type { SessionThreadExport } from "@/lib/session-documents";
-import {
+    '''import { mergeRuntimeBranchIntoSessionSnapshot } from "@/lib/session-runtime-snapshot";
 ''',
-    '''import type { SessionThreadExport } from "@/lib/session-documents";
-import { mergeSessionSnapshotRepositories } from "@/lib/session-runtime-snapshot";
-import {
+    '''import {
+  mergeRuntimeBranchIntoSessionSnapshot,
+  mergeSessionSnapshotRepositories,
+} from "@/lib/session-runtime-snapshot";
 ''',
 )
 
