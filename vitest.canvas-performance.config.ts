@@ -9,6 +9,17 @@ export default defineConfig({
     include: ["tests/benchmarks/canvas-flow-elements.bench.js"],
     outputJson: "test-results/canvas-benchmark.json",
   },
+  css: {
+    postcss: {
+      plugins: [],
+    },
+  },
+  oxc: {
+    jsx: {
+      importSource: "react",
+      runtime: "automatic",
+    },
+  },
   test: {
     environment: "node",
     fileParallelism: false,
