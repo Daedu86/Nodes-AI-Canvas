@@ -1,18 +1,18 @@
 {
-  "generatedAt": "2026-07-13T16:17:53.912Z",
+  "generatedAt": "2026-07-13T16:57:22.288Z",
   "runId": 29265135758,
   "headSha": "6f599c3c0745d8c2a1bb8035eb5fdde46809e518",
   "exitCode": 1,
   "status": "failed",
   "stats": {
-    "startTime": "2026-07-13T16:15:21.973Z",
-    "duration": 151876.826,
-    "expected": 11,
+    "startTime": "2026-07-13T16:55:13.130Z",
+    "duration": 129079.214,
+    "expected": 12,
     "skipped": 0,
-    "unexpected": 2,
+    "unexpected": 1,
     "flaky": 0
   },
-  "failureCount": 2,
+  "failureCount": 1,
   "failures": [
     {
       "file": "smoke.spec.ts",
@@ -20,28 +20,10 @@
       "title": "smoke.spec.ts > persists edit branching across reloads",
       "projectName": "",
       "status": "unexpected",
-      "durationMs": 9763,
+      "durationMs": 11987,
       "errors": [
         {
-          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m2\u001b[39m\nReceived: \u001b[31m0\u001b[39m\n\nCall Log:\n- Timeout 5000ms exceeded while waiting on the predicate\n\n  838 |       ).length;\n  839 |     })\n> 840 |     .toBe(assistantNodesBeforeReload.length);\n      |      ^\n  841 |\n  842 |   const persistedSession = await fetchSessionDocument(page, activeSessionId);\n  843 |   const persistedMessages = persistedSession.session.snapshot.messages;\n    at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:840:6",
-          "stack": ""
-        }
-      ]
-    },
-    {
-      "file": "smoke.spec.ts",
-      "line": 1113,
-      "title": "smoke.spec.ts > creates a project from multiple saved sessions and opens the aggregated canvas",
-      "projectName": "",
-      "status": "unexpected",
-      "durationMs": 60663,
-      "errors": [
-        {
-          "message": "\u001b[31mTest timeout of 60000ms exceeded.\u001b[39m",
-          "stack": ""
-        },
-        {
-          "message": "Error: locator.click: Test timeout of 60000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('.react-flow__node [data-memory-type=\"merge\"]').first()\u001b[22m\n\u001b[2m    - locator resolved to <div data-memory-type=\"merge\" class=\"group relative min-w-[300px] max-w-[340px] rounded-2xl border bg-background p-px shadow-[0_18px_42px_-30px_rgba(15,23,42,0.4)] transition-all ring-1 ring-border/50 \">…</div>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is not stable\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <path fill=\"none\" stroke-width=\"20\" stroke-opacity=\"0\" class=\"react-flow__edge-interaction\" d=\"M848 462L 861.625,462Q 864,462 864,464.375L 864,464.375Q 864,466.75 861.625,466.75L -443.625,466.75Q -446,466.75 -446,469.125L -446,469.125Q -446,471.5 -443.625,471.5L-430 471.5\"></path> from <div class=\"react-flow__edges\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <path fill=\"none\" stroke-width=\"20\" stroke-opacity=\"0\" class=\"react-flow__edge-interaction\" d=\"M848 462L 861.625,462Q 864,462 864,464.375L 864,464.375Q 864,466.75 861.625,466.75L -443.625,466.75Q -446,466.75 -446,469.125L -446,469.125Q -446,471.5 -443.625,471.5L-430 471.5\"></path> from <div class=\"react-flow__edges\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    98 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is visible, enabled and stable\u001b[22m\n\u001b[2m       - scrolling into view if needed\u001b[22m\n\u001b[2m       - done scrolling\u001b[22m\n\u001b[2m       - <path fill=\"none\" stroke-width=\"20\" stroke-opacity=\"0\" class=\"react-flow__edge-interaction\" d=\"M848 462L 861.625,462Q 864,462 864,464.375L 864,464.375Q 864,466.75 861.625,466.75L -443.625,466.75Q -446,466.75 -446,469.125L -446,469.125Q -446,471.5 -443.625,471.5L-430 471.5\"></path> from <div class=\"react-flow__edges\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\n\n  1157 |     await hideGuideButton.click();\n  1158 |   }\n> 1159 |   await page.locator('.react-flow__node [data-memory-type=\"merge\"]').first().click();\n       |                                                                              ^\n  1160 |   await expect(page.getByRole(\"button\", { name: \"Use as global context\" })).toBeVisible();\n  1161 |   await page.getByRole(\"button\", { name: \"Use as global context\" }).click();\n  1162 |   await expect(page.getByPlaceholder(/Describe the cross-session goal/i)).toHaveValue(\n    at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:1159:78",
+          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: locator('[data-message-id]').filter({ hasText: 'Edited branch prompt' }).first()\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for locator('[data-message-id]').filter({ hasText: 'Edited branch prompt' }).first()\u001b[22m\n\n\n  356 |   await responsePromise;\n  357 |\n> 358 |   await expect(threadMessage(page, editedPrompt)).toBeVisible();\n      |                                                   ^\n  359 | }\n  360 |\n  361 | async function editUserPrompt(\n    at editAssistantReply (/home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:358:51)\n    at /home/runner/work/Nodes-AI-Canvas/Nodes-AI-Canvas/tests/e2e/smoke.spec.ts:810:3",
           "stack": ""
         }
       ]
