@@ -47,6 +47,11 @@ jobs:
       - name: Apply ProjectWorkspace extraction
         run: python scripts/refactor-project-workspace.py
 
+      - name: Report extraction success
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "Extraction applied; installing dependencies."
+
       - name: Install dependencies
         run: npm ci --no-audit --fund=false
 
@@ -58,8 +63,18 @@ jobs:
           npm run format:check
           npm run typecheck
 
+      - name: Report typecheck success
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "Formatting and TypeScript validation passed."
+
       - name: Run unit tests
         run: npm run test:unit
+
+      - name: Report unit test success
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "All unit tests passed; building production bundle."
 
       - name: Build production bundle
         run: npm run build
@@ -89,3 +104,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "ProjectWorkspace validation passed and the refactor was published to main."
+
+      - name: Report validation failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "ProjectWorkspace validation failed. Inspect the failed workflow step; no functional refactor was published."
