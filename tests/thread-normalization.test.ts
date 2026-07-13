@@ -30,7 +30,7 @@ const makeItem = ({
     content: [],
     ...(sourceId ? { sourceId } : {}),
     metadata: custom ? { custom } : undefined,
-  } as ThreadRepoItem["message"],
+  } as unknown as ThreadRepoItem["message"],
 });
 
 describe("normalizeThreadRepoItems", () => {
