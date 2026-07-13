@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 
 
 def replace_once(path: str, old: str, new: str) -> None:
@@ -200,3 +201,52 @@ replace_once(
   await expect(page.getByText(/E2E reply: Canvas guide seed/i).first()).toBeVisible();
 });''',
 )
+
+replace_once(
+    "lib/assistant-edit-runtime.ts",
+    '''type InternalAssistantEditRuntime = ThreadRuntime & {
+  __internal_threadBinding?: {
+    getState?: () => {
+      _store?: {
+        setMessages?: (messages: unknown[]) => void;
+      };
+    };
+  };
+};
+''',
+    '',
+)
+
+replace_once(
+    "lib/assistant-edit-runtime.ts",
+    '''  const internalSetMessages = (threadRuntime as InternalAssistantEditRuntime)
+    .__internal_threadBinding?.getState?.()._store?.setMessages;
+  if (typeof internalSetMessages === "function") {
+    internalSetMessages(currentMessages.slice(0, parentIndex + 1));
+  } else {
+    const exported = threadRuntime.export();
+    const hasParent = exported.messages.some((entry) => entry.message?.id === options.parentId);
+    if (!hasParent) {
+      return false;
+    }
+    threadRuntime.import({
+      ...exported,
+      headId: options.parentId,
+    });
+  }
+''',
+    '''  const exported = threadRuntime.export();
+  const hasParent = exported.messages.some(
+    (entry) => entry.message?.id === options.parentId,
+  );
+  if (!hasParent) {
+    return false;
+  }
+  threadRuntime.import({
+    ...exported,
+    headId: options.parentId,
+  });
+''',
+)
+
+subprocess.run(["git", "add", "lib/assistant-edit-runtime.ts"], check=True)
