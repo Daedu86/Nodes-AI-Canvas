@@ -14,10 +14,10 @@ export type ModelResolutionRunConfig = {
     contextArtifacts?: LlmContextArtifact[];
     historyMode?: string;
     model?: string;
-    provider?: Provider;
+    provider?: string;
   };
   model?: string;
-  provider?: Provider;
+  provider?: string;
 };
 
 export type ModelResolutionMetadata = {
@@ -26,15 +26,15 @@ export type ModelResolutionMetadata = {
     contextArtifacts?: LlmContextArtifact[];
     historyMode?: string;
     model?: string;
-    provider?: Provider;
+    provider?: string;
   };
   model?: string;
-  provider?: Provider;
+  provider?: string;
 };
 
 export type ModelResolutionInput = {
   model?: string;
-  provider?: Provider;
+  provider?: string;
   runConfig?: ModelResolutionRunConfig;
   metadata?: ModelResolutionMetadata;
 };

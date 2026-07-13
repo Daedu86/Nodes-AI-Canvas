@@ -82,7 +82,8 @@ export function ProjectInvitationAcceptance({ token }: { token: string }) {
   };
 
   const signedInEmail = session?.user?.email?.trim().toLowerCase() ?? null;
-  const canAct = preview?.status === "pending" && state !== "working";
+  const canAct = preview?.status === "pending";
+  const isWorking = state === "working";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
@@ -136,7 +137,7 @@ export function ProjectInvitationAcceptance({ token }: { token: string }) {
                 <Button
                   type="button"
                   className="flex-1"
-                  disabled={state === "working"}
+                  disabled={isWorking}
                   onClick={() => { void runAction("accept"); }}
                 >
                   Accept invitation
@@ -145,7 +146,7 @@ export function ProjectInvitationAcceptance({ token }: { token: string }) {
                   type="button"
                   variant="outline"
                   className="flex-1"
-                  disabled={state === "working"}
+                  disabled={isWorking}
                   onClick={() => { void runAction("decline"); }}
                 >
                   Decline
