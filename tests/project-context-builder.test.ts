@@ -37,6 +37,7 @@ const makeSession = ({
   },
   title,
   updatedAt: "2026-04-01T10:00:00.000Z",
+  version: 1,
 });
 
 describe("project-context-builder", () => {
@@ -62,11 +63,13 @@ describe("project-context-builder", () => {
   ];
 
   const project: ProjectDocument = {
+    accessRole: "owner",
     arenaWinnerBranchKey: null,
     arenaWinnerSessionId: "session-b",
     createdAt: "2026-04-01T09:00:00.000Z",
     globalContext: "",
     id: "project-1",
+    members: [],
     memoryIds: ["memory-1", "memory-2"],
     sessionCount: 2,
     sessionIds: ["session-a", "session-b"],
