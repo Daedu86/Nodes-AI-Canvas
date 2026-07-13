@@ -1,19 +1,20 @@
-import { z } from "zod";
 import {
   declineProjectInvitationForUser,
   ProjectInvitationError,
 } from "@/lib/project-invitation-service";
 import { jsonNoStore, parseJsonBody } from "@/lib/server/api-response";
-import { projectInvitationErrorResponse } from "@/lib/server/project-invitation-http";
+import {
+  projectInvitationErrorResponse,
+  projectInvitationTokenBodySchema,
+} from "@/lib/server/project-invitation-http";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 
-const bodySchema = z.object({ token: z.string().min(1).max(128) }).strict();
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   const guarded = await requireLocalApiUser(req);
   if ("response" in guarded) return guarded.response;
-  const parsed = await parseJsonBody(req, bodySchema, {
+  const parsed = await parseJsonBody(req, projectInvitationTokenBodySchema, {
     code: "invalid_invitation_token",
     error: "The invitation token is required.",
     status: 400,
