@@ -21,7 +21,7 @@ env:
   AUTH_ENABLE_DEV_CREDENTIALS: "0"
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
-  PHASE2_REVISION: "2"
+  PHASE2_REVISION: "3"
   PLAYWRIGHT_RUN_ID: phase2-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
@@ -35,6 +35,9 @@ jobs:
           ref: main
           fetch-depth: 0
 
+      - name: Apply persistence repair
+        run: python scripts/apply-phase2-persistence-fix.py
+
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -44,11 +47,38 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --fund=false
 
+      - name: Format and validate repair
+        run: |
+          npx eslint \
+            components/context/persisted-session-runtime-bridge.tsx \
+            lib/session-snapshot-preference.ts \
+            tests/session-snapshot-preference.test.ts \
+            --fix
+          git diff --check
+          npm run format:check
+          npm run typecheck
+          npx vitest run tests/session-snapshot-preference.test.ts
+
       - name: Install Chromium
         run: npx playwright install chromium
 
+      - name: Run targeted persistence scenarios
+        id: targeted
+        shell: bash
+        run: |
+          set +e
+          npx playwright test tests/e2e/smoke.spec.ts \
+            --workers=1 \
+            --reporter=json \
+            --grep "preserves chat thread and canvas nodes when switching workspace modes|copies graph JSON after a reply|creates an assistant branch when reloading a reply|creates a follow-up user branch from a flow assistant node" \
+            > phase2-targeted-report.json 2> phase2-targeted-stderr.log
+          status=$?
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
       - name: Run complete Playwright suite
         id: playwright
+        if: steps.targeted.outputs.exit_code == '0'
         shell: bash
         run: |
           set +e
@@ -57,29 +87,40 @@ jobs:
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Select diagnostic report
+        env:
+          TARGETED_EXIT_CODE: ${{ steps.targeted.outputs.exit_code }}
+          FULL_EXIT_CODE: ${{ steps.playwright.outputs.exit_code }}
+        run: |
+          if [ "$TARGETED_EXIT_CODE" != "0" ]; then
+            cp phase2-targeted-report.json phase2-selected-report.json
+            cp phase2-targeted-stderr.log phase2-selected-stderr.log
+            echo "$TARGETED_EXIT_CODE" > phase2-exit-code.txt
+          else
+            cp phase2-playwright-report.json phase2-selected-report.json
+            cp phase2-playwright-stderr.log phase2-selected-stderr.log
+            echo "${FULL_EXIT_CODE:-1}" > phase2-exit-code.txt
+          fi
+
       - name: Build diagnostic summary
         env:
-          PLAYWRIGHT_EXIT_CODE: ${{ steps.playwright.outputs.exit_code }}
           PHASE2_RUN_ID: ${{ github.run_id }}
           PHASE2_HEAD_SHA: ${{ github.sha }}
         run: |
           node <<'NODE'
           const fs = require('node:fs');
-
-          const reportPath = 'phase2-playwright-report.json';
-          const stderrPath = 'phase2-playwright-stderr.log';
+          const reportPath = 'phase2-selected-report.json';
+          const stderrPath = 'phase2-selected-stderr.log';
           const outputPath = 'phase2-e2e-summary.json';
           const maxText = 6000;
           const failures = [];
           let report = null;
           let parseError = null;
-
           try {
             report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
           } catch (error) {
             parseError = error instanceof Error ? error.message : String(error);
           }
-
           function collectSuite(suite, parents = []) {
             const nextParents = suite.title ? [...parents, suite.title] : parents;
             for (const spec of suite.specs ?? []) {
@@ -89,10 +130,6 @@ jobs:
                 );
                 if (failedResults.length === 0 && test.status !== 'unexpected') continue;
                 const last = failedResults.at(-1) ?? (test.results ?? []).at(-1) ?? {};
-                const errors = (last.errors ?? []).map((entry) => ({
-                  message: String(entry.message ?? '').slice(0, maxText),
-                  stack: String(entry.stack ?? '').slice(0, maxText),
-                }));
                 failures.push({
                   file: spec.file ?? suite.file ?? null,
                   line: spec.line ?? null,
@@ -100,58 +137,70 @@ jobs:
                   projectName: test.projectName ?? null,
                   status: test.status ?? last.status ?? 'failed',
                   durationMs: last.duration ?? null,
-                  errors,
+                  errors: (last.errors ?? []).map((entry) => ({
+                    message: String(entry.message ?? '').slice(0, maxText),
+                    stack: String(entry.stack ?? '').slice(0, maxText),
+                  })),
                 });
               }
             }
             for (const child of suite.suites ?? []) collectSuite(child, nextParents);
           }
-
           for (const suite of report?.suites ?? []) collectSuite(suite);
-
-          const stderr = fs.existsSync(stderrPath)
-            ? fs.readFileSync(stderrPath, 'utf8').slice(-12000)
-            : '';
-          const stats = report?.stats ?? null;
-          const exitCode = Number(process.env.PLAYWRIGHT_EXIT_CODE ?? 1);
+          const exitCode = Number(fs.readFileSync('phase2-exit-code.txt', 'utf8').trim() || 1);
           const summary = {
             generatedAt: new Date().toISOString(),
             runId: Number(process.env.PHASE2_RUN_ID),
             headSha: process.env.PHASE2_HEAD_SHA,
             exitCode,
             status: exitCode === 0 ? 'passed' : 'failed',
-            stats,
+            stats: report?.stats ?? null,
             failureCount: failures.length,
             failures,
             parseError,
-            stderrTail: stderr,
+            stderrTail: fs.existsSync(stderrPath)
+              ? fs.readFileSync(stderrPath, 'utf8').slice(-12000)
+              : '',
           };
-
           fs.writeFileSync(outputPath, JSON.stringify(summary, null, 2) + '\n');
           NODE
 
-      - name: Upload full diagnostic artifacts
+      - name: Upload diagnostic artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: phase2-playwright-diagnostic
+          name: phase2-persistence-repair
           path: |
-            phase2-playwright-report.json
-            phase2-playwright-stderr.log
+            phase2-*-report.json
+            phase2-*-stderr.log
             phase2-e2e-summary.json
             test-results
             playwright-report
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Publish summary and remove diagnostic workflow
-        if: always()
+      - name: Publish result
         shell: bash
         run: |
           set -euo pipefail
+          exit_code=$(cat phase2-exit-code.txt)
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git rm .github/workflows/phase2-e2e-diagnostic.yml
-          git add phase2-e2e-summary.json
-          git commit -m "test: record phase 2 E2E diagnostic [skip vercel]"
+
+          if [ "$exit_code" = "0" ]; then
+            git rm \
+              .github/workflows/phase2-e2e-diagnostic.yml \
+              scripts/apply-phase2-persistence-fix.py \
+              phase2-status.json
+            git add \
+              components/context/persisted-session-runtime-bridge.tsx \
+              lib/session-snapshot-preference.ts \
+              tests/session-snapshot-preference.test.ts
+            git commit -m "fix: persist complete AI SDK 7 conversation snapshots [skip vercel]"
+          else
+            git add phase2-e2e-summary.json
+            git commit -m "test: record persistence repair E2E result [skip vercel]"
+          fi
+
+          git pull --rebase origin main
           git push origin HEAD:main
