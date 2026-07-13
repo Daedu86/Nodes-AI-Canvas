@@ -1,32 +1,32 @@
-diagnose	Apply phase 2 repairs	﻿2026-07-13T16:47:30.1423534Z ##[group]Run python scripts/apply-phase2-persistence-fix.py
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1425498Z ^[[36;1mpython scripts/apply-phase2-persistence-fix.py^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1494638Z ^[[36;1mpython scripts/finalize-phase2-runtime-signal.py^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1496633Z ^[[36;1mpython scripts/finalize-phase2-optimistic-messages.py^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1498433Z ^[[36;1mpython scripts/finalize-phase2-graph-sources.py^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1500169Z ^[[36;1mpython scripts/finalize-phase2-canvas-rendering.py^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1501879Z ^[[36;1mpython <<'PY'^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1502898Z ^[[36;1mfrom pathlib import Path^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1504516Z ^[[36;1mpath = Path("scripts/finalize-phase2-artifact-persistence.py")^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1506325Z ^[[36;1mtext = path.read_text(encoding="utf-8")^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1507990Z ^[[36;1mtext = text.replace("if count != 1:", "if count < 1:", 1)^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1510044Z ^[[36;1mtext = text.replace("Expected one match", "Expected at least one match", 1)^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1512229Z ^[[36;1mpath.write_text(text, encoding="utf-8")^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1513533Z ^[[36;1mPY^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1514756Z ^[[36;1mpython scripts/finalize-phase2-artifact-persistence.py^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1516655Z ^[[36;1mpython scripts/finalize-phase2-artifact-api-compat.py^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1518616Z ^[[36;1mpython scripts/finalize-phase2-hydration-project-tests.py^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1520673Z ^[[36;1mpython scripts/finalize-phase2-last-regressions.py^[[0m
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1723645Z shell: /usr/bin/bash -e {0}
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1725097Z env:
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1726129Z   CI: true
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1727238Z   NEXT_TELEMETRY_DISABLED: 1
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1728615Z   VERCEL_ENV: preview
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1729890Z   NODES_PERSISTENCE_BACKEND: file
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1731587Z   AUTH_ENABLE_DEV_CREDENTIALS: 0
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1733080Z   OPENROUTER_ALLOW_DEPLOYMENT_KEY: 0
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1734509Z   OPENROUTER_REQUIRE_USER_KEY: 1
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1735697Z   PHASE2_REVISION: 16
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1736818Z   PLAYWRIGHT_RUN_ID: phase2-29265135758-5
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.1738323Z ##[endgroup]
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.4586781Z Expected one match in components/context/persisted-session-runtime-bridge.tsx, found 0: '      const persistedSnapshot =\n        exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());\n      const signature = JSON.stringify(toComparableSnapshot(persistedSnapshot));\n'
-diagnose	Apply phase 2 repairs	2026-07-13T16:47:30.4639953Z ##[error]Process completed with exit code 1.
+diagnose	Apply phase 2 repairs	﻿2026-07-13T16:50:53.0646870Z ##[group]Run python scripts/apply-phase2-persistence-fix.py
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0649458Z ^[[36;1mpython scripts/apply-phase2-persistence-fix.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0651780Z ^[[36;1mpython scripts/finalize-phase2-runtime-signal.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0654153Z ^[[36;1mpython scripts/finalize-phase2-optimistic-messages.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0656670Z ^[[36;1mpython scripts/finalize-phase2-graph-sources.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0740223Z ^[[36;1mpython scripts/finalize-phase2-canvas-rendering.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0743227Z ^[[36;1mpython <<'PY'^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0745315Z ^[[36;1mfrom pathlib import Path^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0748197Z ^[[36;1mpath = Path("scripts/finalize-phase2-artifact-persistence.py")^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0751365Z ^[[36;1mtext = path.read_text(encoding="utf-8")^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0754138Z ^[[36;1mtext = text.replace("if count != 1:", "if count < 1:", 1)^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0757842Z ^[[36;1mtext = text.replace("Expected one match", "Expected at least one match", 1)^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0760870Z ^[[36;1mpath.write_text(text, encoding="utf-8")^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0762531Z ^[[36;1mPY^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0764138Z ^[[36;1mpython scripts/finalize-phase2-artifact-persistence.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0766723Z ^[[36;1mpython scripts/finalize-phase2-artifact-api-compat.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0769079Z ^[[36;1mpython scripts/finalize-phase2-hydration-project-tests.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0771339Z ^[[36;1mpython scripts/finalize-phase2-last-regressions.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0917679Z shell: /usr/bin/bash -e {0}
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0919055Z env:
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0920153Z   CI: true
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0921308Z   NEXT_TELEMETRY_DISABLED: 1
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0922658Z   VERCEL_ENV: preview
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0923947Z   NODES_PERSISTENCE_BACKEND: file
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0925668Z   AUTH_ENABLE_DEV_CREDENTIALS: 0
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0927105Z   OPENROUTER_ALLOW_DEPLOYMENT_KEY: 0
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0928613Z   OPENROUTER_REQUIRE_USER_KEY: 1
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0929984Z   PHASE2_REVISION: 16
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0931324Z   PLAYWRIGHT_RUN_ID: phase2-29265135758-6
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.0933060Z ##[endgroup]
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.4117065Z Expected one match in components/context/persisted-session-runtime-bridge.tsx, found 0: '      const persistedSnapshot = exportRuntimeSnapshot(thread);\n      const signature = JSON.stringify(toComparableSnapshot(persistedSnapshot));\n'
+diagnose	Apply phase 2 repairs	2026-07-13T16:50:53.4175900Z ##[error]Process completed with exit code 1.
