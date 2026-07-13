@@ -66,8 +66,8 @@ export default defineConfig({
       NODES_PLAN_FREE_CHAT_LIMIT_PER_DAY:
         process.env.NODES_PLAN_FREE_CHAT_LIMIT_PER_DAY ?? "1440",
       // Ensure deterministic default model selection in CI runs.
-      DEFAULT_MODEL: "nvidia/nemotron-3-super-120b-a12b:free",
-      NEXT_PUBLIC_DEFAULT_MODEL: "nvidia/nemotron-3-super-120b-a12b:free",
+      DEFAULT_MODEL: "openrouter/free",
+      NEXT_PUBLIC_DEFAULT_MODEL: "openrouter/free",
       NEXT_PUBLIC_DEFAULT_PROVIDER: "openrouter",
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? playwrightAuthSecret,
       NEXTAUTH_URL: baseURL,

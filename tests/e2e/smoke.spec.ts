@@ -49,7 +49,7 @@ function expectedReply(
   {
     history = "last",
     provider = "openrouter",
-    model = "nvidia/nemotron-3-super-120b-a12b:free",
+    model = "openrouter/free",
     count = 1,
     contextCount = 0,
     contextTitles = [],
@@ -715,47 +715,51 @@ test("sends full history when Full mode is selected", async ({ page }) => {
   });
 });
 
-test("creates the first prompt directly from an empty flow canvas", async ({ page }) => {
+test("runs the first prompt directly from an empty flow canvas", async ({ page }) => {
   await gotoChat(page);
   await page.getByRole("button", { name: "Show canvas panel" }).click();
-  await expect(page.getByRole("button", { name: "Create prompt node" })).toBeVisible({
+  const createPromptButton = page.getByRole("button", { name: "Create prompt node" });
+  await expect(createPromptButton).toBeVisible({ timeout: 15_000 });
+
+  await createPromptButton.click();
+  const promptNode = page
+    .locator(".react-flow__node")
+    .filter({ has: page.getByRole("textbox", { name: "Canvas prompt" }) })
+    .last();
+  await expect(promptNode).toBeVisible({ timeout: 15_000 });
+  await promptNode.getByRole("textbox", { name: "Canvas prompt" }).fill("Canvas first prompt");
+
+  const responsePromise = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/canvas-runs") &&
+      response.request().method() === "POST",
+  );
+  await promptNode.getByRole("button", { name: "Run canvas prompt" }).click();
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
+  await expect(promptNode).toContainText("Mock canvas response: Canvas first prompt", {
     timeout: 15_000,
   });
 
-  await page.getByRole("button", { name: "Create prompt node" }).click();
-  const draftNode = page.locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]');
-  await expect(draftNode).toBeVisible({ timeout: 15_000 });
-  await draftNode.getByRole("textbox", { name: "Draft prompt" }).fill("Canvas first prompt");
-
-  const responsePromise = page.waitForResponse(
-    (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
+  const activeSessionId = await getActiveSessionId(page);
+  expect(activeSessionId).toBeTruthy();
+  const persisted = await fetchAppJson<{
+    session: {
+      artifacts: Array<{
+        artifactType: string;
+        content: string;
+        promptResult?: string | null;
+        promptStatus?: string | null;
+      }>;
+    };
+  }>(page, `/api/sessions/${activeSessionId}`);
+  const promptArtifact = persisted.session.artifacts.find(
+    (artifact) => artifact.artifactType === "prompt" && artifact.content === "Canvas first prompt",
   );
-  await draftNode
-    .getByRole("button", { name: "Send prompt node" })
-    .evaluate((button: HTMLButtonElement) => button.click());
-  const response = await responsePromise;
-  expect(response.ok()).toBe(true);
-
-  const rawSelectedModel = await page.getByRole("combobox", { name: "Model" }).evaluate((element) => {
-    if (element instanceof HTMLSelectElement) {
-      return element.value;
-    }
-    return element.getAttribute("value") ?? "";
+  expect(promptArtifact).toMatchObject({
+    promptResult: "Mock canvas response: Canvas first prompt",
+    promptStatus: "completed",
   });
-  const normalizedSelection = rawSelectedModel
-    ? normalizeSelectedModelValue(rawSelectedModel)
-    : null;
-  const reply = expectedReply("Canvas first prompt", {
-    model: normalizedSelection?.model,
-    provider: normalizedSelection?.provider ?? "openrouter",
-  });
-  await page.getByRole("button", { name: "Show chat panel" }).click();
-  await expect(threadMessage(page, "Canvas first prompt")).toBeVisible({ timeout: 15_000 });
-  await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
-
-  await page.getByRole("button", { name: "Show canvas panel" }).click();
-  const graph = await copyGraphJson(page);
-  expect(graph.nodes.map((node) => node.role)).toEqual(["user", "assistant"]);
 });
 
 test("creates an assistant branch when reloading a reply", async ({ page }) => {

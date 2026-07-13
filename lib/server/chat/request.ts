@@ -32,6 +32,7 @@ export const INVALID_CHAT_REQUEST_CODE = "invalid_request";
 
 const providerSchema = z.enum(LLM_PROVIDER_IDS);
 const historyModeSchema = z.enum(["last", "full"]);
+const chatTriggerSchema = z.enum(["submit-message", "regenerate-message"]);
 const boundedIdentifierSchema = z.string().trim().min(1).max(256);
 const optionalNullableStringSchema = z.string().max(2_048).nullable().optional();
 
@@ -119,9 +120,11 @@ const toolsSchema = z
 
 export const chatRequestBodySchema = z
   .object({
+    id: boundedIdentifierSchema.optional(),
     messages: z.array(chatMessageSchema).max(MAX_CHAT_MESSAGES).default([]),
     system: z.string().max(MAX_SYSTEM_CHARS).optional(),
     tools: toolsSchema.optional(),
+    trigger: chatTriggerSchema.optional(),
     runConfig: modelResolutionSchema.optional(),
     metadata: modelResolutionSchema.optional(),
     historyMode: historyModeSchema.optional(),

@@ -13,7 +13,10 @@ export function isProductionLikeRuntime() {
 }
 
 export function isE2eHeaderAuthAllowed() {
-  return process.env.NODE_ENV === "test";
+  if (isProductionLikeRuntime()) {
+    return false;
+  }
+  return process.env.NODE_ENV === "test" || isE2eEnvAuthAllowed();
 }
 
 export function isE2eEnvAuthAllowed() {

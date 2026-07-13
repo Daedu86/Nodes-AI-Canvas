@@ -19,6 +19,8 @@ const validMessage = {
 describe("chat request validation", () => {
   it("accepts the current Assistant UI request envelope", () => {
     const result = chatRequestBodySchema.safeParse({
+      id: "request-1",
+      trigger: "submit-message",
       messages: [
         {
           ...validMessage,
@@ -86,7 +88,20 @@ describe("chat request validation", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects invalid providers, history modes, and empty messages", () => {
+  it("accepts supported transport triggers and rejects invalid request values", () => {
+    expect(
+      chatRequestBodySchema.safeParse({
+        id: "request-2",
+        trigger: "regenerate-message",
+        messages: [validMessage],
+      }).success,
+    ).toBe(true);
+    expect(
+      chatRequestBodySchema.safeParse({
+        messages: [validMessage],
+        trigger: "unsupported-trigger",
+      }).success,
+    ).toBe(false);
     expect(
       chatRequestBodySchema.safeParse({
         messages: [validMessage],

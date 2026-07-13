@@ -120,7 +120,7 @@ test("attaching an image includes it in the sent message", async ({ page }) => {
   });
 
   await page.getByRole("combobox", { name: "Model" }).selectOption({
-    label: "OpenRouter · Nemotron Nano 12B V2 VL (free)",
+    label: "OpenRouter · Free Router",
   });
 
   await page.getByRole("button", { name: "Attach image" }).click();
@@ -190,15 +190,20 @@ test("send is blocked while an image is still preparing", async ({ page }) => {
   const filePath = test.info().outputPath("pixel.png");
   await fs.writeFile(filePath, Buffer.from(PIXEL_PNG_BASE64, "base64"));
 
-  await page.goto("/");
+  await page.evaluate(() => {
+    const originalReadAsDataUrl = FileReader.prototype.readAsDataURL;
+    FileReader.prototype.readAsDataURL = function (blob: Blob) {
+      window.setTimeout(() => originalReadAsDataUrl.call(this, blob), 500);
+    };
+  });
+
   await page.getByRole("button", { name: "Attach image" }).click();
   await page.getByTestId("chat-image-input").setInputFiles(filePath);
 
-  await page.getByRole("button", { name: "Send" }).click();
-  const alert = page.getByTestId("composer-error");
-  await expect(alert).toContainText(
-    /preparing the image attachment|text-only|Could not send/i,
-  );
+  const sendButton = page.getByRole("button", { name: "Send" });
+  await expect(sendButton).toBeDisabled();
+  await expect(page.getByTestId("composer-image-preview")).toBeVisible();
+  await expect(sendButton).toBeEnabled({ timeout: 5_000 });
 });
 
 test("attaching an image does not auto-send when text is already typed", async ({
@@ -219,7 +224,7 @@ test("attaching an image does not auto-send when text is already typed", async (
   });
 
   await page.getByRole("combobox", { name: "Model" }).selectOption({
-    label: "OpenRouter · Nemotron Nano 12B V2 VL (free)",
+    label: "OpenRouter · Free Router",
   });
 
   const composer = page.getByPlaceholder("Write a message...");

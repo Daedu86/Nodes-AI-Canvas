@@ -20,7 +20,7 @@ function expectedReply(
   {
     history = "last",
     provider = "openrouter",
-    model = "nvidia/nemotron-3-super-120b-a12b:free",
+    model = "openrouter/free",
     count = 1,
   }: ReplyOptions = {},
 ) {
@@ -141,9 +141,9 @@ test("composer still works after leaving the session surface and returning", asy
 
   await sendPrompt(page, "hello one");
 
-  // Simulate leaving the chat (for example: opening Knowledge Center).
-  await page.getByRole("button", { name: "Knowledge Center" }).click();
-  await expect(page.getByRole("heading", { name: "Knowledge Center" })).toBeVisible({
+  // Leave the session surface through a current profile workspace.
+  await page.getByRole("button", { name: "LLM Models" }).click();
+  await expect(page.getByRole("heading", { name: "LLM Models" })).toBeVisible({
     timeout: 15_000,
   });
 

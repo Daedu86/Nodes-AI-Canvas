@@ -184,10 +184,8 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
             ? ((lastAssistant?.message as { id: string }).id)
             : null;
         recordPendingLatency(messageId);
-        setRequestError(null);
       } catch {
         pendingLatencyRef.current = null;
-        setRequestError(null);
       }
     });
     return () => {
