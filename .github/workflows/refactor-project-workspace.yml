@@ -101,10 +101,17 @@ jobs:
           echo "VALIDATION_STAGE=production build" >> "$GITHUB_ENV"
           set -o pipefail
           npm run build 2>&1 | tee /tmp/validation.log
+          git checkout -- tsconfig.json
+
+      - name: Report build success
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "Production build passed; publishing the validated refactor to main."
 
       - name: Publish validated refactor to main
         shell: bash
         run: |
+          echo "VALIDATION_STAGE=publishing to main" >> "$GITHUB_ENV"
           set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
