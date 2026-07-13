@@ -1,0 +1,32 @@
+diagnose	Apply phase 2 repairs	﻿2026-07-13T16:22:22.5839320Z ##[group]Run python scripts/apply-phase2-persistence-fix.py
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5840961Z ^[[36;1mpython scripts/apply-phase2-persistence-fix.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5842686Z ^[[36;1mpython scripts/finalize-phase2-runtime-signal.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5844248Z ^[[36;1mpython scripts/finalize-phase2-optimistic-messages.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5913571Z ^[[36;1mpython scripts/finalize-phase2-graph-sources.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5916005Z ^[[36;1mpython scripts/finalize-phase2-canvas-rendering.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5917893Z ^[[36;1mpython <<'PY'^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5919315Z ^[[36;1mfrom pathlib import Path^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5921386Z ^[[36;1mpath = Path("scripts/finalize-phase2-artifact-persistence.py")^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5923937Z ^[[36;1mtext = path.read_text(encoding="utf-8")^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5925977Z ^[[36;1mtext = text.replace("if count != 1:", "if count < 1:", 1)^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5928698Z ^[[36;1mtext = text.replace("Expected one match", "Expected at least one match", 1)^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5930788Z ^[[36;1mpath.write_text(text, encoding="utf-8")^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5931803Z ^[[36;1mPY^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5933027Z ^[[36;1mpython scripts/finalize-phase2-artifact-persistence.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5934654Z ^[[36;1mpython scripts/finalize-phase2-artifact-api-compat.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5936305Z ^[[36;1mpython scripts/finalize-phase2-hydration-project-tests.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.5937893Z ^[[36;1mpython scripts/finalize-phase2-last-regressions.py^[[0m
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6145680Z shell: /usr/bin/bash -e {0}
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6146642Z env:
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6147262Z   CI: true
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6147936Z   NEXT_TELEMETRY_DISABLED: 1
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6148838Z   VERCEL_ENV: preview
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6149675Z   NODES_PERSISTENCE_BACKEND: file
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6150694Z   AUTH_ENABLE_DEV_CREDENTIALS: 0
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6151702Z   OPENROUTER_ALLOW_DEPLOYMENT_KEY: 0
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6152959Z   OPENROUTER_REQUIRE_USER_KEY: 1
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6153912Z   PHASE2_REVISION: 16
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6154781Z   PLAYWRIGHT_RUN_ID: phase2-29265135758-3
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.6155833Z ##[endgroup]
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.8945141Z Expected one match in components/context/persisted-session-runtime-bridge.tsx, found 0: 'import type { SessionThreadExport } from "@/lib/session-documents";\nimport {\n'
+diagnose	Apply phase 2 repairs	2026-07-13T16:22:22.9004401Z ##[error]Process completed with exit code 1.
