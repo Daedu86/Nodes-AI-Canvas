@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Daedu86/Nodes-AI-Canvas/security/advisories/new
+    about: Report authentication, authorization, credential, upload, persistence, or other security issues privately.
+  - name: Product roadmap
+    url: https://github.com/Daedu86/Nodes-AI-Canvas/blob/main/ROADMAP.md
+    about: Review current product direction and planned areas before proposing a feature.
+  - name: Product demo guide
+    url: https://github.com/Daedu86/Nodes-AI-Canvas/blob/main/docs/product-demo.md
+    about: Run and present the deterministic seeded workspace.
