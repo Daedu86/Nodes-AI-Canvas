@@ -36,55 +36,46 @@ const repositoryCases = [
   {
     file: fileSessionRepository,
     get: getSessionRepository,
-    name: "sessions",
     supabase: supabaseSessionRepository,
   },
   {
     file: fileProjectRepositoryV2,
     get: getProjectRepository,
-    name: "projects",
     supabase: supabaseProjectRepository,
   },
   {
     file: fileProjectInvitationRepository,
     get: getProjectInvitationRepository,
-    name: "project invitations",
     supabase: supabaseProjectInvitationRepository,
   },
   {
     file: fileMemoryRepository,
     get: getMemoryRepository,
-    name: "memory",
     supabase: supabaseMemoryRepository,
   },
   {
     file: fileLlmSettingsRepository,
     get: getLlmSettingsRepository,
-    name: "LLM settings",
     supabase: supabaseLlmSettingsRepository,
   },
   {
     file: fileAgentWorkRepository,
     get: getAgentWorkRepository,
-    name: "agent work",
     supabase: supabaseAgentWorkRepository,
   },
   {
     file: fileUserPlanRepository,
     get: getUserPlanRepository,
-    name: "user plans",
     supabase: supabaseUserPlanRepository,
   },
   {
     file: fileChatUsageRepository,
     get: getChatUsageRepository,
-    name: "chat usage",
     supabase: supabaseChatUsageRepository,
   },
   {
     file: fileChatConcurrencyRepository,
     get: getChatConcurrencyRepository,
-    name: "chat concurrency",
     supabase: supabaseChatConcurrencyRepository,
   },
 ] as const;
@@ -118,7 +109,7 @@ describe("persistence repository selection", () => {
     process.env.NODES_PERSISTENCE_BACKEND = "file";
 
     for (const repository of repositoryCases) {
-      expect(repository.get(), repository.name).toBe(repository.file);
+      expect(repository.get()).toBe(repository.file);
     }
   });
 
@@ -126,7 +117,7 @@ describe("persistence repository selection", () => {
     process.env.NODES_PERSISTENCE_BACKEND = "supabase";
 
     for (const repository of repositoryCases) {
-      expect(repository.get(), repository.name).toBe(repository.supabase);
+      expect(repository.get()).toBe(repository.supabase);
     }
   });
 });
