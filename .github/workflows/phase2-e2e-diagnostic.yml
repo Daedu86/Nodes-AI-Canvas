@@ -21,7 +21,7 @@ env:
   AUTH_ENABLE_DEV_CREDENTIALS: "0"
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
-  PHASE2_REVISION: "9"
+  PHASE2_REVISION: "10"
   PLAYWRIGHT_RUN_ID: phase2-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
@@ -174,7 +174,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: phase2-optimistic-response-persistence
+          name: phase2-typed-optimistic-response
           path: |
             phase2-*-report.json
             phase2-*-stderr.log
@@ -202,6 +202,7 @@ jobs:
               phase2-status.json \
               phase2-assistant-ui-api.txt \
               phase2-runtime-source.txt \
+              phase2-static-failure-tail.log \
               phase2-e2e-summary.json
             git add \
               app/assistant.tsx \
@@ -212,7 +213,7 @@ jobs:
             git commit -m "fix: persist substantive AI SDK optimistic responses [skip vercel]"
           else
             git add phase2-e2e-summary.json
-            git commit -m "test: record optimistic-response persistence E2E result [skip vercel]"
+            git commit -m "test: record typed optimistic-response E2E result [skip vercel]"
           fi
 
           git pull --rebase origin main
