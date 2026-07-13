@@ -187,9 +187,8 @@ replace_once(
         );
         const visibleBranch = thread
           .getState()
-          .messages.filter(
-            (message): message is Record<string, unknown> =>
-              typeof message === "object" && message !== null,
+          .messages.map(
+            (message) => message as unknown as Record<string, unknown>,
           );
         const mergedSnapshot = mergeRuntimeBranchIntoSessionSnapshot(
           repositorySnapshot,
