@@ -4,6 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { normalizeProjectMemoryItem } from "../lib/memory-documents";
+import { normalizeProjectDocument } from "../lib/project-documents";
+import {
+  normalizeSessionArtifactsDocument,
+  normalizeSessionContextLinksDocument,
+  normalizeSessionThreadExport,
+} from "../lib/session-documents";
 
 const execFileAsync = promisify(execFile);
 const scriptPath = path.resolve(process.cwd(), "scripts", "seed-product-demo.mjs");
@@ -61,6 +68,11 @@ describe("product demo seed", () => {
       sessionIds: ["demo-positioning", "demo-onboarding", "demo-launch-plan"],
       title: "[Demo] Nodes product launch",
     });
+    expect(normalizeProjectDocument(project)).toMatchObject({
+      arenaWinnerSessionId: "demo-positioning",
+      sessionCount: 3,
+      title: "[Demo] Nodes product launch",
+    });
 
     const positioning = await readJson(positioningPath);
     expect(positioning.ownerId).toBe("dev:presenter@example.com");
@@ -77,11 +89,21 @@ describe("product demo seed", () => {
       ]),
     );
 
+    const normalizedSnapshot = normalizeSessionThreadExport(positioning.snapshot);
+    expect(normalizedSnapshot.headId).toBe("positioning-assistant-decision");
+    expect(normalizedSnapshot.messages).toHaveLength(6);
+    expect(normalizeSessionArtifactsDocument(positioning.artifacts)).toHaveLength(2);
+    expect(normalizeSessionContextLinksDocument(positioning.contextLinks)).toHaveLength(2);
+
     const memory = await readJson(memoryPath);
     expect(memory).toMatchObject({
       ownerId: "dev:presenter@example.com",
       sourceProjectId: "demo-nodes-product-launch",
       sourceSessionId: "demo-positioning",
+      type: "decision",
+    });
+    expect(normalizeProjectMemoryItem(memory)).toMatchObject({
+      id: "demo-memory-positioning-decision",
       type: "decision",
     });
 
