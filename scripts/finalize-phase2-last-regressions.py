@@ -59,8 +59,7 @@ replace_once(
 ''',
     '''    const thread = runtime.threads.main;
     const readMergedPersistedSnapshot = () => {
-      const exportedSnapshot =
-        exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
+      const exportedSnapshot = exportRuntimeSnapshot(thread);
       const persistedSnapshot = sanitizePersistedSnapshot(
         mergeSessionSnapshotRepositories(
           latestPersistedSessionIdRef.current === activeSessionId
@@ -79,8 +78,7 @@ replace_once(
 
 replace_once(
     "components/context/persisted-session-runtime-bridge.tsx",
-    '''      const persistedSnapshot =
-        exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
+    '''      const persistedSnapshot = exportRuntimeSnapshot(thread);
       const signature = JSON.stringify(toComparableSnapshot(persistedSnapshot));
 ''',
     '''      const persistedSnapshot = readMergedPersistedSnapshot();
@@ -90,8 +88,7 @@ replace_once(
 
 replace_once(
     "components/context/persisted-session-runtime-bridge.tsx",
-    '''        const persistedSnapshot =
-          exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
+    '''        const persistedSnapshot = exportRuntimeSnapshot(thread);
         writeSnapshotCacheIfNewer(activeSessionId, persistedSnapshot);
 ''',
     '''        const persistedSnapshot = readMergedPersistedSnapshot();
