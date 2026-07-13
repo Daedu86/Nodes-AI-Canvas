@@ -3,7 +3,7 @@ import {
   acceptProjectInvitationForUser,
   ProjectInvitationError,
 } from "@/lib/project-invitation-service";
-import { parseJsonBody } from "@/lib/server/api-response";
+import { jsonNoStore, parseJsonBody } from "@/lib/server/api-response";
 import { projectInvitationErrorResponse } from "@/lib/server/project-invitation-http";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 
@@ -21,10 +21,7 @@ export async function POST(req: Request) {
   if (!parsed.ok) return parsed.response;
   try {
     const accepted = await acceptProjectInvitationForUser(parsed.data.token, guarded.user);
-    return Response.json(
-      { accepted },
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    return jsonNoStore({ accepted });
   } catch (error) {
     if (!(error instanceof ProjectInvitationError)) {
       console.error("Project invitation acceptance failed", error);
