@@ -13,7 +13,7 @@ def replace_once(path: str, old: str, new: str) -> None:
     text = read(path)
     count = text.count(old)
     if count != 1:
-        raise SystemExit(f"Expected one match in {path}, found {count}: {old[:180]!r}")
+        raise SystemExit(f"Expected one match in {path}, found {count}: {old[:200]!r}")
     write(path, text.replace(old, new, 1))
 
 
@@ -21,7 +21,7 @@ def replace_all(path: str, old: str, new: str, expected: int) -> None:
     text = read(path)
     count = text.count(old)
     if count != expected:
-        raise SystemExit(f"Expected {expected} matches in {path}, found {count}: {old[:180]!r}")
+        raise SystemExit(f"Expected {expected} matches in {path}, found {count}: {old[:200]!r}")
     write(path, text.replace(old, new))
 
 
@@ -79,56 +79,108 @@ export const mergeRuntimeBranchIntoSessionSnapshot = (
     encoding="utf-8",
 )
 
-# Add an explicit completion signal to the existing persistence synchronizer.
 sync_path = "lib/session-persist-sync.ts"
 replace_once(
     sync_path,
     '''export const FORCE_PERSIST_SESSION_EVENT = "assistant-ui:force-persist-session";
 ''',
     '''export const FORCE_PERSIST_SESSION_EVENT = "assistant-ui:force-persist-session";
-export const SESSION_RUN_FINISHED_EVENT = "assistant-ui:session-run-finished";
+export const SESSION_RUNTIME_SETTLED_EVENT = "assistant-ui:session-runtime-settled";
 
-export const notifySessionRunFinished = () => {
+export const notifySessionRuntimeSettled = () => {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event(SESSION_RUN_FINISHED_EVENT));
+  window.dispatchEvent(new Event(SESSION_RUNTIME_SETTLED_EVENT));
 };
 ''',
 )
 
-# Signal completion from the callback that is guaranteed by the AI SDK adapter.
 assistant_path = "app/assistant.tsx"
 replace_once(
     assistant_path,
+    'import { AssistantRuntimeProvider } from "@assistant-ui/react";\n',
+    'import { AssistantRuntimeProvider, useAuiState } from "@assistant-ui/react";\n',
+)
+replace_once(
+    assistant_path,
     '''import { rememberMessageLatencyEntry } from "@/lib/message-latency-registry";
 ''',
     '''import { rememberMessageLatencyEntry } from "@/lib/message-latency-registry";
-import { notifySessionRunFinished } from "@/lib/session-persist-sync";
+import { notifySessionRuntimeSettled } from "@/lib/session-persist-sync";
 ''',
 )
 replace_once(
     assistant_path,
-    '''      onError: (error: Error) => {
-        pendingLatencyRef.current = null;
-        setRequestError(getRequestErrorMessageFromThrowable(error));
-      },
+    '''const ProjectWorkspace = dynamic(
+  () => import("@/components/workspace/project-workspace").then((mod) => mod.ProjectWorkspace),
+  {
+    loading: () => (
+      <div className="flex h-full min-h-0 items-center justify-center p-6 text-sm text-muted-foreground">
+        Loading project workspace…
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
 ''',
-    '''      onError: (error: Error) => {
-        pendingLatencyRef.current = null;
-        setRequestError(getRequestErrorMessageFromThrowable(error));
-        notifySessionRunFinished();
-      },
+    '''const ProjectWorkspace = dynamic(
+  () => import("@/components/workspace/project-workspace").then((mod) => mod.ProjectWorkspace),
+  {
+    loading: () => (
+      <div className="flex h-full min-h-0 items-center justify-center p-6 text-sm text-muted-foreground">
+        Loading project workspace…
+      </div>
+    ),
+    ssr: false,
+  },
+);
+
+function SessionRuntimePersistenceSignal() {
+  const isRunning = useAuiState((state) => state.thread.isRunning);
+  const messages = useAuiState((state) => state.thread.messages);
+  const lastMessage = messages.at(-1);
+  const lastMessageId = lastMessage?.id ?? null;
+  const lastMessageRole = lastMessage?.role ?? null;
+  const lastMessageStatus = lastMessage?.status?.type ?? null;
+  const contentSignature = React.useMemo(
+    () =>
+      JSON.stringify(
+        messages.map((message) => ({
+          content: message.content,
+          id: message.id,
+          role: message.role,
+          status: message.status,
+        })),
+      ),
+    [messages],
+  );
+
+  React.useEffect(() => {
+    if (isRunning || messages.length === 0) return;
+    if (lastMessageRole === "assistant" && lastMessageStatus === "running") return;
+    notifySessionRuntimeSettled();
+  }, [
+    contentSignature,
+    isRunning,
+    lastMessageId,
+    lastMessageRole,
+    lastMessageStatus,
+    messages.length,
+  ]);
+
+  return null;
+}
+
 ''',
 )
 replace_once(
     assistant_path,
-    '''      onFinish: ({ message }: { message?: { id?: string } }) => {
-        recordPendingLatency(message?.id);
-      },
+    '''    <AssistantRuntimeProvider runtime={rawRuntime}>
+      <PersistedSessionRuntimeBridge />
 ''',
-    '''      onFinish: ({ message }: { message?: { id?: string } }) => {
-        recordPendingLatency(message?.id);
-        notifySessionRunFinished();
-      },
+    '''    <AssistantRuntimeProvider runtime={rawRuntime}>
+      <SessionRuntimePersistenceSignal />
+      <PersistedSessionRuntimeBridge />
 ''',
 )
 
@@ -139,7 +191,7 @@ replace_once(
   markSessionPersistPending,
 ''',
     '''  FORCE_PERSIST_SESSION_EVENT,
-  SESSION_RUN_FINISHED_EVENT,
+  SESSION_RUNTIME_SETTLED_EVENT,
   markSessionPersistPending,
 ''',
 )
@@ -164,8 +216,8 @@ replace_once(
   "modelContextUpdate",
 ] as const;
 
-// The adapter's onFinish can precede its final external-store update by a tick.
-const RUN_END_PERSIST_RETRY_DELAYS_MS = [0, 50, 150, 300, 600] as const;
+// React store updates can precede the adapter's repository update by a tick.
+const SETTLED_PERSIST_RETRY_DELAYS_MS = [0, 50, 150, 300] as const;
 ''',
 )
 replace_once(
@@ -259,7 +311,7 @@ replace_once(
   const pendingForcePersistResolversRef = React.useRef<Array<() => void>>([]);
 ''',
     '''  const runActiveRef = React.useRef(false);
-  const runEndPersistGenerationRef = React.useRef(0);
+  const settledPersistGenerationRef = React.useRef(0);
   const pendingForcePersistResolversRef = React.useRef<Array<() => void>>([]);
 ''',
 )
@@ -267,16 +319,16 @@ replace_once(
     bridge,
     '''    const scheduleFlush = () => {
 ''',
-    '''    const persistSettledRun = async () => {
-      const generation = ++runEndPersistGenerationRef.current;
+    '''    const persistSettledRuntime = async () => {
+      const generation = ++settledPersistGenerationRef.current;
 
-      for (const delayMs of RUN_END_PERSIST_RETRY_DELAYS_MS) {
+      for (const delayMs of SETTLED_PERSIST_RETRY_DELAYS_MS) {
         if (delayMs > 0) {
           await new Promise<void>((resolve) => {
             window.setTimeout(resolve, delayMs);
           });
         }
-        if (runEndPersistGenerationRef.current !== generation) return;
+        if (settledPersistGenerationRef.current !== generation) return;
         try {
           await flush({ allowEmptyOverride: true });
         } catch {
@@ -285,17 +337,17 @@ replace_once(
       }
 
       if (
-        runEndPersistGenerationRef.current === generation &&
+        settledPersistGenerationRef.current === generation &&
         pendingForcePersistResolversRef.current.length > 0
       ) {
         resolvePendingForcePersists();
       }
     };
 
-    const handleRunFinished = () => {
+    const handleRuntimeSettled = () => {
       runActiveRef.current = false;
       markSessionPersistPending();
-      void persistSettledRun();
+      void persistSettledRuntime();
     };
 
     const scheduleFlush = () => {
@@ -309,7 +361,7 @@ replace_once(
 ''',
     '''      thread.unstable_on("runStart", () => {
         runActiveRef.current = true;
-        runEndPersistGenerationRef.current += 1;
+        settledPersistGenerationRef.current += 1;
         markSessionPersistPending();
 ''',
 )
@@ -327,7 +379,7 @@ replace_once(
         });
       }),
 ''',
-    '''      thread.unstable_on("runEnd", handleRunFinished),
+    '''      thread.unstable_on("runEnd", handleRuntimeSettled),
 ''',
 )
 replace_once(
@@ -335,7 +387,7 @@ replace_once(
     '''    window.addEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
 ''',
     '''    window.addEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
-    window.addEventListener(SESSION_RUN_FINISHED_EVENT, handleRunFinished);
+    window.addEventListener(SESSION_RUNTIME_SETTLED_EVENT, handleRuntimeSettled);
 ''',
 )
 replace_once(
@@ -346,7 +398,7 @@ replace_once(
 ''',
     '''    return () => {
       runActiveRef.current = false;
-      runEndPersistGenerationRef.current += 1;
+      settledPersistGenerationRef.current += 1;
       resolvePendingForcePersists();
 ''',
 )
@@ -355,7 +407,7 @@ replace_once(
     '''      window.removeEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
 ''',
     '''      window.removeEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
-      window.removeEventListener(SESSION_RUN_FINISHED_EVENT, handleRunFinished);
+      window.removeEventListener(SESSION_RUNTIME_SETTLED_EVENT, handleRuntimeSettled);
 ''',
 )
 
