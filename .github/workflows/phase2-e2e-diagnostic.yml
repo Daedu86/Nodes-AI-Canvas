@@ -21,7 +21,7 @@ env:
   AUTH_ENABLE_DEV_CREDENTIALS: "0"
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
-  PHASE2_REVISION: "10"
+  PHASE2_REVISION: "11"
   PLAYWRIGHT_RUN_ID: phase2-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
@@ -35,11 +35,12 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Apply persistence repair
+      - name: Apply phase 2 repairs
         run: |
           python scripts/apply-phase2-persistence-fix.py
           python scripts/finalize-phase2-runtime-signal.py
           python scripts/finalize-phase2-optimistic-messages.py
+          python scripts/finalize-phase2-graph-sources.py
 
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -50,10 +51,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --fund=false
 
-      - name: Format and validate repair
+      - name: Format and validate repairs
         run: |
           npx eslint \
             app/assistant.tsx \
+            components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx \
+            components/assistant-ui/use-thread-repo-items.ts \
             components/context/persisted-session-runtime-bridge.tsx \
             lib/session-persist-sync.ts \
             lib/session-runtime-snapshot.ts \
@@ -174,7 +177,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: phase2-typed-optimistic-response
+          name: phase2-merged-canvas-sources
           path: |
             phase2-*-report.json
             phase2-*-stderr.log
@@ -199,6 +202,7 @@ jobs:
               scripts/apply-phase2-persistence-fix.py \
               scripts/finalize-phase2-runtime-signal.py \
               scripts/finalize-phase2-optimistic-messages.py \
+              scripts/finalize-phase2-graph-sources.py \
               phase2-status.json \
               phase2-assistant-ui-api.txt \
               phase2-runtime-source.txt \
@@ -206,14 +210,16 @@ jobs:
               phase2-e2e-summary.json
             git add \
               app/assistant.tsx \
+              components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx \
+              components/assistant-ui/use-thread-repo-items.ts \
               components/context/persisted-session-runtime-bridge.tsx \
               lib/session-persist-sync.ts \
               lib/session-runtime-snapshot.ts \
               tests/session-runtime-snapshot.test.ts
-            git commit -m "fix: persist substantive AI SDK optimistic responses [skip vercel]"
+            git commit -m "fix: merge persisted and rendered conversation sources [skip vercel]"
           else
             git add phase2-e2e-summary.json
-            git commit -m "test: record typed optimistic-response E2E result [skip vercel]"
+            git commit -m "test: record merged Canvas source E2E result [skip vercel]"
           fi
 
           git pull --rebase origin main
