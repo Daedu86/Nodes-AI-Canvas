@@ -55,9 +55,7 @@ jobs:
           playwright.config.ts
           tests/chat-request.test.ts
           tests/e2e-auth.test.ts
-          tests/e2e/chat-image-attachment.spec.ts
-          tests/e2e/session-return-send.spec.ts
-          tests/e2e/smoke.spec.ts
+          tests/e2e
           --fix
 
       - name: Validate repository
@@ -98,8 +96,12 @@ jobs:
             playwright.config.ts \
             tests/chat-request.test.ts \
             tests/e2e-auth.test.ts \
-            tests/e2e/chat-image-attachment.spec.ts \
-            tests/e2e/session-return-send.spec.ts \
-            tests/e2e/smoke.spec.ts
+            tests/e2e
+          if ! git diff --quiet; then
+            echo "Unstaged tracked changes remain:" >&2
+            git diff --name-only >&2
+            exit 1
+          fi
+          git diff --cached --check
           git commit -m "fix: restore AI SDK 7 chat and E2E compatibility"
           git push origin HEAD:main
