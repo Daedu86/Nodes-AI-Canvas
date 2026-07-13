@@ -6,9 +6,11 @@ This repository is a Next.js and React application.
 
 - Node.js 22
 - npm
-- One model provider:
+- One model provider for live inference:
   - OpenRouter for hosted models
-  - Ollama for local models
+  - Ollama for supported local development configurations
+
+The seeded product demo does not require a live model response.
 
 The repository pins the Node major in `.nvmrc`, `package.json`, and CI. With nvm:
 
@@ -41,7 +43,9 @@ cp .env.example .env.local
 Copy-Item .env.example .env.local
 ```
 
-Then pick one:
+Set a non-placeholder local development password when `AUTH_ENABLE_DEV_CREDENTIALS=1`.
+
+Then pick one provider configuration when you need live inference.
 
 ### OpenRouter (hosted)
 
@@ -55,7 +59,7 @@ NEXT_PUBLIC_DEFAULT_MODEL=nvidia/nemotron-3-super-120b-a12b:free
 NEXT_PUBLIC_DEFAULT_PROVIDER=openrouter
 ```
 
-### Ollama (local)
+### Ollama (local development)
 
 ```env
 OLLAMA_API_URL=http://localhost:11434/api
@@ -71,6 +75,31 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+## Seeded product demo
+
+Create a deterministic workspace for presentations, screenshots, or product evaluations:
+
+```bash
+npm run demo:seed
+```
+
+Start the app, sign in with the development credentials from `.env.local`, and open `[Demo] Nodes product launch`.
+
+The demo includes three sessions, branching, Canvas artifacts, a project Arena winner, and promoted memory. It uses the local file backend and does not overwrite non-demo records.
+
+```bash
+npm run demo:reset  # replace only the stable demo records
+npm run demo:clean  # remove only the stable demo records
+```
+
+The default seeded owner is `dev:<AUTH_DEV_EMAIL>`. Override it when the authenticated development user has another ID:
+
+```bash
+NODES_DEMO_OWNER_ID="your-user-id" npm run demo:reset
+```
+
+See [product-demo.md](product-demo.md) for the 60-second narration and recording sequence.
 
 ## Quality commands
 
