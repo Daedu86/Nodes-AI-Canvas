@@ -21,7 +21,7 @@ env:
   AUTH_ENABLE_DEV_CREDENTIALS: "0"
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
-  PHASE2_REVISION: "6"
+  PHASE2_REVISION: "7"
   PLAYWRIGHT_RUN_ID: phase2-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
@@ -171,7 +171,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: phase2-onfinish-persistence
+          name: phase2-react-store-persistence
           path: |
             phase2-*-report.json
             phase2-*-stderr.log
@@ -204,10 +204,10 @@ jobs:
               lib/session-persist-sync.ts \
               lib/session-runtime-snapshot.ts \
               tests/session-runtime-snapshot.test.ts
-            git commit -m "fix: persist AI responses from the runtime completion signal [skip vercel]"
+            git commit -m "fix: persist rendered Assistant UI state after responses [skip vercel]"
           else
             git add phase2-e2e-summary.json
-            git commit -m "test: record onFinish persistence E2E result [skip vercel]"
+            git commit -m "test: record React-store persistence E2E result [skip vercel]"
           fi
 
           git pull --rebase origin main
