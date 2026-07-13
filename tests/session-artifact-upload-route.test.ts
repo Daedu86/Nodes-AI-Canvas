@@ -21,11 +21,18 @@ import { POST } from "../app/api/sessions/[sessionId]/artifacts/route";
 const validPngBytes = () =>
   new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 
+const createUploadRequest = (formData: FormData) =>
+  new Request("http://localhost/api/sessions/session-123/artifacts", {
+    body: formData,
+    headers: {
+      "Content-Length": "1024",
+    },
+    method: "POST",
+  });
+
 describe("/api/sessions/[sessionId]/artifacts", () => {
   beforeEach(() => {
-    getSessionMock.mockResolvedValue({
-      id: "session-123",
-    });
+    getSessionMock.mockResolvedValue({ id: "session-123" });
     saveSessionArtifactBlobMock.mockResolvedValue({
       blobRef: "session-123/diagram.png",
       deduplicated: false,
@@ -47,10 +54,7 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
     );
 
     const response = await POST(
-      new Request("http://localhost/api/sessions/session-123/artifacts", {
-        body: formData,
-        method: "POST",
-      }),
+      createUploadRequest(formData),
       { params: Promise.resolve({ sessionId: "session-123" }) },
     );
 
@@ -61,10 +65,7 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
   it("returns 400 when no file is provided", async () => {
     const formData = new FormData();
     const response = await POST(
-      new Request("http://localhost/api/sessions/session-123/artifacts", {
-        body: formData,
-        method: "POST",
-      }),
+      createUploadRequest(formData),
       { params: Promise.resolve({ sessionId: "session-123" }) },
     );
 
@@ -78,10 +79,7 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
     formData.append("file", new File([bytes], "diagram.png", { type: "image/png" }));
 
     const response = await POST(
-      new Request("http://localhost/api/sessions/session-123/artifacts", {
-        body: formData,
-        method: "POST",
-      }),
+      createUploadRequest(formData),
       { params: Promise.resolve({ sessionId: "session-123" }) },
     );
 
@@ -96,10 +94,7 @@ describe("/api/sessions/[sessionId]/artifacts", () => {
     formData.append("file", new File([bytes], "diagram.png", { type: "image/png" }));
 
     const response = await POST(
-      new Request("http://localhost/api/sessions/session-123/artifacts", {
-        body: formData,
-        method: "POST",
-      }),
+      createUploadRequest(formData),
       { params: Promise.resolve({ sessionId: "session-123" }) },
     );
 
