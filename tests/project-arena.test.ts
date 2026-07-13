@@ -44,6 +44,7 @@ const makeSession = ({
   },
   title,
   updatedAt: "2026-03-30T10:00:00.000Z",
+  version: 1,
 });
 
 describe("project-arena", () => {
