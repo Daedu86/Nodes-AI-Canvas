@@ -1,13 +1,10 @@
 import { revokeProjectInvitationForUser } from "@/lib/project-invitation-service";
 import { jsonNoStore } from "@/lib/server/api-response";
-import { projectInvitationErrorResponse } from "@/lib/server/project-invitation-http";
+import {
+  projectInvitationErrorResponse,
+  projectNotFoundApiError,
+} from "@/lib/server/project-invitation-http";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
-
-const projectNotFound = {
-  code: "project_not_found",
-  error: "Project not found",
-  status: 404,
-} as const;
 
 type RouteParams = {
   params: Promise<{ invitationId: string; projectId: string }>;
@@ -27,6 +24,6 @@ export async function DELETE(req: Request, context: RouteParams) {
     });
     return jsonNoStore({ project });
   } catch (error) {
-    return projectInvitationErrorResponse(error, projectNotFound);
+    return projectInvitationErrorResponse(error, projectNotFoundApiError);
   }
 }
