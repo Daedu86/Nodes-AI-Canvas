@@ -71,10 +71,7 @@ export const mergeRuntimeBranchIntoSessionSnapshot = (
   });
 
   return {
-    headId:
-      branchMessages.at(-1)?.id ??
-      repositorySnapshot?.headId ??
-      null,
+    headId: branchMessages.at(-1)?.id ?? repositorySnapshot?.headId ?? null,
     messages: mergedMessages,
   };
 };
@@ -82,14 +79,75 @@ export const mergeRuntimeBranchIntoSessionSnapshot = (
     encoding="utf-8",
 )
 
-bridge = "components/context/persisted-session-runtime-bridge.tsx"
+# Add an explicit completion signal to the existing persistence synchronizer.
+sync_path = "lib/session-persist-sync.ts"
+replace_once(
+    sync_path,
+    '''export const FORCE_PERSIST_SESSION_EVENT = "assistant-ui:force-persist-session";
+''',
+    '''export const FORCE_PERSIST_SESSION_EVENT = "assistant-ui:force-persist-session";
+export const SESSION_RUN_FINISHED_EVENT = "assistant-ui:session-run-finished";
 
+export const notifySessionRunFinished = () => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(SESSION_RUN_FINISHED_EVENT));
+};
+''',
+)
+
+# Signal completion from the callback that is guaranteed by the AI SDK adapter.
+assistant_path = "app/assistant.tsx"
+replace_once(
+    assistant_path,
+    '''import { rememberMessageLatencyEntry } from "@/lib/message-latency-registry";
+''',
+    '''import { rememberMessageLatencyEntry } from "@/lib/message-latency-registry";
+import { notifySessionRunFinished } from "@/lib/session-persist-sync";
+''',
+)
+replace_once(
+    assistant_path,
+    '''      onError: (error: Error) => {
+        pendingLatencyRef.current = null;
+        setRequestError(getRequestErrorMessageFromThrowable(error));
+      },
+''',
+    '''      onError: (error: Error) => {
+        pendingLatencyRef.current = null;
+        setRequestError(getRequestErrorMessageFromThrowable(error));
+        notifySessionRunFinished();
+      },
+''',
+)
+replace_once(
+    assistant_path,
+    '''      onFinish: ({ message }: { message?: { id?: string } }) => {
+        recordPendingLatency(message?.id);
+      },
+''',
+    '''      onFinish: ({ message }: { message?: { id?: string } }) => {
+        recordPendingLatency(message?.id);
+        notifySessionRunFinished();
+      },
+''',
+)
+
+bridge = "components/context/persisted-session-runtime-bridge.tsx"
+replace_once(
+    bridge,
+    '''  FORCE_PERSIST_SESSION_EVENT,
+  markSessionPersistPending,
+''',
+    '''  FORCE_PERSIST_SESSION_EVENT,
+  SESSION_RUN_FINISHED_EVENT,
+  markSessionPersistPending,
+''',
+)
 replace_once(
     bridge,
     'import type { SessionThreadExport } from "@/lib/session-documents";\n',
     'import type { SessionThreadExport } from "@/lib/session-documents";\nimport { mergeRuntimeBranchIntoSessionSnapshot } from "@/lib/session-runtime-snapshot";\n',
 )
-
 replace_once(
     bridge,
     '''const THREAD_EVENTS = [
@@ -106,12 +164,10 @@ replace_once(
   "modelContextUpdate",
 ] as const;
 
-// The AI SDK adapter can emit runEnd before its external repository has
-// published the final assistant message. Retry briefly after completion.
+// The adapter's onFinish can precede its final external-store update by a tick.
 const RUN_END_PERSIST_RETRY_DELAYS_MS = [0, 50, 150, 300, 600] as const;
 ''',
 )
-
 replace_once(
     bridge,
     '''const exportExternalStateAsSnapshot = (
@@ -138,7 +194,6 @@ replace_once(
 ''',
     '',
 )
-
 replace_once(
     bridge,
     '''const toPersistedSnapshot = (snapshot: ThreadExport): SessionThreadExport => ({
@@ -181,14 +236,10 @@ const exportRuntimeSnapshot = (
     // Keep the repository export as the fallback when state is not ready yet.
   }
 
-  return mergeRuntimeBranchIntoSessionSnapshot(
-    repositorySnapshot,
-    runtimeBranch,
-  );
+  return mergeRuntimeBranchIntoSessionSnapshot(repositorySnapshot, runtimeBranch);
 };
 ''',
 )
-
 replace_all(
     bridge,
     '''exportExternalStateAsSnapshot(runtime.threads.main) ??
@@ -196,14 +247,12 @@ replace_all(
     '''exportRuntimeSnapshot(runtime.threads.main)''',
     expected=2,
 )
-
 replace_all(
     bridge,
     '''exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export())''',
     '''exportRuntimeSnapshot(thread)''',
     expected=2,
 )
-
 replace_once(
     bridge,
     '''  const runActiveRef = React.useRef(false);
@@ -214,7 +263,6 @@ replace_once(
   const pendingForcePersistResolversRef = React.useRef<Array<() => void>>([]);
 ''',
 )
-
 replace_once(
     bridge,
     '''    const scheduleFlush = () => {
@@ -228,9 +276,7 @@ replace_once(
             window.setTimeout(resolve, delayMs);
           });
         }
-        if (runEndPersistGenerationRef.current !== generation) {
-          return;
-        }
+        if (runEndPersistGenerationRef.current !== generation) return;
         try {
           await flush({ allowEmptyOverride: true });
         } catch {
@@ -246,10 +292,15 @@ replace_once(
       }
     };
 
+    const handleRunFinished = () => {
+      runActiveRef.current = false;
+      markSessionPersistPending();
+      void persistSettledRun();
+    };
+
     const scheduleFlush = () => {
 ''',
 )
-
 replace_once(
     bridge,
     '''      thread.unstable_on("runStart", () => {
@@ -262,7 +313,6 @@ replace_once(
         markSessionPersistPending();
 ''',
 )
-
 replace_once(
     bridge,
     '''      thread.unstable_on("runEnd", () => {
@@ -277,14 +327,17 @@ replace_once(
         });
       }),
 ''',
-    '''      thread.unstable_on("runEnd", () => {
-        runActiveRef.current = false;
-        markSessionPersistPending();
-        void persistSettledRun();
-      }),
+    '''      thread.unstable_on("runEnd", handleRunFinished),
 ''',
 )
-
+replace_once(
+    bridge,
+    '''    window.addEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
+''',
+    '''    window.addEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
+    window.addEventListener(SESSION_RUN_FINISHED_EVENT, handleRunFinished);
+''',
+)
 replace_once(
     bridge,
     '''    return () => {
@@ -295,6 +348,14 @@ replace_once(
       runActiveRef.current = false;
       runEndPersistGenerationRef.current += 1;
       resolvePendingForcePersists();
+''',
+)
+replace_once(
+    bridge,
+    '''      window.removeEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
+''',
+    '''      window.removeEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
+      window.removeEventListener(SESSION_RUN_FINISHED_EVENT, handleRunFinished);
 ''',
 )
 
@@ -322,10 +383,7 @@ describe("mergeRuntimeBranchIntoSessionSnapshot", () => {
       headId: "user-1",
       messages: [{ parentId: null, message: user }],
     };
-
-    expect(
-      mergeRuntimeBranchIntoSessionSnapshot(repository, [user, assistant]),
-    ).toEqual({
+    expect(mergeRuntimeBranchIntoSessionSnapshot(repository, [user, assistant])).toEqual({
       headId: "assistant-1",
       messages: [
         { parentId: null, message: user },
@@ -345,21 +403,10 @@ describe("mergeRuntimeBranchIntoSessionSnapshot", () => {
         { parentId: "root", message: oldAssistant },
       ],
     };
-
-    const merged = mergeRuntimeBranchIntoSessionSnapshot(repository, [
-      root,
-      newAssistant,
-    ]);
-
+    const merged = mergeRuntimeBranchIntoSessionSnapshot(repository, [root, newAssistant]);
     expect(merged.headId).toBe("new");
-    expect(merged.messages).toContainEqual({
-      parentId: "root",
-      message: oldAssistant,
-    });
-    expect(merged.messages).toContainEqual({
-      parentId: "root",
-      message: newAssistant,
-    });
+    expect(merged.messages).toContainEqual({ parentId: "root", message: oldAssistant });
+    expect(merged.messages).toContainEqual({ parentId: "root", message: newAssistant });
   });
 
   it("does not persist optimistic placeholders", () => {
@@ -368,12 +415,7 @@ describe("mergeRuntimeBranchIntoSessionSnapshot", () => {
       ...message("optimistic", "assistant", "Loading"),
       metadata: { custom: {}, isOptimistic: true },
     };
-
-    const merged = mergeRuntimeBranchIntoSessionSnapshot(null, [
-      root,
-      optimistic,
-    ]);
-
+    const merged = mergeRuntimeBranchIntoSessionSnapshot(null, [root, optimistic]);
     expect(merged.headId).toBe("root");
     expect(merged.messages).toHaveLength(1);
   });
