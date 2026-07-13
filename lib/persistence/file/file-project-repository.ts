@@ -53,7 +53,6 @@ const sortProjects = (projects: ProjectSummary[]) =>
     if (updatedDelta !== 0) return updatedDelta;
     const createdDelta = b.createdAt.localeCompare(a.createdAt);
     if (createdDelta !== 0) return createdDelta;
-    // Final deterministic tiebreaker (directory iteration order differs across platforms).
     return a.id.localeCompare(b.id);
   });
 
@@ -100,13 +99,13 @@ const toProjectRecord = (
 
 const normalizeStoredMembers = (members: ProjectMember[]) =>
   [...members]
-    .map((member) => ({
+    .map((member): ProjectMember => ({
+      ...member,
       addedAt:
         typeof member.addedAt === "string" && member.addedAt.length > 0
           ? member.addedAt
           : new Date().toISOString(),
       email: member.email.trim().toLowerCase(),
-      role: member.role,
     }))
     .filter((member) => member.email.length > 0)
     .sort((a, b) => a.email.localeCompare(b.email));
@@ -335,15 +334,32 @@ export const fileProjectRepository: ProjectRepository = {
       throw new Error("A valid member email is required");
     }
 
+    const existingMember = current.members.find((entry) => entry.email === email);
+    const addedAt = existingMember?.addedAt ?? new Date().toISOString();
+    const invitationId =
+      member.invitationId === undefined
+        ? (existingMember?.invitationId ?? null)
+        : member.invitationId;
+    const userId =
+      member.userId === undefined
+        ? (existingMember?.userId ?? null)
+        : member.userId;
+    const acceptedAt =
+      member.acceptedAt === undefined
+        ? (existingMember?.acceptedAt ?? (invitationId ? null : addedAt))
+        : member.acceptedAt;
+    const nextMember: ProjectMember = {
+      acceptedAt,
+      addedAt,
+      email,
+      invitationId,
+      role: member.role,
+      status: acceptedAt ? "accepted" : "pending",
+      userId,
+    };
     const nextMembers = [
       ...current.members.filter((entry) => entry.email !== email),
-      {
-        addedAt:
-          current.members.find((entry) => entry.email === email)?.addedAt
-            ?? new Date().toISOString(),
-        email,
-        role: member.role,
-      } satisfies ProjectMember,
+      nextMember,
     ].sort((a, b) => a.email.localeCompare(b.email));
 
     const next: StoredProject = {
