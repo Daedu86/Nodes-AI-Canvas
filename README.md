@@ -1,48 +1,118 @@
 <p align="center">
-  <img alt="Nodes" src="docs/brand/nodes-logo.svg" width="72" />
+  <img alt="Nodes" src="docs/brand/nodes-logo.svg" width="78" />
 </p>
 
 <h1 align="center">Nodes</h1>
 
 <p align="center">
-  A branching chat and a visual canvas for thinking with AI.
+  <strong>Explore every direction. Keep the decision.</strong>
+</p>
+
+<p align="center">
+  A branching AI workspace with a visual Canvas, explicit comparison in Arena, and reusable project memory.
 </p>
 
 <p align="center">
   <a href="https://github.com/Daedu86/Nodes-AI-Canvas/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Daedu86/Nodes-AI-Canvas/actions/workflows/ci.yml/badge.svg" /></a>
   <a href="https://github.com/Daedu86/Nodes-AI-Canvas/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/Daedu86/Nodes-AI-Canvas/actions/workflows/codeql.yml/badge.svg" /></a>
-  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-2563EB.svg" /></a>
+  <img alt="Version 0.1.0" src="https://img.shields.io/badge/version-0.1.0-7C3AED.svg" />
+  <img alt="Active development" src="https://img.shields.io/badge/status-active%20development-0EA5E9.svg" />
 </p>
 
 <p align="center">
-  <img alt="Nodes workspace screenshot" src="docs/screenshots/workspace-hero.png" width="960" />
+  <a href="docs/product-demo.md"><strong>60-second product demo</strong></a>
+  ·
+  <a href="#run-the-seeded-demo"><strong>Run the demo</strong></a>
+  ·
+  <a href="#deploy"><strong>Deploy</strong></a>
+  ·
+  <a href="ROADMAP.md"><strong>Roadmap</strong></a>
 </p>
 
-Nodes is a workspace for exploration, comparison, and decision-making—not just a single-answer chatbot.
+<p align="center">
+  <img alt="Nodes workspace" src="docs/screenshots/workspace-hero.png" width="960" />
+</p>
 
-Instead of forcing every idea into one linear conversation, Nodes helps you:
+Nodes is a workspace for exploration, comparison, and decision-making—not just a single-answer chatbot. It keeps the paths a team considered, the evidence used, and the outcome selected in one connected product workflow.
 
-- Branch and compare different prompt directions.
-- Keep a canvas open for reusable context such as artifacts, decisions, drafts, and evidence.
-- Promote the best result into shared session or project memory.
-- Connect hosted OpenRouter models or local Ollama models from the same interface.
+<p align="center">
+  <img alt="Nodes product flow from branching to project memory" src="docs/brand/nodes-product-flow.svg" width="1100" />
+</p>
 
 ## Why Nodes instead of a linear chat?
 
 | Linear chat | Nodes |
 | --- | --- |
-| One conversation path | Parallel branches from any message |
-| Important context disappears in scrollback | Persistent Canvas with pinned context and artifacts |
+| One conversation path | Parallel branches from any user or assistant message |
+| Important context disappears in scrollback | Persistent Canvas with evidence, plans, drafts, files, and decisions |
 | Alternatives are compared manually | Arena compares branches and sessions side by side |
-| Decisions stay isolated in one thread | Session and project memory carry outcomes forward |
+| The winning result remains isolated | Project memory carries the outcome and rationale into later work |
+| Teams repeat prompts and context | Projects compose shared context across sessions |
 
-## What is the Canvas?
+## The product loop in 60 seconds
 
-The Canvas is a visual, persistent space that lives alongside chat. It is designed for the parts of AI work that should not disappear in scrollback: key decisions, constraints, evidence, reusable context, and outputs.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="Branching conversation" src="docs/readme/01-chat-branching.png" />
+      <br />
+      <strong>1. Branch</strong><br />
+      Explore competing directions without restarting the conversation or losing the original path.
+    </td>
+    <td width="50%" valign="top">
+      <img alt="Canvas artifacts and links" src="docs/readme/02-canvas-artifacts.png" />
+      <br />
+      <strong>2. Preserve context</strong><br />
+      Pin evidence, decisions, plans, code, images, files, and prompts to a persistent visual Canvas.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="Project Arena comparison" src="docs/screenshots/project-arena.png" />
+      <br />
+      <strong>3. Compare</strong><br />
+      Review branches or sessions in Arena and choose a winner explicitly.
+    </td>
+    <td width="50%" valign="top">
+      <img alt="Project context builder" src="docs/screenshots/project-context-builder.png" />
+      <br />
+      <strong>4. Reuse the decision</strong><br />
+      Promote the strongest result into project memory and compose it into future context.
+    </td>
+  </tr>
+</table>
 
-## Product Tour
+The complete narrated sequence is in the [product demo guide](docs/product-demo.md).
 
-### Chat + branching
+## Run the seeded demo
+
+The repository includes a deterministic product workspace with three sessions, a branching positioning conversation, Canvas artifacts, an Arena winner, and promoted project memory. It does not require a live model response.
+
+```bash
+npm ci
+cp .env.example .env.local
+npm run demo:seed
+npm run dev
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+Set a local development password in `.env.local`, sign in, and open:
+
+```text
+[Demo] Nodes product launch
+```
+
+Use `npm run demo:reset` to restore the presentation data and `npm run demo:clean` to remove only the demo records. See [docs/product-demo.md](docs/product-demo.md) for the presentation script and recording sequence.
+
+## Product tour
+
+### Chat and branching
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/01-chat-branching-dark.png" />
@@ -50,9 +120,9 @@ The Canvas is a visual, persistent space that lives alongside chat. It is design
   <img alt="Chat and branching" src="docs/readme/01-chat-branching.png" />
 </picture>
 
-Branch from any user or assistant message by editing it or adding a follow-up, then keep parallel paths side by side.
+Branch from any user or assistant message by editing it or adding a follow-up, then keep parallel paths available instead of overwriting prior work.
 
-### Canvas + artifacts
+### Canvas and artifacts
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/02-canvas-artifacts-dark.png" />
@@ -60,26 +130,26 @@ Branch from any user or assistant message by editing it or adding a follow-up, t
   <img alt="Canvas and artifacts" src="docs/readme/02-canvas-artifacts.png" />
 </picture>
 
-Artifacts—text, code, images, and files—are structured context you can pin and reuse across branches and projects.
+The Canvas is the persistent space for context that should not disappear in scrollback. Artifacts can contain text, code, images, files, or executable prompts, and links make their relationship to prompts and responses visible.
 
-<p>
-  <img alt="Project canvas screenshot" src="docs/screenshots/project-canvas.png" width="960" />
+<p align="center">
+  <img alt="Project Canvas" src="docs/screenshots/project-canvas.png" width="960" />
 </p>
 
 ### Arena
 
-Arena is where you compare branches or sessions side by side and promote the best result into memory.
+Arena compares branches or sessions side by side. A selected winner can be promoted into memory so the decision and its supporting context remain available after the comparison.
 
-<p>
-  <img alt="Project arena screenshot" src="docs/screenshots/project-arena.png" width="960" />
+<p align="center">
+  <img alt="Project Arena" src="docs/screenshots/project-arena.png" width="960" />
 </p>
 
 ### Project Context Builder
 
-Projects accumulate shared context over time. The Context Builder composes project-wide guidance from Arena outcomes, typed Canvas nodes, and session summaries.
+Projects group sessions and memory. Context Builder composes project-wide guidance from Arena outcomes, typed Canvas nodes, and session summaries.
 
-<p>
-  <img alt="Project context builder screenshot" src="docs/screenshots/project-context-builder.png" width="420" />
+<p align="center">
+  <img alt="Project Context Builder" src="docs/screenshots/project-context-builder.png" width="440" />
 </p>
 
 ### Per-user LLM connections
@@ -90,61 +160,64 @@ Projects accumulate shared context over time. The Context Builder composes proje
   <img alt="LLM models and keys" src="docs/readme/04-llm-models.png" />
 </picture>
 
-Users can connect their own provider credentials and control which models appear in the selector. Stored credentials remain server-side and can use a dedicated encryption key in production.
+Users can connect their own OpenRouter credentials and control which models appear in the selector. Stored credentials remain server-side and can use a dedicated encryption key in production.
 
-## What You Can Do
+## What you can do
 
 - Create sessions and branch from user or assistant messages.
-- Keep a Canvas open while you chat.
-- Pin nodes, artifacts, evidence, and decisions.
+- Keep a visual Canvas open while working with AI.
+- Pin evidence, decisions, questions, plans, tables, drafts, code, images, and files.
+- Run Canvas prompts and keep their results attached to the workspace.
 - Group sessions into projects with shared context.
 - Compare alternatives in Arena and promote winners into memory.
-- Collaborate through project membership and secure invitations.
-- Read Knowledge Center documentation inside the workspace.
-- Use hosted OpenRouter models or local Ollama models.
+- Collaborate through secure project invitations and owner, editor, or viewer roles.
+- Use hosted OpenRouter models or a supported local development configuration.
+- Persist locally for development or use Supabase Postgres and Storage in production.
 
-## Getting Started as a User
+## Common use cases
 
-1. Create a **session** from the sidebar.
-2. Pick a model from the top selector.
-3. Chat normally, then use **Edit** or **Follow-up** to create a branch.
-4. Open **Canvas** to keep important context visible.
-5. Add artifacts when structured context matters more than another message.
-6. Open **Profile → LLM Models** to connect your provider credentials and choose available models.
+- **Product and UX iteration:** branch concepts, compare outcomes, and preserve the strongest direction and rationale.
+- **Technical design:** keep constraints, evidence, snippets, alternatives, and architectural decisions connected.
+- **Research synthesis:** pin evidence, compare interpretations, and carry conclusions across sessions.
+- **Writing and planning:** explore competing structures without losing prior versions or selected language.
+- **Model evaluation:** run the same problem through different branches or sessions and compare results in Arena.
 
-## Common Use Cases
+## Architecture at a glance
 
-- **Product and UX iteration:** branch prompts, compare outcomes, and retain the strongest direction.
-- **Technical design:** keep evidence, snippets, constraints, and decisions attached to the same workspace.
-- **Research:** pin sources, draft summaries, compare interpretations, and carry context across sessions.
-- **Writing and planning:** explore alternatives without losing previous versions or decisions.
+```mermaid
+flowchart LR
+  User[Browser user] --> App[Next.js and React application]
+  App --> Auth[Auth.js authentication]
+  App --> Canvas[React Flow Canvas and Arena]
+  App --> API[Authenticated API routes]
+  API --> AIRuntime[Vercel AI SDK runtime]
+  AIRuntime --> OpenRouter[OpenRouter models]
+  API --> Repositories[Repository interfaces]
+  Repositories --> FileStore[Local file backend]
+  Repositories --> SupabaseDB[Supabase Postgres]
+  Repositories --> SupabaseStorage[Supabase Storage]
+  API --> Guards[Ownership, quotas, invitations, uploads]
+  CI[GitHub Actions] --> Quality[Lint, types, coverage, E2E, audits, CodeQL, Canvas budget]
+```
 
-## Architecture at a Glance
+| Layer | Implementation |
+| --- | --- |
+| Application | Next.js, React, and TypeScript |
+| AI runtime | Vercel AI SDK with OpenRouter runtime support |
+| Authentication | Auth.js with GitHub or Google OAuth in production |
+| Persistence | Repository abstraction with file and Supabase implementations |
+| Visual workspace | React Flow-based Canvas and Arena |
+| Security | Server-side ownership, invitation, credential, upload, and quota enforcement |
+| Quality | ESLint, TypeScript, Vitest coverage, Playwright E2E, audits, CodeQL, and Canvas performance budgets |
+| Deployment | Vercel reference deployment with Supabase Postgres and Storage |
 
-- **Application:** Next.js, React, and TypeScript.
-- **AI runtime:** Vercel AI SDK with OpenRouter and Ollama provider support.
-- **Authentication:** Auth.js with GitHub or Google OAuth in production.
-- **Persistence:** local file repositories for development or Supabase Postgres and Storage for cloud deployments.
-- **Canvas:** React Flow-based visual workspace.
-- **Quality:** ESLint, TypeScript, Vitest coverage, Playwright E2E, dependency audits, and CodeQL.
-- **Deployment:** Vercel with production environment validation that fails closed on unsafe configuration.
-
-## Key Ideas
-
-- **Session:** a working conversation that can be reopened later.
-- **Branch:** a parallel path created from any message.
-- **Artifact:** structured context such as text, code, an image, or a file.
-- **Project:** a workspace that groups sessions and shared context.
-- **Arena:** a comparison surface for branches and sessions.
-- **Memory:** promoted context that remains available beyond one branch.
-
-## Developer Quick Start
+## Developer quick start
 
 Requirements:
 
 - Node.js 22
 - npm
-- OpenRouter or Ollama
+- OpenRouter credentials for live hosted inference, or the seeded demo for a no-inference product tour
 
 ```bash
 npm ci
@@ -152,25 +225,44 @@ cp .env.example .env.local
 npm run dev
 ```
 
-On Windows PowerShell, replace the copy command with:
-
-```powershell
-Copy-Item .env.example .env.local
-```
-
 Then open `http://localhost:3000`.
 
 For complete setup and validation commands, see the [development guide](docs/development.md). For production configuration, see the [deploying guide](docs/deploying.md) and [cloud persistence guide](docs/cloud-persistence.md).
 
-## Contributing
+## Deploy
 
-Contributions should include focused changes, appropriate tests, and a clear description of user-visible or operational impact. Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing a change.
+<p>
+  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FDaedu86%2FNodes-AI-Canvas&env=AUTH_SECRET,NEXTAUTH_URL,NODES_PERSISTENCE_BACKEND,ALLOW_REMOTE_API,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY,LLM_SETTINGS_ENCRYPTION_KEY,AUTH_GITHUB_ID,AUTH_GITHUB_SECRET&envDescription=Production%20configuration%20required%20by%20Nodes&envLink=https%3A%2F%2Fgithub.com%2FDaedu86%2FNodes-AI-Canvas%2Fblob%2Fmain%2Fdocs%2Fdeploying.md">
+    <img src="https://vercel.com/button" alt="Deploy with Vercel" />
+  </a>
+</p>
 
-Security vulnerabilities should not be reported in public issues. Follow [SECURITY.md](SECURITY.md) for private reporting instructions.
+A production deployment requires:
 
-## Project Status
+- Supabase Postgres and a private Storage bucket;
+- a final HTTPS `NEXTAUTH_URL`;
+- strong, independent authentication and credential-encryption secrets;
+- at least one complete GitHub or Google OAuth configuration;
+- `NODES_PERSISTENCE_BACKEND=supabase` and `ALLOW_REMOTE_API=1`;
+- explicit OpenRouter funding and quota policy.
 
-Nodes is under active development. Interfaces, persistence details, and operational defaults may continue to evolve before a stable `1.0` release.
+The full pre-deploy and post-deploy checklist is in [docs/deploying.md](docs/deploying.md).
+
+## Roadmap and community
+
+- [Public product roadmap](ROADMAP.md)
+- [Contribution guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Bug reports](https://github.com/Daedu86/Nodes-AI-Canvas/issues/new?template=bug_report.yml)
+- [Feature requests](https://github.com/Daedu86/Nodes-AI-Canvas/issues/new?template=feature_request.yml)
+
+Contributions should include focused changes, appropriate tests, and a clear description of user-visible or operational impact. Security vulnerabilities must be reported privately through the process in [SECURITY.md](SECURITY.md), not through a public issue.
+
+## Project status
+
+Nodes is under active development toward a stable `1.0` product. Interfaces, persistence details, and operational defaults may evolve. The current repository version is `0.1.0`; the roadmap distinguishes available capabilities from planned work.
+
+The prepared social preview artwork is available at [`docs/brand/nodes-social-preview.svg`](docs/brand/nodes-social-preview.svg).
 
 ## License
 
