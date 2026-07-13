@@ -1,0 +1,71 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="1180" y2="620" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#172554"/>
+      <stop offset="0.52" stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(294 146) rotate(39) scale(540 440)">
+      <stop stop-color="#38BDF8" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#38BDF8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="200%">
+      <feDropShadow dx="0" dy="22" stdDeviation="28" flood-color="#020617" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="640" rx="36" fill="url(#bg)"/>
+  <rect width="1280" height="640" rx="36" fill="url(#glow)"/>
+  <circle cx="1116" cy="540" r="260" fill="#7C3AED" fill-opacity="0.12"/>
+
+  <g filter="url(#shadow)">
+    <rect x="88" y="84" width="116" height="116" rx="30" fill="#0F172A" stroke="#7DD3FC" stroke-opacity="0.35"/>
+    <path d="M120 168V116M120 116L172 168M172 168V116" stroke="#F8FAFC" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="120" cy="116" r="11" fill="#F8FAFC"/>
+    <circle cx="120" cy="168" r="11" fill="#F8FAFC"/>
+    <circle cx="172" cy="116" r="11" fill="#F8FAFC"/>
+    <circle cx="172" cy="168" r="11" fill="#F8FAFC"/>
+  </g>
+
+  <text x="238" y="142" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="62" font-weight="800" letter-spacing="-2">Nodes</text>
+  <text x="238" y="191" fill="#7DD3FC" font-family="Inter, Arial, sans-serif" font-size="25" font-weight="600">AI decision workspace</text>
+
+  <text x="88" y="300" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="50" font-weight="750" letter-spacing="-1.4">Explore every direction.</text>
+  <text x="88" y="358" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="50" font-weight="750" letter-spacing="-1.4">Keep the decision.</text>
+  <text x="88" y="410" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="23">Branch conversations, preserve context on Canvas, compare in Arena,</text>
+  <text x="88" y="443" fill="#94A3B8" font-family="Inter, Arial, sans-serif" font-size="23">and promote the strongest result into reusable project memory.</text>
+
+  <g transform="translate(88 502)">
+    <rect width="204" height="62" rx="31" fill="#082F49" stroke="#38BDF8" stroke-opacity="0.72"/>
+    <text x="102" y="39" fill="#E0F2FE" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700">Branch</text>
+    <path d="M214 31H250" stroke="#7DD3FC" stroke-width="3" stroke-linecap="round"/>
+    <path d="M241 23L250 31L241 39" stroke="#7DD3FC" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="262" width="204" height="62" rx="31" fill="#172554" stroke="#60A5FA" stroke-opacity="0.72"/>
+    <text x="364" y="39" fill="#DBEAFE" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700">Canvas</text>
+    <path d="M476 31H512" stroke="#93C5FD" stroke-width="3" stroke-linecap="round"/>
+    <path d="M503 23L512 31L503 39" stroke="#93C5FD" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="524" width="204" height="62" rx="31" fill="#312E81" stroke="#818CF8" stroke-opacity="0.76"/>
+    <text x="626" y="39" fill="#E0E7FF" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700">Arena</text>
+    <path d="M738 31H774" stroke="#A5B4FC" stroke-width="3" stroke-linecap="round"/>
+    <path d="M765 23L774 31L765 39" stroke="#A5B4FC" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="786" width="204" height="62" rx="31" fill="#4C1D95" stroke="#A78BFA" stroke-opacity="0.82"/>
+    <text x="888" y="39" fill="#F3E8FF" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700">Memory</text>
+  </g>
+
+  <g transform="translate(1000 112)" filter="url(#shadow)">
+    <rect width="190" height="238" rx="32" fill="#0F172A" stroke="#475569"/>
+    <circle cx="48" cy="50" r="12" fill="#38BDF8"/>
+    <circle cx="104" cy="86" r="12" fill="#F8FAFC"/>
+    <circle cx="104" cy="150" r="12" fill="#F8FAFC"/>
+    <circle cx="156" cy="118" r="12" fill="#A78BFA"/>
+    <path d="M58 53L94 82M58 53L94 145M114 87L146 113M114 149L146 123" stroke="#64748B" stroke-width="4" stroke-linecap="round"/>
+    <rect x="32" y="188" width="126" height="22" rx="11" fill="url(#accent)" fill-opacity="0.62"/>
+  </g>
+</svg>
