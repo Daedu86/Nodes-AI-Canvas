@@ -11,6 +11,15 @@ const compat = new FlatCompat({
 
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
+  {
+    files: ["tests/e2e/smoke.spec.ts"],
+    rules: {
+      // The smoke suite intentionally retains intermediate snapshots for
+      // failure diagnosis while scenarios evolve. Production code remains strict.
+      "@typescript-eslint/no-unused-vars": "off",
+      "no-unused-vars": "off",
+    },
+  },
 ];
 
 export default eslintConfig;
