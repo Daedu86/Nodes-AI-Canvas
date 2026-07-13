@@ -1,0 +1,63 @@
+diagnose	Publish result	﻿2026-07-13T15:45:07.1570044Z ##[group]Run set -euo pipefail
+diagnose	Publish result	2026-07-13T15:45:07.1570416Z ^[[36;1mset -euo pipefail^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1570704Z ^[[36;1mexit_code=$(cat phase2-exit-code.txt)^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1571270Z ^[[36;1mgit config user.name github-actions[bot]^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1571723Z ^[[36;1mgit config user.email 41898282+github-actions[bot]@users.noreply.github.com^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1572131Z ^[[36;1m^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1572336Z ^[[36;1mif [ "$exit_code" = "0" ]; then^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1572623Z ^[[36;1m  git rm -f --ignore-unmatch \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1572955Z ^[[36;1m    .github/workflows/phase2-e2e-diagnostic.yml \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1573365Z ^[[36;1m    .github/workflows/phase2-runtime-source-probe.yml \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1573756Z ^[[36;1m    scripts/apply-phase2-persistence-fix.py \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1574122Z ^[[36;1m    scripts/finalize-phase2-runtime-signal.py \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1574506Z ^[[36;1m    scripts/finalize-phase2-optimistic-messages.py \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1574935Z ^[[36;1m    scripts/finalize-phase2-graph-sources.py \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1575305Z ^[[36;1m    scripts/finalize-phase2-canvas-rendering.py \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1575711Z ^[[36;1m    scripts/finalize-phase2-artifact-persistence.py \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1576116Z ^[[36;1m    scripts/finalize-phase2-artifact-api-compat.py \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1576457Z ^[[36;1m    phase2-status.json \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1576744Z ^[[36;1m    phase2-final-status.json \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1577037Z ^[[36;1m    phase2-artifact-status.json \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1577352Z ^[[36;1m    phase2-artifact-static-tail.log \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1577811Z ^[[36;1m    phase2-assistant-ui-api.txt \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1578123Z ^[[36;1m    phase2-runtime-source.txt \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1578430Z ^[[36;1m    phase2-static-failure-tail.log \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1578735Z ^[[36;1m    phase2-e2e-summary.json^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1579006Z ^[[36;1m  git add \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1579239Z ^[[36;1m    app/assistant.tsx \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1579603Z ^[[36;1m    components/assistant-ui/thread-graph-flow/canvas-stage.tsx \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1580092Z ^[[36;1m    components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1580595Z ^[[36;1m    components/assistant-ui/thread-graph-flow/use-canvas-run-manager.ts \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1582454Z ^[[36;1m    components/assistant-ui/use-thread-repo-items.ts \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1582918Z ^[[36;1m    components/context/persisted-session-runtime-bridge.tsx \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1583327Z ^[[36;1m    components/context/session-artifacts.tsx \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1583661Z ^[[36;1m    lib/session-persist-sync.ts \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1583973Z ^[[36;1m    lib/session-runtime-snapshot.ts \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1584268Z ^[[36;1m    tests/e2e/smoke.spec.ts \^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1584571Z ^[[36;1m    tests/session-runtime-snapshot.test.ts^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1585036Z ^[[36;1m  git commit -m "fix: stabilize Canvas state, rendering, and persistence [skip vercel]"^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1585464Z ^[[36;1melse^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1585696Z ^[[36;1m  git add phase2-e2e-summary.json^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1586128Z ^[[36;1m  git commit -m "test: record compatible artifact persistence E2E result [skip vercel]"^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1586538Z ^[[36;1mfi^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1586729Z ^[[36;1m^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1586938Z ^[[36;1mgit pull --rebase origin main^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1587219Z ^[[36;1mgit push origin HEAD:main^[[0m
+diagnose	Publish result	2026-07-13T15:45:07.1606551Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+diagnose	Publish result	2026-07-13T15:45:07.1606914Z env:
+diagnose	Publish result	2026-07-13T15:45:07.1607113Z   CI: true
+diagnose	Publish result	2026-07-13T15:45:07.1607317Z   NEXT_TELEMETRY_DISABLED: 1
+diagnose	Publish result	2026-07-13T15:45:07.1607565Z   VERCEL_ENV: preview
+diagnose	Publish result	2026-07-13T15:45:07.1607809Z   NODES_PERSISTENCE_BACKEND: file
+diagnose	Publish result	2026-07-13T15:45:07.1608079Z   AUTH_ENABLE_DEV_CREDENTIALS: 0
+diagnose	Publish result	2026-07-13T15:45:07.1608345Z   OPENROUTER_ALLOW_DEPLOYMENT_KEY: 0
+diagnose	Publish result	2026-07-13T15:45:07.1608619Z   OPENROUTER_REQUIRE_USER_KEY: 1
+diagnose	Publish result	2026-07-13T15:45:07.1609012Z   PHASE2_REVISION: 14
+diagnose	Publish result	2026-07-13T15:45:07.1609254Z   PLAYWRIGHT_RUN_ID: phase2-29262867990-1
+diagnose	Publish result	2026-07-13T15:45:07.1609529Z ##[endgroup]
+diagnose	Publish result	2026-07-13T15:45:07.2002528Z [main de582bd] test: record compatible artifact persistence E2E result [skip vercel]
+diagnose	Publish result	2026-07-13T15:45:07.2003410Z  1 file changed, 130 insertions(+)
+diagnose	Publish result	2026-07-13T15:45:07.2003962Z  create mode 100644 phase2-e2e-summary.json
+diagnose	Publish result	2026-07-13T15:45:07.2029011Z error: cannot pull with rebase: You have unstaged changes.
+diagnose	Publish result	2026-07-13T15:45:07.2030689Z error: Please commit or stash them.
+diagnose	Publish result	2026-07-13T15:45:07.2046102Z ##[error]Process completed with exit code 128.
