@@ -6,10 +6,11 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: refactor-project-workspace
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   CI: "true"
@@ -26,6 +27,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Report validation start
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "ProjectWorkspace validation started."
+
       - name: Checkout main
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -67,6 +73,7 @@ jobs:
 
           git rm .github/workflows/refactor-project-workspace.yml
           git rm scripts/refactor-project-workspace.py
+          git rm scripts/.refactor-trigger-placeholder
           git add \
             components/workspace/project-workspace.tsx \
             components/workspace/project-section-card.tsx \
@@ -77,3 +84,8 @@ jobs:
           git commit -m "refactor: split project workspace responsibilities [skip vercel]"
           git pull --rebase origin main
           git push origin HEAD:main
+
+      - name: Report validation success
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "ProjectWorkspace validation passed and the refactor was published to main."
