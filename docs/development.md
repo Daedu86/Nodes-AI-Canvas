@@ -80,17 +80,24 @@ npm run format:check
 npm run typecheck
 npm test
 npm run test:coverage
+npm run test:critical-coverage
+npm run build
 npm run test:e2e
 ```
 
 `format` applies the autofixes supplied by the repository's ESLint configuration. `format:check` is the non-mutating form used by CI.
 
-`npm run check` runs formatting/lint validation, TypeScript, and unit coverage. `npm run test:ci` adds the Playwright suite with one worker.
+`npm run check` runs formatting/lint validation, TypeScript, repository coverage, and critical-module coverage. `npm run test:ci` adds the Playwright suite with one worker.
 
-Coverage uses V8 and enforces the thresholds in `vitest.config.ts`. The run writes:
+Coverage uses V8 and enforces the thresholds in `vitest.config.ts` and `vitest.critical.config.ts`. The run writes:
 
 - `coverage/index.html` for local inspection.
 - `coverage/coverage-summary.json` for tooling.
+- `coverage/critical/index.html` for critical-module inspection.
 - a text summary in the terminal.
 
-The production build is intentionally left to Vercel so GitHub Actions does not duplicate build minutes.
+GitHub Actions runs linting, type checking, unit and critical coverage, a production build, dependency audits, and Playwright end-to-end tests. Vercel performs an additional deployment build for previews and production.
+
+## Contribution workflow
+
+Before proposing a change, run the checks that match the affected area. For the complete contribution process, commit conventions, and pull request expectations, see [CONTRIBUTING.md](../CONTRIBUTING.md).
