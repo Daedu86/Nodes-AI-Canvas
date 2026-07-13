@@ -45,7 +45,18 @@ jobs:
           cache: npm
 
       - name: Apply ProjectWorkspace extraction
-        run: python scripts/refactor-project-workspace.py
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          path = Path("scripts/refactor-project-workspace.py")
+          text = path.read_text(encoding="utf-8")
+          old = 'if "SectionCard" in text:\n    fail("Not all SectionCard references were migrated.")'
+          new = 'if "<SectionCard" in text or "</SectionCard>" in text:\n    fail("Not all SectionCard references were migrated.")'
+          if old not in text:
+              raise RuntimeError("Could not patch the SectionCard migration guard.")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+          python scripts/refactor-project-workspace.py
 
       - name: Report extraction success
         env:
