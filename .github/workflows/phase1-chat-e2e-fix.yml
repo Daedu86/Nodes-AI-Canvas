@@ -21,6 +21,7 @@ env:
   AUTH_ENABLE_DEV_CREDENTIALS: "0"
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
+  PHASE1_REVISION: "3"
   PLAYWRIGHT_RUN_ID: phase1-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
