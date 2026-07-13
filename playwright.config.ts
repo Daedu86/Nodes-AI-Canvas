@@ -6,14 +6,12 @@ const port = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
 const baseURL = `http://localhost:${port}`;
 const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL;
 const playwrightStateDir = path.join(os.tmpdir(), "ai-canvas-playwright");
-const sessionStoreDir = path.join(
-  playwrightStateDir,
-  `playwright-session-store-${process.pid}`,
+const playwrightRunId = (process.env.PLAYWRIGHT_RUN_ID ?? String(process.pid)).replace(
+  /[^a-zA-Z0-9_-]/gu,
+  "-",
 );
-const projectStoreDir = path.join(
-  playwrightStateDir,
-  `playwright-project-store-${process.pid}`,
-);
+const playwrightRunDir = path.join(playwrightStateDir, `run-${playwrightRunId}`);
+const storeDir = (name: string) => path.join(playwrightRunDir, name);
 const isCi = process.env.CI === "1" || process.env.CI === "true";
 const playwrightAuthSecret =
   process.env.AUTH_SECRET ??
@@ -27,8 +25,9 @@ export default defineConfig({
     : "list",
   // Next dev cold-start + route compilation can exceed 30s on GitHub runners.
   timeout: isCi ? 60_000 : 30_000,
-  // The app uses a single shared webServer per run; multi-worker E2E can fight over shared cleanup.
-  // Force determinism in CI until per-worker isolation is implemented.
+  // Each CI shard owns a dedicated runner, web server, and state directory.
+  // Keep one worker inside each shard so files remain deterministic while the
+  // workflow provides parallelism without sharing server-side cleanup state.
   ...(isCi ? { workers: 1 } : {}),
   use: {
     baseURL,
@@ -73,8 +72,15 @@ export default defineConfig({
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? playwrightAuthSecret,
       NEXTAUTH_URL: baseURL,
       PORT: String(port),
-      PROJECT_STORE_DIR: projectStoreDir,
-      SESSION_STORE_DIR: sessionStoreDir,
+      AGENT_WORK_STORE_DIR: storeDir("agent-work"),
+      CHAT_USAGE_STORE_DIR: storeDir("chat-usage"),
+      LLM_SETTINGS_STORE_DIR: storeDir("llm-settings"),
+      PROJECT_INVITATION_STORE_DIR: storeDir("project-invitations"),
+      PROJECT_MEMORY_STORE_DIR: storeDir("memory"),
+      PROJECT_STORE_DIR: storeDir("projects"),
+      SESSION_BLOB_STORE_DIR: storeDir("session-blobs"),
+      SESSION_STORE_DIR: storeDir("sessions"),
+      USER_PLAN_STORE_DIR: storeDir("user-plans"),
     },
   },
 });
