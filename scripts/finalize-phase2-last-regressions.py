@@ -12,6 +12,95 @@ def replace_once(path: str, old: str, new: str) -> None:
 
 replace_once(
     "components/context/persisted-session-runtime-bridge.tsx",
+    '''import type { SessionThreadExport } from "@/lib/session-documents";
+import {
+''',
+    '''import type { SessionThreadExport } from "@/lib/session-documents";
+import { mergeSessionSnapshotRepositories } from "@/lib/session-runtime-snapshot";
+import {
+''',
+)
+
+replace_once(
+    "components/context/persisted-session-runtime-bridge.tsx",
+    '''  const importedSessionIdRef = React.useRef<string | null>(null);
+  const saveTimeoutRef = React.useRef<number | null>(null);
+''',
+    '''  const importedSessionIdRef = React.useRef<string | null>(null);
+  const latestPersistedSessionIdRef = React.useRef<string | null>(null);
+  const latestPersistedSnapshotRef = React.useRef<SessionThreadExport | null>(null);
+  const saveTimeoutRef = React.useRef<number | null>(null);
+''',
+)
+
+replace_once(
+    "components/context/persisted-session-runtime-bridge.tsx",
+    '''    const sanitizedSnapshot = sanitizePersistedSnapshot(activeSessionSnapshot);
+    const nextSignature = JSON.stringify(toComparableSnapshot(sanitizedSnapshot));
+''',
+    '''    const incomingSnapshot = sanitizePersistedSnapshot(activeSessionSnapshot);
+    const sanitizedSnapshot =
+      latestPersistedSessionIdRef.current === activeSessionId
+        ? mergeSessionSnapshotRepositories(
+            latestPersistedSnapshotRef.current,
+            incomingSnapshot,
+          )
+        : incomingSnapshot;
+    latestPersistedSessionIdRef.current = activeSessionId;
+    latestPersistedSnapshotRef.current = sanitizedSnapshot;
+    const nextSignature = JSON.stringify(toComparableSnapshot(sanitizedSnapshot));
+''',
+)
+
+replace_once(
+    "components/context/persisted-session-runtime-bridge.tsx",
+    '''    const thread = runtime.threads.main;
+    const unregisterForcePersistHandler = registerSessionPersistHandler();
+''',
+    '''    const thread = runtime.threads.main;
+    const readMergedPersistedSnapshot = () => {
+      const exportedSnapshot =
+        exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
+      const persistedSnapshot = sanitizePersistedSnapshot(
+        mergeSessionSnapshotRepositories(
+          latestPersistedSessionIdRef.current === activeSessionId
+            ? latestPersistedSnapshotRef.current
+            : null,
+          exportedSnapshot,
+        ),
+      );
+      latestPersistedSessionIdRef.current = activeSessionId;
+      latestPersistedSnapshotRef.current = persistedSnapshot;
+      return persistedSnapshot;
+    };
+    const unregisterForcePersistHandler = registerSessionPersistHandler();
+''',
+)
+
+replace_once(
+    "components/context/persisted-session-runtime-bridge.tsx",
+    '''      const persistedSnapshot =
+        exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
+      const signature = JSON.stringify(toComparableSnapshot(persistedSnapshot));
+''',
+    '''      const persistedSnapshot = readMergedPersistedSnapshot();
+      const signature = JSON.stringify(toComparableSnapshot(persistedSnapshot));
+''',
+)
+
+replace_once(
+    "components/context/persisted-session-runtime-bridge.tsx",
+    '''        const persistedSnapshot =
+          exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
+        writeSnapshotCacheIfNewer(activeSessionId, persistedSnapshot);
+''',
+    '''        const persistedSnapshot = readMergedPersistedSnapshot();
+        writeSnapshotCacheIfNewer(activeSessionId, persistedSnapshot);
+''',
+)
+
+replace_once(
+    "components/context/persisted-session-runtime-bridge.tsx",
     '''    const nextHydrationSignature = JSON.stringify(
       toHydrationComparableSnapshot(sanitizedSnapshot),
     );
@@ -67,7 +156,10 @@ replace_once(
   if (await hideGuideButton.isVisible()) {
     await hideGuideButton.click();
   }
-  await page.locator('.react-flow__node [data-memory-type="merge"]').first().click();
+  await page
+    .locator('.react-flow__node [data-memory-type="merge"]')
+    .first()
+    .dispatchEvent("click");
 ''',
 )
 
