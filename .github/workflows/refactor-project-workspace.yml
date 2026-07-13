@@ -47,17 +47,7 @@ jobs:
       - name: Apply ProjectWorkspace extraction
         run: |
           echo "VALIDATION_STAGE=extraction" >> "$GITHUB_ENV"
-          python <<'PY'
-          from pathlib import Path
-          path = Path("scripts/refactor-project-workspace.py")
-          text = path.read_text(encoding="utf-8")
-          old = 'if "SectionCard" in text:\n    fail("Not all SectionCard references were migrated.")'
-          new = 'if "<SectionCard" in text or "</SectionCard>" in text:\n    fail("Not all SectionCard references were migrated.")'
-          if old not in text:
-              raise RuntimeError("Could not patch the SectionCard migration guard.")
-          path.write_text(text.replace(old, new, 1), encoding="utf-8")
-          PY
-          python scripts/refactor-project-workspace.py 2>&1 | tee /tmp/validation.log
+          python scripts/refactor-project-workspace-v2.py 2>&1 | tee /tmp/validation.log
 
       - name: Report extraction success
         env:
@@ -121,12 +111,13 @@ jobs:
 
           git rm .github/workflows/refactor-project-workspace.yml
           git rm scripts/refactor-project-workspace.py
+          git rm scripts/refactor-project-workspace-v2.py
           git rm scripts/.refactor-trigger-placeholder
           git add \
             components/workspace/project-workspace.tsx \
             components/workspace/project-section-card.tsx \
             components/workspace/project-workspace-utils.ts \
-            components/workspace/use-project-workspace-state.ts \
+            components/workspace/use-project-workspace-reset.ts \
             tests/project-workspace-utils.test.ts
           git diff --check
           git commit -m "refactor: split project workspace responsibilities [skip vercel]"
