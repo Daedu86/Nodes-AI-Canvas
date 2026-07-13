@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { mergeLlmSettingsState, normalizeLlmSettingsState } from "../lib/llm/user-settings";
 
+type SettingsInput = Parameters<typeof normalizeLlmSettingsState>[0];
+const asSettingsInput = (value: unknown): SettingsInput => value as SettingsInput;
+
 describe("llm user settings", () => {
   it("upgrades legacy single openrouter apiKey into apiKeys list", () => {
-    const normalized = normalizeLlmSettingsState({
+    const normalized = normalizeLlmSettingsState(asSettingsInput({
       providers: {
         openrouter: {
           apiKey: "legacy-key",
           enabledModels: ["openrouter/free"],
         },
       },
-    });
+    }));
 
     expect(normalized.providers.openrouter.apiKeys?.length).toBe(1);
     expect(normalized.providers.openrouter.activeApiKeyId).toBe("legacy-default");
@@ -20,7 +23,7 @@ describe("llm user settings", () => {
 
   it("preserves stored key material when incoming payload is masked", () => {
     const merged = mergeLlmSettingsState(
-      {
+      asSettingsInput({
         providers: {
           openrouter: {
             activeApiKeyId: "k1",
@@ -36,8 +39,8 @@ describe("llm user settings", () => {
             enabledModels: ["openrouter/free"],
           },
         },
-      },
-      {
+      }),
+      asSettingsInput({
         providers: {
           openrouter: {
             activeApiKeyId: "k1",
@@ -52,7 +55,7 @@ describe("llm user settings", () => {
             enabledModels: ["openrouter/free"],
           },
         },
-      },
+      }),
     );
 
     expect(merged.providers.openrouter.apiKeys?.[0]?.key).toBe("secret-1");
@@ -61,16 +64,14 @@ describe("llm user settings", () => {
   });
 
   it("excludes the deleted built-in free router from enabled models", () => {
-    const normalized = normalizeLlmSettingsState({
+    const normalized = normalizeLlmSettingsState(asSettingsInput({
       providers: {
         openrouter: {
           deletedModels: ["openrouter/free"],
-          enabledModels: [
-            "openrouter/free",
-          ],
+          enabledModels: ["openrouter/free"],
         },
       },
-    });
+    }));
 
     expect(normalized.providers.openrouter.deletedModels).toContain(
       "openrouter/free",
@@ -79,20 +80,20 @@ describe("llm user settings", () => {
   });
 
   it("preserves an explicitly empty OpenRouter enabled model list", () => {
-    const normalized = normalizeLlmSettingsState({
+    const normalized = normalizeLlmSettingsState(asSettingsInput({
       providers: {
         openrouter: {
           enabledModels: [],
         },
       },
-    });
+    }));
 
     expect(normalized.providers.openrouter.enabledModels).toEqual([]);
   });
 
   it("preserves stored Ollama key material when incoming payload is masked", () => {
     const merged = mergeLlmSettingsState(
-      {
+      asSettingsInput({
         providers: {
           ollama: {
             activeApiKeyId: "ok1",
@@ -110,8 +111,8 @@ describe("llm user settings", () => {
             models: ["gemma3:4b"],
           },
         },
-      },
-      {
+      }),
+      asSettingsInput({
         providers: {
           ollama: {
             activeApiKeyId: "ok1",
@@ -128,7 +129,7 @@ describe("llm user settings", () => {
             models: ["gemma3:4b"],
           },
         },
-      },
+      }),
     );
 
     expect(merged.providers.ollama.apiKeys?.[0]?.key).toBe("ollama-secret");
