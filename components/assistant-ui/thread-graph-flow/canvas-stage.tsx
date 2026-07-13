@@ -113,7 +113,8 @@ export function CanvasStage({
       ) : (
         <>
           <ReactFlow
-            key={`flow:${activeSessionId}:${graphStructureSignature}`}
+            key={`flow:${activeSessionId}`}
+            data-graph-structure={graphStructureSignature}
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
@@ -123,7 +124,7 @@ export function CanvasStage({
             fitViewOptions={{ padding: 0.18 }}
             minZoom={0.3}
             maxZoom={1.6}
-            onlyRenderVisibleElements
+            onlyRenderVisibleElements={nodes.length > 200}
             nodesDraggable
             elementsSelectable
             proOptions={{ hideAttribution: true }}
@@ -188,7 +189,7 @@ export function CanvasStage({
             />
           </ReactFlow>
           <div className="pointer-events-none absolute bottom-5 left-20 z-10 hidden items-center gap-2 md:flex">
-            <div className="pointer-events-auto rounded-full border border-white/70 bg-white/82 px-3 py-1 text-[11px] text-muted-foreground shadow-[0_18px_48px_-36px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
+            <div className="pointer-events-none rounded-full border border-white/70 bg-white/82 px-3 py-1 text-[11px] text-muted-foreground shadow-[0_18px_48px_-36px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
               Drag nodes directly on the stage. The canvas is the main workspace.
             </div>
           </div>

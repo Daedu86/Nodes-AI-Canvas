@@ -39,6 +39,13 @@ type CreateArtifactInput = {
   syncMode?: SessionArtifactSyncMode;
 };
 
+type ArtifactUpdateOptions = {
+  revisionOrigin?: SessionArtifactRevisionOrigin;
+  revisionAuthor?: "model" | "user";
+  promptId?: string | null;
+  responseId?: string | null;
+};
+
 type ArtifactPatch = Partial<
   Pick<
     SessionArtifact,
@@ -73,13 +80,13 @@ type SessionArtifactsContextValue = {
   updateArtifact: (
     artifactId: string,
     patch: ArtifactPatch,
-    options?: {
-      revisionOrigin?: SessionArtifactRevisionOrigin;
-      revisionAuthor?: "model" | "user";
-      promptId?: string | null;
-      responseId?: string | null;
-    },
+    options?: ArtifactUpdateOptions,
   ) => void;
+  updateArtifactAndPersist: (
+    artifactId: string,
+    patch: ArtifactPatch,
+    options?: ArtifactUpdateOptions,
+  ) => Promise<void>;
   getArtifactsForTarget: (targetMessageId: string) => SessionArtifact[];
   isArtifactLinkedToTarget: (artifactId: string, targetMessageId: string) => boolean;
   linkArtifactToTarget: (artifactId: string, targetMessageId: string) => void;
@@ -109,6 +116,38 @@ const generateId = (prefix: string) =>
 
 const stateSignature = (artifacts: SessionArtifact[], links: SessionCanvasLink[]) =>
   JSON.stringify({ artifacts, contextLinks: links });
+
+const patchArtifacts = (
+  current: SessionArtifact[],
+  artifactId: string,
+  patch: ArtifactPatch,
+  options: ArtifactUpdateOptions = {},
+) =>
+  current.map((artifact) => {
+    if (artifact.id !== artifactId) return artifact;
+    const normalizedPatch: ArtifactPatch = {
+      ...patch,
+      ...(patch.title !== undefined ? { title: patch.title.trim() || artifact.title } : {}),
+      ...(patch.fileName !== undefined ? { fileName: patch.fileName?.trim() || null } : {}),
+      ...(patch.language !== undefined ? { language: patch.language?.trim() || null } : {}),
+      ...(patch.mimeType !== undefined ? { mimeType: patch.mimeType?.trim() || null } : {}),
+    };
+    const next = {
+      ...artifact,
+      ...normalizedPatch,
+      updatedAt: new Date().toISOString(),
+    };
+    if (patch.content === undefined || patch.content === artifact.content) return next;
+    return appendArtifactRevision(next, {
+      id: generateId("revision"),
+      content: patch.content,
+      origin: options.revisionOrigin ?? "manual",
+      author: options.revisionAuthor ?? "user",
+      createdAt: next.updatedAt,
+      promptId: options.promptId ?? null,
+      responseId: options.responseId ?? null,
+    });
+  });
 
 export function SessionArtifactsProvider({ children }: { children: React.ReactNode }) {
   const { activeSession, activeSessionId, saveActiveSessionDocumentPatch } = usePersistedSessions();
@@ -228,42 +267,59 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
     (
       artifactId: string,
       patch: ArtifactPatch,
-      options: {
-        revisionOrigin?: SessionArtifactRevisionOrigin;
-        revisionAuthor?: "model" | "user";
-        promptId?: string | null;
-        responseId?: string | null;
-      } = {},
+      options: ArtifactUpdateOptions = {},
     ) => {
-      setArtifacts((current) =>
-        current.map((artifact) => {
-          if (artifact.id !== artifactId) return artifact;
-          const normalizedPatch: ArtifactPatch = {
-            ...patch,
-            ...(patch.title !== undefined ? { title: patch.title.trim() || artifact.title } : {}),
-            ...(patch.fileName !== undefined ? { fileName: patch.fileName?.trim() || null } : {}),
-            ...(patch.language !== undefined ? { language: patch.language?.trim() || null } : {}),
-            ...(patch.mimeType !== undefined ? { mimeType: patch.mimeType?.trim() || null } : {}),
-          };
-          const next = {
-            ...artifact,
-            ...normalizedPatch,
-            updatedAt: new Date().toISOString(),
-          };
-          if (patch.content === undefined || patch.content === artifact.content) return next;
-          return appendArtifactRevision(next, {
-            id: generateId("revision"),
-            content: patch.content,
-            origin: options.revisionOrigin ?? "manual",
-            author: options.revisionAuthor ?? "user",
-            createdAt: next.updatedAt,
-            promptId: options.promptId ?? null,
-            responseId: options.responseId ?? null,
-          });
-        }),
+      const nextArtifacts = patchArtifacts(
+        artifactsRef.current,
+        artifactId,
+        patch,
+        options,
       );
+      artifactsRef.current = nextArtifacts;
+      setArtifacts(nextArtifacts);
     },
     [],
+  );
+
+  const updateArtifactAndPersist = React.useCallback(
+    async (
+      artifactId: string,
+      patch: ArtifactPatch,
+      options: ArtifactUpdateOptions = {},
+    ) => {
+      const nextArtifacts = patchArtifacts(
+        artifactsRef.current,
+        artifactId,
+        patch,
+        options,
+      );
+      const nextLinks = canvasLinksRef.current;
+      artifactsRef.current = nextArtifacts;
+
+      if (saveTimeoutRef.current !== null) {
+        window.clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+
+      if (!activeSessionId || hydratedSessionIdRef.current !== activeSessionId) {
+        setArtifacts(nextArtifacts);
+        return;
+      }
+
+      const signature = stateSignature(nextArtifacts, nextLinks);
+      try {
+        await saveActiveSessionDocumentPatch({
+          artifacts: nextArtifacts,
+          contextLinks: nextLinks,
+        });
+        lastSavedSignatureRef.current = signature;
+      } catch {
+        // Rendering the completed result remains safe; the normal debounce retries persistence.
+      } finally {
+        setArtifacts(nextArtifacts);
+      }
+    },
+    [activeSessionId, saveActiveSessionDocumentPatch],
   );
 
   const deleteArtifact = React.useCallback((artifactId: string) => {
@@ -409,6 +465,7 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
       createArtifact,
       deleteArtifact,
       updateArtifact,
+      updateArtifactAndPersist,
       getArtifactsForTarget,
       isArtifactLinkedToTarget,
       linkArtifactToTarget,
@@ -426,6 +483,7 @@ export function SessionArtifactsProvider({ children }: { children: React.ReactNo
       createArtifact,
       deleteArtifact,
       updateArtifact,
+      updateArtifactAndPersist,
       getArtifactsForTarget,
       isArtifactLinkedToTarget,
       linkArtifactToTarget,

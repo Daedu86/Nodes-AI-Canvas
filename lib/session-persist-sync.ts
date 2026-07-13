@@ -4,6 +4,12 @@ let pending = false;
 let forcePersistHandlerCount = 0;
 
 export const FORCE_PERSIST_SESSION_EVENT = "assistant-ui:force-persist-session";
+export const SESSION_RUNTIME_CHANGED_EVENT = "assistant-ui:session-runtime-changed";
+
+export const notifySessionRuntimeChanged = () => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(SESSION_RUNTIME_CHANGED_EVENT));
+};
 
 const notify = () => {
   const current = [...listeners];

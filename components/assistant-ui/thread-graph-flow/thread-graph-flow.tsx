@@ -92,7 +92,7 @@ export function ThreadGraphFlow() {
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
   const { clearRequestError, requestError, setRequestError } = useRequestError();
-  const { activeSessionId } = usePersistedSessions();
+  const { activeSession, activeSessionId } = usePersistedSessions();
   const {
     canvasSelectionId,
     focusedMessageId,
@@ -105,6 +105,7 @@ export function ThreadGraphFlow() {
     canvasLinks,
     contextLinks,
     applyCompletedResponse,
+    updateArtifactAndPersist,
     connectCanvasBlocks,
     createArtifact,
     deleteArtifact,
@@ -121,7 +122,11 @@ export function ThreadGraphFlow() {
     items: repoItems,
     order: itemOrderMap,
     bridges: bridgeNodeIds,
-  } = useThreadRepoItems(runtime, { defaultModel: { modelId, provider } });
+  } = useThreadRepoItems(runtime, {
+    defaultModel: { modelId, provider },
+    persistedSnapshot: activeSession?.snapshot ?? null,
+    sessionKey: activeSessionId,
+  });
   const { cutLink, getParentId, overrides, resetLinks, restoreLink } = useLinkEditor();
   const {
     beginDraft,
@@ -246,6 +251,7 @@ export function ThreadGraphFlow() {
     prompts: canvasPrompts,
     provider,
     updateArtifact,
+    updateArtifactAndPersist,
   });
   const linkedTargetCountByArtifact = React.useMemo(() => {
     const counts = new Map<string, number>();

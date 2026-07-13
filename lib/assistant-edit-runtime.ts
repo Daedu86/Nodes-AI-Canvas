@@ -13,15 +13,6 @@ type AssistantEditRuntime = Pick<
   ThreadRuntime,
   "append" | "cancelRun" | "export" | "import" | "unstable_on"
 >;
-type InternalAssistantEditRuntime = ThreadRuntime & {
-  __internal_threadBinding?: {
-    getState?: () => {
-      _store?: {
-        setMessages?: (messages: unknown[]) => void;
-      };
-    };
-  };
-};
 
 type ExecuteAssistantEditBranchOptions = {
   historyMode: HistoryMode;
@@ -86,21 +77,17 @@ export const executeAssistantEditBranch = async (
     return false;
   }
 
-  const internalSetMessages = (threadRuntime as InternalAssistantEditRuntime)
-    .__internal_threadBinding?.getState?.()._store?.setMessages;
-  if (typeof internalSetMessages === "function") {
-    internalSetMessages(currentMessages.slice(0, parentIndex + 1));
-  } else {
-    const exported = threadRuntime.export();
-    const hasParent = exported.messages.some((entry) => entry.message?.id === options.parentId);
-    if (!hasParent) {
-      return false;
-    }
-    threadRuntime.import({
-      ...exported,
-      headId: options.parentId,
-    });
+  const exported = threadRuntime.export();
+  const hasParent = exported.messages.some(
+    (entry) => entry.message?.id === options.parentId,
+  );
+  if (!hasParent) {
+    return false;
   }
+  threadRuntime.import({
+    ...exported,
+    headId: options.parentId,
+  });
 
   await new Promise<void>((resolve) => {
     window.setTimeout(resolve, 0);

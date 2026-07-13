@@ -7,6 +7,12 @@ import {
   ASSISTANT_EDIT_BRIDGE_KEY,
 } from "@/lib/assistant-edit-branching";
 import { getModelEntry, rememberModelEntry, type ModelEntry } from "@/lib/message-model-registry";
+import type { SessionThreadExport } from "@/lib/session-documents";
+import {
+  mergeRuntimeBranchIntoSessionSnapshot,
+  mergeSessionSnapshotRepositories,
+} from "@/lib/session-runtime-snapshot";
+import { SESSION_RUNTIME_CHANGED_EVENT } from "@/lib/session-persist-sync";
 
 type ThreadRuntimeEventType = "initialize" | "runStart" | "runEnd" | "modelContextUpdate";
 type ThreadExport = ReturnType<AssistantRuntime["threads"]["main"]["export"]>;
@@ -16,6 +22,8 @@ export type ThreadRepoItem = ThreadExport["messages"][number];
 type Options = {
   enabled?: boolean;
   defaultModel?: { modelId: string; provider: string };
+  persistedSnapshot?: SessionThreadExport | null;
+  sessionKey?: string | null;
 };
 
 const THREAD_EVENTS: ThreadRuntimeEventType[] = [
@@ -195,16 +203,25 @@ export function useThreadRepoItems(
   runtime: AssistantRuntime | null | undefined,
   options: Options = {},
 ): NormalizedThreadRepo {
-  const { enabled = true, defaultModel } = options;
+  const { enabled = true, defaultModel, persistedSnapshot = null, sessionKey = null } = options;
   const defaultModelId = defaultModel?.modelId;
   const defaultProvider = defaultModel?.provider;
   const [items, setItems] = useState<ThreadRepoItem[]>([]);
+  const itemsRef = useRef<ThreadRepoItem[]>([]);
   const seenIdsRef = useRef<Set<string>>(new Set());
+  const sessionKeyRef = useRef<string | null>(sessionKey);
 
   useEffect(() => {
     if (!enabled) {
+      itemsRef.current = [];
       setItems([]);
       return;
+    }
+
+    if (sessionKeyRef.current !== sessionKey) {
+      sessionKeyRef.current = sessionKey;
+      itemsRef.current = [];
+      seenIdsRef.current = new Set();
     }
 
     const thread = runtime?.threads?.main;
@@ -217,11 +234,54 @@ export function useThreadRepoItems(
     const readExport = () => {
       if (!isMounted) return;
       try {
-        const exportValue = thread.export();
-        const rawItems = Array.isArray(exportValue?.messages) ? exportValue.messages : [];
+        const previousSnapshot: SessionThreadExport = {
+          headId: null,
+          messages: itemsRef.current.map((item) => ({
+            parentId: item.parentId,
+            message: item.message as unknown as Record<string, unknown>,
+          })),
+        };
+
+        let runtimeSnapshot: SessionThreadExport | null = null;
+        try {
+          const exportValue = thread.export();
+          const rawItems = Array.isArray(exportValue?.messages) ? exportValue.messages : [];
+          runtimeSnapshot = {
+            headId: exportValue?.headId ?? null,
+            messages: rawItems.map((item) => ({
+              parentId: item.parentId,
+              message: item.message as unknown as Record<string, unknown>,
+            })),
+          };
+        } catch {
+          // A newly mounted Canvas can briefly see a remote-thread placeholder.
+        }
+
+        const repositorySnapshot = mergeSessionSnapshotRepositories(
+          persistedSnapshot,
+          previousSnapshot,
+          runtimeSnapshot,
+        );
+
+        let visibleBranch: Record<string, unknown>[] = [];
+        try {
+          visibleBranch = thread
+            .getState()
+            .messages.map(
+              (message) => message as unknown as Record<string, unknown>,
+            );
+        } catch {
+          // The persisted repository remains sufficient while runtime state mounts.
+        }
+
+        const mergedSnapshot = mergeRuntimeBranchIntoSessionSnapshot(
+          repositorySnapshot,
+          visibleBranch,
+        );
+        const nextItems = mergedSnapshot.messages as unknown as ThreadRepoItem[];
 
         // Record model/provider once per message (without mutating message data).
-        rawItems.forEach((item) => {
+        nextItems.forEach((item) => {
           const id = item.message?.id;
           if (!id) return;
           if (seenIdsRef.current.has(id)) return;
@@ -239,7 +299,8 @@ export function useThreadRepoItems(
           }
         });
 
-        setItems(rawItems);
+        itemsRef.current = nextItems;
+        setItems(nextItems);
       } catch {
         if (isMounted) setItems([]);
       }
@@ -251,8 +312,10 @@ export function useThreadRepoItems(
     THREAD_EVENTS.forEach((event) => {
       unsubscribes.push(thread.unstable_on(event, readExport));
     });
+    window.addEventListener(SESSION_RUNTIME_CHANGED_EVENT, readExport);
 
     return () => {
+      window.removeEventListener(SESSION_RUNTIME_CHANGED_EVENT, readExport);
       isMounted = false;
       unsubscribes.forEach((unsubscribe) => {
         try {
@@ -262,6 +325,13 @@ export function useThreadRepoItems(
         }
       });
     };
-  }, [enabled, runtime, defaultModelId, defaultProvider]);
+  }, [
+    defaultModelId,
+    defaultProvider,
+    enabled,
+    persistedSnapshot,
+    runtime,
+    sessionKey,
+  ]);
   return useMemo(() => normalizeThreadRepoItems(items), [items]);
 }

@@ -60,6 +60,7 @@ export const ArtifactGraphNode = memo(({ data, selected, dragging }: NodeProps<T
 
   return (
     <div
+      data-memory-type={data.memoryType ?? undefined}
       className={[
         "group relative min-w-[300px] max-w-[340px] rounded-2xl border bg-background p-px shadow-[0_18px_42px_-30px_rgba(15,23,42,0.4)] transition-all",
         selected ? "ring-2 ring-ring/60" : "ring-1 ring-border/50",

@@ -45,6 +45,17 @@ type UpdateArtifact = (
   },
 ) => void;
 
+type UpdateArtifactAndPersist = (
+  artifactId: string,
+  patch: ArtifactPatch,
+  options?: {
+    revisionOrigin?: SessionArtifactRevisionOrigin;
+    revisionAuthor?: "model" | "user";
+    promptId?: string | null;
+    responseId?: string | null;
+  },
+) => Promise<void>;
+
 type ApplyCompletedResponse = (input: {
   promptId: string;
   responseId: string;
@@ -110,6 +121,7 @@ export function useCanvasRunManager({
   prompts,
   provider,
   updateArtifact,
+  updateArtifactAndPersist,
 }: {
   applyCompletedResponse: ApplyCompletedResponse;
   artifacts: SessionArtifact[];
@@ -120,6 +132,7 @@ export function useCanvasRunManager({
   prompts: SessionArtifact[];
   provider: ModelProvider;
   updateArtifact: UpdateArtifact;
+  updateArtifactAndPersist?: UpdateArtifactAndPersist;
 }) {
   const concurrency = normalizeCanvasRunConcurrency(maxConcurrent);
   const queueRef = React.useRef<PendingCanvasRun[]>([]);
@@ -130,6 +143,12 @@ export function useCanvasRunManager({
   const artifactIndexRef = React.useRef(new Map<string, SessionArtifact>());
   const linksRef = React.useRef<SessionCanvasLink[]>(canvasLinks);
   const updateArtifactRef = React.useRef(updateArtifact);
+  const updateArtifactAndPersistRef = React.useRef<UpdateArtifactAndPersist>(
+    updateArtifactAndPersist ??
+      (async (...args) => {
+        updateArtifact(...args);
+      }),
+  );
   const applyCompletedResponseRef = React.useRef(applyCompletedResponse);
   const pumpRef = React.useRef<() => void>(() => {});
   const [counts, setCounts] = React.useState({ active: 0, queued: 0 });
@@ -149,6 +168,14 @@ export function useCanvasRunManager({
   React.useEffect(() => {
     updateArtifactRef.current = updateArtifact;
   }, [updateArtifact]);
+
+  React.useEffect(() => {
+    updateArtifactAndPersistRef.current =
+      updateArtifactAndPersist ??
+      (async (...args) => {
+        updateArtifact(...args);
+      });
+  }, [updateArtifact, updateArtifactAndPersist]);
 
   React.useEffect(() => {
     applyCompletedResponseRef.current = applyCompletedResponse;
@@ -211,7 +238,7 @@ export function useCanvasRunManager({
           responseId: spec.runId,
           text,
         });
-        updateArtifactRef.current(spec.promptId, {
+        await updateArtifactAndPersistRef.current(spec.promptId, {
           promptCompletedAt: new Date().toISOString(),
           promptError: null,
           promptModel: payload.modelId || spec.model,
@@ -223,7 +250,7 @@ export function useCanvasRunManager({
       } catch (error) {
         const aborted = controller.signal.aborted ||
           (error instanceof DOMException && error.name === "AbortError");
-        updateArtifactRef.current(spec.promptId, {
+        await updateArtifactAndPersistRef.current(spec.promptId, {
           promptCompletedAt: new Date().toISOString(),
           promptError: aborted
             ? "Run cancelled."

@@ -1,6 +1,6 @@
 "use client";
 
-import { AssistantRuntimeProvider } from "@assistant-ui/react";
+import { AssistantRuntimeProvider, useAuiState } from "@assistant-ui/react";
 import { useChatRuntime } from "@assistant-ui/react-ai-sdk";
 import dynamic from "next/dynamic";
 import { LinkEditorProvider } from "@/components/context/link-editor";
@@ -34,6 +34,7 @@ import {
   getRequestErrorMessageFromThrowable,
 } from "@/lib/llm/request-errors";
 import { rememberMessageLatencyEntry } from "@/lib/message-latency-registry";
+import { notifySessionRuntimeChanged } from "@/lib/session-persist-sync";
 import { GraphBranchIntentProvider } from "@/components/context/graph-branch-intent";
 import { clearPostAuthHandoff, hasPostAuthChatHandoff } from "@/lib/client/post-auth-handoff";
 
@@ -67,6 +68,29 @@ const ProjectWorkspace = dynamic(
     ssr: false,
   },
 );
+
+function SessionRuntimePersistenceSignal() {
+  const messages = useAuiState((state) => state.thread.messages);
+  const contentSignature = React.useMemo(
+    () =>
+      JSON.stringify(
+        messages.map((message) => ({
+          content: message.content,
+          id: message.id,
+          role: message.role,
+          status: message.status,
+        })),
+      ),
+    [messages],
+  );
+
+  React.useEffect(() => {
+    if (messages.length === 0) return;
+    notifySessionRuntimeChanged();
+  }, [contentSignature, messages.length]);
+
+  return null;
+}
 
 function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
   const { historyMode, modelConfig, setModelConfig } = useSessionUiState();
@@ -200,6 +224,7 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
 
   return (
     <AssistantRuntimeProvider runtime={rawRuntime}>
+      <SessionRuntimePersistenceSignal />
       <PersistedSessionRuntimeBridge />
       <RequestErrorProvider
         value={{

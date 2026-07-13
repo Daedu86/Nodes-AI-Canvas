@@ -8,7 +8,12 @@ import type { UIMessage } from "ai";
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
 import type { SessionThreadExport } from "@/lib/session-documents";
 import {
+  mergeRuntimeBranchIntoSessionSnapshot,
+  mergeSessionSnapshotRepositories,
+} from "@/lib/session-runtime-snapshot";
+import {
   FORCE_PERSIST_SESSION_EVENT,
+  SESSION_RUNTIME_CHANGED_EVENT,
   markSessionPersistPending,
   registerSessionPersistHandler,
   markSessionPersistSettled,
@@ -20,6 +25,7 @@ const THREAD_EVENTS = [
   "runEnd",
   "modelContextUpdate",
 ] as const;
+
 type ForcePersistEventDetail = {
   resolve?: () => void;
 };
@@ -65,47 +71,132 @@ const isUiMessageLike = (value: unknown): value is UIMessage =>
   (value.role === "user" || value.role === "assistant" || value.role === "system") &&
   Array.isArray((value as { parts?: unknown }).parts);
 
-const isExternalStateSnapshot = (snapshot: SessionThreadExport) =>
-  snapshot.messages.some((entry) => isUiMessageLike(entry.message));
+const toUiMessagePart = (value: unknown): Record<string, unknown> | null => {
+  if (!isRecord(value) || typeof value.type !== "string") return null;
+  if (value.type === "text" || value.type === "reasoning") {
+    return typeof value.text === "string"
+      ? { type: value.type, text: value.text }
+      : null;
+  }
+  if (value.type === "image") {
+    const url =
+      typeof value.image === "string"
+        ? value.image
+        : typeof value.url === "string"
+          ? value.url
+          : null;
+    if (!url) return null;
+    return {
+      type: "file",
+      url,
+      mediaType:
+        typeof value.mediaType === "string"
+          ? value.mediaType
+          : typeof value.mimeType === "string"
+            ? value.mimeType
+            : "image/*",
+      ...(typeof value.filename === "string" ? { filename: value.filename } : {}),
+    };
+  }
+  if (value.type === "file") {
+    const url =
+      typeof value.url === "string"
+        ? value.url
+        : typeof value.data === "string"
+          ? value.data
+          : typeof value.content === "string"
+            ? value.content
+            : null;
+    const mediaType =
+      typeof value.mediaType === "string"
+        ? value.mediaType
+        : typeof value.mimeType === "string"
+          ? value.mimeType
+          : null;
+    if (!url || !mediaType) return null;
+    return {
+      type: "file",
+      url,
+      mediaType,
+      ...(typeof value.filename === "string"
+        ? { filename: value.filename }
+        : typeof value.name === "string"
+          ? { filename: value.name }
+          : {}),
+    };
+  }
+  return null;
+};
+
+const toUiMessage = (value: unknown): UIMessage | null => {
+  if (isUiMessageLike(value)) return value;
+  if (!isRecord(value) || typeof value.id !== "string") return null;
+  if (value.role !== "user" && value.role !== "assistant" && value.role !== "system") {
+    return null;
+  }
+  const sourceParts = Array.isArray(value.parts)
+    ? value.parts
+    : Array.isArray(value.content)
+      ? value.content
+      : typeof value.content === "string"
+        ? [{ type: "text", text: value.content }]
+        : [];
+  const parts = sourceParts
+    .map(toUiMessagePart)
+    .filter((part): part is Record<string, unknown> => part !== null);
+  if (parts.length === 0) return null;
+  return {
+    id: value.id,
+    role: value.role,
+    parts,
+    ...(isRecord(value.metadata) ? { metadata: value.metadata } : {}),
+  } as unknown as UIMessage;
+};
 
 const toExternalStateRepository = (
   snapshot: SessionThreadExport,
 ): MessageFormatRepository<UIMessage> => ({
   headId: snapshot.headId ?? null,
-  messages: snapshot.messages
-    .filter((entry) => isUiMessageLike(entry.message))
-    .map((entry) => ({
-      parentId: entry.parentId,
-      message: entry.message as unknown as UIMessage,
-    })),
+  messages: snapshot.messages.flatMap((entry) => {
+    const message = toUiMessage(entry.message);
+    return message ? [{ parentId: entry.parentId, message }] : [];
+  }),
 });
 
-const exportExternalStateAsSnapshot = (
-  thread: AssistantRuntime["threads"]["main"],
-): SessionThreadExport | null => {
-  try {
-    const exported = (thread as unknown as { exportExternalState?: () => MessageFormatRepository<UIMessage> })
-      .exportExternalState?.();
-    if (!exported || !Array.isArray(exported.messages)) {
-      return null;
-    }
-    return {
-      headId: exported.headId ?? null,
-      messages: exported.messages.map((item) => ({
-        parentId: item.parentId ?? null,
-        message: item.message as unknown as Record<string, unknown>,
-      })),
-    };
-  } catch {
-    return null;
-  }
-};
+const canImportAsExternalState = (snapshot: SessionThreadExport) =>
+  snapshot.messages.length > 0 &&
+  toExternalStateRepository(snapshot).messages.length === snapshot.messages.length;
 
 const toComparableSnapshot = (snapshot: SessionThreadExport) => ({
   headId: snapshot.headId ?? null,
   messages: snapshot.messages.map((entry) => ({
     parentId: entry.parentId,
     message: entry.message,
+  })),
+});
+
+const getHydrationText = (message: Record<string, unknown>) => {
+  const parts = Array.isArray(message.parts)
+    ? message.parts
+    : Array.isArray(message.content)
+      ? message.content
+      : typeof message.content === "string"
+        ? [{ type: "text", text: message.content }]
+        : [];
+  return parts
+    .flatMap((part) =>
+      isRecord(part) && typeof part.text === "string" ? [part.text] : [],
+    )
+    .join("\n");
+};
+
+const toHydrationComparableSnapshot = (snapshot: SessionThreadExport) => ({
+  headId: snapshot.headId ?? null,
+  messages: snapshot.messages.map((entry) => ({
+    parentId: entry.parentId,
+    id: typeof entry.message.id === "string" ? entry.message.id : null,
+    role: typeof entry.message.role === "string" ? entry.message.role : null,
+    text: isRecord(entry.message) ? getHydrationText(entry.message) : "",
   })),
 });
 
@@ -143,12 +234,37 @@ const toPersistedSnapshot = (snapshot: ThreadExport): SessionThreadExport => ({
   })),
 });
 
+const exportRuntimeSnapshot = (
+  thread: AssistantRuntime["threads"]["main"],
+): SessionThreadExport => {
+  let repositorySnapshot: SessionThreadExport | null = null;
+  try {
+    repositorySnapshot = toPersistedSnapshot(thread.export());
+  } catch {
+    // The runtime can temporarily be a remote-thread placeholder during mount.
+  }
+
+  let runtimeBranch: Record<string, unknown>[] = [];
+  try {
+    runtimeBranch = thread
+      .getState()
+      .messages.filter((message) => isRecord(message))
+      .map((message) => normalizeAssistantStatusForPersistence(message));
+  } catch {
+    // Keep the repository export as the fallback when state is not ready yet.
+  }
+
+  return mergeRuntimeBranchIntoSessionSnapshot(repositorySnapshot, runtimeBranch);
+};
+
 export function PersistedSessionRuntimeBridge() {
   const runtime = useAssistantRuntime();
   const { activeSession, saveActiveSessionSnapshot } = usePersistedSessions();
   const activeSessionId = activeSession?.id ?? null;
   const activeSessionSnapshot = activeSession?.snapshot ?? null;
   const importedSessionIdRef = React.useRef<string | null>(null);
+  const latestPersistedSessionIdRef = React.useRef<string | null>(null);
+  const latestPersistedSnapshotRef = React.useRef<SessionThreadExport | null>(null);
   const saveTimeoutRef = React.useRef<number | null>(null);
   const importTimeoutRef = React.useRef<number | null>(null);
   const lastSavedSignatureRef = React.useRef<string | null>(null);
@@ -164,8 +280,29 @@ export function PersistedSessionRuntimeBridge() {
     if (!runtime || !activeSessionId || !activeSessionSnapshot) return;
     let cancelled = false;
 
-    const sanitizedSnapshot = sanitizePersistedSnapshot(activeSessionSnapshot);
+    const incomingSnapshot = sanitizePersistedSnapshot(activeSessionSnapshot);
+    const sanitizedSnapshot =
+      latestPersistedSessionIdRef.current === activeSessionId
+        ? mergeSessionSnapshotRepositories(
+            latestPersistedSnapshotRef.current,
+            incomingSnapshot,
+          )
+        : incomingSnapshot;
+    latestPersistedSessionIdRef.current = activeSessionId;
+    latestPersistedSnapshotRef.current = sanitizedSnapshot;
     const nextSignature = JSON.stringify(toComparableSnapshot(sanitizedSnapshot));
+    const nextHydrationSignature = JSON.stringify(
+      toHydrationComparableSnapshot(sanitizedSnapshot),
+    );
+
+    // Snapshot updates for the currently mounted session are acknowledgements of
+    // local saves, not navigation events. Re-importing them while Assistant UI is
+    // creating a branch can invalidate the message lookup indexes.
+    if (importedSessionIdRef.current === activeSessionId) {
+      lastSavedSignatureRef.current = nextSignature;
+      return;
+    }
+
     const clearImportRetry = () => {
       if (importTimeoutRef.current !== null) {
         window.clearTimeout(importTimeoutRef.current);
@@ -189,9 +326,10 @@ export function PersistedSessionRuntimeBridge() {
 
       try {
         const currentPersisted =
-          exportExternalStateAsSnapshot(runtime.threads.main) ??
-          toPersistedSnapshot(runtime.threads.main.export());
-        const runtimeSignature = JSON.stringify(toComparableSnapshot(currentPersisted));
+          exportRuntimeSnapshot(runtime.threads.main);
+        const runtimeSignature = JSON.stringify(
+          toHydrationComparableSnapshot(currentPersisted),
+        );
         const switchingSessions = importedSessionIdRef.current !== activeSessionId;
         if (runActiveRef.current && !switchingSessions) {
           scheduleImportRetry();
@@ -199,7 +337,7 @@ export function PersistedSessionRuntimeBridge() {
         }
         const safeToHydrate = switchingSessions || currentPersisted.messages.length === 0;
 
-        if (runtimeSignature === nextSignature) {
+        if (runtimeSignature === nextHydrationSignature) {
           importedSessionIdRef.current = activeSessionId;
           lastSavedSignatureRef.current = nextSignature;
           clearImportRetry();
@@ -211,17 +349,20 @@ export function PersistedSessionRuntimeBridge() {
           return;
         }
 
-        if (isExternalStateSnapshot(sanitizedSnapshot)) {
-          runtime.threads.main.importExternalState(toExternalStateRepository(sanitizedSnapshot));
+        if (canImportAsExternalState(sanitizedSnapshot)) {
+          runtime.threads.main.importExternalState(
+            toExternalStateRepository(sanitizedSnapshot),
+          );
         } else {
           runtime.threads.main.import(toRuntimeSnapshot(sanitizedSnapshot));
         }
 
         const importedPersisted =
-          exportExternalStateAsSnapshot(runtime.threads.main) ??
-          toPersistedSnapshot(runtime.threads.main.export());
-        const importedSignature = JSON.stringify(toComparableSnapshot(importedPersisted));
-        if (importedSignature === nextSignature) {
+          exportRuntimeSnapshot(runtime.threads.main);
+        const importedSignature = JSON.stringify(
+          toHydrationComparableSnapshot(importedPersisted),
+        );
+        if (importedSignature === nextHydrationSignature) {
           importedSessionIdRef.current = activeSessionId;
           lastSavedSignatureRef.current = nextSignature;
           clearImportRetry();
@@ -245,6 +386,20 @@ export function PersistedSessionRuntimeBridge() {
   React.useEffect(() => {
     if (!runtime || !activeSessionId) return;
     const thread = runtime.threads.main;
+    const readMergedPersistedSnapshot = () => {
+      const exportedSnapshot = exportRuntimeSnapshot(thread);
+      const persistedSnapshot = sanitizePersistedSnapshot(
+        mergeSessionSnapshotRepositories(
+          latestPersistedSessionIdRef.current === activeSessionId
+            ? latestPersistedSnapshotRef.current
+            : null,
+          exportedSnapshot,
+        ),
+      );
+      latestPersistedSessionIdRef.current = activeSessionId;
+      latestPersistedSnapshotRef.current = persistedSnapshot;
+      return persistedSnapshot;
+    };
     const unregisterForcePersistHandler = registerSessionPersistHandler();
 
     const resolvePendingForcePersists = () => {
@@ -263,8 +418,7 @@ export function PersistedSessionRuntimeBridge() {
         window.clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
       }
-      const persistedSnapshot =
-        exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
+      const persistedSnapshot = readMergedPersistedSnapshot();
       const signature = JSON.stringify(toComparableSnapshot(persistedSnapshot));
 
       // Local fallback cache: helps restore conversation state if the user closes/navigates
@@ -296,8 +450,7 @@ export function PersistedSessionRuntimeBridge() {
 
       // Cache immediately so a fast close/reopen can restore even if the server PATCH is interrupted.
       try {
-        const persistedSnapshot =
-          exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
+        const persistedSnapshot = readMergedPersistedSnapshot();
         writeSnapshotCacheIfNewer(activeSessionId, persistedSnapshot);
       } catch {
         // ignore cache errors
@@ -326,14 +479,8 @@ export function PersistedSessionRuntimeBridge() {
     unsubscribes.push(
       thread.unstable_on("runEnd", () => {
         runActiveRef.current = false;
-        // Flush immediately at run end so reopening the app right after a reply
-        // still restores the latest conversation state.
-        void flush({ allowEmptyOverride: true }).finally(() => {
-          if (pendingForcePersistResolversRef.current.length === 0) {
-            return;
-          }
-          resolvePendingForcePersists();
-        });
+        scheduleFlush();
+        resolvePendingForcePersists();
       }),
     );
     const handleForcePersist = (event: Event) => {
@@ -348,7 +495,15 @@ export function PersistedSessionRuntimeBridge() {
         detail?.resolve?.();
       });
     };
+    const handleRuntimeChanged = () => {
+      // The rendered Assistant UI branch is the source of truth even when the
+      // adapter leaves run lifecycle flags stale after the stream has rendered.
+      runActiveRef.current = false;
+      scheduleFlush();
+      resolvePendingForcePersists();
+    };
     window.addEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
+    window.addEventListener(SESSION_RUNTIME_CHANGED_EVENT, handleRuntimeChanged);
 
     // Best-effort persistence when the tab/app is backgrounded or closed.
     // This addresses "messages disappeared after reopening" by using fetch keepalive on PATCH.
@@ -375,6 +530,7 @@ export function PersistedSessionRuntimeBridge() {
         saveTimeoutRef.current = null;
       }
       window.removeEventListener(FORCE_PERSIST_SESSION_EVENT, handleForcePersist);
+      window.removeEventListener(SESSION_RUNTIME_CHANGED_EVENT, handleRuntimeChanged);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("pagehide", handlePageHide);
       unsubscribes.forEach((unsubscribe) => {

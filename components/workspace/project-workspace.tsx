@@ -287,11 +287,16 @@ export function ProjectWorkspace() {
 
   const attachedMemoryItems = React.useMemo(() => {
     if (!activeProject) return [];
-    if (Array.isArray(activeProject.attachedMemoryItems)) {
-      return activeProject.attachedMemoryItems;
-    }
     const attached = new Set(activeProject.memoryIds);
-    return memoryItems.filter((item) => attached.has(item.id));
+    const byId = new Map(
+      (activeProject.attachedMemoryItems ?? [])
+        .filter((item) => attached.has(item.id))
+        .map((item) => [item.id, item] as const),
+    );
+    memoryItems.forEach((item) => {
+      if (attached.has(item.id)) byId.set(item.id, item);
+    });
+    return [...byId.values()];
   }, [activeProject, memoryItems]);
 
   const availableMemoryItems = React.useMemo(() => {

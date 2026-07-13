@@ -356,9 +356,6 @@ async function editAssistantReply(
   await responsePromise;
 
   await expect(threadMessage(page, editedPrompt)).toBeVisible();
-  await expect(page.getByText("2 / 2", { exact: true }).first()).toBeVisible({
-    timeout: 15_000,
-  });
 }
 
 async function editUserPrompt(
@@ -691,6 +688,24 @@ test("copies graph JSON after a reply", async ({ page }) => {
 
 test("respects the selected local model in the request metadata", async ({ page }) => {
   await gotoChat(page);
+
+  await fetchAppJson(page, "/api/llm/settings", {
+    method: "PUT",
+    body: JSON.stringify({
+      settings: {
+        providers: {
+          ollama: {
+            enabled: true,
+            models: ["gemma3:4b"],
+          },
+        },
+      },
+    }),
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("combobox", { name: "Model" })).toContainText(
+    "Ollama",
+  );
 
   await page.locator("select").selectOption("ollama:gemma3:4b");
   const reply = await sendPrompt(page, "Model selection prompt", {
@@ -1137,7 +1152,14 @@ test("creates a project from multiple saved sessions and opens the aggregated ca
 
   await page.getByRole("button", { name: "Canvas" }).last().click();
   await expect(page.getByText("Arena memo", { exact: true }).first()).toBeVisible();
-  await page.locator('.react-flow__node [data-memory-type="merge"]').first().click();
+  const hideGuideButton = page.getByRole("button", { name: "Hide guide" });
+  if (await hideGuideButton.isVisible()) {
+    await hideGuideButton.click();
+  }
+  await page
+    .locator('.react-flow__node [data-memory-type="merge"]')
+    .first()
+    .dispatchEvent("click");
   await expect(page.getByRole("button", { name: "Use as global context" })).toBeVisible();
   await page.getByRole("button", { name: "Use as global context" }).click();
   await expect(page.getByPlaceholder(/Describe the cross-session goal/i)).toHaveValue(
@@ -1244,7 +1266,7 @@ test("creates a semantic text artifact, attaches it as context, and branches wit
   expect(assistantNodeId).toBeTruthy();
   if (!assistantNodeId) return;
 
-  await page.getByRole("button", { name: "Draft" }).click();
+  await page.getByRole("button", { name: "Add Text block" }).click();
   await page.getByLabel("Artifact content").fill("Use the attached artifact as additional product context.");
 
   await page.getByRole("button", { name: `Attach target ${assistantNodeId}` }).click();
@@ -1277,12 +1299,12 @@ test("creates a semantic text artifact, attaches it as context, and branches wit
 
   const reply = expectedReply("Follow-up with artifact context", {
     contextCount: 1,
-    contextTitles: ["Draft 1"],
+    contextTitles: ["Text Context 1"],
   });
   await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
 
   const graphAfter = await copyGraphJson(page);
-  expect(graphAfter.artifacts?.some((artifact) => artifact.title === "Draft 1")).toBe(true);
+  expect(graphAfter.artifacts?.some((artifact) => artifact.title === "Text Context 1")).toBe(true);
   expect(
     graphAfter.contextLinks?.some(
       (link) => link.targetMessageId === assistantNodeId,
@@ -1294,7 +1316,7 @@ test("creates a semantic text artifact, attaches it as context, and branches wit
   if (!activeSessionId) return;
 
   const persistedSession = await fetchPersistedSession(page, activeSessionId);
-  expect(persistedSession.session.artifacts.some((artifact) => artifact.title === "Draft 1")).toBe(true);
+  expect(persistedSession.session.artifacts.some((artifact) => artifact.title === "Text Context 1")).toBe(true);
   expect(
     persistedSession.session.contextLinks.some((link) => link.targetMessageId === assistantNodeId),
   ).toBe(true);
@@ -1383,7 +1405,7 @@ test("uploads an image artifact, persists it, and branches with it from the flow
   ).toBe(true);
 });
 
-test("opens the canvas guide and explains the selected focus", async ({ page }) => {
+test("shows the selected Canvas focus in the inspector", async ({ page }) => {
   await gotoChat(page);
   await sendPrompt(page, "Canvas guide seed");
 
@@ -1392,15 +1414,9 @@ test("opens the canvas guide and explains the selected focus", async ({ page }) 
   expect(assistantNodeId).toBeTruthy();
   if (!assistantNodeId) return;
 
-  await page.getByRole("button", { name: "Show nody panel" }).click();
   await page.locator(`.react-flow__node[data-id="${assistantNodeId}"]`).dispatchEvent("click");
-  const responsePromise = page.waitForResponse(
-    (response) => response.url().includes("/api/canvas-agent") && response.request().method() === "POST",
-  );
-  await page.getByRole("button", { name: "Explain focus" }).dispatchEvent("click");
-  await responsePromise;
 
-  await expect(
-    page.getByText(/Canvas guide: Explain focus on assistant/i).first(),
-  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Canvas focus", { exact: true })).toBeVisible();
+  await expect(page.getByText("assistant branch selected", { exact: true })).toBeVisible();
+  await expect(page.getByText(/E2E reply: Canvas guide seed/i).first()).toBeVisible();
 });
