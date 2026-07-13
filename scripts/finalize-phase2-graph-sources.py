@@ -164,32 +164,46 @@ replace_once(
 
         // Record model/provider once per message (without mutating message data).
         rawItems.forEach((item) => {''',
-    '''        const exportValue = thread.export();
-        const rawItems = Array.isArray(exportValue?.messages) ? exportValue.messages : [];
-        const previousSnapshot: SessionThreadExport = {
+    '''        const previousSnapshot: SessionThreadExport = {
           headId: null,
           messages: itemsRef.current.map((item) => ({
             parentId: item.parentId,
             message: item.message as unknown as Record<string, unknown>,
           })),
         };
-        const runtimeSnapshot: SessionThreadExport = {
-          headId: exportValue?.headId ?? null,
-          messages: rawItems.map((item) => ({
-            parentId: item.parentId,
-            message: item.message as unknown as Record<string, unknown>,
-          })),
-        };
+
+        let runtimeSnapshot: SessionThreadExport | null = null;
+        try {
+          const exportValue = thread.export();
+          const rawItems = Array.isArray(exportValue?.messages) ? exportValue.messages : [];
+          runtimeSnapshot = {
+            headId: exportValue?.headId ?? null,
+            messages: rawItems.map((item) => ({
+              parentId: item.parentId,
+              message: item.message as unknown as Record<string, unknown>,
+            })),
+          };
+        } catch {
+          // A newly mounted Canvas can briefly see a remote-thread placeholder.
+        }
+
         const repositorySnapshot = mergeSessionSnapshotRepositories(
           persistedSnapshot,
           previousSnapshot,
           runtimeSnapshot,
         );
-        const visibleBranch = thread
-          .getState()
-          .messages.map(
-            (message) => message as unknown as Record<string, unknown>,
-          );
+
+        let visibleBranch: Record<string, unknown>[] = [];
+        try {
+          visibleBranch = thread
+            .getState()
+            .messages.map(
+              (message) => message as unknown as Record<string, unknown>,
+            );
+        } catch {
+          // The persisted repository remains sufficient while runtime state mounts.
+        }
+
         const mergedSnapshot = mergeRuntimeBranchIntoSessionSnapshot(
           repositorySnapshot,
           visibleBranch,
