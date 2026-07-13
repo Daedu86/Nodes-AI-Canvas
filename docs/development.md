@@ -81,13 +81,15 @@ npm run typecheck
 npm test
 npm run test:coverage
 npm run test:critical-coverage
+npm run benchmark:canvas:budget
+npm run benchmark:canvas
 npm run build
 npm run test:e2e
 ```
 
 `format` applies the autofixes supplied by the repository's ESLint configuration. `format:check` is the non-mutating form used by CI.
 
-`npm run check` runs formatting/lint validation, TypeScript, repository coverage, and critical-module coverage. `npm run test:ci` adds the Playwright suite with one worker.
+`npm run check` runs formatting/lint validation, TypeScript, repository coverage, and critical-module coverage. `npm run test:ci` adds the Playwright suite with one worker for a deterministic local run.
 
 Coverage uses V8 and enforces the thresholds in `vitest.config.ts` and `vitest.critical.config.ts`. The run writes:
 
@@ -96,7 +98,18 @@ Coverage uses V8 and enforces the thresholds in `vitest.config.ts` and `vitest.c
 - `coverage/critical/index.html` for critical-module inspection.
 - a text summary in the terminal.
 
-GitHub Actions runs linting, type checking, unit and critical coverage, a production build, dependency audits, and Playwright end-to-end tests. Vercel performs an additional deployment build for previews and production.
+## Canvas performance
+
+`npm run benchmark:canvas:budget` builds a quarter-size graph and the standard benchmark graph, then checks both an absolute median duration and the scaling ratio between the two workloads. The default limits are intentionally broad enough for shared CI runners:
+
+- `CANVAS_FLOW_MAX_MEDIAN_MS=10000`
+- `CANVAS_FLOW_MAX_SCALE_RATIO=30`
+
+Override either environment variable when calibrating a specific machine. Tighten the committed CI limits only after several stable runs demonstrate a lower sustainable baseline.
+
+`npm run benchmark:canvas` runs the Tinybench suite for 1,000 messages, 300 artifacts/prompts, and 2,000 links. It writes the machine-readable report to `test-results/canvas-benchmark.json`.
+
+GitHub Actions runs linting, type checking, unit and critical coverage, the Canvas performance budget, a production build, dependency audits, and Playwright end-to-end tests across two isolated shards. The Canvas JSON report is retained as a workflow artifact for 14 days. Vercel performs an additional deployment build for previews and production.
 
 ## Contribution workflow
 
