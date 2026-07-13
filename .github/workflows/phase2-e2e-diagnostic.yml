@@ -21,7 +21,7 @@ env:
   AUTH_ENABLE_DEV_CREDENTIALS: "0"
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
-  PHASE2_REVISION: "3"
+  PHASE2_REVISION: "4"
   PLAYWRIGHT_RUN_ID: phase2-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
@@ -51,13 +51,12 @@ jobs:
         run: |
           npx eslint \
             components/context/persisted-session-runtime-bridge.tsx \
-            lib/session-snapshot-preference.ts \
-            tests/session-snapshot-preference.test.ts \
+            tests/session-run-end-persistence.test.ts \
             --fix
           git diff --check
           npm run format:check
           npm run typecheck
-          npx vitest run tests/session-snapshot-preference.test.ts
+          npx vitest run tests/session-run-end-persistence.test.ts
 
       - name: Install Chromium
         run: npx playwright install chromium
@@ -169,7 +168,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: phase2-persistence-repair
+          name: phase2-run-end-persistence
           path: |
             phase2-*-report.json
             phase2-*-stderr.log
@@ -188,18 +187,20 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
 
           if [ "$exit_code" = "0" ]; then
-            git rm \
+            git rm -f --ignore-unmatch \
               .github/workflows/phase2-e2e-diagnostic.yml \
               scripts/apply-phase2-persistence-fix.py \
-              phase2-status.json
+              phase2-status.json \
+              phase2-assistant-ui-api.txt \
+              phase2-runtime-source.txt \
+              phase2-e2e-summary.json
             git add \
               components/context/persisted-session-runtime-bridge.tsx \
-              lib/session-snapshot-preference.ts \
-              tests/session-snapshot-preference.test.ts
-            git commit -m "fix: persist complete AI SDK 7 conversation snapshots [skip vercel]"
+              tests/session-run-end-persistence.test.ts
+            git commit -m "fix: persist assistant messages after AI SDK run completion [skip vercel]"
           else
             git add phase2-e2e-summary.json
-            git commit -m "test: record persistence repair E2E result [skip vercel]"
+            git commit -m "test: record delayed persistence E2E result [skip vercel]"
           fi
 
           git pull --rebase origin main
