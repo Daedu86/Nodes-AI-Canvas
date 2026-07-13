@@ -1,9 +1,20 @@
+import { z } from "zod";
 import { ProjectAccessError } from "@/lib/project-collaboration";
 import { ProjectInvitationError } from "@/lib/project-invitation-service";
 import {
   apiError,
   type ApiErrorDescriptor,
 } from "@/lib/server/api-response";
+
+export const projectInvitationTokenBodySchema = z.object({
+  token: z.string().min(1).max(128),
+}).strict();
+
+export const projectNotFoundApiError = {
+  code: "project_not_found",
+  error: "Project not found",
+  status: 404,
+} satisfies ApiErrorDescriptor;
 
 export function projectInvitationErrorResponse(
   error: unknown,
