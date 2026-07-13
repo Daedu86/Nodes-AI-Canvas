@@ -1,4 +1,5 @@
 import { previewProjectInvitationToken } from "@/lib/project-invitation-service";
+import { apiError, jsonNoStore } from "@/lib/server/api-response";
 
 export const runtime = "nodejs";
 
@@ -6,13 +7,11 @@ export async function GET(req: Request) {
   const token = new URL(req.url).searchParams.get("token");
   const preview = await previewProjectInvitationToken(token);
   if (!preview) {
-    return Response.json(
-      { code: "invitation_not_found", error: "The invitation link is invalid." },
-      { status: 404, headers: { "Cache-Control": "no-store" } },
-    );
+    return apiError({
+      code: "invitation_not_found",
+      error: "The invitation link is invalid.",
+      status: 404,
+    });
   }
-  return Response.json(
-    { invitation: preview },
-    { headers: { "Cache-Control": "no-store" } },
-  );
+  return jsonNoStore({ invitation: preview });
 }
