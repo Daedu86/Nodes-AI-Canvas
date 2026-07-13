@@ -1,0 +1,47 @@
+name: Inspect phase 1 workflow status
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/phase1-status-probe.yml
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Inspect phase 1 runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow phase1-chat-e2e-fix.yml \
+            --limit 20 \
+            --json databaseId,status,conclusion,headSha,createdAt,updatedAt,displayTitle,url \
+            > phase1-run-status.json
+          cat phase1-run-status.json
+
+      - name: Publish status and remove probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/phase1-status-probe.yml
+          git add phase1-run-status.json
+          git commit -m "ci: record phase 1 workflow status [skip vercel]"
+          git push origin HEAD:main
