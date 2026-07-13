@@ -278,7 +278,7 @@ export async function executeChatRequest(
         experimental_telemetry: {
           functionId: "nodes.chat",
           isEnabled: process.env.NODES_LLM_OBSERVABILITY !== "0",
-          metadata: {
+          attributes: {
             attemptNumber,
             fallbackApplied,
             modelId: currentModel.modelId,

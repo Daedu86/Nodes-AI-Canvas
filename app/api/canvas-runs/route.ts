@@ -246,7 +246,7 @@ export async function POST(req: Request) {
         experimental_telemetry: {
           functionId: "nodes.canvas-run",
           isEnabled: process.env.NODES_LLM_OBSERVABILITY !== "0",
-          metadata: {
+          attributes: {
             attemptNumber,
             fallbackApplied,
             modelId: currentModel.modelId,
