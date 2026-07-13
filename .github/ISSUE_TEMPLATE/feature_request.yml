@@ -1,0 +1,81 @@
+name: Feature request
+description: Propose a product improvement grounded in a user problem.
+title: "product: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Nodes prioritizes improvements that strengthen exploration, visible context, explicit comparison, reusable decisions, reliability, or safe collaboration. Review the public roadmap before proposing a feature.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I reviewed ROADMAP.md and existing issues.
+          required: true
+        - label: This request describes a user problem, not only a preferred implementation.
+          required: true
+
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Primary product outcome
+      options:
+        - Faster product understanding or onboarding
+        - Better exploration and branching
+        - More useful Canvas context
+        - Clearer Arena comparison
+        - Better project memory or reuse
+        - Safer collaboration
+        - Greater reliability or recovery
+        - Easier deployment or operation
+        - Accessibility or responsive design
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Who experiences the problem, in what situation, and why does it matter?
+      placeholder: When a ... tries to ..., they cannot ... which causes ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Current workaround
+      description: How is the problem handled today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome_description
+    attributes:
+      label: Desired outcome
+      description: Describe what a successful product experience would allow the user to accomplish.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Possible approach
+      description: Optional implementation ideas, interaction details, or references.
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence or demand signal
+      description: User feedback, repeated workflow friction, examples, or measurable impact.
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and trade-offs
+      description: Consider complexity, security, operating cost, data portability, or UI density.
