@@ -264,9 +264,8 @@ describe("PersistedSessionsProvider", () => {
       </PersistedSessionsProvider>,
     );
 
-    expect(await screen.findByRole("alertdialog")).toHaveTextContent(
-      "Session changed elsewhere",
-    );
+    const conflictDialog = await screen.findByRole("alertdialog");
+    expect(conflictDialog.textContent).toContain("Session changed elsewhere");
     fireEvent.click(screen.getByRole("button", { name: "Load latest" }));
 
     await waitFor(() => {
