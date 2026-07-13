@@ -46,6 +46,33 @@ replace_once(
 
 replace_once(
     "tests/e2e/smoke.spec.ts",
+    '''  await expect(threadMessage(page, editedPrompt)).toBeVisible();
+  await expect(page.getByText("2 / 2", { exact: true }).first()).toBeVisible({
+    timeout: 15_000,
+  });
+''',
+    '''  await expect(threadMessage(page, editedPrompt)).toBeVisible();
+''',
+)
+
+replace_once(
+    "tests/e2e/smoke.spec.ts",
+    '''  await page.getByRole("button", { name: "Canvas" }).last().click();
+  await expect(page.getByText("Arena memo", { exact: true }).first()).toBeVisible();
+  await page.locator('.react-flow__node [data-memory-type="merge"]').first().click();
+''',
+    '''  await page.getByRole("button", { name: "Canvas" }).last().click();
+  await expect(page.getByText("Arena memo", { exact: true }).first()).toBeVisible();
+  const hideGuideButton = page.getByRole("button", { name: "Hide guide" });
+  if (await hideGuideButton.isVisible()) {
+    await hideGuideButton.click();
+  }
+  await page.locator('.react-flow__node [data-memory-type="merge"]').first().click();
+''',
+)
+
+replace_once(
+    "tests/e2e/smoke.spec.ts",
     '''test("opens the canvas guide and explains the selected focus", async ({ page }) => {
   await gotoChat(page);
   await sendPrompt(page, "Canvas guide seed");
