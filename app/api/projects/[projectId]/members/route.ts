@@ -1,13 +1,14 @@
 import { z } from "zod";
-import { ProjectAccessError } from "@/lib/project-collaboration";
 import {
   createProjectInvitationForUser,
   ProjectInvitationError,
   removeProjectMemberOrInvitationForUser,
   updateAcceptedProjectMemberForUser,
 } from "@/lib/project-invitation-service";
-import { requireLocalApiUser } from "@/lib/server/request-guards";
+import { jsonNoStore, parseJsonBody } from "@/lib/server/api-response";
+import { projectInvitationErrorResponse } from "@/lib/server/project-invitation-http";
 import { getPublicAppOrigin } from "@/lib/server/public-app-origin";
+import { requireLocalApiUser } from "@/lib/server/request-guards";
 
 const memberSchema = z.object({
   email: z.string().trim().min(3).max(254),
@@ -18,41 +19,27 @@ const removeSchema = z.object({
   email: z.string().trim().min(3).max(254),
 }).strict();
 
+const projectNotFound = {
+  code: "project_not_found",
+  error: "Project not found",
+  status: 404,
+} as const;
+
 type RouteParams = {
   params: Promise<{ projectId: string }>;
 };
 
 export const runtime = "nodejs";
 
-const errorResponse = (error: unknown) => {
-  if (error instanceof ProjectInvitationError) {
-    return Response.json(
-      { code: error.code, error: error.message },
-      { status: error.status, headers: { "Cache-Control": "no-store" } },
-    );
-  }
-  if (error instanceof ProjectAccessError) {
-    return Response.json(
-      { code: "project_access_denied", error: error.message },
-      { status: error.status, headers: { "Cache-Control": "no-store" } },
-    );
-  }
-  return Response.json(
-    { code: "project_not_found", error: "Project not found" },
-    { status: 404, headers: { "Cache-Control": "no-store" } },
-  );
-};
-
 export async function POST(req: Request, context: RouteParams) {
   const guarded = await requireLocalApiUser(req);
   if ("response" in guarded) return guarded.response;
-  const parsed = memberSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return Response.json(
-      { code: "invalid_project_member", error: "Member email and role are required." },
-      { status: 400, headers: { "Cache-Control": "no-store" } },
-    );
-  }
+  const parsed = await parseJsonBody(req, memberSchema, {
+    code: "invalid_project_member",
+    error: "Member email and role are required.",
+    status: 400,
+  });
+  if (!parsed.ok) return parsed.response;
   const { projectId } = await context.params;
   try {
     try {
@@ -62,10 +49,7 @@ export async function POST(req: Request, context: RouteParams) {
         role: parsed.data.role,
         user: guarded.user,
       });
-      return Response.json(
-        { project },
-        { headers: { "Cache-Control": "no-store" } },
-      );
+      return jsonNoStore({ project });
     } catch (error) {
       if (!(error instanceof ProjectInvitationError) || error.code !== "member_not_accepted") {
         throw error;
@@ -79,25 +63,21 @@ export async function POST(req: Request, context: RouteParams) {
       role: parsed.data.role,
       user: guarded.user,
     });
-    return Response.json(result, {
-      status: 201,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return jsonNoStore(result, { status: 201 });
   } catch (error) {
-    return errorResponse(error);
+    return projectInvitationErrorResponse(error, projectNotFound);
   }
 }
 
 export async function DELETE(req: Request, context: RouteParams) {
   const guarded = await requireLocalApiUser(req);
   if ("response" in guarded) return guarded.response;
-  const parsed = removeSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return Response.json(
-      { code: "invalid_project_member", error: "Member email is required." },
-      { status: 400, headers: { "Cache-Control": "no-store" } },
-    );
-  }
+  const parsed = await parseJsonBody(req, removeSchema, {
+    code: "invalid_project_member",
+    error: "Member email is required.",
+    status: 400,
+  });
+  if (!parsed.ok) return parsed.response;
   const { projectId } = await context.params;
   try {
     const project = await removeProjectMemberOrInvitationForUser({
@@ -105,11 +85,8 @@ export async function DELETE(req: Request, context: RouteParams) {
       projectId,
       user: guarded.user,
     });
-    return Response.json(
-      { project },
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    return jsonNoStore({ project });
   } catch (error) {
-    return errorResponse(error);
+    return projectInvitationErrorResponse(error, projectNotFound);
   }
 }
