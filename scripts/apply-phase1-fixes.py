@@ -47,9 +47,11 @@ replace_once(
 
 replace_once(
     "tests/chat-request.test.ts",
-    """    const result = chatRequestBodySchema.safeParse({
+    """  it("accepts the current Assistant UI request envelope", () => {
+    const result = chatRequestBodySchema.safeParse({
       messages: [""",
-    """    const result = chatRequestBodySchema.safeParse({
+    """  it("accepts the current Assistant UI request envelope", () => {
+    const result = chatRequestBodySchema.safeParse({
       id: "request-1",
       trigger: "submit-message",
       messages: [""",
