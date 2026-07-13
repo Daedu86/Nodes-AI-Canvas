@@ -1,16 +1,22 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import { defineConfig } from "eslint/config";
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import nextTypeScript from "eslint-config-next/typescript";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+export default defineConfig([
+  ...nextCoreWebVitals,
+  ...nextTypeScript,
+  {
+    rules: {
+      // Next 16 enables React Compiler advisory rules that were not part of the
+      // repository's previous lint contract. Keep established hooks correctness
+      // rules such as exhaustive-deps, while deferring compiler-specific refactors
+      // to a dedicated change with focused behavioral testing.
+      "react-hooks/preserve-manual-memoization": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
   {
     files: ["tests/e2e/smoke.spec.ts"],
     rules: {
@@ -20,6 +26,4 @@ const eslintConfig = [
       "no-unused-vars": "off",
     },
   },
-];
-
-export default eslintConfig;
+]);
