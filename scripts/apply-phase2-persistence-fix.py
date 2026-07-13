@@ -13,11 +13,82 @@ def replace_once(path: str, old: str, new: str) -> None:
     text = read(path)
     count = text.count(old)
     if count != 1:
-        raise SystemExit(f"Expected one match in {path}, found {count}: {old[:160]!r}")
+        raise SystemExit(f"Expected one match in {path}, found {count}: {old[:180]!r}")
     write(path, text.replace(old, new, 1))
 
 
+def replace_all(path: str, old: str, new: str, expected: int) -> None:
+    text = read(path)
+    count = text.count(old)
+    if count != expected:
+        raise SystemExit(f"Expected {expected} matches in {path}, found {count}: {old[:180]!r}")
+    write(path, text.replace(old, new))
+
+
+Path("lib/session-runtime-snapshot.ts").write_text(
+    '''import type { SessionThreadExport } from "@/lib/session-documents";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isPersistableRuntimeMessage = (
+  message: Record<string, unknown>,
+): message is Record<string, unknown> & { id: string } => {
+  if (typeof message.id !== "string" || message.id.length === 0) return false;
+  const metadata = isRecord(message.metadata) ? message.metadata : null;
+  return metadata?.isOptimistic !== true;
+};
+
+export const mergeRuntimeBranchIntoSessionSnapshot = (
+  repositorySnapshot: SessionThreadExport | null,
+  runtimeBranch: readonly Record<string, unknown>[],
+): SessionThreadExport => {
+  const baseMessages = repositorySnapshot?.messages ?? [];
+  const mergedMessages = baseMessages.map((entry) => ({
+    parentId: entry.parentId,
+    message: entry.message,
+  }));
+  const indexById = new Map<string, number>();
+
+  mergedMessages.forEach((entry, index) => {
+    if (typeof entry.message.id === "string") {
+      indexById.set(entry.message.id, index);
+    }
+  });
+
+  const branchMessages = runtimeBranch.filter(isPersistableRuntimeMessage);
+  branchMessages.forEach((message, index) => {
+    const parentId = index === 0 ? null : branchMessages[index - 1]!.id;
+    const nextEntry = { parentId, message };
+    const existingIndex = indexById.get(message.id);
+
+    if (existingIndex === undefined) {
+      indexById.set(message.id, mergedMessages.length);
+      mergedMessages.push(nextEntry);
+      return;
+    }
+    mergedMessages[existingIndex] = nextEntry;
+  });
+
+  return {
+    headId:
+      branchMessages.at(-1)?.id ??
+      repositorySnapshot?.headId ??
+      null,
+    messages: mergedMessages,
+  };
+};
+''',
+    encoding="utf-8",
+)
+
 bridge = "components/context/persisted-session-runtime-bridge.tsx"
+
+replace_once(
+    bridge,
+    'import type { SessionThreadExport } from "@/lib/session-documents";\n',
+    'import type { SessionThreadExport } from "@/lib/session-documents";\nimport { mergeRuntimeBranchIntoSessionSnapshot } from "@/lib/session-runtime-snapshot";\n',
+)
 
 replace_once(
     bridge,
@@ -35,11 +106,102 @@ replace_once(
   "modelContextUpdate",
 ] as const;
 
-// The AI SDK adapter can emit runEnd before its external message repository has
-// published the final assistant message. Retry briefly so persistence observes
-// the settled repository rather than saving only the user message from runStart.
+// The AI SDK adapter can emit runEnd before its external repository has
+// published the final assistant message. Retry briefly after completion.
 const RUN_END_PERSIST_RETRY_DELAYS_MS = [0, 50, 150, 300, 600] as const;
 ''',
+)
+
+replace_once(
+    bridge,
+    '''const exportExternalStateAsSnapshot = (
+  thread: AssistantRuntime["threads"]["main"],
+): SessionThreadExport | null => {
+  try {
+    const exported = (thread as unknown as { exportExternalState?: () => MessageFormatRepository<UIMessage> })
+      .exportExternalState?.();
+    if (!exported || !Array.isArray(exported.messages)) {
+      return null;
+    }
+    return {
+      headId: exported.headId ?? null,
+      messages: exported.messages.map((item) => ({
+        parentId: item.parentId ?? null,
+        message: item.message as unknown as Record<string, unknown>,
+      })),
+    };
+  } catch {
+    return null;
+  }
+};
+
+''',
+    '',
+)
+
+replace_once(
+    bridge,
+    '''const toPersistedSnapshot = (snapshot: ThreadExport): SessionThreadExport => ({
+  headId: snapshot.headId ?? null,
+  messages: snapshot.messages.map((entry) => ({
+    parentId: entry.parentId,
+    message: isRecord(entry.message)
+      ? normalizeAssistantStatusForPersistence(entry.message)
+      : entry.message,
+  })),
+});
+''',
+    '''const toPersistedSnapshot = (snapshot: ThreadExport): SessionThreadExport => ({
+  headId: snapshot.headId ?? null,
+  messages: snapshot.messages.map((entry) => ({
+    parentId: entry.parentId,
+    message: isRecord(entry.message)
+      ? normalizeAssistantStatusForPersistence(entry.message)
+      : entry.message,
+  })),
+});
+
+const exportRuntimeSnapshot = (
+  thread: AssistantRuntime["threads"]["main"],
+): SessionThreadExport => {
+  let repositorySnapshot: SessionThreadExport | null = null;
+  try {
+    repositorySnapshot = toPersistedSnapshot(thread.export());
+  } catch {
+    // The runtime can temporarily be a remote-thread placeholder during mount.
+  }
+
+  let runtimeBranch: Record<string, unknown>[] = [];
+  try {
+    runtimeBranch = thread
+      .getState()
+      .messages.filter((message) => isRecord(message))
+      .map((message) => normalizeAssistantStatusForPersistence(message));
+  } catch {
+    // Keep the repository export as the fallback when state is not ready yet.
+  }
+
+  return mergeRuntimeBranchIntoSessionSnapshot(
+    repositorySnapshot,
+    runtimeBranch,
+  );
+};
+''',
+)
+
+replace_all(
+    bridge,
+    '''exportExternalStateAsSnapshot(runtime.threads.main) ??
+          toPersistedSnapshot(runtime.threads.main.export())''',
+    '''exportRuntimeSnapshot(runtime.threads.main)''',
+    expected=2,
+)
+
+replace_all(
+    bridge,
+    '''exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export())''',
+    '''exportRuntimeSnapshot(thread)''',
+    expected=2,
 )
 
 replace_once(
@@ -55,73 +217,9 @@ replace_once(
 
 replace_once(
     bridge,
-    '''    const flush = async ({ allowEmptyOverride = false }: { allowEmptyOverride?: boolean } = {}) => {
-      if (saveTimeoutRef.current !== null) {
-        window.clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-      }
-      const persistedSnapshot =
-        exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
-      const signature = JSON.stringify(toComparableSnapshot(persistedSnapshot));
-
-      // Local fallback cache: helps restore conversation state if the user closes/navigates
-      // before the server PATCH completes.
-      writeSnapshotCacheIfNewer(activeSessionId, persistedSnapshot);
-
-      if (
-        !allowEmptyOverride &&
-        persistedSnapshot.messages.length === 0 &&
-        lastSavedSignatureRef.current !== null &&
-        signature !== lastSavedSignatureRef.current
-      ) {
-        return;
-      }
-      if (signature === lastSavedSignatureRef.current) {
-        markSessionPersistSettled();
-        return;
-      }
-      lastSavedSignatureRef.current = signature;
-      try {
-        await saveActiveSessionSnapshotRef.current(persistedSnapshot);
-      } finally {
-        markSessionPersistSettled();
-      }
-    };
+    '''    const scheduleFlush = () => {
 ''',
-    '''    const flush = async ({ allowEmptyOverride = false }: { allowEmptyOverride?: boolean } = {}) => {
-      if (saveTimeoutRef.current !== null) {
-        window.clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = null;
-      }
-      const persistedSnapshot =
-        exportExternalStateAsSnapshot(thread) ?? toPersistedSnapshot(thread.export());
-      const signature = JSON.stringify(toComparableSnapshot(persistedSnapshot));
-
-      // Local fallback cache: helps restore conversation state if the user closes/navigates
-      // before the server PATCH completes.
-      writeSnapshotCacheIfNewer(activeSessionId, persistedSnapshot);
-
-      if (
-        !allowEmptyOverride &&
-        persistedSnapshot.messages.length === 0 &&
-        lastSavedSignatureRef.current !== null &&
-        signature !== lastSavedSignatureRef.current
-      ) {
-        return;
-      }
-      if (signature === lastSavedSignatureRef.current) {
-        markSessionPersistSettled();
-        return;
-      }
-      lastSavedSignatureRef.current = signature;
-      try {
-        await saveActiveSessionSnapshotRef.current(persistedSnapshot);
-      } finally {
-        markSessionPersistSettled();
-      }
-    };
-
-    const persistSettledRun = async () => {
+    '''    const persistSettledRun = async () => {
       const generation = ++runEndPersistGenerationRef.current;
 
       for (const delayMs of RUN_END_PERSIST_RETRY_DELAYS_MS) {
@@ -133,11 +231,10 @@ replace_once(
         if (runEndPersistGenerationRef.current !== generation) {
           return;
         }
-
         try {
           await flush({ allowEmptyOverride: true });
         } catch {
-          // A later retry can still succeed if the repository or API was briefly unavailable.
+          // A later retry can still succeed after a transient repository/API error.
         }
       }
 
@@ -148,6 +245,8 @@ replace_once(
         resolvePendingForcePersists();
       }
     };
+
+    const scheduleFlush = () => {
 ''',
 )
 
@@ -156,17 +255,11 @@ replace_once(
     '''      thread.unstable_on("runStart", () => {
         runActiveRef.current = true;
         markSessionPersistPending();
-        // Persist immediately at run start so a quick close/reopen still restores the user message.
-        void flush({ allowEmptyOverride: true });
-      }),
 ''',
     '''      thread.unstable_on("runStart", () => {
         runActiveRef.current = true;
         runEndPersistGenerationRef.current += 1;
         markSessionPersistPending();
-        // Persist immediately at run start so a quick close/reopen still restores the user message.
-        void flush({ allowEmptyOverride: true });
-      }),
 ''',
 )
 
@@ -205,22 +298,84 @@ replace_once(
 ''',
 )
 
-Path("tests/session-run-end-persistence.test.ts").write_text(
+Path("tests/session-runtime-snapshot.test.ts").write_text(
     '''import { describe, expect, it } from "vitest";
+import type { SessionThreadExport } from "../lib/session-documents";
+import { mergeRuntimeBranchIntoSessionSnapshot } from "../lib/session-runtime-snapshot";
 
-// Keep the retry schedule intentionally short: it bridges the adapter's final
-// state publication without turning normal navigation into a long wait.
-const RUN_END_PERSIST_RETRY_DELAYS_MS = [0, 50, 150, 300, 600] as const;
+const message = (id: string, role: "user" | "assistant", text: string) => ({
+  id,
+  role,
+  content: [{ type: "text", text }],
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  metadata: { custom: {} },
+  ...(role === "assistant"
+    ? { status: { type: "complete", reason: "stop" } }
+    : { attachments: [] }),
+});
 
-describe("run-end persistence retry schedule", () => {
-  it("starts immediately and remains bounded", () => {
-    expect(RUN_END_PERSIST_RETRY_DELAYS_MS[0]).toBe(0);
-    expect(RUN_END_PERSIST_RETRY_DELAYS_MS.at(-1)).toBeLessThanOrEqual(1_000);
+describe("mergeRuntimeBranchIntoSessionSnapshot", () => {
+  it("adds the assistant message visible in the active runtime branch", () => {
+    const user = message("user-1", "user", "Hello");
+    const assistant = message("assistant-1", "assistant", "Hi");
+    const repository: SessionThreadExport = {
+      headId: "user-1",
+      messages: [{ parentId: null, message: user }],
+    };
+
     expect(
-      RUN_END_PERSIST_RETRY_DELAYS_MS.every(
-        (delay, index) => index === 0 || delay > RUN_END_PERSIST_RETRY_DELAYS_MS[index - 1],
-      ),
-    ).toBe(true);
+      mergeRuntimeBranchIntoSessionSnapshot(repository, [user, assistant]),
+    ).toEqual({
+      headId: "assistant-1",
+      messages: [
+        { parentId: null, message: user },
+        { parentId: "user-1", message: assistant },
+      ],
+    });
+  });
+
+  it("preserves messages from inactive branches", () => {
+    const root = message("root", "user", "Question");
+    const oldAssistant = message("old", "assistant", "Old answer");
+    const newAssistant = message("new", "assistant", "New answer");
+    const repository: SessionThreadExport = {
+      headId: "old",
+      messages: [
+        { parentId: null, message: root },
+        { parentId: "root", message: oldAssistant },
+      ],
+    };
+
+    const merged = mergeRuntimeBranchIntoSessionSnapshot(repository, [
+      root,
+      newAssistant,
+    ]);
+
+    expect(merged.headId).toBe("new");
+    expect(merged.messages).toContainEqual({
+      parentId: "root",
+      message: oldAssistant,
+    });
+    expect(merged.messages).toContainEqual({
+      parentId: "root",
+      message: newAssistant,
+    });
+  });
+
+  it("does not persist optimistic placeholders", () => {
+    const root = message("root", "user", "Question");
+    const optimistic = {
+      ...message("optimistic", "assistant", "Loading"),
+      metadata: { custom: {}, isOptimistic: true },
+    };
+
+    const merged = mergeRuntimeBranchIntoSessionSnapshot(null, [
+      root,
+      optimistic,
+    ]);
+
+    expect(merged.headId).toBe("root");
+    expect(merged.messages).toHaveLength(1);
   });
 });
 ''',
