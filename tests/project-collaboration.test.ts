@@ -193,7 +193,7 @@ describe("project collaboration", () => {
       content: "Owner memory",
       ownerId: owner.id,
       title: "Owner memory",
-      type: "note",
+      type: "summary",
     });
     const project = await createProjectForUser({ title: "Owner project" }, owner);
 
