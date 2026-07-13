@@ -4,7 +4,10 @@ import {
   listProjectInvitationsForUser,
 } from "@/lib/project-invitation-service";
 import { jsonNoStore, parseJsonBody } from "@/lib/server/api-response";
-import { projectInvitationErrorResponse } from "@/lib/server/project-invitation-http";
+import {
+  projectInvitationErrorResponse,
+  projectNotFoundApiError,
+} from "@/lib/server/project-invitation-http";
 import { getPublicAppOrigin } from "@/lib/server/public-app-origin";
 import { requireLocalApiUser } from "@/lib/server/request-guards";
 
@@ -13,12 +16,6 @@ const createSchema = z.object({
   expiresAt: z.union([z.string(), z.number()]).optional(),
   role: z.enum(["editor", "viewer"]),
 }).strict();
-
-const projectNotFound = {
-  code: "project_not_found",
-  error: "Project not found",
-  status: 404,
-} as const;
 
 type RouteParams = { params: Promise<{ projectId: string }> };
 export const runtime = "nodejs";
@@ -31,7 +28,7 @@ export async function GET(req: Request, context: RouteParams) {
     const invitations = await listProjectInvitationsForUser(projectId, guarded.user);
     return jsonNoStore({ invitations });
   } catch (error) {
-    return projectInvitationErrorResponse(error, projectNotFound);
+    return projectInvitationErrorResponse(error, projectNotFoundApiError);
   }
 }
 
@@ -56,6 +53,6 @@ export async function POST(req: Request, context: RouteParams) {
     });
     return jsonNoStore(result, { status: 201 });
   } catch (error) {
-    return projectInvitationErrorResponse(error, projectNotFound);
+    return projectInvitationErrorResponse(error, projectNotFoundApiError);
   }
 }
