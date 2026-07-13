@@ -1,0 +1,94 @@
+name: Bug report
+description: Report a reproducible problem in Nodes.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Do not include API keys, tokens, private project content, or security vulnerabilities. Report security issues privately through GitHub Security Advisories.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I removed credentials and private content from this report.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Product area
+      options:
+        - Authentication and profile
+        - Chat and model execution
+        - Branching
+        - Canvas and artifacts
+        - Arena
+        - Projects and memory
+        - Collaboration and invitations
+        - Persistence and Supabase
+        - Deployment and CI
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Problem summary
+      description: What happened, and what impact did it have?
+      placeholder: A clear description of the failure and its user-visible impact.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: |
+        Deployment: local / Vercel preview / production
+        Persistence: file / Supabase
+        Browser and version:
+        Operating system:
+        Commit or release:
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Relevant logs or screenshots
+      description: Include only sanitized evidence. Prefer text logs over screenshots when possible.
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Include frequency, workarounds, affected projects, or related issues.
