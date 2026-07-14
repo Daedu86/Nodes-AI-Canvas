@@ -82,7 +82,6 @@ export function useCanvasSessionState({
   const [storedViewport, setStoredViewport] = React.useState<Viewport | null>(() =>
     readFlowViewport(activeSessionId),
   );
-  const treeSignatureRef = React.useRef<string | null>(null);
   const flowRenderModeKey = React.useMemo(
     () => getCanvasFlowRenderModeStorageKey(activeSessionId),
     [activeSessionId],
@@ -108,7 +107,6 @@ export function useCanvasSessionState({
     setToolbarMenu(null);
     setSpotlight("all");
     setDensityMode("overview");
-    treeSignatureRef.current = null;
     cancelDraft();
   }, [activeSessionId, cancelDraft, setCanvasSelectionId]);
 
@@ -193,6 +191,5 @@ export function useCanvasSessionState({
     spotlight,
     storedViewport,
     toolbarMenu,
-    treeSignatureRef,
   };
 }
