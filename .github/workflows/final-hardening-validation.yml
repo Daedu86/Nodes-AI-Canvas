@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - .ci-validation-trigger
+  pull_request:
+    branches: [main]
+    paths:
+      - .ci-validation-trigger
 
 permissions:
   actions: read
@@ -36,7 +40,7 @@ jobs:
       - name: Report start
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue comment "$VALIDATION_ISSUE" -R "$VALIDATION_REPOSITORY" --body "Final hardening validation started on main."
+        run: gh issue comment "$VALIDATION_ISSUE" -R "$VALIDATION_REPOSITORY" --body "Final hardening validation started on main via the temporary validation PR."
 
       - name: Checkout main
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
