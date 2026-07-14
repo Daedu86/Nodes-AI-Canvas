@@ -1,6 +1,17 @@
 "use client";
 
 import React from "react";
+import {
+  dedupeResourceIds,
+  fetchApi,
+  fetchJson,
+  readStoredResourceId,
+  writeStoredResourceId,
+} from "@/lib/client/persisted-resource-client";
+import {
+  usePersistedResourceState,
+  useSerialTaskQueue,
+} from "@/components/context/use-persisted-resource-state";
 import { useSession } from "next-auth/react";
 import type {
   ProjectCollaboratorRole,
@@ -50,48 +61,17 @@ type ProjectResponse = {
   project: ProjectDocument;
 };
 
-const buildActiveProjectKey = (userId: string | null) =>
-  userId ? `nodes.active-project-id.${userId}` : "nodes.active-project-id.v1";
 const AUTO_OPEN_PROJECT_SESSION_THRESHOLD = 10;
 
 const ProjectsContext = React.createContext<ProjectsContextValue | null>(null);
 
-const readStoredActiveProjectId = (userId: string | null) => {
-  try {
-    return localStorage.getItem(buildActiveProjectKey(userId));
-  } catch {
-    return null;
-  }
-};
+const readStoredActiveProjectId = (userId: string | null) =>
+  readStoredResourceId("project", userId);
 
-const writeStoredActiveProjectId = (userId: string | null, projectId: string | null) => {
-  try {
-    const storageKey = buildActiveProjectKey(userId);
-    if (!projectId) {
-      localStorage.removeItem(storageKey);
-      return;
-    }
-    localStorage.setItem(storageKey, projectId);
-  } catch {
-    // ignore storage errors
-  }
-};
-
-async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit) {
-  const response = await fetch(input, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
-  if (!response.ok) {
-    const error = new Error(`Request failed: ${response.status}`) as Error & { status?: number };
-    error.status = response.status;
-    throw error;
-  }
-  return (await response.json()) as T;
-}
+const writeStoredActiveProjectId = (
+  userId: string | null,
+  projectId: string | null,
+) => writeStoredResourceId("project", userId, projectId);
 
 async function exposeInvitationLink(inviteUrl: string) {
   try {
@@ -104,28 +84,30 @@ async function exposeInvitationLink(inviteUrl: string) {
 export function ProjectsProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const userId = session?.user?.id ?? null;
-  const [projects, setProjects] = React.useState<ProjectSummary[]>([]);
-  const [activeProject, setActiveProject] = React.useState<ProjectDocument | null>(null);
+  const {
+    activeResource: activeProject,
+    activeResourceRef: activeProjectRef,
+    prependResource: prependProject,
+    resources: projects,
+    setActiveResource: setActiveProject,
+    setResources: setProjects,
+    updateKnownResource: updateKnownProject,
+  } = usePersistedResourceState<ProjectSummary, ProjectDocument>();
+  const enqueueProjectPatch = useSerialTaskQueue<ProjectDocument | null>(null);
   const [isReady, setIsReady] = React.useState(false);
-  const activeProjectRef = React.useRef<ProjectDocument | null>(null);
-  const patchQueueRef = React.useRef<Promise<ProjectDocument | null>>(Promise.resolve(null));
-
-  React.useEffect(() => {
-    activeProjectRef.current = activeProject;
-  }, [activeProject]);
 
   const loadProject = React.useCallback(async (projectId: string) => {
     const data = await fetchJson<ProjectResponse>(`/api/projects/${projectId}`);
     setActiveProject(data.project);
     writeStoredActiveProjectId(userId, data.project.id);
     return data.project;
-  }, [userId]);
+  }, [setActiveProject, userId]);
 
   const refreshProjects = React.useCallback(async () => {
     const data = await fetchJson<ProjectsListResponse>("/api/projects");
     setProjects(data.projects);
     return data.projects;
-  }, []);
+  }, [setProjects]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -189,12 +171,19 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [loadProject, refreshProjects, status, userId]);
+  }, [
+    loadProject,
+    refreshProjects,
+    setActiveProject,
+    setProjects,
+    status,
+    userId,
+  ]);
 
   const clearActiveProject = React.useCallback(() => {
     setActiveProject(null);
     writeStoredActiveProjectId(userId, null);
-  }, [userId]);
+  }, [setActiveProject, userId]);
 
   const selectProject = React.useCallback(async (projectId: string) => {
     setIsReady(false);
@@ -217,38 +206,35 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         body: JSON.stringify(input ?? {}),
       });
-      setProjects((prev) => [data.project, ...prev]);
+      prependProject(data.project);
       setActiveProject(data.project);
       writeStoredActiveProjectId(userId, data.project.id);
       return data.project;
     } finally {
       setIsReady(true);
     }
-  }, [userId]);
+  }, [prependProject, setActiveProject, userId]);
 
   const deleteProjects = React.useCallback(async (projectIds: string[]) => {
-    const uniqueProjectIds = [...new Set(projectIds)].filter((projectId) => projectId.length > 0);
+    const uniqueProjectIds = dedupeResourceIds(projectIds);
     if (uniqueProjectIds.length === 0) return;
     const currentActiveProjectId = activeProjectRef.current?.id ?? null;
     const deletingActiveProject =
       currentActiveProjectId !== null && uniqueProjectIds.includes(currentActiveProjectId);
 
     if (deletingActiveProject) {
-      activeProjectRef.current = null;
       setActiveProject(null);
       writeStoredActiveProjectId(userId, null);
     }
 
-    const response = await fetch("/api/projects", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
+    await fetchApi(
+      "/api/projects",
+      {
+        method: "DELETE",
+        body: JSON.stringify({ projectIds: uniqueProjectIds }),
       },
-      body: JSON.stringify({ projectIds: uniqueProjectIds }),
-    });
-    if (!response.ok && response.status !== 404) {
-      throw new Error(`Request failed: ${response.status}`);
-    }
+      { allowedStatuses: [404] },
+    );
 
     const remaining = await refreshProjects();
     if (deletingActiveProject) {
@@ -259,7 +245,14 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         clearActiveProject();
       }
     }
-  }, [clearActiveProject, loadProject, refreshProjects, userId]);
+  }, [
+    activeProjectRef,
+    clearActiveProject,
+    loadProject,
+    refreshProjects,
+    setActiveProject,
+    userId,
+  ]);
 
   const deleteProject = React.useCallback(async (projectId: string) => {
     await deleteProjects([projectId]);
@@ -270,11 +263,8 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       method: "PATCH",
       body: JSON.stringify({ title }),
     });
-    setProjects((prev) =>
-      prev.map((project) => (project.id === projectId ? data.project : project)),
-    );
-    setActiveProject((prev) => (prev?.id === projectId ? data.project : prev));
-  }, []);
+    updateKnownProject(data.project);
+  }, [updateKnownProject]);
 
   const saveActiveProjectPatch = React.useCallback((patch: {
     arenaWinnerBranchKey?: string | null;
@@ -291,18 +281,12 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
         method: "PATCH",
         body: JSON.stringify(patch),
       });
-      setActiveProject(data.project);
-      setProjects((prev) =>
-        prev.map((project) => (project.id === data.project.id ? data.project : project)),
-      );
-      activeProjectRef.current = data.project;
+      updateKnownProject(data.project);
       return data.project;
     };
 
-    const nextPatch = patchQueueRef.current.then(enqueue, enqueue);
-    patchQueueRef.current = nextPatch.catch(() => null);
-    return nextPatch;
-  }, []);
+    return enqueueProjectPatch(enqueue);
+  }, [activeProjectRef, enqueueProjectPatch, updateKnownProject]);
 
   const saveActiveProjectMember = React.useCallback(async (input: {
     email: string;
@@ -317,13 +301,9 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
     if (data.inviteUrl) {
       await exposeInvitationLink(data.inviteUrl);
     }
-    setActiveProject(data.project);
-    setProjects((prev) =>
-      prev.map((project) => (project.id === data.project.id ? data.project : project)),
-    );
-    activeProjectRef.current = data.project;
+    updateKnownProject(data.project);
     return data.project;
-  }, []);
+  }, [activeProjectRef, updateKnownProject]);
 
   const removeActiveProjectMember = React.useCallback(async (email: string) => {
     const projectId = activeProjectRef.current?.id;
@@ -332,13 +312,9 @@ export function ProjectsProvider({ children }: { children: React.ReactNode }) {
       method: "DELETE",
       body: JSON.stringify({ email }),
     });
-    setActiveProject(data.project);
-    setProjects((prev) =>
-      prev.map((project) => (project.id === data.project.id ? data.project : project)),
-    );
-    activeProjectRef.current = data.project;
+    updateKnownProject(data.project);
     return data.project;
-  }, []);
+  }, [activeProjectRef, updateKnownProject]);
 
   const value = React.useMemo<ProjectsContextValue>(() => ({
     activeProject,
