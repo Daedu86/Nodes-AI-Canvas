@@ -92,11 +92,13 @@ jobs:
           {
             echo 'LLM settings provider split validation failed. No validated implementation was published.'
             echo
-            echo '<details><summary>Relevant log tail</summary>'
+            echo '<details><summary>Failure summary</summary>'
             echo
             echo '```text'
             if [ -f /tmp/llm-settings-split.log ]; then
-              tail -n 180 /tmp/llm-settings-split.log
+              grep -E 'FAIL|AssertionError|TypeError|ReferenceError|Error:|Test Files|Tests |TS[0-9]{4}|expected|Received|Coverage threshold' /tmp/llm-settings-split.log | tail -n 100 || true
+              echo '--- final log lines ---'
+              tail -n 35 /tmp/llm-settings-split.log
             else
               echo 'Validation log was not created.'
             fi
