@@ -1,1 +1,1 @@
-inspect phase 3 status again
+inspect failed phase 3 browser diagnostics
