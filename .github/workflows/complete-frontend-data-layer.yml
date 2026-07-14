@@ -43,6 +43,16 @@ jobs:
         run: |
           set -o pipefail
           {
+            python - <<'PY'
+          from pathlib import Path
+          path = Path("scripts/complete-frontend-data-layer.mjs")
+          source = path.read_text()
+          source = source.replace(
+              r'return \`${fallback}: \${record.status}\`;',
+              r'return \`\${fallback}: \${record.status}\`;',
+          )
+          path.write_text(source)
+          PY
             node scripts/complete-frontend-data-layer.mjs
             npm run format
             npm run check
