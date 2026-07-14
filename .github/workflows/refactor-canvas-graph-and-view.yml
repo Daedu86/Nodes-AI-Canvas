@@ -49,6 +49,39 @@ jobs:
           echo "VALIDATION_STAGE=extraction" >> "$GITHUB_ENV"
           set -o pipefail
           python scripts/refactor-canvas-graph-and-view.py 2>&1 | tee /tmp/validation.log
+          python <<'PY'
+          from pathlib import Path
+
+          graph = Path("components/assistant-ui/thread-graph-flow/use-canvas-graph-view-model.ts")
+          text = graph.read_text(encoding="utf-8")
+          old = '''type UseCanvasGraphViewModelOptions = Omit<
+            CanvasFlowElementsParams,
+            "linkedTargetCountByArtifact"
+          > & {
+          '''
+          new = '''type UseCanvasGraphViewModelOptions = Omit<
+            CanvasFlowElementsParams,
+            "linkedTargetCountByArtifact" | "nodeIndex"
+          > & {
+            nodeIndex: Map<string, ThreadGraphNodeModel>;
+          '''
+          if old not in text:
+              raise RuntimeError("Could not align the graph view model nodeIndex contract.")
+          text = text.replace(old, new, 1)
+          text = text.replace(
+              "selectedContextArtifactIds: ReadonlySet<string>;",
+              "selectedContextArtifactIds: Set<string>;",
+              1,
+          )
+          graph.write_text(text, encoding="utf-8")
+
+          test = Path("tests/canvas-graph-view-model.test.ts")
+          text = test.read_text(encoding="utf-8")
+          text = text.replace("  semanticType: artifactType,\n", "  semanticType: null,\n", 1)
+          text = text.replace("  createdAt: 1,\n", '  createdAt: "2026-01-01T00:00:00.000Z",\n', 1)
+          text = text.replace("  updatedAt: 1,\n", '  updatedAt: "2026-01-01T00:00:00.000Z",\n', 1)
+          test.write_text(text, encoding="utf-8")
+          PY
 
       - name: Install dependencies
         run: |
