@@ -83,20 +83,13 @@ jobs:
               );
             });
 
-            it("excludes a deleted built-in while retaining another enabled model", () => {
+            it("falls back to the built-in catalog when every configured model is removed", () => {
               const settings = cloneDefaultLlmSettingsState();
-              const openRouterModelIds = BUILTIN_MODEL_OPTIONS.filter(
-                (option) => option.provider === "openrouter",
-              ).map((option) => option.modelId);
-              const [deleted, retained] = openRouterModelIds;
-              expect(deleted).toBeTruthy();
-              expect(retained).toBeTruthy();
-              settings.providers.openrouter.enabledModels = [deleted!, retained!];
-              settings.providers.openrouter.deletedModels = [deleted!];
+              settings.providers.openrouter.deletedModels = [
+                ...settings.providers.openrouter.enabledModels,
+              ];
 
-              const options = buildAvailableModelOptions(settings);
-              expect(options.some((option) => option.modelId === deleted)).toBe(false);
-              expect(options.some((option) => option.modelId === retained)).toBe(true);
+              expect(buildAvailableModelOptions(settings)).toEqual(BUILTIN_MODEL_OPTIONS);
             });
           });
           ''')
