@@ -1,0 +1,30 @@
+name: Inspect phase 3 run status
+
+on:
+  push:
+    branches: [main]
+    paths: ["phase3-status-trigger.txt"]
+
+permissions:
+  actions: read
+  issues: write
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report latest phase 3 runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo 'Phase 3 workflow status:'
+            echo
+            echo '```json'
+            gh run list --repo "${{ github.repository }}" --workflow phase3-hardening.yml --limit 6 --json databaseId,status,conclusion,createdAt,updatedAt,headSha,event,displayTitle
+            echo '```'
+          } > /tmp/phase3-status.md
+          gh issue comment 89 --repo "${{ github.repository }}" --body-file /tmp/phase3-status.md
