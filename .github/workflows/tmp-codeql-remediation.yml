@@ -1,0 +1,82 @@
+name: Temporary CodeQL remediation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/tmp-codeql-remediation.yml
+
+permissions:
+  contents: write
+  security-events: read
+
+jobs:
+  collect-alert-details:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect open CodeQL alerts and source context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp-codeql
+          gh api --paginate --slurp "/repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&ref=refs/heads/main&per_page=100" > .tmp-codeql/alert-pages.json
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+
+          const pages = JSON.parse(fs.readFileSync(".tmp-codeql/alert-pages.json", "utf8"));
+          const alerts = pages.flat();
+          fs.writeFileSync(".tmp-codeql/open-alerts.json", `${JSON.stringify(alerts, null, 2)}\n`);
+
+          const lines = ["# Open CodeQL alerts", ""];
+          for (const alert of alerts) {
+            const instance = alert.most_recent_instance ?? {};
+            const location = instance.location ?? {};
+            const filePath = location.path ?? "unknown";
+            const startLine = Number(location.start_line ?? 1);
+            const endLine = Number(location.end_line ?? startLine);
+            lines.push(`## #${alert.number}: ${alert.rule?.description ?? alert.rule?.id ?? "Unknown rule"}`);
+            lines.push("");
+            lines.push(`- Rule: \`${alert.rule?.id ?? "unknown"}\``);
+            lines.push(`- Severity: \`${alert.rule?.security_severity_level ?? alert.rule?.severity ?? "unknown"}\``);
+            lines.push(`- File: \`${filePath}:${startLine}-${endLine}\``);
+            lines.push(`- State: \`${alert.state}\``);
+            lines.push("");
+
+            if (filePath !== "unknown" && fs.existsSync(filePath)) {
+              const source = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+              const from = Math.max(1, startLine - 10);
+              const to = Math.min(source.length, endLine + 10);
+              lines.push("```text");
+              for (let lineNumber = from; lineNumber <= to; lineNumber += 1) {
+                const marker = lineNumber >= startLine && lineNumber <= endLine ? ">" : " ";
+                lines.push(`${marker}${String(lineNumber).padStart(5, " ")} | ${source[lineNumber - 1] ?? ""}`);
+              }
+              lines.push("```");
+              lines.push("");
+            }
+          }
+
+          fs.writeFileSync(".tmp-codeql/open-alerts.md", `${lines.join("\n")}\n`);
+          NODE
+
+      - name: Commit the temporary report
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .tmp-codeql/open-alerts.json .tmp-codeql/open-alerts.md
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore: capture CodeQL alert details [skip vercel]"
+          git push origin HEAD:main
