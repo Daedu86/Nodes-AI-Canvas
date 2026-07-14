@@ -35,7 +35,7 @@ const ThreadGraph3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full min-h-[28rem] items-center justify-center rounded-[32px] border border-white/70 bg-background/80 text-sm text-muted-foreground dark:border-white/10">
+      <div role="status" aria-live="polite" className="flex h-full min-h-[28rem] items-center justify-center rounded-[32px] border border-white/70 bg-background/80 text-sm text-muted-foreground dark:border-white/10">
         Loading 3D canvas…
       </div>
     ),
@@ -99,10 +99,16 @@ export function CanvasStage({
   return (
     <div
       ref={viewportRef}
+      role="region"
+      aria-label="Conversation canvas"
+      aria-describedby="canvas-stage-instructions"
       className="relative min-h-[28rem] flex-1 lg:min-h-0"
       onDragOver={onCanvasDragOver}
       onDrop={onCanvasDrop}
     >
+      <p id="canvas-stage-instructions" className="sr-only">
+        Use Tab to reach canvas controls and graph elements. Select a node to inspect it. Double-click a conversation node to open it in Chat.
+      </p>
       {flowRenderMode === "3d" ? (
         <ThreadGraph3D
           nodes={nodes}
@@ -114,6 +120,7 @@ export function CanvasStage({
         <>
           <ReactFlow
             key={`flow:${activeSessionId}`}
+            aria-label="Conversation graph"
             data-graph-structure={graphStructureSignature}
             nodes={nodes}
             edges={edges}

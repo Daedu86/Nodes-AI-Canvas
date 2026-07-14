@@ -55,6 +55,7 @@ function HeaderHarness() {
 describe("AppHeader", () => {
   beforeEach(() => {
     localStorage.clear();
+    localStorage.setItem("nodes.workspace-onboarding.completed.v1", "1");
     window.history.replaceState({}, "", "/");
   });
 

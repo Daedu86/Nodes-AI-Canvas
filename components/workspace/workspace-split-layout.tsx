@@ -34,28 +34,37 @@ const shellInnerClassName =
 const workspaceBackdropClassName =
   "flex flex-1 flex-col overflow-hidden bg-[linear-gradient(180deg,rgba(11,13,19,0.92),rgba(9,11,16,0.98))]";
 
-const WorkspacePanelShell = ({ children }: { children: React.ReactNode }) => (
-  <div className={shellClassName}>
+const WorkspacePanelShell = ({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label: string;
+}) => (
+  <section aria-label={label} className={shellClassName}>
     <div className={shellInnerClassName}>{children}</div>
-  </div>
+  </section>
 );
 
 const SinglePanelLayer = ({
   active,
   children,
+  label,
 }: {
   active: boolean;
   children: React.ReactNode;
+  label: string;
 }) => (
   <div
     aria-hidden={!active}
+    inert={!active}
     className={
       active
         ? "absolute inset-0 z-10"
         : "pointer-events-none absolute inset-0 opacity-0"
     }
   >
-    <WorkspacePanelShell>{children}</WorkspacePanelShell>
+    <WorkspacePanelShell label={label}>{children}</WorkspacePanelShell>
   </div>
 );
 
@@ -102,8 +111,12 @@ export function WorkspaceSplitLayout({
     return (
       <div className={`${workspaceBackdropClassName} px-4 py-4 md:px-5 md:py-5`}>
         <div className="relative min-h-0 flex-1">
-          <SinglePanelLayer active={viewMode === "chat"}>{chatPanel}</SinglePanelLayer>
-          <SinglePanelLayer active={viewMode === "canvas"}>{canvasPanel}</SinglePanelLayer>
+          <SinglePanelLayer active={viewMode === "chat"} label="Chat workspace">
+            {chatPanel}
+          </SinglePanelLayer>
+          <SinglePanelLayer active={viewMode === "canvas"} label="Canvas workspace">
+            {canvasPanel}
+          </SinglePanelLayer>
         </div>
       </div>
     );
@@ -161,7 +174,9 @@ export function WorkspaceSplitLayout({
                       }
                 }
               >
-                <WorkspacePanelShell>{pane.panel}</WorkspacePanelShell>
+                <WorkspacePanelShell label={`${pane.label} workspace`}>
+                  {pane.panel}
+                </WorkspacePanelShell>
               </div>
             ))}
           </div>

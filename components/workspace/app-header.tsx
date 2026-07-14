@@ -16,6 +16,7 @@ import { LlmToggleButton } from "@/components/assistant-ui/llm-toggle";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { useSessionUiState, type SessionViewMode } from "@/components/context/session-ui-state";
 import { SessionContextSheet } from "@/components/workspace/session-context-sheet";
+import { WorkspaceOnboardingDialog } from "@/components/workspace/workspace-onboarding-dialog";
 
 export const AppHeader = () => {
   const { llmEnabled } = useLlmEnabled();
@@ -86,6 +87,7 @@ export const AppHeader = () => {
         })}
       </div>
       <div className="ml-auto flex items-center gap-2">
+        <WorkspaceOnboardingDialog onOpenCanvas={() => setViewMode("split")} />
         <ModelSelector />
         <SessionContextSheet />
         <span

@@ -98,6 +98,7 @@ export function CanvasSidebar({
   return (
     <aside
       ref={toolbarMenuRef}
+      aria-label="Canvas controls and inspector"
       className="flex min-h-0 w-full shrink-0 flex-col gap-3 overflow-y-auto rounded-[24px] border border-white/70 bg-white/84 p-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/78 lg:w-[18rem] lg:max-w-[22rem]"
     >
       <div className="min-w-0 border-b border-border/60 pb-3">
@@ -128,7 +129,7 @@ export function CanvasSidebar({
             {selectedBranchPathLabel}
           </p>
         ) : null}
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div aria-live="polite" className="mt-3 flex flex-wrap gap-2">
           <span className="inline-flex items-center rounded-full border border-border/60 bg-background/85 px-2 py-1 text-[11px] text-muted-foreground">
             {visibleCanvasNodeCount} / {flowNodeCount} nodes
           </span>
@@ -153,7 +154,7 @@ export function CanvasSidebar({
           </p>
         ) : null}
         {activeCanvasRunCount > 0 || queuedCanvasRunCount > 0 ? (
-          <div className="flex items-center justify-between rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs text-foreground">
+          <div role="status" aria-live="polite" className="flex items-center justify-between rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs text-foreground">
             <span>
               {activeCanvasRunCount} running · {queuedCanvasRunCount} queued
             </span>
@@ -177,7 +178,7 @@ export function CanvasSidebar({
             <span>Create prompt node</span>
           </button>
         ) : null}
-        <div className="flex items-center rounded-full border border-border/60 bg-background/92 p-1 text-[11px] font-medium text-muted-foreground shadow-sm">
+        <div role="group" aria-label="Canvas render mode" className="flex items-center rounded-full border border-border/60 bg-background/92 p-1 text-[11px] font-medium text-muted-foreground shadow-sm">
           {(["2d", "3d"] as FlowRenderMode[]).map((mode) => (
             <button
               key={mode}
@@ -189,6 +190,7 @@ export function CanvasSidebar({
               }`}
               onClick={() => onFlowRenderModeChange(mode)}
               aria-label={`Switch canvas to ${mode.toUpperCase()}`}
+              aria-pressed={flowRenderMode === mode}
             >
               {mode.toUpperCase()}
             </button>
@@ -209,13 +211,14 @@ export function CanvasSidebar({
             <span className="hidden sm:inline">Tools</span>
           </button>
           {toolbarMenu === "tools" ? (
-            <div className="mt-2 w-full rounded-[18px] border border-white/70 bg-white/90 p-2 shadow-sm dark:border-white/10 dark:bg-slate-950/92">
+            <div role="menu" aria-label="Canvas tools" className="mt-2 w-full rounded-[18px] border border-white/70 bg-white/90 p-2 shadow-sm dark:border-white/10 dark:bg-slate-950/92">
               <p className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Canvas tools
               </p>
               <div className="space-y-1">
                 <button
                   type="button"
+                  role="menuitem"
                   className="flex w-full items-center gap-3 rounded-[18px] px-3 py-2 text-left transition-colors hover:bg-background/85"
                   onClick={() => {
                     onToolbarMenuChange(null);
@@ -236,6 +239,7 @@ export function CanvasSidebar({
                 </button>
                 <button
                   type="button"
+                  role="menuitem"
                   className="flex w-full items-center gap-3 rounded-[18px] px-3 py-2 text-left transition-colors hover:bg-background/85"
                   onClick={() => {
                     onToolbarMenuChange(null);
@@ -288,7 +292,7 @@ export function CanvasSidebar({
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div role="group" aria-label="Canvas spotlight filters" className="flex flex-wrap items-center gap-2">
             {(Object.keys(flowFilterLabel) as FlowSpotlightMode[]).map((mode) => (
               <button
                 key={mode}
@@ -299,6 +303,7 @@ export function CanvasSidebar({
                     : "border-border/60 bg-background/80 text-muted-foreground hover:bg-background"
                 }`}
                 onClick={() => onSpotlightChange(mode)}
+                aria-pressed={spotlight === mode}
               >
                 <span>{flowFilterLabel[mode]}</span>
                 <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] dark:bg-white/10">
@@ -325,7 +330,7 @@ export function CanvasSidebar({
             </button>
           </div>
           {linkEditMode ? (
-            <p className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[11px] leading-5 text-rose-700 dark:text-rose-200">
+            <p role="status" aria-live="polite" className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[11px] leading-5 text-rose-700 dark:text-rose-200">
               Link edit mode is on. Use{" "}
               <span className="font-semibold">Cut selected link</span> from the
               inspector, then restore it when needed.
