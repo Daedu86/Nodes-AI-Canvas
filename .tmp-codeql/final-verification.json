@@ -1,0 +1,13 @@
+{
+  "analysisFoundForCommit": true,
+  "commitSha": "3f79f51ee0138c0c68f11d990d32c0d68cae3aa3",
+  "openAlertCount": 1,
+  "alerts": [
+    {
+      "number": 9,
+      "rule": "js/http-to-file-access",
+      "path": "scripts/rotate-secrets.mjs",
+      "startLine": 406
+    }
+  ]
+}
