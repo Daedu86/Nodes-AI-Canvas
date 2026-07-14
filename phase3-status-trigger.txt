@@ -1,1 +1,1 @@
-inspect latest structural diagnostic status
+monitor final phase 3 validation
