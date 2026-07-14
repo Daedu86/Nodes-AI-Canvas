@@ -18,21 +18,14 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           ref: main
-      - name: Persist final phase 3 failure
+      - name: Persist current phase 3 status
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: "29342183812"
         shell: bash
         run: |
-          gh run view "$RUN_ID" --repo "${{ github.repository }}" --log-failed > /tmp/phase3-final.log
-          {
-            echo 'Final Phase 3 failure diagnostic:'
-            grep -E '^[^[:space:]].*tests/e2e/|^[[:space:]]+[0-9]+\)|[0-9]+ failed|Error:|TimeoutError:|expect\(' /tmp/phase3-final.log | tail -n 220 || true
-            echo '--- final 140 lines ---'
-            tail -n 140 /tmp/phase3-final.log
-          } > phase3-final-diagnostic.txt
+          gh run list --repo "${{ github.repository }}" --workflow phase3-hardening.yml --limit 3 --json databaseId,status,conclusion,createdAt,updatedAt,headSha,displayTitle > phase3-current-status.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add phase3-final-diagnostic.txt
-          git commit -m "chore: capture final phase 3 failure [skip vercel]"
+          git add phase3-current-status.json
+          git commit -m "chore: capture current phase 3 status [skip vercel]"
           git push
