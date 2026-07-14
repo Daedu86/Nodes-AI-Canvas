@@ -1,1 +1,1 @@
-run phase 3 hardening attempt 4
+run phase 3 hardening with accessible model selector
