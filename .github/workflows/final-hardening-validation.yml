@@ -25,6 +25,7 @@ env:
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
   VALIDATION_ISSUE: "98"
+  VALIDATION_REPOSITORY: "Daedu86/Nodes-AI-Canvas"
 
 jobs:
   validate:
@@ -35,7 +36,7 @@ jobs:
       - name: Report start
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue comment "$VALIDATION_ISSUE" --body "Final hardening validation started on main."
+        run: gh issue comment "$VALIDATION_ISSUE" -R "$VALIDATION_REPOSITORY" --body "Final hardening validation started on main."
 
       - name: Checkout main
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -151,8 +152,8 @@ jobs:
             echo
             cat /tmp/codeql-summary.md
           } > /tmp/final-validation-success.md
-          gh issue comment "$VALIDATION_ISSUE" --body-file /tmp/final-validation-success.md
-          gh issue close "$VALIDATION_ISSUE" --reason completed
+          gh issue comment "$VALIDATION_ISSUE" -R "$VALIDATION_REPOSITORY" --body-file /tmp/final-validation-success.md
+          gh issue close "$VALIDATION_ISSUE" -R "$VALIDATION_REPOSITORY" --reason completed
 
       - name: Report failure
         if: failure()
@@ -177,4 +178,4 @@ jobs:
               fi
             done
           } > /tmp/final-validation-failure.md
-          gh issue comment "$VALIDATION_ISSUE" --body-file /tmp/final-validation-failure.md
+          gh issue comment "$VALIDATION_ISSUE" -R "$VALIDATION_REPOSITORY" --body-file /tmp/final-validation-failure.md
