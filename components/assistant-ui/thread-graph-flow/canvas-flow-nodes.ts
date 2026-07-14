@@ -53,7 +53,8 @@ export function buildConversationFlowNodes({
   linkedArtifactCountByTarget,
   overrides,
   resolveModelVisual,
-}: Pick<CanvasFlowElementsParams, "canvasConversationNodes" | "overrides"> & {
+  handleNodeBranchOperation,
+}: Pick<CanvasFlowElementsParams, "canvasConversationNodes" | "overrides" | "handleNodeBranchOperation"> & {
   linkedArtifactCountByTarget: ReadonlyMap<string, number>;
   resolveModelVisual: ReturnType<typeof createCanvasModelVisualResolver>;
 }): ThreadGraphFlowNode[] {
@@ -90,6 +91,9 @@ export function buildConversationFlowNodes({
         role: node.role,
         idx: node.idx,
         title: null,
+        onBranchOperation: handleNodeBranchOperation
+          ? (operation) => handleNodeBranchOperation(node.id, operation)
+          : undefined,
       },
     } satisfies ThreadGraphFlowNode;
   });

@@ -2,6 +2,7 @@
 
 import { memo, type CSSProperties } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import type { BranchOperation } from "@/lib/thread-branching";
 import { getGraphModelLabel, getGraphModelPalette } from "@/components/assistant-ui/thread-graph/graph-models";
 import type { ThreadGraphFlowNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-flow-types";
 
@@ -93,6 +94,14 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
   const isMuted = emphasis === "muted";
   const isLineage = emphasis === "lineage";
   const isSelected = emphasis === "selected" || selected;
+  const branchAction: { label: string; operation: BranchOperation } | null =
+    isRoot
+      ? { label: "Create root branch", operation: "new-root-prompt" }
+      : data.role === "user"
+        ? { label: "Create sibling branch", operation: "create-sibling-prompt" }
+        : data.role === "assistant"
+          ? { label: "Create follow-up message", operation: "create-follow-up-prompt" }
+          : null;
 
   return (
     <div
@@ -246,6 +255,18 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
             </span>
           ) : null}
         </div>
+        {branchAction && data.onBranchOperation ? (
+          <button
+            type="button"
+            className="nodrag nopan relative mt-3 inline-flex items-center rounded-full border border-sky-400/35 bg-sky-400/12 px-3 py-1.5 text-xs font-medium text-sky-100 transition-colors hover:bg-sky-400/20"
+            onClick={(event) => {
+              event.stopPropagation();
+              data.onBranchOperation?.(branchAction.operation);
+            }}
+          >
+            {branchAction.label}
+          </button>
+        ) : null}
       </div>
     </div>
   );

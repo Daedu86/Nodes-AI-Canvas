@@ -34,6 +34,7 @@ export function buildCanvasFlowElements(
 
   const conversationNodes = buildConversationFlowNodes({
     canvasConversationNodes: params.canvasConversationNodes,
+    handleNodeBranchOperation: params.handleNodeBranchOperation,
     linkedArtifactCountByTarget: indexes.linkedArtifactCountByTarget,
     overrides: params.overrides,
     resolveModelVisual,

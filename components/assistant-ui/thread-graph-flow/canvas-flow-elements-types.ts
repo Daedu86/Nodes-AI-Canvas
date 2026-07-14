@@ -1,6 +1,7 @@
 import type { Node as ThreadGraphNodeModel } from "@/components/assistant-ui/thread-graph/graph-types";
 import type { GraphBranchIntent } from "@/components/context/graph-branch-intent";
 import type {
+  BranchOperation,
   BranchOperationDetail,
   BranchSpec,
 } from "@/lib/thread-branching";
@@ -37,6 +38,7 @@ export type CanvasFlowElementsParams = {
   draftDetail: BranchOperationDetail | null;
   getArtifactsForTarget: SessionArtifactsApi["getArtifactsForTarget"];
   handleCancelPromptDraft: () => void;
+  handleNodeBranchOperation?: (nodeId: string, operation: BranchOperation) => void;
   handleCancelRun: () => void;
   handleCutEdge: (childId: string, parentId: string | null) => void;
   handleSubmitBranchDraft: () => void;

@@ -61,6 +61,7 @@ export type ThreadGraphFlowNodeData = {
   onDraftCancelRun?: () => void;
   onDraftSubmit?: () => void;
   onDraftTextChange?: (value: string) => void;
+  onBranchOperation?: (operation: BranchOperation) => void;
 };
 
 export type ThreadGraphFlowEdgeData = {

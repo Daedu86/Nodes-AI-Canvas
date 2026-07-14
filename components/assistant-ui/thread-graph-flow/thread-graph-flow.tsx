@@ -273,6 +273,30 @@ export function ThreadGraphFlow() {
     [applyCanvasSelection, cutLink],
   );
 
+  const handleNodeBranchOperation = React.useCallback(
+    (nodeId: string, operation: Parameters<typeof beginDraft>[1]) => {
+      const anchor = nodeIndex.get(nodeId);
+      if (!anchor) return;
+      clearRequestError();
+      setCanvasDraftError(null);
+      const initialText =
+        anchor.role === "user" && operation !== "create-follow-up-prompt"
+          ? anchor.text
+          : "";
+      beginDraft(anchor.id, operation, initialText);
+      applyCanvasSelection(anchor.id);
+      setFlowRenderMode("2d");
+    },
+    [
+      applyCanvasSelection,
+      beginDraft,
+      clearRequestError,
+      nodeIndex,
+      setCanvasDraftError,
+      setFlowRenderMode,
+    ],
+  );
+
   const {
     decoratedFlowEdges,
     decoratedFlowNodes,
@@ -303,6 +327,7 @@ export function ThreadGraphFlow() {
     draftDetail,
     getArtifactsForTarget,
     handleCancelPromptDraft,
+    handleNodeBranchOperation,
     handleCancelRun,
     handleCutEdge,
     handleSubmitBranchDraft,
@@ -549,7 +574,7 @@ export function ThreadGraphFlow() {
         selectedCanvasPreview,
         selectedNodeId,
         showCanvasPromptCta,
-        showInspector,
+        showInspector: false,
         spotlight,
         toolbarMenu,
         toolbarMenuRef,
