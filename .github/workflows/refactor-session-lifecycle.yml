@@ -65,17 +65,19 @@ jobs:
 
           hook_path = Path("components/context/use-session-lifecycle.ts")
           hook = hook_path.read_text(encoding="utf-8")
-          old = '''      } catch {
-                setSessions((current) =>
-                  filterRemovedSessions(current, [sessionId]),
-                );
-              }
-          '''
-          new = '''      } catch {
-                remaining = filterRemovedSessions(sessionsRef.current, [sessionId]);
-                setSessions(remaining);
-              }
-          '''
+          old = (
+              "      } catch {\n"
+              "        setSessions((current) =>\n"
+              "          filterRemovedSessions(current, [sessionId]),\n"
+              "        );\n"
+              "      }\n"
+          )
+          new = (
+              "      } catch {\n"
+              "        remaining = filterRemovedSessions(sessionsRef.current, [sessionId]);\n"
+              "        setSessions(remaining);\n"
+              "      }\n"
+          )
           if hook.count(old) != 1:
               raise RuntimeError("Could not preserve fallback session-list recovery.")
           hook_path.write_text(hook.replace(old, new, 1), encoding="utf-8")
