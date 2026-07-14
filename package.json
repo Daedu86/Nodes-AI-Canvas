@@ -33,9 +33,10 @@
     "benchmark:canvas:ci": "npm run benchmark:canvas:budget && npm run benchmark:canvas",
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "audit:all": "npm audit --audit-level=critical",
-    "check": "npm run format:check && npm run typecheck && npm run test:coverage && npm run test:critical-coverage",
+    "check": "npm run format:check && npm run typecheck && npm run typecheck:e2e && npm run test:coverage && npm run test:critical-coverage",
     "test:ci": "npm run check && npm run build:budget && npm run test:e2e -- --workers=1",
-    "test:a11y:e2e": "playwright test accessibility.spec.ts"
+    "test:a11y:e2e": "playwright test accessibility.spec.ts",
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.11",

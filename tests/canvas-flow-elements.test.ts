@@ -133,6 +133,7 @@ const createParams = () => {
     requestError: null,
     runCanvasPrompt: vi.fn(),
     setDraftText: vi.fn(),
+    setDraftContextScope: vi.fn(),
     updateArtifact: vi.fn(),
   };
 };
@@ -163,6 +164,7 @@ describe("buildCanvasFlowElements", () => {
       draft: {
         anchorId: "user-1",
         operation: "create-sibling-prompt",
+        contextScope: null,
         text: "Alternative question",
         inputArtifactIds: [],
         outputArtifactIds: ["artifact-1"],

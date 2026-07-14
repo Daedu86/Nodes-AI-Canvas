@@ -406,10 +406,12 @@ export const validateSessionCanvasConnection = ({
   return { ok: true, link: candidate };
 };
 
-const makeRevisionId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `revision-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+const makeRevisionId = () => {
+  if (typeof crypto === "undefined" || typeof crypto.randomUUID !== "function") {
+    throw new Error("Secure random UUID generation is unavailable.");
+  }
+  return crypto.randomUUID();
+};
 
 export const appendArtifactRevision = (
   artifact: SessionArtifact,
@@ -459,19 +461,20 @@ const trimArtifactText = (value: string, maxLength = 220) => {
   return compact.length > maxLength ? `${compact.slice(0, maxLength - 1)}…` : compact;
 };
 
+const escapeMarkdownTableCell = (value: unknown) =>
+  String(value ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .replace(/\s+/g, " ")
+    .trim();
+
 const markdownTableFromRows = (rows: Array<Record<string, unknown>>) => {
   const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
   if (columns.length === 0) return null;
-  const escape = (value: unknown) =>
-    String(value ?? "")
-      .replace(/\\/g, "\\\\")
-      .replace(/\|/g, "\\|")
-      .replace(/\s+/g, " ")
-      .trim();
   return [
-    `| ${columns.map(escape).join(" | ")} |`,
+    `| ${columns.map(escapeMarkdownTableCell).join(" | ")} |`,
     `| ${columns.map(() => "---").join(" | ")} |`,
-    ...rows.map((row) => `| ${columns.map((column) => escape(row[column])).join(" | ")} |`),
+    ...rows.map((row) => `| ${columns.map((column) => escapeMarkdownTableCell(row[column])).join(" | ")} |`),
   ].join("\n");
 };
 
@@ -512,9 +515,11 @@ const parseDelimitedTable = (text: string) => {
   if (width < 2 || rows.some((row) => row.length !== width)) return null;
   const [header, ...body] = rows;
   return [
-    `| ${header.join(" | ")} |`,
+    `| ${header.map(escapeMarkdownTableCell).join(" | ")} |`,
     `| ${header.map(() => "---").join(" | ")} |`,
-    ...body.map((row) => `| ${row.join(" | ")} |`),
+    ...body.map(
+      (row) => `| ${row.map(escapeMarkdownTableCell).join(" | ")} |`,
+    ),
   ].join("\n");
 };
 

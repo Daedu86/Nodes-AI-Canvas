@@ -539,7 +539,6 @@ export function ThreadGraphFlow() {
     selectedCanvasPreview,
     selectedPreview,
     showCanvasPromptCta,
-    showInspector,
   } = useCanvasInspectorViewModel({
     canvasConversationNodes,
     draft,

@@ -11,13 +11,16 @@ const PLAYWRIGHT_BASE_URL =
 
 async function fetchAppJson<T>(page: Page, input: string, init?: RequestInit) {
   const url = new URL(input, page.url()).toString();
-  const { body, ...rest } = init ?? {};
+  const { body, headers, ...rest } = init ?? {};
+  const normalizedHeaders = headers
+    ? Object.fromEntries(new Headers(headers).entries())
+    : {};
   const response = await page.request.fetch(url, {
+    ...rest,
     headers: {
       "Content-Type": "application/json",
-      ...(rest.headers ?? {}),
+      ...normalizedHeaders,
     },
-    ...rest,
     ...(body === undefined ? {} : { data: body }),
   });
   if (!response.ok()) {
