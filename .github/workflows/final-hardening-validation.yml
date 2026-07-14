@@ -1,8 +1,10 @@
 name: Final hardening validation
 
 on:
-  issues:
-    types: [opened]
+  push:
+    branches: [main]
+    paths:
+      - .ci-validation-trigger
 
 permissions:
   actions: read
@@ -11,7 +13,7 @@ permissions:
   security-events: write
 
 concurrency:
-  group: final-hardening-validation-${{ github.event.issue.number }}
+  group: final-hardening-validation
   cancel-in-progress: false
 
 env:
@@ -22,10 +24,10 @@ env:
   AUTH_ENABLE_DEV_CREDENTIALS: "0"
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
+  VALIDATION_ISSUE: "98"
 
 jobs:
   validate:
-    if: github.event.issue.title == '[automation] Final hardening validation'
     runs-on: ubuntu-latest
     timeout-minutes: 75
 
@@ -33,7 +35,7 @@ jobs:
       - name: Report start
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue comment "${{ github.event.issue.number }}" --body "Final hardening validation started on main."
+        run: gh issue comment "$VALIDATION_ISSUE" --body "Final hardening validation started on main."
 
       - name: Checkout main
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -149,8 +151,8 @@ jobs:
             echo
             cat /tmp/codeql-summary.md
           } > /tmp/final-validation-success.md
-          gh issue comment "${{ github.event.issue.number }}" --body-file /tmp/final-validation-success.md
-          gh issue close "${{ github.event.issue.number }}" --reason completed
+          gh issue comment "$VALIDATION_ISSUE" --body-file /tmp/final-validation-success.md
+          gh issue close "$VALIDATION_ISSUE" --reason completed
 
       - name: Report failure
         if: failure()
@@ -175,4 +177,4 @@ jobs:
               fi
             done
           } > /tmp/final-validation-failure.md
-          gh issue comment "${{ github.event.issue.number }}" --body-file /tmp/final-validation-failure.md
+          gh issue comment "$VALIDATION_ISSUE" --body-file /tmp/final-validation-failure.md
