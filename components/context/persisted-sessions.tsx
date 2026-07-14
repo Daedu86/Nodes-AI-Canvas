@@ -2,19 +2,9 @@
 
 import React from "react";
 import {
-  dedupeResourceIds,
-  fetchApi,
-  fetchJson,
-  readStoredResourceId,
-  writeStoredResourceId,
-} from "@/lib/client/persisted-resource-client";
-import {
   patchSessionRequest,
-  pickSessionId,
-  recoverSessionDocumentFromCache,
   shouldKeepaliveSessionPatch,
   type ActiveSessionDocumentPatch,
-  type SessionResponse,
 } from "@/lib/client/session-persistence";
 import { SessionConflictDialog } from "@/components/context/session-conflict-dialog";
 import {
@@ -22,6 +12,7 @@ import {
   useSerialTaskQueue,
 } from "@/components/context/use-persisted-resource-state";
 import { useSessionConflictResolution } from "@/components/context/use-session-conflict-resolution";
+import { useSessionLifecycle } from "@/components/context/use-session-lifecycle";
 import { useSession } from "next-auth/react";
 import type {
   SessionDocument,
@@ -44,19 +35,7 @@ type PersistedSessionsContextValue = {
   sessions: SessionSummary[];
 };
 
-type SessionsListResponse = {
-  sessions: SessionSummary[];
-};
-
 const PersistedSessionsContext = React.createContext<PersistedSessionsContextValue | null>(null);
-
-const readStoredActiveSessionId = (userId: string | null) =>
-  readStoredResourceId("session", userId, { urlParam: "sessionId" });
-
-const writeStoredActiveSessionId = (
-  userId: string | null,
-  sessionId: string | null,
-) => writeStoredResourceId("session", userId, sessionId);
 
 export function PersistedSessionsProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -73,7 +52,6 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
     updateKnownResource: updateKnownSession,
   } = usePersistedResourceState<SessionSummary, SessionDocument>();
   const enqueueSessionSave = useSerialTaskQueue<void>(undefined);
-  const [isReady, setIsReady] = React.useState(false);
   const {
     hasSessionConflict,
     isResolvingConflict,
@@ -85,254 +63,26 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
     activeSessionRef,
     updateKnownSession,
   });
-
-  const loadSession = React.useCallback(async (sessionId: string) => {
-    const data = await fetchJson<SessionResponse>(`/api/sessions/${sessionId}`);
-    const sessionDoc = await recoverSessionDocumentFromCache(
-      data.session,
-      registerSessionConflict,
-    );
-
-    setActiveSession(sessionDoc);
-    writeStoredActiveSessionId(userId, sessionDoc.id);
-    return sessionDoc;
-  }, [registerSessionConflict, setActiveSession, userId]);
-
-  const refreshSessions = React.useCallback(async () => {
-    const data = await fetchJson<SessionsListResponse>("/api/sessions?includeArchived=1");
-    setSessions(data.sessions);
-    return data.sessions;
-  }, [setSessions]);
-
-  const bootstrap = React.useCallback(async () => {
-    if (status === "loading") {
-      return;
-    }
-    if (!userId) {
-      sessionsRef.current = [];
-      activeSessionRef.current = null;
-      setSessions([]);
-      setActiveSession(null);
-      setIsReady(true);
-      return;
-    }
-    setIsReady(false);
-    try {
-      let nextSessions = await refreshSessions();
-
-      if (nextSessions.length === 0) {
-        const created = await fetchJson<SessionResponse>("/api/sessions", {
-          method: "POST",
-          body: JSON.stringify({}),
-        });
-        nextSessions = [created.session, ...nextSessions.filter((item) => item.id !== created.session.id)];
-        sessionsRef.current = nextSessions;
-        activeSessionRef.current = created.session;
-        setSessions(nextSessions);
-        setActiveSession(created.session);
-        writeStoredActiveSessionId(userId, created.session.id);
-        return;
-      }
-
-      setSessions(nextSessions);
-      const preferredId = pickSessionId(nextSessions, {
-        preferredId: readStoredActiveSessionId(userId),
-      });
-
-      if (preferredId) {
-        try {
-          await loadSession(preferredId);
-        } catch {
-          const fallbackSessionId = pickSessionId(nextSessions, {
-            excludeIds: [preferredId],
-          });
-          if (fallbackSessionId) {
-            await loadSession(fallbackSessionId);
-          } else {
-            setActiveSession(null);
-            writeStoredActiveSessionId(userId, null);
-          }
-        }
-      } else {
-        setActiveSession(null);
-        writeStoredActiveSessionId(userId, null);
-      }
-    } finally {
-      setIsReady(true);
-    }
-  }, [
+  const {
+    archiveSession,
+    createSession,
+    deleteSession,
+    deleteSessions,
+    isReady,
+    recoverMissingSession,
+    selectSession,
+  } = useSessionLifecycle({
     activeSessionRef,
-    loadSession,
-    refreshSessions,
+    getKnownSession,
+    prependSession,
+    registerSessionConflict,
     sessionsRef,
     setActiveSession,
     setSessions,
     status,
-    userId,
-  ]);
-
-  React.useEffect(() => {
-    void bootstrap();
-  }, [bootstrap]);
-
-  const selectSession = React.useCallback(async (sessionId: string) => {
-    setIsReady(false);
-    await loadSession(sessionId);
-    setIsReady(true);
-  }, [loadSession]);
-
-  const createSession = React.useCallback(async () => {
-    setIsReady(false);
-    const data = await fetchJson<SessionResponse>("/api/sessions", {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-    prependSession(data.session);
-    setActiveSession(data.session);
-    writeStoredActiveSessionId(userId, data.session.id);
-    setIsReady(true);
-  }, [prependSession, setActiveSession, userId]);
-
-  const archiveSession = React.useCallback(async (sessionId: string) => {
-    const knownSession = getKnownSession(sessionId);
-    if (!knownSession) return;
-    const attemptedPatch = { archived: true };
-    let data: SessionResponse;
-    try {
-      data = await patchSessionRequest(sessionId, attemptedPatch, knownSession.version);
-    } catch (error) {
-      if (registerSessionConflict(sessionId, attemptedPatch, error)) return;
-      throw error;
-    }
-    updateKnownSession(data.session);
-    const remaining = await refreshSessions();
-    if (activeSessionRef.current?.id !== sessionId) {
-      return;
-    }
-    const nextSessionId = pickSessionId(remaining, { excludeIds: [sessionId] });
-    if (nextSessionId) {
-      setIsReady(false);
-      try {
-        await loadSession(nextSessionId);
-        setIsReady(true);
-      } catch {
-        await createSession();
-      }
-      return;
-    }
-    setActiveSession(data.session);
-    await createSession();
-  }, [
-    activeSessionRef,
-    createSession,
-    getKnownSession,
-    loadSession,
-    refreshSessions,
-    registerSessionConflict,
-    setActiveSession,
     updateKnownSession,
-  ]);
-
-  const deleteSessions = React.useCallback(async (sessionIds: string[]) => {
-    const uniqueSessionIds = dedupeResourceIds(sessionIds);
-    if (uniqueSessionIds.length === 0) return;
-
-    await fetchApi(
-      "/api/sessions",
-      {
-        method: "DELETE",
-        body: JSON.stringify({ sessionIds: uniqueSessionIds }),
-      },
-      { allowedStatuses: [404] },
-    );
-
-    const remaining = await refreshSessions();
-
-    if (!activeSessionRef.current?.id || !uniqueSessionIds.includes(activeSessionRef.current.id)) {
-      return;
-    }
-
-    const nextSessionId = pickSessionId(remaining, {
-      excludeIds: uniqueSessionIds,
-      preferredId: readStoredActiveSessionId(userId),
-    });
-
-    if (nextSessionId) {
-      setIsReady(false);
-      try {
-        await loadSession(nextSessionId);
-        setIsReady(true);
-      } catch {
-        await createSession();
-      }
-      return;
-    }
-
-    writeStoredActiveSessionId(userId, null);
-    setActiveSession(null);
-    await createSession();
-  }, [
-    activeSessionRef,
-    createSession,
-    loadSession,
-    refreshSessions,
-    setActiveSession,
     userId,
-  ]);
-
-  const deleteSession = React.useCallback(async (sessionId: string) => {
-    await deleteSessions([sessionId]);
-  }, [deleteSessions]);
-
-  const recoverMissingSession = React.useCallback(async (sessionId: string) => {
-    let remaining: SessionSummary[] = [];
-    try {
-      remaining = await refreshSessions();
-    } catch {
-      const next = sessionsRef.current.filter((item) => item.id !== sessionId);
-      setSessions(next);
-    }
-
-    const visibleSessions = remaining.filter((item) => item.id !== sessionId);
-    if (remaining.length > 0) {
-      setSessions(visibleSessions);
-    }
-
-    if (activeSessionRef.current?.id !== sessionId) {
-      return;
-    }
-
-    const nextSessionId = pickSessionId(visibleSessions, {
-      preferredId: readStoredActiveSessionId(userId),
-    });
-
-    if (nextSessionId) {
-      setIsReady(false);
-      try {
-        await loadSession(nextSessionId);
-      } catch {
-        writeStoredActiveSessionId(userId, null);
-        setActiveSession(null);
-        await createSession();
-      } finally {
-        setIsReady(true);
-      }
-      return;
-    }
-
-    writeStoredActiveSessionId(userId, null);
-    setActiveSession(null);
-    await createSession();
-  }, [
-    activeSessionRef,
-    createSession,
-    loadSession,
-    refreshSessions,
-    sessionsRef,
-    setActiveSession,
-    setSessions,
-    userId,
-  ]);
+  });
 
   const renameSession = React.useCallback(async (sessionId: string, title: string | null) => {
     const knownSession = getKnownSession(sessionId);
