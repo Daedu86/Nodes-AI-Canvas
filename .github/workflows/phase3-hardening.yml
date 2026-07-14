@@ -49,6 +49,44 @@ jobs:
           set -o pipefail
           {
             node scripts/apply-phase3-hardening.mjs
+            python - <<'PY'
+          from pathlib import Path
+
+          fixture_path = Path("tests/e2e/fixtures/app.ts")
+          fixture = fixture_path.read_text()
+          old = '''  const { body, ...rest } = init ?? {};
+            const response = await page.request.fetch(url, {
+              headers: {
+                "Content-Type": "application/json",
+                ...(rest.headers ?? {}),
+              },
+              ...rest,
+              ...(body === undefined ? {} : { data: body }),
+            });'''
+          new = '''  const { body, headers, ...rest } = init ?? {};
+            const normalizedHeaders = headers
+              ? Object.fromEntries(new Headers(headers).entries())
+              : {};
+            const response = await page.request.fetch(url, {
+              ...rest,
+              headers: {
+                "Content-Type": "application/json",
+                ...normalizedHeaders,
+              },
+              ...(body === undefined ? {} : { data: body }),
+            });'''
+          if old not in fixture:
+              raise SystemExit("fixture headers marker not found")
+          fixture_path.write_text(fixture.replace(old, new))
+
+          session_path = Path("tests/e2e/session-return-send.spec.ts")
+          session_source = session_path.read_text()
+          old_import = 'import { ensureSignedIn, fetchAppJson, resetAppData, type Page } from "./fixtures/app";'
+          new_import = 'import { ensureSignedIn, fetchAppJson, PLAYWRIGHT_BASE_URL, resetAppData, type Page } from "./fixtures/app";'
+          if old_import not in session_source:
+              raise SystemExit("session fixture import marker not found")
+          session_path.write_text(session_source.replace(old_import, new_import))
+          PY
             npm run format
             npm run check
             npm run build:budget
