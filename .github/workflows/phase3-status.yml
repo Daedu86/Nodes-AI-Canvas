@@ -13,18 +13,22 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Report final phase 3 status
+      - name: Report final phase 3 failure
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_ID: "29342183812"
         shell: bash
         run: |
+          gh run view "$RUN_ID" --repo "${{ github.repository }}" --log-failed > /tmp/phase3-final.log
           {
-            echo 'Final Phase 3 validation status:'
+            echo 'Final Phase 3 failure diagnostic:'
             echo
-            echo '```json'
-            gh run list --repo "${{ github.repository }}" --workflow phase3-hardening.yml --limit 4 --json databaseId,status,conclusion,createdAt,updatedAt,headSha,displayTitle
+            echo '```text'
+            grep -E '^[^[:space:]].*tests/e2e/|^[[:space:]]+[0-9]+\)|[0-9]+ failed|Error:|TimeoutError:|expect\(' /tmp/phase3-final.log | tail -n 180 || true
+            echo '--- final 120 lines ---'
+            tail -n 120 /tmp/phase3-final.log
             echo '```'
           } > /tmp/phase3-status.md
           gh issue comment 89 --repo "${{ github.repository }}" --body-file /tmp/phase3-status.md
