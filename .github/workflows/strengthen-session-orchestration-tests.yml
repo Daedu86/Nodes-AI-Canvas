@@ -48,6 +48,19 @@ jobs:
         run: |
           echo "VALIDATION_STAGE=extraction" >> "$GITHUB_ENV"
           set -o pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/strengthen-session-orchestration-tests.py")
+          text = path.read_text(encoding="utf-8")
+          old = '''    ''' + "'''" + '''  const hasSessionConflict = React.useCallback(\\n    (sessionId: string) =>\\n      matchesSessionConflict(sessionConflictRef.current, sessionId),\\n    [],\\n  );\\n\\n  const loadLatestConflictVersion = React.useCallback(() => {\\n''' + "'''" + ''',
+          '''
+          new = '''    ''' + "'''" + '''  const hasSessionConflict = React.useCallback(\\n    (sessionId: string) =>\\n      matchesSessionConflict(sessionConflictRef.current, sessionId),\\n    [],\\n  );\\n\\n''' + "'''" + ''',
+          '''
+          if text.count(old) != 1:
+              raise RuntimeError("Could not remove the duplicated conflict callback marker.")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
           python scripts/strengthen-session-orchestration-tests.py 2>&1 | tee /tmp/validation.log
 
       - name: Install dependencies
@@ -97,7 +110,7 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
 
           git rm .github/workflows/strengthen-session-orchestration-tests.yml
-          git rm scripts/strengthen-session-orchestration-tests.py
+          git rm -f scripts/strengthen-session-orchestration-tests.py
           git add \
             components/context/use-persisted-resource-state.ts \
             components/context/use-session-conflict-resolution.ts \
