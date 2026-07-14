@@ -1,0 +1,72 @@
+name: Complete frontend data layer
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+  VERCEL_ENV: preview
+  NODES_PERSISTENCE_BACKEND: file
+  AUTH_ENABLE_DEV_CREDENTIALS: "0"
+  OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
+  OPENROUTER_REQUIRE_USER_KEY: "1"
+
+jobs:
+  refactor:
+    if: github.event.issue.title == '[automation] Complete frontend data layer'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --fund=false
+
+      - name: Apply frontend data-layer refactor
+        run: node scripts/complete-frontend-data-layer.mjs
+
+      - name: Format generated changes
+        run: npm run format
+
+      - name: Validate quality and coverage
+        run: npm run check
+
+      - name: Validate production build and bundle budget
+        run: npm run build:budget
+
+      - name: Publish validated code
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm scripts/complete-frontend-data-layer.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/context/reusable-memory.tsx components/context/llm-settings.tsx lib/client tests scripts/complete-frontend-data-layer.mjs
+          git diff --cached --check
+          git commit -m "refactor: complete frontend data layer [skip vercel]"
+          git pull --rebase origin main
+          git push origin HEAD:main
+          gh issue comment "${{ github.event.issue.number }}" --body "Validation passed and the frontend data-layer refactor was published to main."
+
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue comment "${{ github.event.issue.number }}" --body "Frontend data-layer validation failed. No validated implementation was published."
