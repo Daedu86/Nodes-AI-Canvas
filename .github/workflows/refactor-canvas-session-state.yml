@@ -49,6 +49,48 @@ jobs:
           echo "VALIDATION_STAGE=extraction" >> "$GITHUB_ENV"
           set -o pipefail
           python scripts/refactor-canvas-session-state.py 2>&1 | tee /tmp/validation.log
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx")
+          text = path.read_text(encoding="utf-8")
+          replacements = [
+              (
+                  "  }, [toolbarMenu]);",
+                  "  }, [setToolbarMenu, toolbarMenu]);",
+              ),
+              (
+                  "  }, [decoratedFlowNodes.length, reactFlowInstance, treeStructureSignature]);",
+                  "  }, [decoratedFlowNodes.length, reactFlowInstance, setStoredViewport, treeSignatureRef, treeStructureSignature]);",
+              ),
+              (
+                  "  }, [focusedMessageId, nodeIndex, reactFlowInstance]);",
+                  "  }, [focusedMessageId, nodeIndex, reactFlowInstance, setStoredViewport]);",
+              ),
+              (
+                  "  }, [densityMode, reactFlowInstance, selectedNodeId, visibleFlowNodes.length]);",
+                  "  }, [densityMode, reactFlowInstance, selectedNodeId, setStoredViewport, visibleFlowNodes.length]);",
+              ),
+              (
+                  "  }, [draft, flowRenderMode, reactFlowInstance]);",
+                  "  }, [draft, flowRenderMode, reactFlowInstance, setStoredViewport]);",
+              ),
+              (
+                  "  }, [reactFlowInstance, selectedNodeId]);",
+                  "  }, [reactFlowInstance, selectedNodeId, setStoredViewport]);",
+              ),
+              (
+                  "  }, [reactFlowInstance]);",
+                  "  }, [reactFlowInstance, setStoredViewport]);",
+              ),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"Expected one dependency block {old!r}, found {count}.")
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
 
       - name: Install dependencies
         run: |
