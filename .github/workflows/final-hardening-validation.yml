@@ -16,10 +16,6 @@ permissions:
   issues: write
   security-events: write
 
-concurrency:
-  group: final-hardening-validation
-  cancel-in-progress: false
-
 env:
   CI: "true"
   NEXT_TELEMETRY_DISABLED: "1"
