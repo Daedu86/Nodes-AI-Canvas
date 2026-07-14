@@ -1,1 +1,1 @@
-inspect focused diagnostic status
+inspect latest structural diagnostic status
