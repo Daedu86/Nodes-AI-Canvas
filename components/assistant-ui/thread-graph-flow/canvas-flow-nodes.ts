@@ -208,6 +208,7 @@ export function buildDraftFlowNodes({
   nodeIndex,
   requestError,
   setDraftText,
+  setDraftContextScope,
 }: Pick<
   CanvasFlowElementsParams,
   | "canvasDraftError"
@@ -225,6 +226,7 @@ export function buildDraftFlowNodes({
   | "nodeIndex"
   | "requestError"
   | "setDraftText"
+  | "setDraftContextScope"
 >): ThreadGraphFlowNode[] {
   if (!draft || !draftBranchSpec || !draftDetail) return [];
   const sourceNode =
@@ -248,6 +250,7 @@ export function buildDraftFlowNodes({
         draftOperation: draft.operation,
         draftRunInterruptionNote: isThreadRunning ? CANVAS_BRANCH_RUN_NOTICE : null,
         draftText: draft.text,
+        draftContextScope: draft.contextScope,
         emphasis: "normal",
         filterMatched: true,
         kind: "prompt-draft",
@@ -259,6 +262,7 @@ export function buildDraftFlowNodes({
         onDraftCancelRun: isThreadRunning ? handleCancelRun : undefined,
         onDraftSubmit: handleSubmitBranchDraft,
         onDraftTextChange: setDraftText,
+        onDraftContextScopeChange: setDraftContextScope,
       },
     },
   ];

@@ -25,6 +25,8 @@ export type ThreadGraphFlowNodeData = {
   draftOperation?: BranchOperation | null;
   draftRunInterruptionNote?: string | null;
   draftText?: string;
+  draftContextScope?: "parent" | "branch" | "tree" | null;
+  onDraftContextScopeChange?: (scope: "parent" | "branch" | "tree") => void;
   emphasis?: "normal" | "selected" | "lineage" | "muted";
   editedFromId?: string | null;
   fileName?: string | null;

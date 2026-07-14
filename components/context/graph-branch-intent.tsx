@@ -2,10 +2,12 @@
 
 import React from "react";
 import type { BranchOperation } from "@/lib/thread-branching";
+export type ContextScope = "parent" | "branch" | "tree";
 
 export type GraphBranchIntent = {
   anchorId: string;
   operation: BranchOperation;
+  contextScope: ContextScope | null;
   text: string;
   inputArtifactIds: string[];
   outputArtifactIds: string[];
@@ -16,6 +18,7 @@ type BeginDraftOptions = {
   inputArtifactIds?: string[];
   outputArtifactIds?: string[];
   position?: { x: number; y: number } | null;
+  contextScope?: ContextScope | null;
 };
 
 type GraphBranchIntentContextValue = {
@@ -32,6 +35,7 @@ type GraphBranchIntentContextValue = {
     artifactIds: string[],
   ) => void;
   setDraftText: (value: string) => void;
+  setDraftContextScope: (scope: ContextScope) => void;
   setDraftPosition: (position: { x: number; y: number } | null) => void;
   toggleDraftArtifact: (
     relation: "input" | "output",
@@ -63,6 +67,7 @@ export function GraphBranchIntentProvider({
       setDraft({
         anchorId,
         operation,
+        contextScope: options.contextScope ?? null,
         text: initialText,
         inputArtifactIds: uniqueIds(options.inputArtifactIds ?? []),
         outputArtifactIds: uniqueIds(options.outputArtifactIds ?? []),
@@ -78,6 +83,9 @@ export function GraphBranchIntentProvider({
 
   const setDraftText = React.useCallback((value: string) => {
     setDraft((current) => (current ? { ...current, text: value } : current));
+  }, []);
+  const setDraftContextScope = React.useCallback((contextScope: ContextScope) => {
+    setDraft((current) => (current ? { ...current, contextScope } : current));
   }, []);
 
   const setDraftPosition = React.useCallback((position: { x: number; y: number } | null) => {
@@ -118,6 +126,7 @@ export function GraphBranchIntentProvider({
       setDraftArtifactIds,
       setDraftPosition,
       setDraftText,
+      setDraftContextScope,
       toggleDraftArtifact,
     }),
     [
@@ -127,6 +136,7 @@ export function GraphBranchIntentProvider({
       setDraftArtifactIds,
       setDraftPosition,
       setDraftText,
+      setDraftContextScope,
       toggleDraftArtifact,
     ],
   );

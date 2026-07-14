@@ -55,6 +55,7 @@ export type CanvasFlowElementsParams = {
   requestError: string | null;
   runCanvasPrompt: CanvasRunManagerApi["runPrompt"];
   setDraftText: (value: string) => void;
+  setDraftContextScope: (scope: "parent" | "branch" | "tree") => void;
   updateArtifact: SessionArtifactsApi["updateArtifact"];
 };
 
