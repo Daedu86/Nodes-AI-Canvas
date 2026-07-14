@@ -11,7 +11,7 @@ permissions:
   security-events: write
 
 concurrency:
-  group: final-hardening-validation
+  group: final-hardening-validation-${{ github.event.issue.number }}
   cancel-in-progress: false
 
 env:
@@ -30,6 +30,11 @@ jobs:
     timeout-minutes: 75
 
     steps:
+      - name: Report start
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --body "Final hardening validation started on main."
+
       - name: Checkout main
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
