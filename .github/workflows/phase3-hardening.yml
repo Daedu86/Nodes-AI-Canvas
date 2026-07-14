@@ -1,8 +1,9 @@
 name: Apply phase 3 hardening
 
 on:
-  issues:
-    types: [opened]
+  push:
+    branches: [main]
+    paths: ["phase3-trigger.txt"]
 
 permissions:
   contents: write
@@ -20,10 +21,10 @@ env:
   AUTH_ENABLE_DEV_CREDENTIALS: "0"
   OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
   OPENROUTER_REQUIRE_USER_KEY: "1"
+  PHASE3_ISSUE_NUMBER: "89"
 
 jobs:
   harden:
-    if: github.event.issue.title == '[automation] Apply phase 3 hardening'
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
@@ -62,16 +63,16 @@ jobs:
         run: |
           git restore --worktree -- tsconfig.json
           rm -f next-env.d.ts
-          rm scripts/apply-phase3-hardening.mjs
+          rm scripts/apply-phase3-hardening.mjs phase3-trigger.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json tsconfig.e2e.json vitest.critical.config.ts tests/e2e tests/persisted-resource-client-critical.test.ts tests/session-persistence-critical.test.ts
-          git add -A scripts/apply-phase3-hardening.mjs
+          git add -A scripts/apply-phase3-hardening.mjs phase3-trigger.txt
           git diff --cached --check
           git commit -m "test: harden e2e types fixtures and critical coverage [skip vercel]"
           git pull --rebase origin main
           git push origin HEAD:main
-          gh issue comment "${{ github.event.issue.number }}" --body "Validation passed and Phase 3 hardening was published to main."
+          gh issue comment "$PHASE3_ISSUE_NUMBER" --body "Validation passed and Phase 3 hardening was published to main."
 
       - name: Report failure
         if: failure()
@@ -95,4 +96,4 @@ jobs:
             echo '```'
             echo '</details>'
           } > /tmp/phase3-hardening-comment.md
-          gh issue comment "${{ github.event.issue.number }}" --body-file /tmp/phase3-hardening-comment.md
+          gh issue comment "$PHASE3_ISSUE_NUMBER" --body-file /tmp/phase3-hardening-comment.md
