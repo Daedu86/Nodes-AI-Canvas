@@ -15,16 +15,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Report focused diagnostic status
+      - name: Report final phase 3 status
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           {
-            echo 'Focused Phase 3 diagnostic status:'
+            echo 'Final Phase 3 validation status:'
             echo
             echo '```json'
-            gh run list --repo "${{ github.repository }}" --workflow phase3-e2e-diagnostic.yml --limit 4 --json databaseId,status,conclusion,createdAt,updatedAt,headSha,displayTitle
+            gh run list --repo "${{ github.repository }}" --workflow phase3-hardening.yml --limit 4 --json databaseId,status,conclusion,createdAt,updatedAt,headSha,displayTitle
             echo '```'
           } > /tmp/phase3-status.md
           gh issue comment 89 --repo "${{ github.repository }}" --body-file /tmp/phase3-status.md
