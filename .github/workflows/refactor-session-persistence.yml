@@ -52,12 +52,61 @@ jobs:
           python <<'PY'
           from pathlib import Path
 
-          path = Path("components/context/persisted-sessions.tsx")
-          text = path.read_text(encoding="utf-8")
-          old = "  type SessionDocumentPatch,\n"
-          if text.count(old) != 1:
-              raise RuntimeError("Could not remove the unused SessionDocumentPatch import.")
-          path.write_text(text.replace(old, "", 1), encoding="utf-8")
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"Expected exactly one {label}, found {count}.")
+              return text.replace(old, new, 1)
+
+          provider_path = Path("components/context/persisted-sessions.tsx")
+          provider = provider_path.read_text(encoding="utf-8")
+          provider = replace_once(
+              provider,
+              "  type SessionDocumentPatch,\n",
+              "",
+              "unused SessionDocumentPatch import",
+          )
+          provider = replace_once(
+              provider,
+              "    isResolvingConflict,\n    keepLocalConflictVersion,",
+              "    hasSessionConflict,\n    isResolvingConflict,\n    keepLocalConflictVersion,",
+              "conflict hook destructuring",
+          )
+          provider = replace_once(
+              provider,
+              "      if (sessionConflictRef.current?.sessionId === targetSessionId) return;",
+              "      if (hasSessionConflict(targetSessionId)) return;",
+              "conflict save guard",
+          )
+          provider = replace_once(
+              provider,
+              "    activeSessionRef,\n    enqueueSessionSave,",
+              "    activeSessionRef,\n    enqueueSessionSave,\n    hasSessionConflict,",
+              "session save dependencies",
+          )
+          provider_path.write_text(provider, encoding="utf-8")
+
+          hook_path = Path("components/context/use-session-conflict-resolution.ts")
+          hook = hook_path.read_text(encoding="utf-8")
+          hook = replace_once(
+              hook,
+              "  const loadLatestConflictVersion = React.useCallback(() => {",
+              '''  const hasSessionConflict = React.useCallback(
+                (sessionId: string) =>
+                  sessionConflictRef.current?.sessionId === sessionId,
+                [],
+              );
+
+              const loadLatestConflictVersion = React.useCallback(() => {''',
+              "conflict lookup callback",
+          )
+          hook = replace_once(
+              hook,
+              "  return {\n    isResolvingConflict,",
+              "  return {\n    hasSessionConflict,\n    isResolvingConflict,",
+              "conflict hook return value",
+          )
+          hook_path.write_text(hook, encoding="utf-8")
           PY
 
       - name: Install dependencies
