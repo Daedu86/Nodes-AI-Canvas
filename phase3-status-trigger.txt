@@ -1,1 +1,1 @@
-capture current isolated phase 3 status
+refresh isolated phase 3 status 2
