@@ -113,12 +113,17 @@ npm run test:critical-coverage
 npm run benchmark:canvas:budget
 npm run benchmark:canvas
 npm run build
+npm run bundle:budget
+npm run build:budget
 npm run test:e2e
+npm run test:a11y:e2e
 ```
 
 `format` applies the autofixes supplied by the repository's ESLint configuration. `format:check` is the non-mutating form used by CI.
 
-`npm run check` runs formatting/lint validation, TypeScript, repository coverage, and critical-module coverage. `npm run test:ci` adds the Playwright suite with one worker for a deterministic local run.
+`npm run check` runs formatting/lint validation, TypeScript, repository coverage, and critical-module coverage. `npm run test:ci` adds the production build, JavaScript bundle budget, and the standard Playwright suite with one worker for a deterministic local run.
+
+`npm run bundle:budget` inspects the JavaScript chunks from an existing `.next` production build. `npm run build:budget` runs `next build` first and then enforces the gzip limits.
 
 Coverage uses V8 and enforces the thresholds in `vitest.config.ts` and `vitest.critical.config.ts`. The run writes:
 
@@ -126,6 +131,25 @@ Coverage uses V8 and enforces the thresholds in `vitest.config.ts` and `vitest.c
 - `coverage/coverage-summary.json` for tooling.
 - `coverage/critical/index.html` for critical-module inspection.
 - a text summary in the terminal.
+
+## Accessibility E2E
+
+`npm run test:a11y:e2e` runs the focused Playwright accessibility suite. It checks serious and critical axe findings, dialog focus trapping and restoration, and the `inert` behavior of hidden workspace panels.
+
+The default local browser is Chromium. To run the same suite in Firefox:
+
+```bash
+PLAYWRIGHT_BROWSER_NAME=firefox npm run test:a11y:e2e
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:PLAYWRIGHT_BROWSER_NAME="firefox"
+npm run test:a11y:e2e
+```
+
+GitHub Actions runs this suite independently in Chromium and Firefox. Browser-specific clipboard permissions are enabled only for Chromium.
 
 ## Canvas performance
 
@@ -138,7 +162,7 @@ Override either environment variable when calibrating a specific machine. Tighte
 
 `npm run benchmark:canvas` runs the Tinybench suite for 1,000 messages, 300 artifacts/prompts, and 2,000 links. It writes the machine-readable report to `test-results/canvas-benchmark.json`.
 
-GitHub Actions runs linting, type checking, unit and critical coverage, the Canvas performance budget, a production build, dependency audits, and Playwright end-to-end tests across two isolated shards. The Canvas JSON report is retained as a workflow artifact for 14 days. Vercel performs an additional deployment build for previews and production.
+GitHub Actions runs linting, type checking, unit and critical coverage, the Canvas performance budget, a production build, the JavaScript bundle budget, dependency audits, standard Playwright E2E across two isolated Chromium shards, and focused accessibility E2E in Chromium and Firefox. Failure artifacts and selected reports are retained for diagnosis. Vercel performs an additional deployment build for previews and production when the project quota permits it.
 
 ## Contribution workflow
 
