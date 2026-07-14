@@ -1,13 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildWorkspaceOnboardingStorageKey,
   isWorkspaceOnboardingComplete,
-  WORKSPACE_ONBOARDING_STORAGE_KEY,
+  WORKSPACE_ONBOARDING_STORAGE_KEY_PREFIX,
 } from "@/lib/client/workspace-onboarding";
 
 describe("workspace onboarding state", () => {
-  it("uses a versioned storage key", () => {
-    expect(WORKSPACE_ONBOARDING_STORAGE_KEY).toBe(
-      "nodes.workspace-onboarding.completed.v1",
+  it("builds a versioned storage key scoped to the authenticated user", () => {
+    expect(WORKSPACE_ONBOARDING_STORAGE_KEY_PREFIX).toBe(
+      "nodes.workspace-onboarding.completed",
+    );
+    expect(buildWorkspaceOnboardingStorageKey("user-42")).toBe(
+      "nodes.workspace-onboarding.completed.user-42.v1",
+    );
+  });
+
+  it("escapes user identifiers and isolates anonymous sessions", () => {
+    expect(buildWorkspaceOnboardingStorageKey("user/example")).toBe(
+      "nodes.workspace-onboarding.completed.user%2Fexample.v1",
+    );
+    expect(buildWorkspaceOnboardingStorageKey(null)).toBe(
+      "nodes.workspace-onboarding.completed.anonymous.v1",
     );
   });
 

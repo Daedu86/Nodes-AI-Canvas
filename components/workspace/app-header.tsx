@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useSession } from "next-auth/react";
 import { Columns2, MessageSquareText, Workflow, X } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -20,6 +21,7 @@ import { WorkspaceOnboardingDialog } from "@/components/workspace/workspace-onbo
 
 export const AppHeader = () => {
   const { llmEnabled } = useLlmEnabled();
+  const { data: session } = useSession();
   const { viewMode, setViewMode, toggleSplitView } = useSessionUiState();
 
   const viewOptions: Array<{
@@ -87,7 +89,10 @@ export const AppHeader = () => {
         })}
       </div>
       <div className="ml-auto flex items-center gap-2">
-        <WorkspaceOnboardingDialog onOpenCanvas={() => setViewMode("split")} />
+        <WorkspaceOnboardingDialog
+          onOpenCanvas={() => setViewMode("split")}
+          userId={session?.user?.id ?? null}
+        />
         <ModelSelector />
         <SessionContextSheet />
         <span

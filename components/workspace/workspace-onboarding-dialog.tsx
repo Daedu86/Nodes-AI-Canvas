@@ -4,12 +4,13 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { CircleHelp, MessageSquareText, Network, Workflow, X } from "lucide-react";
 import React from "react";
 import {
+  buildWorkspaceOnboardingStorageKey,
   isWorkspaceOnboardingComplete,
-  WORKSPACE_ONBOARDING_STORAGE_KEY,
 } from "@/lib/client/workspace-onboarding";
 
 type WorkspaceOnboardingDialogProps = {
   onOpenCanvas: () => void;
+  userId: string | null;
 };
 
 const onboardingSteps = [
@@ -32,25 +33,30 @@ const onboardingSteps = [
 
 export function WorkspaceOnboardingDialog({
   onOpenCanvas,
+  userId,
 }: WorkspaceOnboardingDialogProps) {
   const [open, setOpen] = React.useState(false);
+  const storageKey = React.useMemo(
+    () => buildWorkspaceOnboardingStorageKey(userId),
+    [userId],
+  );
 
   React.useEffect(() => {
     try {
-      setOpen(!isWorkspaceOnboardingComplete(localStorage.getItem(WORKSPACE_ONBOARDING_STORAGE_KEY)));
+      setOpen(!isWorkspaceOnboardingComplete(localStorage.getItem(storageKey)));
     } catch {
       setOpen(false);
     }
-  }, []);
+  }, [storageKey]);
 
   const completeOnboarding = React.useCallback(() => {
     try {
-      localStorage.setItem(WORKSPACE_ONBOARDING_STORAGE_KEY, "1");
+      localStorage.setItem(storageKey, "1");
     } catch {
       // Ignore storage failures; the dialog remains manually accessible.
     }
     setOpen(false);
-  }, []);
+  }, [storageKey]);
 
   const handleOpenChange = React.useCallback(
     (nextOpen: boolean) => {

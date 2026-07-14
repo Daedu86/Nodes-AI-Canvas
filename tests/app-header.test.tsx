@@ -6,6 +6,14 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 import { SessionUiStateProvider, useSessionUiState } from "@/components/context/session-ui-state";
 import { AppHeader } from "@/components/workspace/app-header";
+import { buildWorkspaceOnboardingStorageKey } from "@/lib/client/workspace-onboarding";
+
+vi.mock("next-auth/react", () => ({
+  useSession: () => ({
+    data: { user: { id: "header-user" } },
+    status: "authenticated",
+  }),
+}));
 
 vi.mock("@/components/ui/sidebar", () => ({
   SidebarTrigger: () => <button type="button">Sidebar</button>,
@@ -55,7 +63,7 @@ function HeaderHarness() {
 describe("AppHeader", () => {
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem("nodes.workspace-onboarding.completed.v1", "1");
+    localStorage.setItem(buildWorkspaceOnboardingStorageKey("header-user"), "1");
     window.history.replaceState({}, "", "/");
   });
 
