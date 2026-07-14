@@ -21,15 +21,11 @@ type CanvasWorkspaceViewProps = {
 };
 
 export function CanvasWorkspaceView({
-  artifactInspectorProps,
   blockLibraryProps,
   fileUploadInputRef,
   imageUploadInputRef,
-  inspectorScrollRef,
-  messageInspectorProps,
   onFileUploadChange,
   onImageUploadChange,
-  sidebarProps,
   stageProps,
 }: CanvasWorkspaceViewProps) {
   return (
@@ -49,41 +45,8 @@ export function CanvasWorkspaceView({
         onChange={onFileUploadChange}
       />
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 p-3 lg:flex-row">
-          <aside
-            aria-label="Canvas controls and block library"
-            data-testid="canvas-sidebar"
-            className="flex min-h-[28rem] shrink-0 overflow-hidden rounded-[24px] border border-white/70 bg-background/96 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 lg:min-h-0 lg:w-fit"
-          >
-            <CanvasBlockLibrary {...blockLibraryProps} />
-            <CanvasSidebar {...sidebarProps} contained>
-            <div
-              ref={inspectorScrollRef}
-              className="max-h-[min(34rem,calc(100vh-11rem))] overflow-y-auto rounded-[26px] border border-border/60 bg-background/85 px-3 py-3 shadow-sm"
-            >
-              {artifactInspectorProps ? (
-                <CanvasArtifactInspector {...artifactInspectorProps} />
-              ) : messageInspectorProps ? (
-                <CanvasMessageInspector {...messageInspectorProps} />
-              ) : (
-                <div className="space-y-2 rounded-[24px] border border-dashed border-border/70 bg-background/80 px-4 py-5 text-left">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Nothing selected
-                  </p>
-                  <p className="text-sm font-medium text-foreground/85">
-                    Pick a message node to branch, or select an artifact to shape
-                    reusable context.
-                  </p>
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    The canvas is your structured input layer. Use it to build
-                    artifacts the model can reason over without losing
-                    human-readable form.
-                  </p>
-                </div>
-              )}
-            </div>
-            </CanvasSidebar>
-          </aside>
+        <div className="flex min-h-0 min-w-0 flex-1 gap-3 p-3">
+          <CanvasBlockLibrary {...blockLibraryProps} />
           <CanvasStage {...stageProps} />
         </div>
       </div>

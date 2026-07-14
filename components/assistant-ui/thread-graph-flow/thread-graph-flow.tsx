@@ -429,6 +429,23 @@ export function ThreadGraphFlow() {
     repoItems,
   ]);
 
+  const interactiveFlowNodes = React.useMemo(
+    () =>
+      decoratedFlowNodes.map((node) =>
+        node.id === ROOT_NODE_ID
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                onCopyGraphJson: handleCopyJson,
+                onToggleLinkEdit: () => setLinkEditMode((current) => !current),
+              },
+            }
+          : node,
+      ),
+    [decoratedFlowNodes, handleCopyJson, setLinkEditMode],
+  );
+
   const handleOpenSelectedInChat = React.useCallback(() => {
     if (!selectedMessageNode || selectedMessageNode.id === ROOT_NODE_ID) return;
     setViewMode("split");
@@ -672,7 +689,7 @@ export function ThreadGraphFlow() {
         edges: decoratedFlowEdges,
         flowRenderMode,
         graphStructureSignature,
-        nodes: decoratedFlowNodes,
+        nodes: interactiveFlowNodes,
         onArtifactPositionChange: (artifactId, position) =>
           updateArtifact(artifactId, { position }),
         onCanvasConnect: handleCanvasConnect,
@@ -685,6 +702,7 @@ export function ThreadGraphFlow() {
           setViewMode("split");
           scrollMessageIntoView(messageId);
         },
+        onFlowRenderModeChange: setFlowRenderMode,
         onNodeSelect: applyCanvasSelection,
         onViewportChange: setStoredViewport,
         selectedNodeId,

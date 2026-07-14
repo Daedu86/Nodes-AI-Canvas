@@ -267,6 +267,12 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
             {branchAction.label}
           </button>
         ) : null}
+        {isRoot && (data.onToggleLinkEdit || data.onCopyGraphJson) ? (
+          <div className="nodrag nopan relative mt-3 flex flex-wrap gap-2">
+            {data.onToggleLinkEdit ? <button type="button" className="rounded-full border border-white/15 bg-white/[0.05] px-3 py-1.5 text-xs text-slate-100 hover:bg-white/[0.1]" onClick={(event) => { event.stopPropagation(); data.onToggleLinkEdit?.(); }}>Edit links</button> : null}
+            {data.onCopyGraphJson ? <button type="button" className="rounded-full border border-white/15 bg-white/[0.05] px-3 py-1.5 text-xs text-slate-100 hover:bg-white/[0.1]" onClick={(event) => { event.stopPropagation(); data.onCopyGraphJson?.(); }}>Copy JSON</button> : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );

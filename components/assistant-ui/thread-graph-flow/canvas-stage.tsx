@@ -70,6 +70,7 @@ type CanvasStageProps = {
     instance: ReactFlowInstance<ThreadGraphFlowNode, ThreadGraphFlowEdge>,
   ) => void;
   onMessageOpen: (messageId: string) => void;
+  onFlowRenderModeChange: (mode: FlowRenderMode) => void;
   onNodeSelect: (nodeId: string | null) => void;
   onViewportChange: (viewport: Viewport) => void;
   selectedNodeId: string | null;
@@ -90,6 +91,7 @@ export function CanvasStage({
   onDraftPositionChange,
   onInit,
   onMessageOpen,
+  onFlowRenderModeChange,
   onNodeSelect,
   onViewportChange,
   selectedNodeId,
@@ -106,6 +108,13 @@ export function CanvasStage({
       onDragOver={onCanvasDragOver}
       onDrop={onCanvasDrop}
     >
+      <div role="group" aria-label="Canvas render mode" className="absolute right-5 top-5 z-20 flex items-center rounded-full border border-white/70 bg-white/92 p-1 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/92">
+        {(["2d", "3d"] as FlowRenderMode[]).map((mode) => (
+          <button key={mode} type="button" aria-pressed={flowRenderMode === mode} onClick={() => onFlowRenderModeChange(mode)} className={`rounded-full px-3 py-2 transition-colors ${flowRenderMode === mode ? "bg-foreground text-background" : "hover:text-foreground"}`}>
+            {mode.toUpperCase()}
+          </button>
+        ))}
+      </div>
       <p id="canvas-stage-instructions" className="sr-only">
         Use Tab to reach canvas controls and graph elements. Select a node to inspect it. Double-click a conversation node to open it in Chat.
       </p>

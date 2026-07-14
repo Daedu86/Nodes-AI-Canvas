@@ -39,6 +39,8 @@ export type CanvasFlowElementsParams = {
   getArtifactsForTarget: SessionArtifactsApi["getArtifactsForTarget"];
   handleCancelPromptDraft: () => void;
   handleNodeBranchOperation?: (nodeId: string, operation: BranchOperation) => void;
+  onCopyGraphJson?: () => void;
+  onToggleLinkEdit?: () => void;
   handleCancelRun: () => void;
   handleCutEdge: (childId: string, parentId: string | null) => void;
   handleSubmitBranchDraft: () => void;
