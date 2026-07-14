@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { chmod, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const args = new Set(process.argv.slice(2));
@@ -20,6 +20,7 @@ const deploy = !args.has("--no-deploy");
 const envFilePath = path.resolve(process.cwd(), ".env.local");
 const vercelEnvironment = "production";
 const defaultOpenRouterRotationLimitUsd = 0.01;
+const allowedProviderHosts = new Set(["openrouter.ai", "api.supabase.com"]);
 
 const shouldRun = (name) => !only || only.has(name);
 
@@ -72,10 +73,6 @@ function setEnvValue(state, name, value) {
   }
   state.values.set(name, value);
 }
-
-
-
-
 
 function runCommand(command, commandArgs) {
   const childEnv = { ...process.env };
@@ -138,8 +135,42 @@ function setVercelSecret(name, value) {
   }
 }
 
+function getAllowedProviderUrl(rawUrl) {
+  const providerUrl = new URL(rawUrl);
+  if (
+    providerUrl.protocol !== "https:" ||
+    providerUrl.username ||
+    providerUrl.password ||
+    !allowedProviderHosts.has(providerUrl.hostname)
+  ) {
+    throw new RotationError("UNTRUSTED_PROVIDER_URL", "Provider request URL is not allowlisted");
+  }
+  return providerUrl;
+}
+
+function validateSecretValue(value, label) {
+  if (
+    typeof value !== "string" ||
+    value.length < 16 ||
+    value.length > 8192 ||
+    /[\r\n\0]/u.test(value)
+  ) {
+    throw new RotationError("INVALID_PROVIDER_SECRET", `${label} returned an invalid secret value`);
+  }
+  return value;
+}
+
+function validateProviderIdentifier(value, label) {
+  if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{1,512}$/u.test(value)) {
+    throw new RotationError("INVALID_PROVIDER_IDENTIFIER", `${label} returned an invalid identifier`);
+  }
+  return value;
+}
+
 async function fetchJson(url, init, label) {
-  const response = await fetch(url, init);
+  const providerUrl = getAllowedProviderUrl(url);
+  // codeql[js/file-access-to-http] This trusted CLI sends selected credentials only to explicitly allowlisted provider APIs.
+  const response = await fetch(providerUrl, init);
   if (!response.ok) {
     throw new RotationError("HTTP_REQUEST_FAILED", `${label} failed with HTTP ${response.status}`);
   }
@@ -188,11 +219,8 @@ async function rotateOpenRouterKey(state, summary, warnings) {
       "OpenRouter key creation",
     );
 
-    newKey = created?.key ?? "";
-    newHash = created?.data?.hash ?? "";
-    if (!newKey || !newHash) {
-      throw new RotationError("INCOMPLETE_PROVIDER_RESPONSE", "OpenRouter key creation returned an incomplete payload");
-    }
+    newKey = validateSecretValue(created?.key, "OpenRouter key creation");
+    newHash = validateProviderIdentifier(created?.data?.hash, "OpenRouter key creation");
   }
 
   const previousHash = getRuntimeEnvValue("OPENROUTER_API_KEY_HASH");
@@ -276,7 +304,10 @@ async function rotateSupabaseSecretKey(state, summary, warnings) {
 
     if (Array.isArray(existingKeys)) {
       const matchedKey = existingKeys.find((entry) => entry?.api_key === currentKey);
-      currentKeyId = typeof matchedKey?.id === "string" ? matchedKey.id : "";
+      currentKeyId =
+        typeof matchedKey?.id === "string"
+          ? validateProviderIdentifier(matchedKey.id, "Supabase API key listing")
+          : "";
     }
   }
 
@@ -296,10 +327,7 @@ async function rotateSupabaseSecretKey(state, summary, warnings) {
       "Supabase API key creation",
     );
 
-    nextKey = created?.api_key ?? "";
-    if (!nextKey) {
-      throw new RotationError("INCOMPLETE_PROVIDER_RESPONSE", "Supabase API key creation returned an incomplete payload");
-    }
+    nextKey = validateSecretValue(created?.api_key, "Supabase API key creation");
   }
 
   setEnvValue(state, "SUPABASE_SERVICE_ROLE_KEY", nextKey);
@@ -374,8 +402,12 @@ async function main() {
   await syncGoogleSecret(summary, warnings);
 
   if (!dryRun) {
-    // codeql[js/http-to-file-access] This trusted CLI persists newly issued keys from fixed provider APIs to the fixed local .env.local file.
-    await writeFile(envFilePath, `${state.lines.join("\n").replace(/\n+$/u, "")}\n`, "utf8");
+    const serializedEnv = `${state.lines.join("\n").replace(/\n+$/u, "")}\n`;
+    // codeql[js/http-to-file-access] Validated rotated secrets are intentionally persisted only to the fixed local .env.local file.
+    await writeFile(envFilePath, serializedEnv, { encoding: "utf8", mode: 0o600 });
+    if (process.platform !== "win32") {
+      await chmod(envFilePath, 0o600);
+    }
   }
 
   await deployProduction(summary);
