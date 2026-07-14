@@ -49,6 +49,16 @@ jobs:
           echo "VALIDATION_STAGE=extraction" >> "$GITHUB_ENV"
           set -o pipefail
           python scripts/refactor-canvas-viewport-controller.py 2>&1 | tee /tmp/validation.log
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx")
+          text = path.read_text(encoding="utf-8")
+          old = "  CANVAS_PROMPT_DRAFT_NODE_ID,\n"
+          if text.count(old) != 1:
+              raise RuntimeError("Could not remove the obsolete canvas draft node import.")
+          path.write_text(text.replace(old, "", 1), encoding="utf-8")
+          PY
 
       - name: Install dependencies
         run: |
