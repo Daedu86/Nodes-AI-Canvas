@@ -1,0 +1,156 @@
+name: Improve accessibility onboarding and bundle budgets
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: improve-accessibility-onboarding-bundle
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+  VERCEL_ENV: preview
+  NODES_PERSISTENCE_BACKEND: file
+  AUTH_ENABLE_DEV_CREDENTIALS: "0"
+  OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
+  OPENROUTER_REQUIRE_USER_KEY: "1"
+
+jobs:
+  improve:
+    if: github.event.issue.title == '[automation] Improve Accessibility Onboarding Bundle'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Report validation start
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "Accessibility, onboarding, and bundle-budget validation started."
+
+      - name: Checkout main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Apply changes
+        run: |
+          echo "VALIDATION_STAGE=extraction" >> "$GITHUB_ENV"
+          set -o pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/improve-workspace-accessibility-onboarding.mjs")
+          text = path.read_text(encoding="utf-8")
+          for expression in (
+              "${pane.label}",
+              "${activeSessionId}",
+              "${mode.toUpperCase()}",
+          ):
+              text = text.replace(expression, "\\" + expression)
+          path.write_text(text, encoding="utf-8")
+          PY
+          node scripts/improve-workspace-accessibility-onboarding.mjs 2>&1 | tee /tmp/validation.log
+
+      - name: Install dependencies
+        run: |
+          echo "VALIDATION_STAGE=dependency installation" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm ci --no-audit --fund=false 2>&1 | tee /tmp/validation.log
+
+      - name: Format generated files
+        run: |
+          echo "VALIDATION_STAGE=formatting" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm run format 2>&1 | tee /tmp/validation.log
+
+      - name: Validate formatting and types
+        run: |
+          echo "VALIDATION_STAGE=lint and TypeScript" >> "$GITHUB_ENV"
+          set -o pipefail
+          (npm run format:check && npm run typecheck) 2>&1 | tee /tmp/validation.log
+
+      - name: Run unit tests
+        run: |
+          echo "VALIDATION_STAGE=unit tests" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm run test:unit 2>&1 | tee /tmp/validation.log
+
+      - name: Build production bundle
+        run: |
+          echo "VALIDATION_STAGE=production build" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/validation.log
+          git checkout -- tsconfig.json
+
+      - name: Enforce bundle budgets
+        run: |
+          echo "VALIDATION_STAGE=bundle budget" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm run bundle:budget 2>&1 | tee /tmp/validation.log
+
+      - name: Publish validated changes to main
+        shell: bash
+        run: |
+          echo "VALIDATION_STAGE=publishing to main" >> "$GITHUB_ENV"
+          set -euo pipefail
+          exec > >(tee /tmp/publish.log) 2>&1
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+          git rm .github/workflows/improve-accessibility-onboarding-bundle.yml
+          git rm -f scripts/improve-workspace-accessibility-onboarding.mjs
+          git add \
+            package.json \
+            app/assistant.tsx \
+            components/workspace/app-header.tsx \
+            components/workspace/workspace-onboarding-dialog.tsx \
+            components/workspace/workspace-split-layout.tsx \
+            components/assistant-ui/thread-graph-flow/canvas-stage.tsx \
+            components/assistant-ui/thread-graph-flow/canvas-sidebar.tsx \
+            lib/client/workspace-onboarding.ts \
+            scripts/check-bundle-budget.mjs \
+            tests/bundle-budget.test.mjs \
+            tests/workspace-onboarding.test.ts
+          git diff --check
+          git commit -m "feat: improve accessibility onboarding and bundle budgets [skip vercel]"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: Report validation success
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "Validation passed and the accessibility, onboarding, and bundle-budget improvements were published to main."
+
+      - name: Report validation failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo "Validation failed during **${VALIDATION_STAGE:-preflight}**. No functional changes were published."
+            echo
+            echo "<details><summary>Relevant log tail</summary>"
+            echo
+            echo '```text'
+            if [[ -s /tmp/publish.log ]]; then
+              tail -c 16000 /tmp/publish.log
+            else
+              tail -c 16000 /tmp/validation.log 2>/dev/null || echo "No command log was captured."
+            fi
+            echo '```'
+            echo "</details>"
+          } > /tmp/validation-comment.md
+          gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body-file /tmp/validation-comment.md
