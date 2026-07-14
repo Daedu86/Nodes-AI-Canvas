@@ -48,12 +48,17 @@ jobs:
         run: |
           set -o pipefail
           {
+            echo '[validate] applying transformations'
             node scripts/fix-hardening-preflight.mjs
             node scripts/fix-hardening-test-fixtures.mjs
             node scripts/apply-remaining-hardening.mjs
+            echo '[validate] formatting'
             npm run format
+            echo '[validate] repository checks'
             npm run check
+            echo '[validate] production build and bundle budget'
             npm run build:budget
+            echo '[validate] all gates passed'
           } 2>&1 | tee /tmp/remaining-hardening.log
 
       - name: Publish validated changes to main
@@ -86,9 +91,13 @@ jobs:
           {
             echo 'Remaining hardening validation failed. No implementation commit was published.'
             echo
+            echo 'High-signal errors:'
             echo '```text'
             if [ -f /tmp/remaining-hardening.log ]; then
-              tail -n 220 /tmp/remaining-hardening.log
+              grep -E '\[validate\]|error TS|Type error|Error:|FAIL |failed|threshold|budget|exceeded|warning' /tmp/remaining-hardening.log | tail -n 120 || true
+              echo
+              echo '--- final log lines ---'
+              tail -n 80 /tmp/remaining-hardening.log
             else
               echo 'Validation log was not created.'
             fi
