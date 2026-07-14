@@ -1,4 +1,5 @@
 name: Temporary CodeQL status verification
+# Verification run after the final secret-flow hardening commit.
 
 on:
   push:
