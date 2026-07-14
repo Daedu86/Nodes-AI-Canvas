@@ -48,8 +48,8 @@ jobs:
           from pathlib import Path
           import re
 
-          path = Path("components/context/use-llm-settings-actions.ts")
-          source = path.read_text()
+          actions_path = Path("components/context/use-llm-settings-actions.ts")
+          source = actions_path.read_text()
           source = re.sub(
               r",\s*\[\s*persistSettingsImmediately\s*\]\s*\);",
               ", [persistSettingsImmediately, setSettings]);",
@@ -60,7 +60,46 @@ jobs:
               ", [setSettings]);",
               source,
           )
-          path.write_text(source)
+          actions_path.write_text(source)
+
+          Path("tests/llm-settings-model-options.test.ts").write_text('''import { describe, expect, it } from "vitest";
+          import { buildAvailableModelOptions } from "@/components/context/llm-settings-model-options";
+          import { cloneDefaultLlmSettingsState } from "@/lib/llm/user-settings";
+          import { BUILTIN_MODEL_OPTIONS } from "@/lib/model-options";
+
+          describe("LLM settings model options", () => {
+            it("adds enabled Ollama models to the available catalog", () => {
+              const settings = cloneDefaultLlmSettingsState();
+              settings.providers.ollama.enabled = true;
+              settings.providers.ollama.models = ["llama3.2:latest"];
+
+              expect(buildAvailableModelOptions(settings)).toEqual(
+                expect.arrayContaining([
+                  expect.objectContaining({
+                    modelId: "llama3.2:latest",
+                    provider: "ollama",
+                  }),
+                ]),
+              );
+            });
+
+            it("excludes a deleted built-in while retaining another enabled model", () => {
+              const settings = cloneDefaultLlmSettingsState();
+              const openRouterModelIds = BUILTIN_MODEL_OPTIONS.filter(
+                (option) => option.provider === "openrouter",
+              ).map((option) => option.modelId);
+              const [deleted, retained] = openRouterModelIds;
+              expect(deleted).toBeTruthy();
+              expect(retained).toBeTruthy();
+              settings.providers.openrouter.enabledModels = [deleted!, retained!];
+              settings.providers.openrouter.deletedModels = [deleted!];
+
+              const options = buildAvailableModelOptions(settings);
+              expect(options.some((option) => option.modelId === deleted)).toBe(false);
+              expect(options.some((option) => option.modelId === retained)).toBe(true);
+            });
+          });
+          ''')
           PY
             npm run format
             npm run check
