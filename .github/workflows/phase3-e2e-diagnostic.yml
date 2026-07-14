@@ -40,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --fund=false
 
-      - name: Generate shared fixture
+      - name: Generate shared fixture and accessible model selector
         shell: bash
         run: |
           node scripts/apply-phase3-hardening.mjs
@@ -73,6 +73,17 @@ jobs:
           if old not in fixture:
               raise SystemExit("fixture headers marker not found")
           fixture_path.write_text(fixture.replace(old, new))
+
+          selector_path = Path("components/assistant-ui/model-selector.tsx")
+          selector = selector_path.read_text()
+          marker = '''      <select
+                className='''
+          replacement = '''      <select
+                aria-label="Model"
+                className='''
+          if marker not in selector:
+              raise SystemExit("model selector marker not found")
+          selector_path.write_text(selector.replace(marker, replacement, 1))
           PY
           npm run format
           npx playwright install --with-deps chromium
