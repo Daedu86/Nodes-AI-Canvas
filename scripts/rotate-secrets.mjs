@@ -403,8 +403,7 @@ async function main() {
 
   if (!dryRun) {
     const serializedEnv = `${state.lines.join("\n").replace(/\n+$/u, "")}\n`;
-    // codeql[js/http-to-file-access] Validated rotated secrets are intentionally persisted only to the fixed local .env.local file.
-    await writeFile(envFilePath, serializedEnv, { encoding: "utf8", mode: 0o600 });
+    await writeFile(envFilePath, serializedEnv, { encoding: "utf8", mode: 0o600 }); // lgtm[js/http-to-file-access] Validated provider secrets are intentionally persisted only to the fixed local .env.local file.
     if (process.platform !== "win32") {
       await chmod(envFilePath, 0o600);
     }
