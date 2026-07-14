@@ -9,6 +9,7 @@ import { buildThreadGraphExportText } from "@/components/assistant-ui/thread-gra
 import { getEdgeKey } from "@/components/assistant-ui/thread-graph/graph-geometry";
 import {
   CANVAS_BRANCH_RUN_NOTICE,
+  CANVAS_PROMPT_DRAFT_NODE_ID,
   scrollMessageIntoView,
 } from "@/components/assistant-ui/thread-graph-flow/canvas-workspace-utils";
 import { useCanvasRunManager } from "@/components/assistant-ui/thread-graph-flow/use-canvas-run-manager";
@@ -284,7 +285,7 @@ export function ThreadGraphFlow() {
           ? anchor.text
           : "";
       beginDraft(anchor.id, operation, initialText);
-      applyCanvasSelection(anchor.id);
+      applyCanvasSelection(CANVAS_PROMPT_DRAFT_NODE_ID);
       setFlowRenderMode("2d");
     },
     [
