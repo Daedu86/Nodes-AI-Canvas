@@ -49,6 +49,16 @@ jobs:
           echo "VALIDATION_STAGE=extraction" >> "$GITHUB_ENV"
           set -o pipefail
           python scripts/refactor-session-persistence.py 2>&1 | tee /tmp/validation.log
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("components/context/persisted-sessions.tsx")
+          text = path.read_text(encoding="utf-8")
+          old = "  type SessionDocumentPatch,\n"
+          if text.count(old) != 1:
+              raise RuntimeError("Could not remove the unused SessionDocumentPatch import.")
+          path.write_text(text.replace(old, "", 1), encoding="utf-8")
+          PY
 
       - name: Install dependencies
         run: |
