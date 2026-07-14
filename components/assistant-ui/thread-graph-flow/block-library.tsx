@@ -172,7 +172,7 @@ export function CanvasBlockLibrary({
       aria-label="Block library"
       data-testid="canvas-block-library"
       className={[
-        "relative z-30 flex h-full shrink-0 flex-col border-r border-border/60 bg-background/96 shadow-[12px_0_36px_-30px_rgba(15,23,42,0.45)] backdrop-blur transition-[width] duration-200",
+        "relative z-30 flex h-full shrink-0 flex-col border-r border-border/60 bg-transparent transition-[width] duration-200",
         collapsed ? "w-14" : "w-72",
       ].join(" ")}
     >

@@ -28,6 +28,7 @@ type CanvasSidebarProps = {
   activeCanvasRunCount: number;
   artifactCount: number;
   children: React.ReactNode;
+  contained?: boolean;
   connectionError: string | null;
   densityMode: FlowDensityMode;
   filterCounts: Record<FlowSpotlightMode, number>;
@@ -64,6 +65,7 @@ export function CanvasSidebar({
   activeCanvasRunCount,
   artifactCount,
   children,
+  contained = false,
   connectionError,
   densityMode,
   filterCounts,
@@ -95,11 +97,15 @@ export function CanvasSidebar({
   toolbarMenuRef,
   visibleCanvasNodeCount,
 }: CanvasSidebarProps) {
+  const Component = contained ? "div" : "aside";
+
   return (
-    <aside
+    <Component
       ref={toolbarMenuRef}
       aria-label="Canvas controls and inspector"
-      className="flex min-h-0 w-full shrink-0 flex-col gap-3 overflow-y-auto rounded-[24px] border border-white/70 bg-white/84 p-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/78 lg:w-[18rem] lg:max-w-[22rem]"
+      className={contained
+        ? "flex min-h-0 w-[18rem] shrink-0 flex-col gap-3 overflow-y-auto bg-transparent p-3 lg:max-w-[22rem]"
+        : "flex min-h-0 w-full shrink-0 flex-col gap-3 overflow-y-auto rounded-[24px] border border-white/70 bg-white/84 p-3 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-slate-950/78 lg:w-[18rem] lg:max-w-[22rem]"}
     >
       <div className="min-w-0 border-b border-border/60 pb-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -349,6 +355,6 @@ export function CanvasSidebar({
           {children}
         </div>
       ) : null}
-    </aside>
+    </Component>
   );
 }
