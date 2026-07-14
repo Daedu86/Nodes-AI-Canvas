@@ -1,1 +1,1 @@
-inspect final phase 3 failure
+persist final phase 3 diagnostic
