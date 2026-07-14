@@ -59,9 +59,36 @@ jobs:
               "${mode.toUpperCase()}",
           ):
               text = text.replace(expression, "\\" + expression)
+
+          for label in ("first menu item role", "second menu item role"):
+              label_position = text.index(f'  "{label}",')
+              block_start = text.rfind("sidebar = replaceOnce(", 0, label_position)
+              block_end = text.index("\n);", label_position) + len("\n);")
+              if block_start < 0:
+                  raise RuntimeError(f"Could not locate {label} transformation.")
+              text = text[:block_start] + text[block_end:]
+
           path.write_text(text, encoding="utf-8")
           PY
           node scripts/improve-workspace-accessibility-onboarding.mjs 2>&1 | tee /tmp/validation.log
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("components/assistant-ui/thread-graph-flow/canvas-sidebar.tsx")
+          text = path.read_text(encoding="utf-8")
+          for action in (
+              "onLinkEditModeChange(!linkEditMode);",
+              "onCopyJson();",
+          ):
+              action_position = text.index(action)
+              button_position = text.rfind("<button", 0, action_position)
+              type_position = text.index('type="button"', button_position, action_position)
+              line_end = text.index("\n", type_position)
+              insertion = '\n                  role="menuitem"'
+              if 'role="menuitem"' not in text[type_position:action_position]:
+                  text = text[:line_end] + insertion + text[line_end:]
+          path.write_text(text, encoding="utf-8")
+          PY
 
       - name: Install dependencies
         run: |
@@ -113,7 +140,6 @@ jobs:
           git rm -f scripts/improve-workspace-accessibility-onboarding.mjs
           git add \
             package.json \
-            app/assistant.tsx \
             components/workspace/app-header.tsx \
             components/workspace/workspace-onboarding-dialog.tsx \
             components/workspace/workspace-split-layout.tsx \
