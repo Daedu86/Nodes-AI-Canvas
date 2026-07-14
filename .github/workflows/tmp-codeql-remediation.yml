@@ -12,7 +12,7 @@ permissions:
   security-events: read
 
 jobs:
-  collect-alert-details:
+  apply-and-verify:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -20,63 +20,306 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Collect open CodeQL alerts and source context
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Apply focused CodeQL fixes
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p .tmp-codeql
-          gh api --paginate --slurp "/repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&ref=refs/heads/main&per_page=100" > .tmp-codeql/alert-pages.json
           node <<'NODE'
           const fs = require("node:fs");
-          const path = require("node:path");
 
-          const pages = JSON.parse(fs.readFileSync(".tmp-codeql/alert-pages.json", "utf8"));
-          const alerts = pages.flat();
-          fs.writeFileSync(".tmp-codeql/open-alerts.json", `${JSON.stringify(alerts, null, 2)}\n`);
-
-          const lines = ["# Open CodeQL alerts", ""];
-          for (const alert of alerts) {
-            const instance = alert.most_recent_instance ?? {};
-            const location = instance.location ?? {};
-            const filePath = location.path ?? "unknown";
-            const startLine = Number(location.start_line ?? 1);
-            const endLine = Number(location.end_line ?? startLine);
-            lines.push(`## #${alert.number}: ${alert.rule?.description ?? alert.rule?.id ?? "Unknown rule"}`);
-            lines.push("");
-            lines.push(`- Rule: \`${alert.rule?.id ?? "unknown"}\``);
-            lines.push(`- Severity: \`${alert.rule?.security_severity_level ?? alert.rule?.severity ?? "unknown"}\``);
-            lines.push(`- File: \`${filePath}:${startLine}-${endLine}\``);
-            lines.push(`- State: \`${alert.state}\``);
-            lines.push("");
-
-            if (filePath !== "unknown" && fs.existsSync(filePath)) {
-              const source = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
-              const from = Math.max(1, startLine - 10);
-              const to = Math.min(source.length, endLine + 10);
-              lines.push("```text");
-              for (let lineNumber = from; lineNumber <= to; lineNumber += 1) {
-                const marker = lineNumber >= startLine && lineNumber <= endLine ? ">" : " ";
-                lines.push(`${marker}${String(lineNumber).padStart(5, " ")} | ${source[lineNumber - 1] ?? ""}`);
-              }
-              lines.push("```");
-              lines.push("");
+          const replaceOnce = (filePath, from, to, label) => {
+            const source = fs.readFileSync(filePath, "utf8");
+            const first = source.indexOf(from);
+            const last = source.lastIndexOf(from);
+            if (first < 0 || first !== last) {
+              throw new Error(`${label}: expected exactly one match in ${filePath}`);
             }
-          }
+            fs.writeFileSync(filePath, source.replace(from, to));
+          };
 
-          fs.writeFileSync(".tmp-codeql/open-alerts.md", `${lines.join("\n")}\n`);
+          replaceOnce(
+            "components/context/llm-settings.tsx",
+            [
+              'const createProviderApiKeyId = (prefix: string) => {',
+              '  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {',
+              '    return crypto.randomUUID();',
+              '  }',
+              '  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;',
+              '};',
+            ].join("\n"),
+            [
+              'const createProviderApiKeyId = (prefix: string) => {',
+              '  const cryptoApi = globalThis.crypto;',
+              '  if (typeof cryptoApi?.randomUUID === "function") {',
+              '    return cryptoApi.randomUUID();',
+              '  }',
+              '  if (typeof cryptoApi?.getRandomValues !== "function") {',
+              '    throw new Error("Secure random number generation is unavailable.");',
+              '  }',
+              '  const bytes = new Uint8Array(16);',
+              '  cryptoApi.getRandomValues(bytes);',
+              '  const suffix = Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");',
+              '  return `${prefix}-${suffix}`;',
+              '};',
+            ].join("\n"),
+            "secure provider API-key IDs",
+          );
+
+          replaceOnce(
+            "lib/session-artifacts.ts",
+            '.replace(/\\|/g, "\\\\|")',
+            '.replace(/\\\\/g, "\\\\\\\\").replace(/\\|/g, "\\\\|")',
+            "escape backslashes before Markdown table separators",
+          );
+
+          replaceOnce(
+            "scripts/rotate-secrets.mjs",
+            'import { readFile, writeFile } from "node:fs/promises";',
+            'import { chmod, readFile, writeFile } from "node:fs/promises";',
+            "import chmod for restrictive secret-file permissions",
+          );
+
+          replaceOnce(
+            "scripts/rotate-secrets.mjs",
+            'const defaultOpenRouterRotationLimitUsd = 0.01;',
+            [
+              'const defaultOpenRouterRotationLimitUsd = 0.01;',
+              'const allowedProviderHosts = new Set(["openrouter.ai", "api.supabase.com"]);',
+            ].join("\n"),
+            "declare provider API allowlist",
+          );
+
+          replaceOnce(
+            "scripts/rotate-secrets.mjs",
+            [
+              'async function fetchJson(url, init, label) {',
+              '  const response = await fetch(url, init);',
+              '  if (!response.ok) {',
+              '    throw new Error(`${label} failed with HTTP ${response.status}`);',
+              '  }',
+              '  return response.json();',
+              '}',
+            ].join("\n"),
+            [
+              'function getAllowedProviderUrl(rawUrl) {',
+              '  const providerUrl = new URL(rawUrl);',
+              '  if (',
+              '    providerUrl.protocol !== "https:" ||',
+              '    providerUrl.username ||',
+              '    providerUrl.password ||',
+              '    !allowedProviderHosts.has(providerUrl.hostname)',
+              '  ) {',
+              '    throw new Error("Provider request URL is not allowlisted");',
+              '  }',
+              '  return providerUrl;',
+              '}',
+              '',
+              'function validateSecretValue(value, label) {',
+              '  if (',
+              '    typeof value !== "string" ||',
+              '    value.length < 16 ||',
+              '    value.length > 8192 ||',
+              '    /[\\r\\n\\0]/u.test(value)',
+              '  ) {',
+              '    throw new Error(`${label} returned an invalid secret value`);',
+              '  }',
+              '  return value;',
+              '}',
+              '',
+              'function validateProviderIdentifier(value, label) {',
+              '  if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{1,512}$/u.test(value)) {',
+              '    throw new Error(`${label} returned an invalid identifier`);',
+              '  }',
+              '  return value;',
+              '}',
+              '',
+              'async function fetchJson(url, init, label) {',
+              '  const providerUrl = getAllowedProviderUrl(url);',
+              '  const response = await fetch(providerUrl, init); // codeql[js/file-access-to-http] -- This CLI intentionally sends selected secret values only to allowlisted provider APIs.',
+              '  if (!response.ok) {',
+              '    throw new Error(`${label} failed with HTTP ${response.status}`);',
+              '  }',
+              '  return response.json();',
+              '}',
+            ].join("\n"),
+            "allowlist provider requests and validate provider payloads",
+          );
+
+          replaceOnce(
+            "scripts/rotate-secrets.mjs",
+            [
+              '    newKey = created?.key ?? "";',
+              '    newHash = created?.data?.hash ?? "";',
+              '    if (!newKey || !newHash) {',
+              '      throw new Error("OpenRouter key creation returned an incomplete payload");',
+              '    }',
+            ].join("\n"),
+            [
+              '    newKey = validateSecretValue(created?.key, "OpenRouter key creation");',
+              '    newHash = validateProviderIdentifier(created?.data?.hash, "OpenRouter key creation");',
+            ].join("\n"),
+            "validate OpenRouter key response",
+          );
+
+          replaceOnce(
+            "scripts/rotate-secrets.mjs",
+            '      currentKeyId = typeof matchedKey?.id === "string" ? matchedKey.id : "";',
+            [
+              '      currentKeyId =',
+              '        typeof matchedKey?.id === "string"',
+              '          ? validateProviderIdentifier(matchedKey.id, "Supabase API key listing")',
+              '          : "";',
+            ].join("\n"),
+            "validate Supabase key identifier",
+          );
+
+          replaceOnce(
+            "scripts/rotate-secrets.mjs",
+            [
+              '    nextKey = created?.api_key ?? "";',
+              '    if (!nextKey) {',
+              '      throw new Error("Supabase API key creation returned an incomplete payload");',
+              '    }',
+            ].join("\n"),
+            '    nextKey = validateSecretValue(created?.api_key, "Supabase API key creation");',
+            "validate Supabase secret response",
+          );
+
+          replaceOnce(
+            "scripts/rotate-secrets.mjs",
+            '    await writeFile(envFilePath, `${state.lines.join("\\n").replace(/\\n+$/u, "")}\\n`, "utf8");',
+            [
+              '    const serializedEnv = `${state.lines.join("\\n").replace(/\\n+$/u, "")}\\n`;',
+              '    await writeFile(envFilePath, serializedEnv, { encoding: "utf8", mode: 0o600 }); // codeql[js/http-to-file-access] -- Validated rotated secrets are intentionally persisted only to the fixed local env file.',
+              '    if (process.platform !== "win32") {',
+              '      await chmod(envFilePath, 0o600);',
+              '    }',
+            ].join("\n"),
+            "harden local secret persistence",
+          );
+
+          replaceOnce(
+            "scripts/rotate-secrets.mjs",
+            [
+              'main().catch((error) => {',
+              '  const message = error instanceof Error ? error.message : String(error);',
+              '  console.error(`Rotation failed: ${message}`);',
+              '  process.exitCode = 1;',
+              '});',
+            ].join("\n"),
+            [
+              'main().catch(() => {',
+              '  console.error("Rotation failed. Secret values were not written to logs.");',
+              '  process.exitCode = 1;',
+              '});',
+            ].join("\n"),
+            "remove sensitive error details from logs",
+          );
+
+          const llmSettings = fs.readFileSync("components/context/llm-settings.tsx", "utf8");
+          const artifacts = fs.readFileSync("lib/session-artifacts.ts", "utf8");
+          const rotation = fs.readFileSync("scripts/rotate-secrets.mjs", "utf8");
+          if (llmSettings.includes("Math.random()")) {
+            throw new Error("Math.random remains in llm-settings.tsx");
+          }
+          if (!artifacts.includes('.replace(/\\\\/g, "\\\\\\\\").replace(/\\|/g, "\\\\|")')) {
+            throw new Error("Markdown escaping regression guard is missing");
+          }
+          if (rotation.includes("Rotation failed: ${message}")) {
+            throw new Error("Sensitive error logging remains");
+          }
+          if (!rotation.includes("codeql[js/file-access-to-http]")) {
+            throw new Error("Outbound intentional-flow suppression is missing");
+          }
+          if (!rotation.includes("codeql[js/http-to-file-access]")) {
+            throw new Error("Inbound intentional-flow suppression is missing");
+          }
           NODE
 
-      - name: Commit the temporary report
+      - name: Install dependencies
+        id: install
+        continue-on-error: true
+        shell: bash
+        run: npm ci > .tmp-codeql/npm-ci.log 2>&1
+
+      - name: Check script syntax
+        id: syntax
+        continue-on-error: true
+        shell: bash
+        run: node --check scripts/rotate-secrets.mjs > .tmp-codeql/syntax.log 2>&1
+
+      - name: Run lint
+        id: lint
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: npm run lint > .tmp-codeql/lint.log 2>&1
+
+      - name: Run typecheck
+        id: typecheck
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: npm run typecheck > .tmp-codeql/typecheck.log 2>&1
+
+      - name: Run unit tests
+        id: tests
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: npm run test:unit > .tmp-codeql/tests.log 2>&1
+
+      - name: Commit verified fixes or failure report
+        env:
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          SYNTAX_OUTCOME: ${{ steps.syntax.outcome }}
+          LINT_OUTCOME: ${{ steps.lint.outcome }}
+          TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
         shell: bash
         run: |
           set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const checks = [
+            ["npm ci", process.env.INSTALL_OUTCOME],
+            ["node --check scripts/rotate-secrets.mjs", process.env.SYNTAX_OUTCOME],
+            ["npm run lint", process.env.LINT_OUTCOME || "skipped"],
+            ["npm run typecheck", process.env.TYPECHECK_OUTCOME || "skipped"],
+            ["npm run test:unit", process.env.TESTS_OUTCOME || "skipped"],
+          ];
+          const report = ["# CodeQL remediation verification", ""];
+          for (const [name, outcome] of checks) {
+            report.push(`- ${name}: ${outcome}`);
+          }
+          report.push("");
+          for (const fileName of ["npm-ci", "syntax", "lint", "typecheck", "tests"]) {
+            const logPath = `.tmp-codeql/${fileName}.log`;
+            if (!fs.existsSync(logPath)) continue;
+            const logLines = fs.readFileSync(logPath, "utf8").split(/\r?\n/).slice(-80);
+            report.push(`## ${fileName}`, "", "```text", ...logLines, "```", "");
+          }
+          fs.writeFileSync(".tmp-codeql/remediation-status.md", `${report.join("\n")}\n`);
+          NODE
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .tmp-codeql/open-alerts.json .tmp-codeql/open-alerts.md
-          if git diff --cached --quiet; then
-            exit 0
+
+          failed=0
+          for outcome in "$INSTALL_OUTCOME" "$SYNTAX_OUTCOME" "$LINT_OUTCOME" "$TYPECHECK_OUTCOME" "$TESTS_OUTCOME"; do
+            if [[ -n "$outcome" && "$outcome" != "success" ]]; then
+              failed=1
+            fi
+          done
+
+          if [[ "$failed" -eq 1 ]]; then
+            git restore components/context/llm-settings.tsx lib/session-artifacts.ts scripts/rotate-secrets.mjs
+            git add .tmp-codeql/remediation-status.md
+            git commit -m "chore: record failed CodeQL remediation checks [skip vercel]"
+            git push origin HEAD:main
+            exit 1
           fi
-          git commit -m "chore: capture CodeQL alert details [skip vercel]"
+
+          git add components/context/llm-settings.tsx lib/session-artifacts.ts scripts/rotate-secrets.mjs .tmp-codeql/remediation-status.md
+          git commit -m "fix(security): resolve CodeQL alerts [skip vercel]"
           git push origin HEAD:main
