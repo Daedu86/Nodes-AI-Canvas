@@ -1,1 +1,1 @@
-inspect failed phase 3 browser diagnostics
+inspect focused diagnostic status
