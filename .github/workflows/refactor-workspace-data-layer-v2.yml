@@ -1,0 +1,290 @@
+name: Refactor workspace data layer v2
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: refactor-workspace-data-layer-v2
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+  VERCEL_ENV: preview
+  NODES_PERSISTENCE_BACKEND: file
+  AUTH_ENABLE_DEV_CREDENTIALS: "0"
+  OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
+  OPENROUTER_REQUIRE_USER_KEY: "1"
+
+jobs:
+  refactor:
+    if: github.event.issue.title == '[automation] Refactor Workspace Data Layer V2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Report validation start
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "Workspace data-layer validation v2 started."
+
+      - name: Checkout main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Apply extraction
+        run: |
+          echo "VALIDATION_STAGE=extraction" >> "$GITHUB_ENV"
+          set -o pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/refactor-workspace-data-layer.py")
+          text = path.read_text(encoding="utf-8")
+          regex_block = '''# Ref-aware setters now update their refs synchronously.
+          sessions = re.sub(
+              r'(?m)^(\\s*)activeSessionRef\\.current = ([^\\n;]+);\\n\\1setActiveSession\\(\\2\\);',
+              r'\\1setActiveSession(\\2);',
+              sessions,
+          )
+          sessions = re.sub(
+              r'(?m)^(\\s*)sessionsRef\\.current = ([^\\n;]+);\\n\\1setSessions\\(\\2\\);',
+              r'\\1setSessions(\\2);',
+              sessions,
+          )
+          '''
+          if regex_block not in text:
+              raise RuntimeError("Could not relocate the session ref cleanup block.")
+          text = text.replace(regex_block, "", 1)
+          old_create = '''    const nextSessions = [data.session, ...sessionsRef.current];\\n    setSessions(nextSessions);\\n    setActiveSession(data.session);\\n'''
+          new_create = '''    const nextSessions = [data.session, ...sessionsRef.current];\\n    sessionsRef.current = nextSessions;\\n    activeSessionRef.current = data.session;\\n    setSessions(nextSessions);\\n    setActiveSession(data.session);\\n'''
+          if old_create not in text:
+              raise RuntimeError("Could not align the create-session transformation.")
+          text = text.replace(old_create, new_create, 1)
+          marker = 'SESSIONS_PATH.write_text(sessions, encoding="utf-8")\n'
+          cleanup = '''# Ref-aware setters now update their refs synchronously.
+          sessions = re.sub(
+              r'(?m)^(\\s*)activeSessionRef\\.current = ([^\\n;]+);\\n\\1setActiveSession\\(\\2\\);',
+              r'\\1setActiveSession(\\2);',
+              sessions,
+          )
+          sessions = re.sub(
+              r'(?m)^(\\s*)sessionsRef\\.current = ([^\\n;]+);\\n\\1setSessions\\(\\2\\);',
+              r'\\1setSessions(\\2);',
+              sessions,
+          )
+          '''
+          if marker not in text:
+              raise RuntimeError("Could not locate the session write marker.")
+          text = text.replace(marker, cleanup + marker, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+          python scripts/refactor-workspace-data-layer.py 2>&1 | tee /tmp/validation.log
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_exact(text: str, old: str, new: str, label: str) -> str:
+              actual = text.count(old)
+              if actual != 1:
+                  raise RuntimeError(f"Expected one {label}, found {actual}.")
+              return text.replace(old, new, 1)
+
+          sessions_path = Path("components/context/persisted-sessions.tsx")
+          sessions = sessions_path.read_text(encoding="utf-8")
+          replacements = [
+              (
+                  "  }, [registerSessionConflict, userId]);",
+                  "  }, [registerSessionConflict, setActiveSession, userId]);",
+                  "loadSession dependency block",
+              ),
+              (
+                  "    return data.sessions;\n  }, []);",
+                  "    return data.sessions;\n  }, [setSessions]);",
+                  "refreshSessions dependency block",
+              ),
+              (
+                  "  }, [loadSession, refreshSessions, status, userId]);",
+                  "  }, [\n    activeSessionRef,\n    loadSession,\n    refreshSessions,\n    sessionsRef,\n    setActiveSession,\n    setSessions,\n    status,\n    userId,\n  ]);",
+                  "bootstrap dependency block",
+              ),
+              (
+                  "    setIsReady(true);\n  }, [userId]);\n\n  const archiveSession",
+                  "    setIsReady(true);\n  }, [prependSession, setActiveSession, userId]);\n\n  const archiveSession",
+                  "createSession dependency block",
+              ),
+              (
+                  "  }, [createSession, getKnownSession, loadSession, refreshSessions, registerSessionConflict, updateKnownSession]);",
+                  "  }, [\n    activeSessionRef,\n    createSession,\n    getKnownSession,\n    loadSession,\n    refreshSessions,\n    registerSessionConflict,\n    setActiveSession,\n    updateKnownSession,\n  ]);",
+                  "archiveSession dependency block",
+              ),
+              (
+                  "  }, [createSession, loadSession, refreshSessions, userId]);\n\n  const deleteSession",
+                  "  }, [\n    activeSessionRef,\n    createSession,\n    loadSession,\n    refreshSessions,\n    setActiveSession,\n    userId,\n  ]);\n\n  const deleteSession",
+                  "deleteSessions dependency block",
+              ),
+              (
+                  "  }, [createSession, loadSession, refreshSessions, userId]);\n\n  const renameSession",
+                  "  }, [\n    activeSessionRef,\n    createSession,\n    loadSession,\n    refreshSessions,\n    sessionsRef,\n    setActiveSession,\n    setSessions,\n    userId,\n  ]);\n\n  const renameSession",
+                  "recoverMissingSession dependency block",
+              ),
+              (
+                  "  }, [enqueueSessionSave, registerSessionConflict, updateKnownSession]);",
+                  "  }, [\n    activeSessionRef,\n    enqueueSessionSave,\n    registerSessionConflict,\n    updateKnownSession,\n  ]);",
+                  "saveActiveSessionDocumentPatch dependency block",
+              ),
+              (
+                  "  }, [updateKnownSession]);",
+                  "  }, [activeSessionRef, updateKnownSession]);",
+                  "loadLatestConflictVersion dependency block",
+              ),
+          ]
+          for old, new, label in replacements:
+              sessions = replace_exact(sessions, old, new, label)
+          sessions_path.write_text(sessions, encoding="utf-8")
+
+          projects_path = Path("components/context/projects.tsx")
+          projects = projects_path.read_text(encoding="utf-8")
+          replacements = [
+              (
+                  "    return data.project;\n  }, [userId]);",
+                  "    return data.project;\n  }, [setActiveProject, userId]);",
+                  "loadProject dependency block",
+              ),
+              (
+                  "    return data.projects;\n  }, []);",
+                  "    return data.projects;\n  }, [setProjects]);",
+                  "refreshProjects dependency block",
+              ),
+              (
+                  "  }, [loadProject, refreshProjects, status, userId]);",
+                  "  }, [\n    loadProject,\n    refreshProjects,\n    setActiveProject,\n    setProjects,\n    status,\n    userId,\n  ]);",
+                  "projects bootstrap dependency block",
+              ),
+              (
+                  "  }, [userId]);\n\n  const selectProject",
+                  "  }, [setActiveProject, userId]);\n\n  const selectProject",
+                  "clearActiveProject dependency block",
+              ),
+              (
+                  "  }, [userId]);\n\n  const deleteProjects",
+                  "  }, [prependProject, setActiveProject, userId]);\n\n  const deleteProjects",
+                  "createProject dependency block",
+              ),
+              (
+                  "  }, [clearActiveProject, loadProject, refreshProjects, userId]);",
+                  "  }, [\n    activeProjectRef,\n    clearActiveProject,\n    loadProject,\n    refreshProjects,\n    setActiveProject,\n    userId,\n  ]);",
+                  "deleteProjects dependency block",
+              ),
+              (
+                  "    updateKnownProject(data.project);\n  }, []);",
+                  "    updateKnownProject(data.project);\n  }, [updateKnownProject]);",
+                  "renameProject dependency block",
+              ),
+              (
+                  "  }, [enqueueProjectPatch, updateKnownProject]);",
+                  "  }, [activeProjectRef, enqueueProjectPatch, updateKnownProject]);",
+                  "saveActiveProjectPatch dependency block",
+              ),
+              (
+                  "    return data.project;\n  }, []);\n\n  const removeActiveProjectMember",
+                  "    return data.project;\n  }, [activeProjectRef, updateKnownProject]);\n\n  const removeActiveProjectMember",
+                  "saveActiveProjectMember dependency block",
+              ),
+              (
+                  "    return data.project;\n  }, []);\n\n  const value",
+                  "    return data.project;\n  }, [activeProjectRef, updateKnownProject]);\n\n  const value",
+                  "removeActiveProjectMember dependency block",
+              ),
+          ]
+          for old, new, label in replacements:
+              projects = replace_exact(projects, old, new, label)
+          projects_path.write_text(projects, encoding="utf-8")
+          PY
+
+      - name: Install dependencies
+        run: |
+          echo "VALIDATION_STAGE=dependency installation" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm ci --no-audit --fund=false 2>&1 | tee /tmp/validation.log
+
+      - name: Format generated files
+        run: |
+          echo "VALIDATION_STAGE=formatting" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm run format 2>&1 | tee /tmp/validation.log
+
+      - name: Validate formatting and types
+        run: |
+          echo "VALIDATION_STAGE=lint and TypeScript" >> "$GITHUB_ENV"
+          set -o pipefail
+          (npm run format:check && npm run typecheck) 2>&1 | tee /tmp/validation.log
+
+      - name: Run unit tests
+        run: |
+          echo "VALIDATION_STAGE=unit tests" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm run test:unit 2>&1 | tee /tmp/validation.log
+
+      - name: Build production bundle
+        run: |
+          echo "VALIDATION_STAGE=production build" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/validation.log
+          git checkout -- tsconfig.json
+
+      - name: Publish validated refactor to main
+        shell: bash
+        run: |
+          echo "VALIDATION_STAGE=publishing to main" >> "$GITHUB_ENV"
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+          git rm .github/workflows/refactor-workspace-data-layer.yml
+          git rm .github/workflows/refactor-workspace-data-layer-v2.yml
+          git rm scripts/refactor-workspace-data-layer.py
+          git add \
+            components/context/persisted-sessions.tsx \
+            components/context/projects.tsx \
+            components/context/use-persisted-resource-state.ts \
+            lib/client/persisted-resource-client.ts \
+            tests/persisted-resource-client.test.ts
+          git diff --check
+          git commit -m "refactor: unify workspace persistence data layer [skip vercel]"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: Report validation success
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "Validation passed and the unified workspace data layer was published to main."
+
+      - name: Report validation failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo "Validation failed during **${VALIDATION_STAGE:-preflight}**. No functional refactor was published."
+            echo
+            echo "<details><summary>Log tail</summary>"
+            echo
+            echo '```text'
+            tail -c 12000 /tmp/validation.log 2>/dev/null || echo "No command log was captured."
+            echo '```'
+            echo "</details>"
+          } > /tmp/validation-comment.md
+          gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body-file /tmp/validation-comment.md
