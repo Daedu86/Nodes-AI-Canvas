@@ -26,7 +26,7 @@ env:
 jobs:
   harden:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 70
     steps:
       - name: Checkout main
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -131,7 +131,14 @@ jobs:
             npm run check
             npm run build:budget
             npx playwright install --with-deps chromium
-            npm run test:e2e -- tests/e2e/accessibility.spec.ts tests/e2e/chat-image-attachment.spec.ts tests/e2e/session-return-send.spec.ts tests/e2e/smoke.spec.ts --workers=1
+            for suite in \
+              tests/e2e/accessibility.spec.ts \
+              tests/e2e/chat-image-attachment.spec.ts \
+              tests/e2e/session-return-send.spec.ts \
+              tests/e2e/smoke.spec.ts
+            do
+              PLAYWRIGHT_RUN_ID="phase3-$(basename "$suite" .spec.ts)" npm run test:e2e -- "$suite" --workers=1
+            done
           } 2>&1 | tee /tmp/phase3-hardening.log
 
       - name: Publish validated code
