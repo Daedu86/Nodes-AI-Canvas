@@ -2,18 +2,11 @@
 
 import "@xyflow/react/dist/style.css";
 import { useAssistantRuntime } from "@assistant-ui/react";
-import {
-  type ReactFlowInstance,
-  type Viewport,
-} from "@xyflow/react";
+import { type ReactFlowInstance } from "@xyflow/react";
 import React from "react";
 import { useThreadRepoItems } from "@/components/assistant-ui/use-thread-repo-items";
 import { buildThreadGraphNodes } from "@/components/assistant-ui/thread-graph/build-graph-nodes";
 import { buildThreadGraphExportText } from "@/components/assistant-ui/thread-graph/export-graph-json";
-import {
-  readFlowViewport,
-  writeFlowViewport,
-} from "@/components/assistant-ui/thread-graph/graph-storage";
 import { buildGraphLegendItems } from "@/components/assistant-ui/thread-graph/graph-models";
 import { getEdgeKey } from "@/components/assistant-ui/thread-graph/graph-geometry";
 import { CanvasBlockLibrary } from "@/components/assistant-ui/thread-graph-flow/block-library";
@@ -41,13 +34,8 @@ import {
   CANVAS_BRANCH_RUN_NOTICE,
   CANVAS_PROMPT_DRAFT_NODE_ID,
   formatByteSize,
-  isFlowViewport,
-  readFlowRenderMode,
   scrollMessageIntoView,
   trimArtifactPreview,
-  type FlowDensityMode,
-  type FlowRenderMode,
-  type FlowSpotlightMode,
 } from "@/components/assistant-ui/thread-graph-flow/canvas-workspace-utils";
 import {
   getArtifactLineCount,
@@ -56,6 +44,7 @@ import {
 import { useCanvasRunManager } from "@/components/assistant-ui/thread-graph-flow/use-canvas-run-manager";
 import { useCanvasBlockActions } from "@/components/assistant-ui/thread-graph-flow/use-canvas-block-actions";
 import { useCanvasBranchSubmission } from "@/components/assistant-ui/thread-graph-flow/use-canvas-branch-submission";
+import { useCanvasSessionState } from "@/components/assistant-ui/thread-graph-flow/use-canvas-session-state";
 import type {
   ThreadGraphFlowEdge,
   ThreadGraphFlowNode,
@@ -133,16 +122,6 @@ export function ThreadGraphFlow() {
     setDraftText,
     toggleDraftArtifact,
   } = useGraphBranchIntent();
-  const [linkEditMode, setLinkEditMode] = React.useState(false);
-  const [spotlight, setSpotlight] = React.useState<FlowSpotlightMode>("all");
-  const [densityMode, setDensityMode] = React.useState<FlowDensityMode>("overview");
-  const [toolbarMenu, setToolbarMenu] = React.useState<"add" | "tools" | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
-  const flowRenderModeKey = React.useMemo(
-    () => `nodes.canvas.render-mode.v1:${activeSessionId ?? "unknown"}`,
-    [activeSessionId],
-  );
-  const [flowRenderMode, setFlowRenderMode] = React.useState<FlowRenderMode>("2d");
   const [blockLibraryCollapsed, setBlockLibraryCollapsed] = React.useState(false);
   const [connectionError, setConnectionError] = React.useState<string | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = React.useState<
@@ -158,21 +137,6 @@ export function ThreadGraphFlow() {
   const toolbarMenuRef = React.useRef<HTMLDivElement | null>(null);
   const flowViewportRef = React.useRef<HTMLDivElement | null>(null);
 
-  React.useEffect(() => {
-    setFlowRenderMode(readFlowRenderMode(flowRenderModeKey));
-  }, [flowRenderModeKey]);
-
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(flowRenderModeKey, flowRenderMode);
-    } catch {
-      // ignore storage errors
-    }
-  }, [flowRenderMode, flowRenderModeKey]);
-  const [storedViewport, setStoredViewport] = React.useState<Viewport | null>(() =>
-    readFlowViewport(activeSessionId),
-  );
-  const treeSignatureRef = React.useRef<string | null>(null);
 
   const nodes = React.useMemo(
     () => buildThreadGraphNodes({ repoItems, bridgeNodeIds, getParentId }),
@@ -215,6 +179,35 @@ export function ThreadGraphFlow() {
     () => new Map(canvasPrompts.map((prompt) => [prompt.id, prompt] as const)),
     [canvasPrompts],
   );
+  const {
+    applyCanvasSelection,
+    densityMode,
+    flowRenderMode,
+    linkEditMode,
+    selectedNodeId,
+    setDensityMode,
+    setFlowRenderMode,
+    setLinkEditMode,
+    setSelectedNodeId,
+    setSpotlight,
+    setStoredViewport,
+    setToolbarMenu,
+    spotlight,
+    storedViewport,
+    toolbarMenu,
+    treeSignatureRef,
+  } = useCanvasSessionState({
+    activeSessionId,
+    artifactIndex,
+    cancelDraft,
+    canvasSelectionId,
+    draft,
+    focusedMessageId,
+    nodeIndex,
+    promptIndex,
+    setCanvasSelectionId,
+    setFocusedMessageId,
+  });
   const {
     activeCount: activeCanvasRunCount,
     cancelAll: cancelAllCanvasRuns,
@@ -269,18 +262,6 @@ export function ThreadGraphFlow() {
   }, [artifacts, canvasPrompts.length, nodes]);
 
   React.useEffect(() => {
-    setStoredViewport(readFlowViewport(activeSessionId));
-    setSelectedNodeId(null);
-    setCanvasSelectionId(null);
-    setLinkEditMode(false);
-    setToolbarMenu(null);
-    setSpotlight("all");
-    setDensityMode("overview");
-    treeSignatureRef.current = null;
-    cancelDraft();
-  }, [activeSessionId, cancelDraft, setCanvasSelectionId]);
-
-  React.useEffect(() => {
     if (!toolbarMenu) return;
 
     const handlePointerDown = (event: PointerEvent) => {
@@ -294,24 +275,7 @@ export function ThreadGraphFlow() {
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
     };
-  }, [toolbarMenu]);
-
-  React.useEffect(() => {
-    if (
-      draft &&
-      selectedNodeId &&
-      selectedNodeId !== CANVAS_PROMPT_DRAFT_NODE_ID &&
-      draft.anchorId !== selectedNodeId
-    ) {
-      cancelDraft();
-    }
-  }, [cancelDraft, draft, selectedNodeId]);
-
-  React.useEffect(() => {
-    if (isFlowViewport(storedViewport)) {
-      writeFlowViewport(storedViewport, activeSessionId);
-    }
-  }, [activeSessionId, storedViewport]);
+  }, [setToolbarMenu, toolbarMenu]);
 
   const selectedMessageNode = selectedNodeId ? nodeIndex.get(selectedNodeId) ?? null : null;
   const selectedArtifact = selectedNodeId ? artifactIndex.get(selectedNodeId) ?? null : null;
@@ -415,55 +379,6 @@ export function ThreadGraphFlow() {
     runtime,
     setRequestError,
   });
-
-  const applyCanvasSelection = React.useCallback(
-    (nodeId: string | null) => {
-      setSelectedNodeId(nodeId);
-      setCanvasSelectionId(nodeId);
-      if (!nodeId || nodeId === ROOT_NODE_ID || nodeId === CANVAS_PROMPT_DRAFT_NODE_ID) {
-        setFocusedMessageId(null);
-        return;
-      }
-      if (artifactIndex.has(nodeId) || promptIndex.has(nodeId)) {
-        setFocusedMessageId(null);
-        return;
-      }
-      if (nodeIndex.has(nodeId)) {
-        setFocusedMessageId(nodeId);
-      }
-    },
-    [artifactIndex, nodeIndex, promptIndex, setCanvasSelectionId, setFocusedMessageId],
-  );
-
-  React.useEffect(() => {
-    if (!focusedMessageId || focusedMessageId === selectedNodeId) {
-      return;
-    }
-    if (!nodeIndex.has(focusedMessageId)) {
-      return;
-    }
-    setSelectedNodeId(focusedMessageId);
-  }, [focusedMessageId, nodeIndex, selectedNodeId]);
-
-  React.useEffect(() => {
-    if (!canvasSelectionId || canvasSelectionId === selectedNodeId) {
-      return;
-    }
-    if (
-      !nodeIndex.has(canvasSelectionId) &&
-      !artifactIndex.has(canvasSelectionId) &&
-      !promptIndex.has(canvasSelectionId)
-    ) {
-      return;
-    }
-    applyCanvasSelection(canvasSelectionId);
-  }, [applyCanvasSelection, artifactIndex, canvasSelectionId, nodeIndex, promptIndex, selectedNodeId]);
-
-  React.useEffect(() => {
-    if (densityMode === "focus" && !selectedNodeId) {
-      setDensityMode("overview");
-    }
-  }, [densityMode, selectedNodeId]);
 
   React.useEffect(() => {
     const inspector = inspectorScrollRef.current;
@@ -662,7 +577,7 @@ const { nodes: visibleFlowNodes, edges: visibleFlowEdges } = React.useMemo(
     return () => {
       window.cancelAnimationFrame(animationFrame);
     };
-  }, [decoratedFlowNodes.length, reactFlowInstance, treeStructureSignature]);
+  }, [decoratedFlowNodes.length, reactFlowInstance, setStoredViewport, treeSignatureRef, treeStructureSignature]);
 
   React.useEffect(() => {
     if (!reactFlowInstance || !focusedMessageId || !nodeIndex.has(focusedMessageId)) {
@@ -682,7 +597,7 @@ const { nodes: visibleFlowNodes, edges: visibleFlowEdges } = React.useMemo(
     return () => {
       window.cancelAnimationFrame(animationFrame);
     };
-  }, [focusedMessageId, nodeIndex, reactFlowInstance]);
+  }, [focusedMessageId, nodeIndex, reactFlowInstance, setStoredViewport]);
 
   React.useEffect(() => {
     if (!reactFlowInstance || densityMode !== "focus" || !selectedNodeId) {
@@ -701,7 +616,7 @@ const { nodes: visibleFlowNodes, edges: visibleFlowEdges } = React.useMemo(
     return () => {
       window.cancelAnimationFrame(animationFrame);
     };
-  }, [densityMode, reactFlowInstance, selectedNodeId, visibleFlowNodes.length]);
+  }, [densityMode, reactFlowInstance, selectedNodeId, setStoredViewport, visibleFlowNodes.length]);
 
   React.useEffect(() => {
     if (!reactFlowInstance || !draft || flowRenderMode !== "2d") {
@@ -721,7 +636,7 @@ const { nodes: visibleFlowNodes, edges: visibleFlowEdges } = React.useMemo(
     return () => {
       window.cancelAnimationFrame(animationFrame);
     };
-  }, [draft, flowRenderMode, reactFlowInstance]);
+  }, [draft, flowRenderMode, reactFlowInstance, setStoredViewport]);
 
   const selectedFlowNode = React.useMemo(
     () => decoratedFlowNodes.find((node) => node.id === selectedNodeId) ?? null,
@@ -801,7 +716,7 @@ const { nodes: visibleFlowNodes, edges: visibleFlowEdges } = React.useMemo(
       nodes: [{ id: selectedNodeId }],
     });
     setStoredViewport(reactFlowInstance.getViewport());
-  }, [reactFlowInstance, selectedNodeId]);
+  }, [reactFlowInstance, selectedNodeId, setStoredViewport]);
 
   const handleOpenSelectedInChat = React.useCallback(() => {
     if (!selectedMessageNode || selectedMessageNode.id === ROOT_NODE_ID) return;
@@ -814,7 +729,7 @@ const { nodes: visibleFlowNodes, edges: visibleFlowEdges } = React.useMemo(
     if (!reactFlowInstance) return;
     await reactFlowInstance.fitView({ duration: 450, padding: 0.18 });
     setStoredViewport(reactFlowInstance.getViewport());
-  }, [reactFlowInstance]);
+  }, [reactFlowInstance, setStoredViewport]);
 
   const handleRestoreSelected = React.useCallback(() => {
     if (!selectedNodeId || !overrides.has(selectedNodeId)) return;
