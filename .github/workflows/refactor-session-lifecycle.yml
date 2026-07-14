@@ -54,12 +54,20 @@ jobs:
 
           provider_path = Path("components/context/persisted-sessions.tsx")
           provider = provider_path.read_text(encoding="utf-8")
-          start_marker = "  const refreshSessions = React.useCallback(async () => {\n"
+          start_markers = [
+              "  const refreshSessions = React.useCallback(async () => {\n",
+              "  React.useEffect(() => {\n    void bootstrap();\n",
+              "  const selectSession = React.useCallback(async (sessionId: string) => {\n",
+          ]
+          starts = [provider.find(marker) for marker in start_markers]
+          starts = [start for start in starts if start >= 0]
           end_marker = "  const renameSession = React.useCallback(async (sessionId: string, title: string | null) => {\n"
-          start = provider.find(start_marker)
-          end = provider.find(end_marker, start)
-          if start < 0 or end < 0:
-              raise RuntimeError("Could not remove the remaining provider lifecycle callbacks.")
+          end = provider.find(end_marker)
+          if not starts or end < 0:
+              raise RuntimeError("Could not locate the remaining provider lifecycle boundary.")
+          start = min(starts)
+          if start >= end:
+              raise RuntimeError("Invalid provider lifecycle extraction boundary.")
           provider = provider[:start] + provider[end:]
           provider_path.write_text(provider, encoding="utf-8")
 
@@ -81,6 +89,7 @@ jobs:
           if hook.count(old) != 1:
               raise RuntimeError("Could not preserve fallback session-list recovery.")
           hook_path.write_text(hook.replace(old, new, 1), encoding="utf-8")
+          print("Lifecycle cleanup boundary and fallback recovery applied.")
           PY
 
       - name: Install dependencies
