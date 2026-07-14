@@ -63,6 +63,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          git restore --worktree -- tsconfig.json next-env.d.ts
           rm scripts/complete-frontend-data-layer.mjs scripts/.frontend-data-layer-trigger
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
