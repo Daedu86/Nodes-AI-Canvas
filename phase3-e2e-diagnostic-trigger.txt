@@ -1,1 +1,1 @@
-run focused fixture diagnostic
+run focused model-label diagnostic
