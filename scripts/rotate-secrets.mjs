@@ -23,6 +23,33 @@ const defaultOpenRouterRotationLimitUsd = 0.01;
 
 const shouldRun = (name) => !only || only.has(name);
 
+class RotationError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = "RotationError";
+    this.code = code;
+  }
+}
+
+class CommandError extends RotationError {
+  constructor(command, status, sensitiveVariableConflict) {
+    super("COMMAND_FAILED", `${command} failed with exit code ${status ?? "unknown"}`);
+    this.sensitiveVariableConflict = sensitiveVariableConflict;
+  }
+}
+
+function getRuntimeEnvValue(name) {
+  return process.env[name]?.trim() ?? "";
+}
+
+function ensureRuntimeEnvValue(name, message) {
+  const value = getRuntimeEnvValue(name);
+  if (!value) {
+    throw new RotationError("MISSING_CONFIGURATION", message);
+  }
+  return value;
+}
+
 function readEnvFile(raw) {
   const lines = raw.split(/\r?\n/);
   const values = new Map();
@@ -46,45 +73,11 @@ function setEnvValue(state, name, value) {
   state.values.set(name, value);
 }
 
-function getEnvValue(state, name) {
-  return state.values.get(name)?.trim() ?? "";
-}
 
-function ensureEnvValue(state, name, message) {
-  const value = getEnvValue(state, name);
-  if (!value) {
-    throw new Error(message);
-  }
-  return value;
-}
 
-function summarizeStdErr(text) {
-  if (!text) {
-    return "no stderr/stdout available";
-  }
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(-4)
-    .join(" | ");
-}
 
-function formatCommandForError(command, commandArgs) {
-  const redactedArgs = [];
-  for (let index = 0; index < commandArgs.length; index += 1) {
-    const arg = commandArgs[index];
-    redactedArgs.push(arg);
-    if (arg === "--value" && index + 1 < commandArgs.length) {
-      redactedArgs.push("<redacted>");
-      index += 1;
-    }
-  }
-  return `${command} ${redactedArgs.join(" ")}`;
-}
 
 function runCommand(command, commandArgs) {
-  const printableCommand = formatCommandForError(command, commandArgs);
   const childEnv = { ...process.env };
   if (command === "vercel") {
     delete childEnv.VERCEL_TOKEN;
@@ -98,14 +91,15 @@ function runCommand(command, commandArgs) {
   });
 
   if (result.error) {
-    throw new Error(`${printableCommand} failed: ${result.error.message}`);
+    throw new RotationError("COMMAND_START_FAILED", `${command} failed to start`);
   }
 
   if (result.status !== 0) {
-    throw new Error(`${printableCommand} failed: ${summarizeStdErr(result.stderr || result.stdout)}`);
+    const output = result.stderr || result.stdout || "";
+    const sensitiveVariableConflict =
+      command === "vercel" && output.includes("Sensitive Environment Variable");
+    throw new CommandError(command, result.status, sensitiveVariableConflict);
   }
-
-  return result.stdout.trim();
 }
 
 function setVercelSecret(name, value) {
@@ -126,8 +120,7 @@ function setVercelSecret(name, value) {
       "--yes",
     ]);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!message.includes("Sensitive Environment Variable")) {
+    if (!(error instanceof CommandError) || !error.sensitiveVariableConflict) {
       throw error;
     }
 
@@ -148,7 +141,7 @@ function setVercelSecret(name, value) {
 async function fetchJson(url, init, label) {
   const response = await fetch(url, init);
   if (!response.ok) {
-    throw new Error(`${label} failed with HTTP ${response.status}`);
+    throw new RotationError("HTTP_REQUEST_FAILED", `${label} failed with HTTP ${response.status}`);
   }
   return response.json();
 }
@@ -165,7 +158,7 @@ async function rotateAuthSecret(state, summary) {
 async function rotateOpenRouterKey(state, summary, warnings) {
   if (!shouldRun("openrouter")) return;
 
-  const managementKey = getEnvValue(state, "OPENROUTER_MANAGEMENT_API_KEY");
+  const managementKey = getRuntimeEnvValue("OPENROUTER_MANAGEMENT_API_KEY");
   if (!managementKey) {
     warnings.push("skipped OpenRouter rotation: missing OPENROUTER_MANAGEMENT_API_KEY");
     return;
@@ -173,13 +166,13 @@ async function rotateOpenRouterKey(state, summary, warnings) {
 
   const name = `Nodes production ${new Date().toISOString().slice(0, 10)}`;
   const configuredLimit = Number.parseFloat(
-    getEnvValue(state, "OPENROUTER_ROTATION_LIMIT_USD") || `${defaultOpenRouterRotationLimitUsd}`,
+    getRuntimeEnvValue("OPENROUTER_ROTATION_LIMIT_USD") || `${defaultOpenRouterRotationLimitUsd}`,
   );
   const limit = Number.isFinite(configuredLimit) && configuredLimit > 0
     ? configuredLimit
     : defaultOpenRouterRotationLimitUsd;
   let newKey = "<dry-run>";
-  let newHash = getEnvValue(state, "OPENROUTER_API_KEY_HASH") || "<dry-run-hash>";
+  let newHash = getRuntimeEnvValue("OPENROUTER_API_KEY_HASH") || "<dry-run-hash>";
 
   if (!dryRun) {
     const created = await fetchJson(
@@ -198,11 +191,11 @@ async function rotateOpenRouterKey(state, summary, warnings) {
     newKey = created?.key ?? "";
     newHash = created?.data?.hash ?? "";
     if (!newKey || !newHash) {
-      throw new Error("OpenRouter key creation returned an incomplete payload");
+      throw new RotationError("INCOMPLETE_PROVIDER_RESPONSE", "OpenRouter key creation returned an incomplete payload");
     }
   }
 
-  const previousHash = getEnvValue(state, "OPENROUTER_API_KEY_HASH");
+  const previousHash = getRuntimeEnvValue("OPENROUTER_API_KEY_HASH");
   setEnvValue(state, "OPENROUTER_API_KEY", newKey);
   setEnvValue(state, "OPENROUTER_API_KEY_HASH", newHash);
   setVercelSecret("OPENROUTER_API_KEY", newKey);
@@ -238,11 +231,17 @@ async function rotateOpenRouterKey(state, summary, warnings) {
   );
 }
 
-function getSupabaseProjectRef(state) {
-  const url = ensureEnvValue(state, "SUPABASE_URL", "SUPABASE_URL is required for Supabase rotation");
+function getSupabaseProjectRef() {
+  const url = ensureRuntimeEnvValue(
+    "SUPABASE_URL",
+    "SUPABASE_URL is required for Supabase rotation",
+  );
   const match = url.match(/^https:\/\/([^.]+)\.supabase\.co/i);
   if (!match) {
-    throw new Error("SUPABASE_URL does not look like a hosted Supabase project URL");
+    throw new RotationError(
+      "INVALID_SUPABASE_URL",
+      "SUPABASE_URL does not look like a hosted Supabase project URL",
+    );
   }
   return match[1];
 }
@@ -250,15 +249,14 @@ function getSupabaseProjectRef(state) {
 async function rotateSupabaseSecretKey(state, summary, warnings) {
   if (!shouldRun("supabase")) return;
 
-  const accessToken = getEnvValue(state, "SUPABASE_ACCESS_TOKEN");
+  const accessToken = getRuntimeEnvValue("SUPABASE_ACCESS_TOKEN");
   if (!accessToken) {
     warnings.push("skipped Supabase rotation: missing SUPABASE_ACCESS_TOKEN");
     return;
   }
 
-  const projectRef = getSupabaseProjectRef(state);
-  const currentKey = ensureEnvValue(
-    state,
+  const projectRef = getSupabaseProjectRef();
+  const currentKey = ensureRuntimeEnvValue(
     "SUPABASE_SERVICE_ROLE_KEY",
     "SUPABASE_SERVICE_ROLE_KEY is required for Supabase rotation",
   );
@@ -300,7 +298,7 @@ async function rotateSupabaseSecretKey(state, summary, warnings) {
 
     nextKey = created?.api_key ?? "";
     if (!nextKey) {
-      throw new Error("Supabase API key creation returned an incomplete payload");
+      throw new RotationError("INCOMPLETE_PROVIDER_RESPONSE", "Supabase API key creation returned an incomplete payload");
     }
   }
 
@@ -336,10 +334,10 @@ async function rotateSupabaseSecretKey(state, summary, warnings) {
   );
 }
 
-async function syncGoogleSecret(state, summary, warnings) {
+async function syncGoogleSecret(summary, warnings) {
   if (!shouldRun("google")) return;
 
-  const googleSecret = getEnvValue(state, "AUTH_GOOGLE_SECRET");
+  const googleSecret = getRuntimeEnvValue("AUTH_GOOGLE_SECRET");
   if (!googleSecret) {
     warnings.push("skipped Google sync: add AUTH_GOOGLE_SECRET to .env.local after resetting it in Google Cloud");
     return;
@@ -373,9 +371,10 @@ async function main() {
   await rotateAuthSecret(state, summary);
   await rotateOpenRouterKey(state, summary, warnings);
   await rotateSupabaseSecretKey(state, summary, warnings);
-  await syncGoogleSecret(state, summary, warnings);
+  await syncGoogleSecret(summary, warnings);
 
   if (!dryRun) {
+    // codeql[js/http-to-file-access] This trusted CLI persists newly issued keys from fixed provider APIs to the fixed local .env.local file.
     await writeFile(envFilePath, `${state.lines.join("\n").replace(/\n+$/u, "")}\n`, "utf8");
   }
 
@@ -395,7 +394,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`Rotation failed: ${message}`);
+  const code = error instanceof RotationError ? error.code : "UNEXPECTED_INTERNAL_ERROR";
+  console.error(`Rotation failed (${code}).`);
   process.exitCode = 1;
 });

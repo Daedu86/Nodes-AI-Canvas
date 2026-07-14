@@ -66,10 +66,18 @@ const LEGACY_STORAGE_KEY_PREFIX = "nodes.llm-settings.v1:";
 const SAVE_DEBOUNCE_MS = 450;
 
 const createProviderApiKeyId = (prefix: string) => {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi || typeof cryptoApi.getRandomValues !== "function") {
+    throw new Error("Secure random number generation is unavailable.");
   }
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  if (typeof cryptoApi.randomUUID === "function") {
+    return cryptoApi.randomUUID();
+  }
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+  const randomId = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
+  return `${prefix}-${randomId}`;
 };
 
 const readLegacySettings = (storageKey: string) => {

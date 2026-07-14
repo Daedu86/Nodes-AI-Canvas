@@ -462,7 +462,12 @@ const trimArtifactText = (value: string, maxLength = 220) => {
 const markdownTableFromRows = (rows: Array<Record<string, unknown>>) => {
   const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
   if (columns.length === 0) return null;
-  const escape = (value: unknown) => String(value ?? "").replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
+  const escape = (value: unknown) =>
+    String(value ?? "")
+      .replace(/\\/g, "\\\\")
+      .replace(/\|/g, "\\|")
+      .replace(/\s+/g, " ")
+      .trim();
   return [
     `| ${columns.map(escape).join(" | ")} |`,
     `| ${columns.map(() => "---").join(" | ")} |`,
