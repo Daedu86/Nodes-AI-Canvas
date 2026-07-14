@@ -15,6 +15,11 @@ type UseSessionConflictResolutionOptions = {
   updateKnownSession: (session: SessionDocument) => void;
 };
 
+export const matchesSessionConflict = (
+  conflict: SessionConflictState | null,
+  sessionId: string,
+) => conflict?.sessionId === sessionId;
+
 export function useSessionConflictResolution({
   activeSessionRef,
   updateKnownSession,
@@ -49,12 +54,12 @@ export function useSessionConflictResolution({
   );
 
   const hasSessionConflict = React.useCallback(
-      (sessionId: string) =>
-        sessionConflictRef.current?.sessionId === sessionId,
-      [],
-    );
+    (sessionId: string) =>
+      matchesSessionConflict(sessionConflictRef.current, sessionId),
+    [],
+  );
 
-    const loadLatestConflictVersion = React.useCallback(() => {
+  const loadLatestConflictVersion = React.useCallback(() => {
     const conflict = sessionConflictRef.current;
     if (!conflict) return;
     updateKnownSession(conflict.currentSession);

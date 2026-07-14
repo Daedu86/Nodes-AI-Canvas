@@ -2,6 +2,7 @@
 
 import React from "react";
 import {
+  createSerialTaskQueue,
   prependUniqueResource,
   replaceResourceById,
 } from "@/lib/client/persisted-resource-client";
@@ -75,14 +76,6 @@ export function usePersistedResourceState<
 }
 
 export function useSerialTaskQueue<T>(fallback: T) {
-  const queueRef = React.useRef<Promise<T>>(Promise.resolve(fallback));
-
-  return React.useCallback(
-    (task: () => Promise<T>) => {
-      const next = queueRef.current.then(task, task);
-      queueRef.current = next.catch(() => fallback);
-      return next;
-    },
-    [fallback],
-  );
+  const queue = React.useMemo(() => createSerialTaskQueue(fallback), [fallback]);
+  return React.useCallback((task: () => Promise<T>) => queue(task), [queue]);
 }

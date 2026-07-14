@@ -10,11 +10,16 @@ import {
 } from "@/lib/client/persisted-resource-client";
 import {
   patchSessionRequest,
-  pickSessionId,
   recoverSessionDocumentFromCache,
   type SessionDocumentPatch,
   type SessionResponse,
 } from "@/lib/client/session-persistence";
+import {
+  decideAfterSessionRemoval,
+  decideMissingSessionRecovery,
+  decideSessionBootstrap,
+  decideSessionLoadFailure,
+} from "@/lib/client/session-orchestration";
 import type { SessionDocument, SessionSummary } from "@/lib/session-documents";
 
 type SessionStatus = "authenticated" | "loading" | "unauthenticated";
@@ -110,6 +115,11 @@ export function useSessionLifecycle({
     setIsReady(true);
   }, [prependSession, setActiveSession, userId]);
 
+  const clearActiveSession = React.useCallback(() => {
+    writeStoredActiveSessionId(userId, null);
+    setActiveSession(null);
+  }, [setActiveSession, userId]);
+
   const bootstrap = React.useCallback(async () => {
     if (status === "loading") return;
     if (!userId) {
@@ -122,37 +132,38 @@ export function useSessionLifecycle({
     setIsReady(false);
     try {
       const nextSessions = await refreshSessions();
-      if (nextSessions.length === 0) {
+      const decision = decideSessionBootstrap(
+        nextSessions,
+        readStoredActiveSessionId(userId),
+      );
+      if (decision.type === "create") {
         await createSession();
         return;
       }
-
-      const preferredId = pickSessionId(nextSessions, {
-        preferredId: readStoredActiveSessionId(userId),
-      });
-      if (!preferredId) {
-        setActiveSession(null);
-        writeStoredActiveSessionId(userId, null);
+      if (decision.type === "clear") {
+        clearActiveSession();
         return;
       }
+      if (decision.type !== "load") return;
 
       try {
-        await loadSession(preferredId);
+        await loadSession(decision.sessionId);
       } catch {
-        const fallbackSessionId = pickSessionId(nextSessions, {
-          excludeIds: [preferredId],
-        });
-        if (fallbackSessionId) {
-          await loadSession(fallbackSessionId);
+        const fallback = decideSessionLoadFailure(
+          nextSessions,
+          decision.sessionId,
+        );
+        if (fallback.type === "load") {
+          await loadSession(fallback.sessionId);
         } else {
-          setActiveSession(null);
-          writeStoredActiveSessionId(userId, null);
+          clearActiveSession();
         }
       }
     } finally {
       setIsReady(true);
     }
   }, [
+    clearActiveSession,
     createSession,
     loadSession,
     refreshSessions,
@@ -193,15 +204,16 @@ export function useSessionLifecycle({
       }
       updateKnownSession(data.session);
       const remaining = await refreshSessions();
-      if (activeSessionRef.current?.id !== sessionId) return;
-
-      const nextSessionId = pickSessionId(remaining, {
-        excludeIds: [sessionId],
+      const decision = decideAfterSessionRemoval({
+        activeSessionId: activeSessionRef.current?.id,
+        remainingSessions: remaining,
+        removedSessionIds: [sessionId],
       });
-      if (nextSessionId) {
+      if (decision.type === "keep") return;
+      if (decision.type === "load") {
         setIsReady(false);
         try {
-          await loadSession(nextSessionId);
+          await loadSession(decision.sessionId);
           setIsReady(true);
         } catch {
           await createSession();
@@ -239,23 +251,17 @@ export function useSessionLifecycle({
       );
 
       const remaining = await refreshSessions();
-      if (
-        !isActiveSessionRemoved(
-          activeSessionRef.current?.id,
-          uniqueSessionIds,
-        )
-      ) {
-        return;
-      }
-
-      const nextSessionId = pickSessionId(remaining, {
-        excludeIds: uniqueSessionIds,
+      const decision = decideAfterSessionRemoval({
+        activeSessionId: activeSessionRef.current?.id,
         preferredId: readStoredActiveSessionId(userId),
+        remainingSessions: remaining,
+        removedSessionIds: uniqueSessionIds,
       });
-      if (nextSessionId) {
+      if (decision.type === "keep") return;
+      if (decision.type === "load") {
         setIsReady(false);
         try {
-          await loadSession(nextSessionId);
+          await loadSession(decision.sessionId);
           setIsReady(true);
         } catch {
           await createSession();
@@ -263,16 +269,15 @@ export function useSessionLifecycle({
         return;
       }
 
-      writeStoredActiveSessionId(userId, null);
-      setActiveSession(null);
+      clearActiveSession();
       await createSession();
     },
     [
       activeSessionRef,
+      clearActiveSession,
       createSession,
       loadSession,
       refreshSessions,
-      setActiveSession,
       userId,
     ],
   );
@@ -296,18 +301,19 @@ export function useSessionLifecycle({
 
       const visibleSessions = filterRemovedSessions(remaining, [sessionId]);
       if (remaining.length > 0) setSessions(visibleSessions);
-      if (activeSessionRef.current?.id !== sessionId) return;
-
-      const nextSessionId = pickSessionId(visibleSessions, {
+      const decision = decideMissingSessionRecovery({
+        activeSessionId: activeSessionRef.current?.id,
+        missingSessionId: sessionId,
         preferredId: readStoredActiveSessionId(userId),
+        visibleSessions,
       });
-      if (nextSessionId) {
+      if (decision.type === "keep") return;
+      if (decision.type === "load") {
         setIsReady(false);
         try {
-          await loadSession(nextSessionId);
+          await loadSession(decision.sessionId);
         } catch {
-          writeStoredActiveSessionId(userId, null);
-          setActiveSession(null);
+          clearActiveSession();
           await createSession();
         } finally {
           setIsReady(true);
@@ -315,17 +321,16 @@ export function useSessionLifecycle({
         return;
       }
 
-      writeStoredActiveSessionId(userId, null);
-      setActiveSession(null);
+      clearActiveSession();
       await createSession();
     },
     [
       activeSessionRef,
+      clearActiveSession,
       createSession,
       loadSession,
       refreshSessions,
       sessionsRef,
-      setActiveSession,
       setSessions,
       userId,
     ],

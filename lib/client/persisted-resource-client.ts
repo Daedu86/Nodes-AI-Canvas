@@ -40,6 +40,19 @@ export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit)
   return (await response.json()) as T;
 }
 
+export function createSerialTaskQueue<T>(fallback: T) {
+  let queue = new Promise<T>((resolve) => resolve(fallback));
+
+  return (task: () => Promise<T>) => {
+    const next = new Promise<T>((resolve, reject) => {
+      const run = () => task().then(resolve, reject);
+      void queue.then(run, run);
+    });
+    queue = next.catch(() => fallback);
+    return next;
+  };
+}
+
 export const buildActiveResourceStorageKey = (
   resourceName: string,
   userId: string | null,
