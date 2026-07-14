@@ -1,1 +1,1 @@
-run phase 3 hardening with accessible model selector
+run isolated phase 3 browser suites
