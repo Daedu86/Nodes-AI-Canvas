@@ -48,6 +48,7 @@ jobs:
         run: |
           set -o pipefail
           {
+            node scripts/fix-hardening-preflight.mjs
             node scripts/apply-remaining-hardening.mjs
             npm run format
             npm run check
@@ -63,6 +64,7 @@ jobs:
           rm -f next-env.d.ts
           rm .github/workflows/apply-remaining-hardening.yml
           rm scripts/apply-remaining-hardening.mjs
+          rm scripts/fix-hardening-preflight.mjs
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
@@ -70,7 +72,7 @@ jobs:
           git commit -m "fix: complete repository hardening [skip vercel]"
           git pull --rebase origin main
           git push origin HEAD:main
-          gh issue comment "${{ github.event.issue.number }}" --body "Validation passed. E2E type checking, secure revision IDs, and Markdown table escaping were published directly to main."
+          gh issue comment "${{ github.event.issue.number }}" --body "Validation passed. E2E type checking, secure revision IDs, Markdown table escaping, and the blocking lint cleanup were published directly to main."
           gh issue close "${{ github.event.issue.number }}" --reason completed
 
       - name: Report validation failure
