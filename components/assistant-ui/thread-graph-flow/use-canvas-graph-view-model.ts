@@ -107,6 +107,7 @@ export function useCanvasGraphViewModel({
   selectedContextArtifactIds,
   selectedNodeId,
   setDraftText,
+  setDraftContextScope,
   spotlight,
   updateArtifact,
 }: UseCanvasGraphViewModelOptions) {
@@ -202,6 +203,7 @@ export function useCanvasGraphViewModel({
       requestError,
       runCanvasPrompt,
       setDraftText,
+      setDraftContextScope,
       updateArtifact,
     }),
     [
@@ -236,6 +238,7 @@ export function useCanvasGraphViewModel({
       requestError,
       runCanvasPrompt,
       setDraftText,
+      setDraftContextScope,
       updateArtifact,
     ],
   );

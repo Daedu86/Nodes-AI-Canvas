@@ -89,6 +89,7 @@ export function ThreadGraphFlow() {
     cancelDraft,
     draft,
     setDraftPosition,
+    setDraftContextScope,
     setDraftText,
     toggleDraftArtifact,
   } = useGraphBranchIntent();
@@ -345,6 +346,7 @@ export function ThreadGraphFlow() {
     selectedArtifactId: selectedArtifact?.id ?? null,
     selectedContextArtifactIds,
     selectedNodeId,
+    setDraftContextScope,
     setDraftText,
     spotlight,
     updateArtifact,
