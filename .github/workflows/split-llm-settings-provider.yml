@@ -44,6 +44,24 @@ jobs:
           set -o pipefail
           {
             node scripts/split-llm-settings-provider.mjs
+            python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("components/context/use-llm-settings-actions.ts")
+          source = path.read_text()
+          source = re.sub(
+              r",\s*\[\s*persistSettingsImmediately\s*\]\s*\);",
+              ", [persistSettingsImmediately, setSettings]);",
+              source,
+          )
+          source = re.sub(
+              r",\s*\[\s*\]\s*\);",
+              ", [setSettings]);",
+              source,
+          )
+          path.write_text(source)
+          PY
             npm run format
             npm run check
             npm run build:budget
