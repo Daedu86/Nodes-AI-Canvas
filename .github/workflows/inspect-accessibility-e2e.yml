@@ -1,0 +1,46 @@
+name: Inspect accessibility E2E harness
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  inspect:
+    if: github.event.issue.title == '[automation] Inspect Accessibility E2E Harness'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: main
+      - name: Collect E2E harness context
+        shell: bash
+        run: |
+          {
+            echo '## E2E files'
+            echo
+            find tests/e2e -maxdepth 2 -type f -print | sort | sed 's/^/- `/' | sed 's/$/`/'
+            echo
+            echo '## Authentication and navigation references'
+            echo
+            echo '```text'
+            grep -RInE 'ALLOW_E2E_AUTH_OVERRIDE|E2E_AUTH|signIn|login|page\.goto|storageState|Open workspace guide|Open split workspace' tests/e2e playwright.config.ts app components lib 2>/dev/null | head -n 500 || true
+            echo '```'
+            echo
+            echo '## E2E source excerpts'
+            for file in $(find tests/e2e -maxdepth 2 -type f -print | sort | head -n 12); do
+              echo
+              echo "### $file"
+              echo '```ts'
+              sed -n '1,180p' "$file"
+              echo '```'
+            done
+          } > /tmp/e2e-context.md
+      - name: Report context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body-file /tmp/e2e-context.md
