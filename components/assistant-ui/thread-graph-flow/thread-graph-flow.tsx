@@ -6,48 +6,19 @@ import React from "react";
 import { useThreadRepoItems } from "@/components/assistant-ui/use-thread-repo-items";
 import { buildThreadGraphNodes } from "@/components/assistant-ui/thread-graph/build-graph-nodes";
 import { buildThreadGraphExportText } from "@/components/assistant-ui/thread-graph/export-graph-json";
-import { buildGraphLegendItems } from "@/components/assistant-ui/thread-graph/graph-models";
 import { getEdgeKey } from "@/components/assistant-ui/thread-graph/graph-geometry";
-import { CanvasBlockLibrary } from "@/components/assistant-ui/thread-graph-flow/block-library";
 import {
-  buildCanvasFilterCounts,
-  buildFocusPathNodeIds,
-  buildGraphStructureSignature,
-  buildRelatedContextIds,
-  buildSelectedLineage,
-  buildTreeStructureSignature,
-  decorateCanvasEdges,
-  decorateCanvasNodes,
-  filterCanvasGraph,
-  resolveCanvasVisibleNodeIds,
-} from "@/components/assistant-ui/thread-graph-flow/canvas-graph-projection";
-import { CanvasArtifactInspector } from "@/components/assistant-ui/thread-graph-flow/canvas-artifact-inspector";
-import { CanvasMessageInspector } from "@/components/assistant-ui/thread-graph-flow/canvas-message-inspector";
-import { CanvasSidebar } from "@/components/assistant-ui/thread-graph-flow/canvas-sidebar";
-import { CanvasStage } from "@/components/assistant-ui/thread-graph-flow/canvas-stage";
-import { buildCanvasFlowElements } from "@/components/assistant-ui/thread-graph-flow/canvas-flow-elements";
-import { estimateDataUrlBytes } from "@/components/assistant-ui/thread-graph-flow/canvas-upload-utils";
-import {
-  artifactAccent,
-  artifactTypeLabel,
   CANVAS_BRANCH_RUN_NOTICE,
-  formatByteSize,
   scrollMessageIntoView,
-  trimArtifactPreview,
 } from "@/components/assistant-ui/thread-graph-flow/canvas-workspace-utils";
-import {
-  getArtifactLineCount,
-  getArtifactStatChips,
-} from "@/components/assistant-ui/thread-graph-flow/artifact-presentation";
 import { useCanvasRunManager } from "@/components/assistant-ui/thread-graph-flow/use-canvas-run-manager";
 import { useCanvasBlockActions } from "@/components/assistant-ui/thread-graph-flow/use-canvas-block-actions";
 import { useCanvasBranchSubmission } from "@/components/assistant-ui/thread-graph-flow/use-canvas-branch-submission";
 import { useCanvasSessionState } from "@/components/assistant-ui/thread-graph-flow/use-canvas-session-state";
 import { useCanvasViewportController } from "@/components/assistant-ui/thread-graph-flow/use-canvas-viewport-controller";
-import type {
-  ThreadGraphFlowEdge,
-  ThreadGraphFlowNode,
-} from "@/components/assistant-ui/thread-graph-flow/thread-graph-flow-types";
+import { useCanvasGraphViewModel } from "@/components/assistant-ui/thread-graph-flow/use-canvas-graph-view-model";
+import { useCanvasInspectorViewModel } from "@/components/assistant-ui/thread-graph-flow/use-canvas-inspector-view-model";
+import { CanvasWorkspaceView } from "@/components/assistant-ui/thread-graph-flow/canvas-workspace-view";
 import {
   ROOT_NODE_ID,
   ROOT_NODE_LABEL,
@@ -66,7 +37,6 @@ import { useSessionArtifacts } from "@/components/context/session-artifacts";
 import { useSessionUiState } from "@/components/context/session-ui-state";
 import {
   buildBranchSpec,
-  getAllowedBranchOperations,
   getBranchOperationDetail,
 } from "@/lib/thread-branching";
 import { getContextBudgetPolicy } from "@/lib/context-budget";
@@ -221,41 +191,6 @@ export function ThreadGraphFlow() {
     updateArtifact,
     updateArtifactAndPersist,
   });
-  const linkedTargetCountByArtifact = React.useMemo(() => {
-    const counts = new Map<string, number>();
-    canvasLinks.forEach((link) => {
-      counts.set(link.artifactId, (counts.get(link.artifactId) ?? 0) + 1);
-    });
-    return counts;
-  }, [canvasLinks]);
-
-  const legendItems = React.useMemo(() => {
-    const conversationLegend = buildGraphLegendItems(nodes);
-    const hasTextArtifacts = artifacts.some((artifact) => artifact.artifactType === "text");
-    const hasCodeArtifacts = artifacts.some((artifact) => artifact.artifactType === "code");
-    const hasImageArtifacts = artifacts.some((artifact) => artifact.artifactType === "image");
-    const hasFileArtifacts = artifacts.some((artifact) => artifact.artifactType === "file");
-    const hasCanvasPrompts = canvasPrompts.length > 0;
-    return [
-      ...conversationLegend,
-      ...(hasTextArtifacts
-        ? [{ key: "artifact-text", label: "Text Context", swatch: artifactAccent("text") }]
-        : []),
-      ...(hasCodeArtifacts
-        ? [{ key: "artifact-code", label: "Code Context", swatch: artifactAccent("code") }]
-        : []),
-      ...(hasImageArtifacts
-        ? [{ key: "artifact-image", label: "Image Context", swatch: artifactAccent("image") }]
-        : []),
-      ...(hasFileArtifacts
-        ? [{ key: "artifact-file", label: "File Context", swatch: artifactAccent("file") }]
-        : []),
-      ...(hasCanvasPrompts
-        ? [{ key: "canvas-prompt", label: "Independent Prompt", swatch: artifactAccent("prompt") }]
-        : []),
-    ];
-  }, [artifacts, canvasPrompts.length, nodes]);
-
   React.useEffect(() => {
     if (!toolbarMenu) return;
 
@@ -305,51 +240,6 @@ export function ThreadGraphFlow() {
     [draft],
   );
   const isThreadRunning = runtime.threads.main.getState().isRunning;
-  const selectedContextLinkedMessageIds = React.useMemo(() => {
-    if (!selectedArtifact) return new Set<string>();
-    return new Set(
-      contextLinks
-        .filter((link) => link.artifactId === selectedArtifact.id)
-        .map((link) => link.targetMessageId),
-    );
-  }, [contextLinks, selectedArtifact]);
-
-  const filterCounts = React.useMemo(
-  () => buildCanvasFilterCounts(canvasConversationNodes, artifacts.length),
-  [artifacts.length, canvasConversationNodes],
-);
-
-  const selectedLineage = React.useMemo(
-  () =>
-    buildSelectedLineage({
-      canvasConversationNodes,
-      nodeIndex,
-      selectedArtifactId: selectedArtifact?.id ?? null,
-      selectedNodeId,
-    }),
-  [canvasConversationNodes, nodeIndex, selectedArtifact, selectedNodeId],
-);
-
-  const focusPathNodeIds = React.useMemo(
-  () =>
-    buildFocusPathNodeIds({
-      canvasConversationNodes,
-      nodeIndex,
-      selectedArtifactId: selectedArtifact?.id ?? null,
-      selectedContextArtifactIds,
-      selectedContextLinkedMessageIds,
-      selectedNodeId,
-    }),
-  [
-    canvasConversationNodes,
-    nodeIndex,
-    selectedArtifact,
-    selectedContextArtifactIds,
-    selectedContextLinkedMessageIds,
-    selectedNodeId,
-  ],
-);
-
   const {
     canvasDraftError,
     handleCancelPromptDraft,
@@ -375,28 +265,6 @@ export function ThreadGraphFlow() {
     setRequestError,
   });
 
-  React.useEffect(() => {
-    const inspector = inspectorScrollRef.current;
-    if (!inspector) return;
-    inspector.scrollTop = 0;
-  }, [
-    draft?.anchorId,
-    draft?.operation,
-    linkEditMode,
-    selectedNodeId,
-    selectedArtifact?.id,
-    selectedMessageNode?.id,
-  ]);
-
-  const relatedContextIds = React.useMemo(
-  () =>
-    buildRelatedContextIds(
-      selectedContextArtifactIds,
-      selectedContextLinkedMessageIds,
-    ),
-  [selectedContextArtifactIds, selectedContextLinkedMessageIds],
-);
-
   const handleCutEdge = React.useCallback(
     (childId: string, parentId: string | null) => {
       cutLink(childId, parentId);
@@ -406,147 +274,55 @@ export function ThreadGraphFlow() {
   );
 
   const {
-    conversationEdges: baseConversationEdges,
-    edges: flowEdges,
-    nodes: flowNodes,
-  } = React.useMemo(
-    () =>
-      buildCanvasFlowElements({
-        artifacts,
-        artifactIndex,
-        canvasConversationNodes,
-        canvasLinks,
-        canvasPrompts,
-        cancelCanvasPrompt,
-        canvasDraftError,
-        contextLinks,
-        deleteArtifact,
-        draft,
-        draftAnchorNode,
-        draftBranchSpec,
-        draftContextCount: draftContextArtifacts.length,
-        draftDetail,
-        getArtifactsForTarget,
-        handleCancelPromptDraft,
-        handleCancelRun,
-        handleCutEdge,
-        handleSubmitBranchDraft,
-        isSubmittingBranch,
-        isThreadRunning,
-        linkedTargetCountByArtifact,
-        linkEditMode,
-        llmEnabled,
-        nodeIndex,
-        overrides,
-        promptIndex,
-        requestError,
-        runCanvasPrompt,
-        setDraftText,
-        updateArtifact,
-      }),
-    [
-      artifacts,
-      artifactIndex,
-      canvasConversationNodes,
-      canvasLinks,
-      canvasPrompts,
-      cancelCanvasPrompt,
-      canvasDraftError,
-      contextLinks,
-      deleteArtifact,
-      draft,
-      draftAnchorNode,
-      draftBranchSpec,
-      draftContextArtifacts.length,
-      draftDetail,
-      getArtifactsForTarget,
-      handleCancelPromptDraft,
-      handleCancelRun,
-      handleCutEdge,
-      handleSubmitBranchDraft,
-      isSubmittingBranch,
-      isThreadRunning,
-      linkedTargetCountByArtifact,
-      linkEditMode,
-      llmEnabled,
-      nodeIndex,
-      overrides,
-      promptIndex,
-      requestError,
-      runCanvasPrompt,
-      setDraftText,
-      updateArtifact,
-    ],
-  );
-
-  const visibleNodeIds = React.useMemo(
-  () =>
-    resolveCanvasVisibleNodeIds({
-      densityMode,
-      focusPathNodeIds,
-      selectedNodeId,
-    }),
-  [densityMode, focusPathNodeIds, selectedNodeId],
-);
-
-const { nodes: visibleFlowNodes, edges: visibleFlowEdges } = React.useMemo(
-  () => filterCanvasGraph(flowNodes, flowEdges, visibleNodeIds),
-  [flowEdges, flowNodes, visibleNodeIds],
-);
-
-  const decoratedFlowNodes = React.useMemo<ThreadGraphFlowNode[]>(
-  () =>
-    decorateCanvasNodes({
-      nodeIndex,
-      relatedContextIds,
-      selectedLineage,
-      selectedNodeId,
-      spotlight,
-      visibleFlowNodes,
-    }),
-  [
-    nodeIndex,
-    relatedContextIds,
-    selectedLineage,
-    selectedNodeId,
-    spotlight,
-    visibleFlowNodes,
-  ],
-);
-
-  const decoratedFlowEdges = React.useMemo<ThreadGraphFlowEdge[]>(
-  () =>
-    decorateCanvasEdges({
-      decoratedFlowNodes,
-      relatedContextIds,
-      selectedLineage,
-      selectedNodeId,
-      spotlight,
-      visibleFlowEdges,
-    }),
-  [
+    decoratedFlowEdges,
     decoratedFlowNodes,
-    relatedContextIds,
-    selectedLineage,
+    filterCounts,
+    flowNodeCount,
+    graphStructureSignature,
+    hiddenCanvasNodeCount,
+    legendItems,
+    selectedContextLinkedMessageIds,
+    selectedFlowNode,
+    treeStructureSignature,
+    visibleCanvasNodeCount,
+  } = useCanvasGraphViewModel({
+    artifacts,
+    artifactIndex,
+    canvasConversationNodes,
+    canvasLinks,
+    canvasPrompts,
+    cancelCanvasPrompt,
+    canvasDraftError,
+    contextLinks,
+    deleteArtifact,
+    densityMode,
+    draft,
+    draftAnchorNode,
+    draftBranchSpec,
+    draftContextCount: draftContextArtifacts.length,
+    draftDetail,
+    getArtifactsForTarget,
+    handleCancelPromptDraft,
+    handleCancelRun,
+    handleCutEdge,
+    handleSubmitBranchDraft,
+    isSubmittingBranch,
+    isThreadRunning,
+    legendNodes: nodes,
+    linkEditMode,
+    llmEnabled,
+    nodeIndex,
+    overrides,
+    promptIndex,
+    requestError,
+    runCanvasPrompt,
+    selectedArtifactId: selectedArtifact?.id ?? null,
+    selectedContextArtifactIds,
     selectedNodeId,
+    setDraftText,
     spotlight,
-    visibleFlowEdges,
-  ],
-);
-
-  const graphStructureSignature = React.useMemo(
-  () => buildGraphStructureSignature(decoratedFlowNodes, decoratedFlowEdges),
-  [decoratedFlowEdges, decoratedFlowNodes],
-);
-
-  const treeStructureSignature = React.useMemo(
-  () =>
-    buildTreeStructureSignature(
-      canvasConversationNodes,
-      baseConversationEdges,
-    ),
-  [baseConversationEdges, canvasConversationNodes],
-);
+    updateArtifact,
+  });
 
   const {
     handleFocusSelected,
@@ -563,17 +339,8 @@ const { nodes: visibleFlowNodes, edges: visibleFlowEdges } = React.useMemo(
     selectedNodeId,
     setStoredViewport,
     treeStructureSignature,
-    visibleNodeCount: visibleFlowNodes.length,
+    visibleNodeCount: visibleCanvasNodeCount,
   });
-
-  const selectedFlowNode = React.useMemo(
-    () => decoratedFlowNodes.find((node) => node.id === selectedNodeId) ?? null,
-    [decoratedFlowNodes, selectedNodeId],
-  );
-  const selectedBranchOptions = React.useMemo(() => {
-    if (!selectedMessageNode) return [];
-    return getAllowedBranchOperations(selectedMessageNode).map(getBranchOperationDetail);
-  }, [selectedMessageNode]);
 
   const exportConnectorDefaults = React.useMemo(() => {
     const defaults = new Map<string, LinkConnectorPref>();
@@ -715,284 +482,189 @@ const { nodes: visibleFlowNodes, edges: visibleFlowEdges } = React.useMemo(
     updateArtifact,
   });
 
-  const selectedBranchTrail = React.useMemo(() => {
-    if (!selectedMessageNode) return [];
-
-    const formatTrailLabel = (node: ThreadGraphNodeModel) => {
-      if (node.id === ROOT_NODE_ID) return "root";
-      const preview = node.text.replace(/\s+/g, " ").trim();
-      if (!preview) {
-        return node.role === "assistant" ? "assistant reply" : "user prompt";
-      }
-      return preview.length > 28 ? `${preview.slice(0, 25)}...` : preview;
-    };
-
-    const trail: string[] = [];
-    const visited = new Set<string>();
-    let currentId: string | null = selectedMessageNode.id;
-
-    while (currentId && !visited.has(currentId)) {
-      visited.add(currentId);
-      const node = nodeIndex.get(currentId);
-      if (!node) break;
-      trail.unshift(formatTrailLabel(node));
-      currentId = node.parentId;
-    }
-
-    return trail;
-  }, [nodeIndex, selectedMessageNode]);
-
-  const selectedBranchPathLabel = React.useMemo(
-    () => selectedBranchTrail.join(" > "),
-    [selectedBranchTrail],
-  );
-
-  const selectedPreview = selectedFlowNode?.data.preview?.replace(/\s+/g, " ").trim() ?? "";
-  const visibleCanvasNodeCount = decoratedFlowNodes.length;
-  const hiddenCanvasNodeCount = Math.max(0, flowNodes.length - visibleCanvasNodeCount);
-  const selectedArtifactSize = formatByteSize(selectedArtifact?.byteSize);
-  const selectedArtifactPreviewSize = selectedArtifact?.sourceDataUrl
-    ? formatByteSize(estimateDataUrlBytes(selectedArtifact.sourceDataUrl))
-    : null;
-  const selectedArtifactStatChips = React.useMemo(
-    () => (selectedArtifact ? getArtifactStatChips(selectedArtifact) : []),
-    [selectedArtifact],
-  );
-  const selectedArtifactLineCount = React.useMemo(
-    () => (selectedArtifact ? getArtifactLineCount(selectedArtifact) : 0),
-    [selectedArtifact],
-  );
-  const selectedCanvasLabel = React.useMemo(() => {
-    if (selectedArtifact) {
-      return `${artifactTypeLabel(selectedArtifact)} selected`;
-    }
-    if (selectedMessageNode) {
-      return `${selectedMessageNode.role} branch selected`;
-    }
-    return "No active focus";
-  }, [selectedArtifact, selectedMessageNode]);
-  const selectedCanvasPreview = React.useMemo(() => {
-    if (selectedArtifact) {
-      return trimArtifactPreview(selectedArtifact);
-    }
-    if (selectedPreview.length > 0) {
-      return selectedPreview;
-    }
-    return "Use the canvas to branch, compare, and pin reusable context.";
-  }, [selectedArtifact, selectedPreview]);
-  const showCanvasPromptCta =
-    !draft &&
-    !selectedArtifact &&
-    (!selectedMessageNode || selectedMessageNode.id === ROOT_NODE_ID);
-  const attachableTargets = React.useMemo(
-    () =>
-      canvasConversationNodes.filter((node) => !node.isBridge).map((node) => ({
-        id: node.id,
-        preview: node.text.replace(/\s+/g, " ").trim() || (node.id === ROOT_NODE_ID ? "Conversation root" : "No preview"),
-        role: node.id === ROOT_NODE_ID ? "root" : node.role,
-      })),
-    [canvasConversationNodes],
-  );
+  const {
+    attachableTargets,
+    selectedArtifactLineCount,
+    selectedArtifactPreviewSize,
+    selectedArtifactSize,
+    selectedArtifactStatChips,
+    selectedBranchOptions,
+    selectedBranchPathLabel,
+    selectedCanvasLabel,
+    selectedCanvasPreview,
+    selectedPreview,
+    showCanvasPromptCta,
+    showInspector,
+  } = useCanvasInspectorViewModel({
+    canvasConversationNodes,
+    draft,
+    inspectorScrollRef,
+    linkEditMode,
+    nodeIndex,
+    resetLinkCount: overrides.size,
+    selectedArtifact,
+    selectedContextArtifacts,
+    selectedFlowNode,
+    selectedMessageNode,
+    selectedNodeId,
+  });
 
   return (
-    <section className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.08),transparent_24%),linear-gradient(180deg,rgba(248,250,252,0.98),rgba(241,245,249,0.96))] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.16),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.12),transparent_22%),linear-gradient(180deg,rgba(15,23,42,0.88),rgba(2,6,23,0.9))]">
-      <input
-        ref={imageUploadInputRef}
-        type="file"
-        accept="image/*"
-        data-testid="artifact-image-upload-input"
-        className="hidden"
-        onChange={handleImageUploadChange}
-      />
-      <input
-        ref={fileUploadInputRef}
-        type="file"
-        className="hidden"
-        onChange={handleFileUploadChange}
-      />
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <CanvasBlockLibrary
-          collapsed={blockLibraryCollapsed}
-          onAddBlock={(block) => handleAddCanvasBlock(block)}
-          onCollapsedChange={setBlockLibraryCollapsed}
-        />
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 p-3 lg:flex-row">
-        <CanvasSidebar
-activeCanvasRunCount={activeCanvasRunCount}
-artifactCount={artifacts.length}
-connectionError={connectionError}
-densityMode={densityMode}
-filterCounts={filterCounts}
-flowNodeCount={flowNodes.length}
-flowRenderMode={flowRenderMode}
-hiddenCanvasNodeCount={hiddenCanvasNodeCount}
-legendItems={legendItems}
-linkEditMode={linkEditMode}
-onCancelAllRuns={cancelAllCanvasRuns}
-onCopyJson={handleCopyJson}
-onCreatePrompt={() => handleCreatePromptNode()}
-onDensityModeChange={setDensityMode}
-onFlowRenderModeChange={setFlowRenderMode}
-onLinkEditModeChange={setLinkEditMode}
-onResetLinks={resetLinks}
-onSpotlightChange={setSpotlight}
-onToolbarMenuChange={setToolbarMenu}
-promptDisabled={!llmEnabled}
-queuedCanvasRunCount={queuedCanvasRunCount}
-resetLinkCount={overrides.size}
-selectedBranchPathLabel={selectedBranchPathLabel}
-selectedCanvasLabel={selectedCanvasLabel}
-selectedCanvasPreview={selectedCanvasPreview}
-selectedNodeId={selectedNodeId}
-showCanvasPromptCta={showCanvasPromptCta}
-showInspector={
-  !!selectedArtifact ||
-  (!!selectedFlowNode && !!selectedMessageNode) ||
-  linkEditMode ||
-  overrides.size > 0
-}
-spotlight={spotlight}
-toolbarMenu={toolbarMenu}
-toolbarMenuRef={toolbarMenuRef}
-visibleCanvasNodeCount={visibleCanvasNodeCount}
-        >
-<div
-  ref={inspectorScrollRef}
-  className="max-h-[min(34rem,calc(100vh-11rem))] overflow-y-auto rounded-[26px] border border-border/60 bg-background/85 px-3 py-3 shadow-sm"
->
-  {selectedArtifact ? (
-    <CanvasArtifactInspector
-      artifact={selectedArtifact}
-      artifactLineCount={selectedArtifactLineCount}
-      artifactPreviewSize={selectedArtifactPreviewSize}
-      artifactSize={selectedArtifactSize}
-      artifactStatChips={selectedArtifactStatChips}
-      attachableTargets={attachableTargets}
-      contextBudgetMaxImagePreviewBytes={
-        contextBudgetPolicy.maxImagePreviewBytes
-      }
-      hasOutputLink={canvasLinks.some(
-        (link) =>
-          link.relation === "output" &&
-          link.artifactId === selectedArtifact.id,
-      )}
-      isLinkedToTarget={(targetId) =>
-        isArtifactLinkedToTarget(selectedArtifact.id, targetId)
-      }
-      linkedTargetCount={selectedContextLinkedMessageIds.size}
-      onConnectTo={handleArtifactConnectFromInspector}
-      onDelete={() => {
-        deleteArtifact(selectedArtifact.id);
-        applyCanvasSelection(null);
+    <CanvasWorkspaceView
+      imageUploadInputRef={imageUploadInputRef}
+      fileUploadInputRef={fileUploadInputRef}
+      onImageUploadChange={handleImageUploadChange}
+      onFileUploadChange={handleFileUploadChange}
+      inspectorScrollRef={inspectorScrollRef}
+      blockLibraryProps={{
+        collapsed: blockLibraryCollapsed,
+        onAddBlock: handleAddCanvasBlock,
+        onCollapsedChange: setBlockLibraryCollapsed,
       }}
-      onDisconnectOutput={() => {
-        const outputLink = canvasLinks.find(
-          (link) =>
-            link.relation === "output" &&
-            link.artifactId === selectedArtifact.id,
-        );
-        if (outputLink) removeCanvasLink(outputLink.id);
+      sidebarProps={{
+        activeCanvasRunCount,
+        artifactCount: artifacts.length,
+        connectionError,
+        densityMode,
+        filterCounts,
+        flowNodeCount,
+        flowRenderMode,
+        hiddenCanvasNodeCount,
+        legendItems,
+        linkEditMode,
+        onCancelAllRuns: cancelAllCanvasRuns,
+        onCopyJson: handleCopyJson,
+        onCreatePrompt: () => handleCreatePromptNode(),
+        onDensityModeChange: setDensityMode,
+        onFlowRenderModeChange: setFlowRenderMode,
+        onLinkEditModeChange: setLinkEditMode,
+        onResetLinks: resetLinks,
+        onSpotlightChange: setSpotlight,
+        onToolbarMenuChange: setToolbarMenu,
+        promptDisabled: !llmEnabled,
+        queuedCanvasRunCount,
+        resetLinkCount: overrides.size,
+        selectedBranchPathLabel,
+        selectedCanvasLabel,
+        selectedCanvasPreview,
+        selectedNodeId,
+        showCanvasPromptCta,
+        showInspector,
+        spotlight,
+        toolbarMenu,
+        toolbarMenuRef,
+        visibleCanvasNodeCount,
       }}
-      onOpenTarget={applyCanvasSelection}
-      onRestoreRevision={(revisionId) =>
-        restoreArtifactRevision(selectedArtifact.id, revisionId)
-      }
-      onToggleLink={(targetId) =>
-        handleToggleArtifactLink(selectedArtifact.id, targetId)
-      }
-      onToggleSync={() =>
-        setArtifactSyncMode(
-          selectedArtifact.id,
-          selectedArtifact.syncMode === "paused" ? "auto" : "paused",
-        )
-      }
-      onUpdate={(patch) => updateArtifact(selectedArtifact.id, patch)}
-    />
-  ) : selectedFlowNode && selectedMessageNode ? (
-    <CanvasMessageInspector
-      activeDraft={
-        draft && draft.anchorId === selectedMessageNode.id
-          ? { operation: draft.operation, text: draft.text }
+      artifactInspectorProps={
+        selectedArtifact
+          ? {
+              artifact: selectedArtifact,
+              artifactLineCount: selectedArtifactLineCount,
+              artifactPreviewSize: selectedArtifactPreviewSize,
+              artifactSize: selectedArtifactSize,
+              artifactStatChips: selectedArtifactStatChips,
+              attachableTargets,
+              contextBudgetMaxImagePreviewBytes:
+                contextBudgetPolicy.maxImagePreviewBytes,
+              hasOutputLink: canvasLinks.some(
+                (link) =>
+                  link.relation === "output" &&
+                  link.artifactId === selectedArtifact.id,
+              ),
+              isLinkedToTarget: (targetId) =>
+                isArtifactLinkedToTarget(selectedArtifact.id, targetId),
+              linkedTargetCount: selectedContextLinkedMessageIds.size,
+              onConnectTo: handleArtifactConnectFromInspector,
+              onDelete: () => {
+                deleteArtifact(selectedArtifact.id);
+                applyCanvasSelection(null);
+              },
+              onDisconnectOutput: () => {
+                const outputLink = canvasLinks.find(
+                  (link) =>
+                    link.relation === "output" &&
+                    link.artifactId === selectedArtifact.id,
+                );
+                if (outputLink) removeCanvasLink(outputLink.id);
+              },
+              onOpenTarget: applyCanvasSelection,
+              onRestoreRevision: (revisionId) =>
+                restoreArtifactRevision(selectedArtifact.id, revisionId),
+              onToggleLink: (targetId) =>
+                handleToggleArtifactLink(selectedArtifact.id, targetId),
+              onToggleSync: () =>
+                setArtifactSyncMode(
+                  selectedArtifact.id,
+                  selectedArtifact.syncMode === "paused" ? "auto" : "paused",
+                ),
+              onUpdate: (patch) => updateArtifact(selectedArtifact.id, patch),
+            }
           : null
       }
-      artifacts={artifacts}
-      busy={isSubmittingBranch}
-      contextCount={selectedContextArtifacts.length}
-      details={selectedBranchOptions}
-      disabled={!llmEnabled}
-      isLinkedToTarget={(artifactId) =>
-        isArtifactLinkedToTarget(artifactId, selectedMessageNode.id)
+      messageInspectorProps={
+        selectedFlowNode && selectedMessageNode
+          ? {
+              activeDraft:
+                draft && draft.anchorId === selectedMessageNode.id
+                  ? { operation: draft.operation, text: draft.text }
+                  : null,
+              artifacts,
+              busy: isSubmittingBranch,
+              contextCount: selectedContextArtifacts.length,
+              details: selectedBranchOptions,
+              disabled: !llmEnabled,
+              isLinkedToTarget: (artifactId) =>
+                isArtifactLinkedToTarget(artifactId, selectedMessageNode.id),
+              linkEditMode,
+              onCancelDraft: handleCancelPromptDraft,
+              onCancelRun: isThreadRunning ? handleCancelRun : undefined,
+              onChooseOperation: handleChooseBranchOperation,
+              onClearFocus: () => applyCanvasSelection(null),
+              onCutSelected: handleCutSelected,
+              onDraftTextChange: setDraftText,
+              onFocusSelected: handleFocusSelected,
+              onOpenInChat: handleOpenSelectedInChat,
+              onResetView: handleResetView,
+              onRestoreSelected: handleRestoreSelected,
+              onSubmitDraft: handleSubmitBranchDraft,
+              onToggleArtifactLink: (artifactId) =>
+                handleToggleArtifactLink(artifactId, selectedMessageNode.id),
+              runInterruptionNote: isThreadRunning
+                ? CANVAS_BRANCH_RUN_NOTICE
+                : null,
+              selectedBranchPathLabel,
+              selectedFlowNode,
+              selectedNodeId,
+              selectedOverride: !!selectedOverride,
+              selectedParentId,
+              selectedPreview,
+            }
+          : null
       }
-      linkEditMode={linkEditMode}
-      onCancelDraft={handleCancelPromptDraft}
-      onCancelRun={isThreadRunning ? handleCancelRun : undefined}
-      onChooseOperation={handleChooseBranchOperation}
-      onClearFocus={() => applyCanvasSelection(null)}
-      onCutSelected={handleCutSelected}
-      onDraftTextChange={setDraftText}
-      onFocusSelected={handleFocusSelected}
-      onOpenInChat={handleOpenSelectedInChat}
-      onResetView={handleResetView}
-      onRestoreSelected={handleRestoreSelected}
-      onSubmitDraft={handleSubmitBranchDraft}
-      onToggleArtifactLink={(artifactId) =>
-        handleToggleArtifactLink(artifactId, selectedMessageNode.id)
-      }
-      runInterruptionNote={
-        isThreadRunning ? CANVAS_BRANCH_RUN_NOTICE : null
-      }
-      selectedBranchPathLabel={selectedBranchPathLabel}
-      selectedFlowNode={selectedFlowNode}
-      selectedNodeId={selectedNodeId}
-      selectedOverride={!!selectedOverride}
-      selectedParentId={selectedParentId}
-      selectedPreview={selectedPreview}
+      stageProps={{
+        activeSessionId,
+        edges: decoratedFlowEdges,
+        flowRenderMode,
+        graphStructureSignature,
+        nodes: decoratedFlowNodes,
+        onArtifactPositionChange: (artifactId, position) =>
+          updateArtifact(artifactId, { position }),
+        onCanvasConnect: handleCanvasConnect,
+        onCanvasDragOver: handleCanvasDragOver,
+        onCanvasDrop: handleCanvasDrop,
+        onDraftPositionChange: setDraftPosition,
+        onInit: setReactFlowInstance,
+        onMessageOpen: (messageId) => {
+          applyCanvasSelection(messageId);
+          setViewMode("split");
+          scrollMessageIntoView(messageId);
+        },
+        onNodeSelect: applyCanvasSelection,
+        onViewportChange: setStoredViewport,
+        selectedNodeId,
+        storedViewport,
+        viewportRef: flowViewportRef,
+      }}
     />
-  ) : (
-    <div className="space-y-2 rounded-[24px] border border-dashed border-border/70 bg-background/80 px-4 py-5 text-left">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-        Nothing selected
-      </p>
-      <p className="text-sm font-medium text-foreground/85">
-        Pick a message node to branch, or select an artifact to shape
-        reusable context.
-      </p>
-      <p className="text-xs leading-5 text-muted-foreground">
-        The canvas is your structured input layer. Use it to build
-        artifacts the model can reason over without losing
-        human-readable form.
-      </p>
-    </div>
-  )}
-</div>
-        </CanvasSidebar>
-        <CanvasStage
-          activeSessionId={activeSessionId}
-          edges={decoratedFlowEdges}
-          flowRenderMode={flowRenderMode}
-          graphStructureSignature={graphStructureSignature}
-          nodes={decoratedFlowNodes}
-          onArtifactPositionChange={(artifactId, position) =>
-            updateArtifact(artifactId, { position })
-          }
-          onCanvasConnect={handleCanvasConnect}
-          onCanvasDragOver={handleCanvasDragOver}
-          onCanvasDrop={handleCanvasDrop}
-          onDraftPositionChange={setDraftPosition}
-          onInit={setReactFlowInstance}
-          onMessageOpen={(messageId) => {
-            applyCanvasSelection(messageId);
-            setViewMode("split");
-            scrollMessageIntoView(messageId);
-          }}
-          onNodeSelect={applyCanvasSelection}
-          onViewportChange={setStoredViewport}
-          selectedNodeId={selectedNodeId}
-          storedViewport={storedViewport}
-          viewportRef={flowViewportRef}
-        />
-      </div>
-      </div>
-    </section>
   );
 }
