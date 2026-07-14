@@ -78,6 +78,16 @@ async function ensureSignedIn(page: Page) {
   }
 }
 
+async function dismissWorkspaceGuide(page: Page) {
+  const guide = page.getByRole("dialog", {
+    name: "Turn a question into a structured decision",
+  });
+  if (!(await guide.isVisible().catch(() => false))) return;
+
+  await guide.getByRole("button", { name: "Close workspace guide" }).click();
+  await expect(guide).toBeHidden();
+}
+
 async function createAndOpenSession(page: Page) {
   await ensureSignedIn(page);
   const created = await fetchAppJson<{ session: { id: string } }>(
@@ -94,6 +104,7 @@ async function createAndOpenSession(page: Page) {
   await expect(page.getByPlaceholder("Write a message...")).toBeVisible({
     timeout: 15_000,
   });
+  await dismissWorkspaceGuide(page);
 }
 
 test.beforeEach(async ({ page }) => {
