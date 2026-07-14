@@ -1,81 +1,4 @@
-import fs from "node:fs";
-
-function replaceOnce(source, before, after, label) {
-  const index = source.indexOf(before);
-  if (index < 0) throw new Error(`Could not locate ${label}.`);
-  return source.slice(0, index) + after + source.slice(index + before.length);
-}
-
-const packagePath = "package.json";
-const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
-packageJson.scripts["test:a11y:e2e"] = "playwright test accessibility.spec.ts";
-fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
-
-const configPath = "playwright.config.ts";
-let config = fs.readFileSync(configPath, "utf8");
-if (!config.includes("const browserName =")) {
-  config = replaceOnce(
-    config,
-    "const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL;\n",
-    'const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL;\nconst browserName = process.env.PLAYWRIGHT_BROWSER_NAME === "firefox" ? "firefox" : "chromium";\n',
-    "Playwright browser channel declaration",
-  );
-}
-config = config.replace(
-  '    browserName: "chromium",\n    ...(browserChannel ? { channel: browserChannel } : {}),',
-  '    browserName,\n    ...(browserName === "chromium" && browserChannel ? { channel: browserChannel } : {}),',
-);
-fs.writeFileSync(configPath, config);
-
-const ciPath = ".github/workflows/ci.yml";
-let ci = fs.readFileSync(ciPath, "utf8");
-if (!ci.includes("  accessibility:\n")) {
-  const anchor = "\n  canvas-performance:\n";
-  const job = `
-  accessibility:
-    name: Accessibility E2E (\${{ matrix.browser }})
-    needs: [quality, build]
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    strategy:
-      fail-fast: false
-      matrix:
-        browser: [chromium, firefox]
-    env:
-      PLAYWRIGHT_BROWSER_NAME: \${{ matrix.browser }}
-      PLAYWRIGHT_RUN_ID: accessibility-\${{ github.run_id }}-\${{ github.run_attempt }}-\${{ matrix.browser }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Install dependencies
-        run: npm ci --no-audit --fund=false
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps \${{ matrix.browser }}
-      - name: Run accessibility E2E
-        run: npm run test:a11y:e2e -- --workers=1
-      - name: Upload accessibility failure artifacts
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: accessibility-\${{ matrix.browser }}-artifacts
-          path: |
-            test-results
-            playwright-report
-          if-no-files-found: ignore
-          retention-days: 7
-`;
-  ci = replaceOnce(ci, anchor, `\n${job}${anchor}`, "CI canvas performance job");
-}
-fs.writeFileSync(ciPath, ci);
-
-fs.writeFileSync(
-  "tests/e2e/accessibility.spec.ts",
-  `import AxeBuilder from "@axe-core/playwright";
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 type Page = import("@playwright/test").Page;
@@ -84,7 +7,7 @@ const DEV_AUTH_EMAIL = process.env.AUTH_DEV_EMAIL || "demo@nodes.local";
 const DEV_AUTH_PASSWORD = process.env.AUTH_DEV_PASSWORD || "dev-password";
 const PLAYWRIGHT_BASE_URL =
   process.env.PLAYWRIGHT_BASE_URL ??
-  \`http://localhost:\${process.env.PLAYWRIGHT_PORT ?? "3100"}\`;
+  `http://localhost:${process.env.PLAYWRIGHT_PORT ?? "3100"}`;
 
 async function fetchAppJson<T>(page: Page, input: string, init?: RequestInit) {
   const url = new URL(input, page.url()).toString();
@@ -98,7 +21,7 @@ async function fetchAppJson<T>(page: Page, input: string, init?: RequestInit) {
     ...(body === undefined ? {} : { data: body }),
   });
   if (!response.ok()) {
-    throw new Error(\`Request failed for \${input}: \${response.status()}\`);
+    throw new Error(`Request failed for ${input}: ${response.status()}`);
   }
   return (await response.json()) as T;
 }
@@ -131,7 +54,7 @@ async function ensureSignedIn(page: Page) {
       method: "POST",
       body: JSON.stringify({}),
     });
-    await page.goto(\`/?sessionId=\${created.session.id}\`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/?sessionId=${created.session.id}`, { waitUntil: "domcontentloaded" });
     await expect(composer).toBeVisible({ timeout: 15_000 });
     return;
   }
@@ -152,7 +75,7 @@ async function createAndOpenSession(page: Page) {
     method: "POST",
     body: JSON.stringify({ title: "Accessibility verification" }),
   });
-  await page.goto(\`/?sessionId=\${created.session.id}\`, { waitUntil: "domcontentloaded" });
+  await page.goto(`/?sessionId=${created.session.id}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByPlaceholder("Write a message...")).toBeVisible({ timeout: 15_000 });
 }
 
@@ -261,5 +184,3 @@ test("prevents hidden workspace panels from receiving focus", async ({ page }) =
     false,
   );
 });
-`,
-);

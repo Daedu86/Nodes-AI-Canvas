@@ -5,6 +5,7 @@ import path from "node:path";
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
 const baseURL = `http://localhost:${port}`;
 const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL;
+const browserName = process.env.PLAYWRIGHT_BROWSER_NAME === "firefox" ? "firefox" : "chromium";
 const playwrightStateDir = path.join(os.tmpdir(), "ai-canvas-playwright");
 const playwrightRunId = (process.env.PLAYWRIGHT_RUN_ID ?? String(process.pid)).replace(
   /[^a-zA-Z0-9_-]/gu,
@@ -31,10 +32,10 @@ export default defineConfig({
   ...(isCi ? { workers: 1 } : {}),
   use: {
     baseURL,
-    browserName: "chromium",
-    ...(browserChannel ? { channel: browserChannel } : {}),
+    browserName,
+    ...(browserName === "chromium" && browserChannel ? { channel: browserChannel } : {}),
     headless: true,
-    permissions: ["clipboard-read", "clipboard-write"],
+    permissions: browserName === "chromium" ? ["clipboard-read", "clipboard-write"] : [],
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     video: "retain-on-failure",

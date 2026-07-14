@@ -272,8 +272,8 @@ export function CanvasBlockLibrary({
                               <Icon className="h-4 w-4" />
                             </span>
                             <span
-                              className="rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em]"
-                              style={{ color: block.accent, borderColor: `${block.accent}35` }}
+                              className="rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-foreground"
+                              style={{ borderColor: `${block.accent}70` }}
                             >
                               {category === "process" ? "run" : category === "inputs" ? "in" : "out"}
                             </span>
