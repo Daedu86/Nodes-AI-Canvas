@@ -71,7 +71,7 @@ jobs:
           retention-days: 7
 
   build:
-    name: Production build
+    name: Production build and bundle budget
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -84,8 +84,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --no-audit --fund=false
-      - name: Build preview configuration
-        run: npm run build
+      - name: Build preview configuration and enforce JavaScript budget
+        run: npm run build:budget
 
   canvas-performance:
     name: Canvas performance budget
