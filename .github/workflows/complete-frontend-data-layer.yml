@@ -38,26 +38,25 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --fund=false
 
-      - name: Apply frontend data-layer refactor
-        run: node scripts/complete-frontend-data-layer.mjs
-
-      - name: Format generated changes
-        run: npm run format
-
-      - name: Validate quality and coverage
-        run: npm run check
-
-      - name: Validate production build and bundle budget
-        run: npm run build:budget
+      - name: Apply and validate frontend data-layer refactor
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            node scripts/complete-frontend-data-layer.mjs
+            npm run format
+            npm run check
+            npm run build:budget
+          } 2>&1 | tee /tmp/frontend-data-layer-validation.log
 
       - name: Publish validated code
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          rm scripts/complete-frontend-data-layer.mjs
+          rm scripts/complete-frontend-data-layer.mjs scripts/.frontend-data-layer-trigger
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add components/context/reusable-memory.tsx components/context/llm-settings.tsx lib/client tests scripts/complete-frontend-data-layer.mjs
+          git add components/context/reusable-memory.tsx components/context/llm-settings.tsx lib/client tests scripts/complete-frontend-data-layer.mjs scripts/.frontend-data-layer-trigger
           git diff --cached --check
           git commit -m "refactor: complete frontend data layer [skip vercel]"
           git pull --rebase origin main
@@ -68,5 +67,20 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          gh issue comment "${{ github.event.issue.number }}" --body "Frontend data-layer validation failed. No validated implementation was published."
+          {
+            echo 'Frontend data-layer validation failed. No validated implementation was published.'
+            echo
+            echo '<details><summary>Relevant log tail</summary>'
+            echo
+            echo '```text'
+            if [ -f /tmp/frontend-data-layer-validation.log ]; then
+              tail -n 120 /tmp/frontend-data-layer-validation.log
+            else
+              echo 'Validation log was not created; inspect setup or dependency installation.'
+            fi
+            echo '```'
+            echo '</details>'
+          } > /tmp/frontend-data-layer-comment.md
+          gh issue comment "${{ github.event.issue.number }}" --body-file /tmp/frontend-data-layer-comment.md
