@@ -1,1 +1,1 @@
-compact final phase 3 failure status
+inspect final phase 3 failure
