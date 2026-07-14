@@ -10,6 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "bundle:budget": "node scripts/check-bundle-budget.mjs",
+    "build:budget": "npm run build && npm run bundle:budget",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
@@ -33,7 +34,7 @@
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "audit:all": "npm audit --audit-level=critical",
     "check": "npm run format:check && npm run typecheck && npm run test:coverage && npm run test:critical-coverage",
-    "test:ci": "npm run check && npm run test:e2e -- --workers=1"
+    "test:ci": "npm run check && npm run build:budget && npm run test:e2e -- --workers=1"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.11",
