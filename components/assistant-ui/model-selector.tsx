@@ -18,6 +18,7 @@ export function ModelSelector() {
     <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
       Model
       <select
+        aria-label="Model"
         className="text-foreground bg-muted/70 hover:bg-muted focus-visible:ring-ring flex min-w-48 items-center rounded-md border px-2 py-1 text-xs outline-none transition-colors"
         disabled={!isReady}
         value={selectedKey}
