@@ -1,0 +1,15 @@
+{
+  "analysisFoundForCommit": true,
+  "commitSha": "fd8f9c7dc6da3ccf800687f012bedfc197773183",
+  "openAlertCount": 1,
+  "alerts": [
+    {
+      "number": 8,
+      "rule": "js/http-to-file-access",
+      "description": "Network data written to file",
+      "severity": "medium",
+      "path": "scripts/rotate-secrets.mjs",
+      "startLine": 407
+    }
+  ]
+}
