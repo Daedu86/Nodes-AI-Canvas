@@ -9,31 +9,25 @@ import {
   writeStoredResourceId,
 } from "@/lib/client/persisted-resource-client";
 import {
+  patchSessionRequest,
+  pickSessionId,
+  recoverSessionDocumentFromCache,
+  shouldKeepaliveSessionPatch,
+  type ActiveSessionDocumentPatch,
+  type SessionResponse,
+} from "@/lib/client/session-persistence";
+import { SessionConflictDialog } from "@/components/context/session-conflict-dialog";
+import {
   usePersistedResourceState,
   useSerialTaskQueue,
 } from "@/components/context/use-persisted-resource-state";
+import { useSessionConflictResolution } from "@/components/context/use-session-conflict-resolution";
 import { useSession } from "next-auth/react";
-import type { SessionArtifact, SessionContextLink } from "@/lib/session-artifacts";
-import type { SessionDocument, SessionSummary, SessionThreadExport } from "@/lib/session-documents";
-import { normalizeSessionThreadExport } from "@/lib/session-documents";
-import { SESSION_VERSION_CONFLICT_CODE } from "@/lib/session-version-conflict";
-
-type ActiveSessionDocumentPatch = {
-  artifacts?: SessionArtifact[];
-  contextLinks?: SessionContextLink[];
-  snapshot?: SessionThreadExport;
-};
-
-type SessionDocumentPatch = ActiveSessionDocumentPatch & {
-  archived?: boolean;
-  title?: string | null;
-};
-
-type SessionConflictState = {
-  attemptedPatch: SessionDocumentPatch;
-  currentSession: SessionDocument;
-  sessionId: string;
-};
+import type {
+  SessionDocument,
+  SessionSummary,
+  SessionThreadExport,
+} from "@/lib/session-documents";
 
 type PersistedSessionsContextValue = {
   activeSession: SessionDocument | null;
@@ -54,32 +48,6 @@ type SessionsListResponse = {
   sessions: SessionSummary[];
 };
 
-type SessionResponse = {
-  session: SessionDocument;
-};
-
-type SessionConflictResponse = SessionResponse & {
-  code: typeof SESSION_VERSION_CONFLICT_CODE;
-  error: string;
-  expectedVersion: number;
-};
-
-const pickSessionId = (
-  sessions: SessionSummary[],
-  options?: { excludeIds?: string[]; preferredId?: string | null },
-) => {
-  const excludeIds = new Set(options?.excludeIds ?? []);
-  const available = sessions.filter((session) => !excludeIds.has(session.id));
-  const preferredId = options?.preferredId ?? null;
-  if (preferredId && available.some((session) => session.id === preferredId)) {
-    return preferredId;
-  }
-  return available.find((session) => !session.archived)?.id ?? available[0]?.id ?? null;
-};
-
-const SESSION_SNAPSHOT_CACHE_KEY_PREFIX = "nodes.session-snapshot-cache.v1:";
-const KEEPALIVE_SAFE_BODY_BYTES = 60 * 1024;
-
 const PersistedSessionsContext = React.createContext<PersistedSessionsContextValue | null>(null);
 
 const readStoredActiveSessionId = (userId: string | null) =>
@@ -89,40 +57,6 @@ const writeStoredActiveSessionId = (
   userId: string | null,
   sessionId: string | null,
 ) => writeStoredResourceId("session", userId, sessionId);
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
-
-const readSessionConflictResponse = (error: unknown): SessionConflictResponse | null => {
-  if (!(error instanceof Error) || !("status" in error) || error.status !== 409) {
-    return null;
-  }
-  const payload = "payload" in error ? error.payload : null;
-  if (!isRecord(payload) || payload.code !== SESSION_VERSION_CONFLICT_CODE) {
-    return null;
-  }
-  if (!isRecord(payload.session) || typeof payload.session.id !== "string") {
-    return null;
-  }
-  return payload as unknown as SessionConflictResponse;
-};
-
-async function patchSessionRequest(
-  sessionId: string,
-  patch: SessionDocumentPatch,
-  expectedVersion: number,
-  options?: { keepalive?: boolean },
-) {
-  const body = JSON.stringify({
-    ...patch,
-    expectedVersion,
-  });
-  return fetchJson<SessionResponse>(`/api/sessions/${sessionId}`, {
-    method: "PATCH",
-    body,
-    keepalive: options?.keepalive === true,
-  });
-}
 
 export function PersistedSessionsProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -140,64 +74,24 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
   } = usePersistedResourceState<SessionSummary, SessionDocument>();
   const enqueueSessionSave = useSerialTaskQueue<void>(undefined);
   const [isReady, setIsReady] = React.useState(false);
-  const [sessionConflict, setSessionConflict] = React.useState<SessionConflictState | null>(null);
-  const [isResolvingConflict, setIsResolvingConflict] = React.useState(false);
-  const sessionConflictRef = React.useRef<SessionConflictState | null>(null);
-
-  React.useEffect(() => {
-    sessionConflictRef.current = sessionConflict;
-  }, [sessionConflict]);
-
-  const registerSessionConflict = React.useCallback((
-    sessionId: string,
-    attemptedPatch: SessionDocumentPatch,
-    error: unknown,
-  ) => {
-    const conflict = readSessionConflictResponse(error);
-    if (!conflict) return false;
-    const nextConflict = {
-      attemptedPatch,
-      currentSession: conflict.session,
-      sessionId,
-    } satisfies SessionConflictState;
-    sessionConflictRef.current = nextConflict;
-    setSessionConflict(nextConflict);
-    return true;
-  }, []);
+  const {
+    hasSessionConflict,
+    isResolvingConflict,
+    keepLocalConflictVersion,
+    loadLatestConflictVersion,
+    registerSessionConflict,
+    sessionConflict,
+  } = useSessionConflictResolution({
+    activeSessionRef,
+    updateKnownSession,
+  });
 
   const loadSession = React.useCallback(async (sessionId: string) => {
     const data = await fetchJson<SessionResponse>(`/api/sessions/${sessionId}`);
-    let sessionDoc = data.session;
-
-    try {
-      const cachedRaw = localStorage.getItem(`${SESSION_SNAPSHOT_CACHE_KEY_PREFIX}${sessionId}`);
-      if (cachedRaw) {
-        const parsed = JSON.parse(cachedRaw) as { snapshot?: unknown; savedAt?: unknown };
-        const normalizedCachedSnapshot = normalizeSessionThreadExport(parsed?.snapshot);
-        if (normalizedCachedSnapshot.messages.length > (sessionDoc.snapshot?.messages?.length ?? 0)) {
-          const attemptedPatch = { snapshot: normalizedCachedSnapshot };
-          const localSessionDoc = { ...sessionDoc, snapshot: normalizedCachedSnapshot };
-          sessionDoc = localSessionDoc;
-          const bodyBytes = new TextEncoder().encode(JSON.stringify({
-            ...attemptedPatch,
-            expectedVersion: data.session.version,
-          })).length;
-          try {
-            const recovered = await patchSessionRequest(
-              sessionId,
-              attemptedPatch,
-              data.session.version,
-              { keepalive: bodyBytes <= KEEPALIVE_SAFE_BODY_BYTES },
-            );
-            sessionDoc = recovered.session;
-          } catch (error) {
-            registerSessionConflict(sessionId, attemptedPatch, error);
-          }
-        }
-      }
-    } catch {
-      // ignore cache errors
-    }
+    const sessionDoc = await recoverSessionDocumentFromCache(
+      data.session,
+      registerSessionConflict,
+    );
 
     setActiveSession(sessionDoc);
     writeStoredActiveSessionId(userId, sessionDoc.id);
@@ -462,21 +356,19 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
     if (!targetSessionId) return Promise.resolve();
 
     const run = async () => {
-      if (sessionConflictRef.current?.sessionId === targetSessionId) return;
+      if (hasSessionConflict(targetSessionId)) return;
       const current = activeSessionRef.current?.id === targetSessionId
         ? activeSessionRef.current
         : null;
       if (!current) return;
       try {
-        const bodyBytes = new TextEncoder().encode(JSON.stringify({
-          ...patch,
-          expectedVersion: current.version,
-        })).length;
         const data = await patchSessionRequest(
           targetSessionId,
           patch,
           current.version,
-          { keepalive: bodyBytes <= KEEPALIVE_SAFE_BODY_BYTES },
+          {
+            keepalive: shouldKeepaliveSessionPatch(patch, current.version),
+          },
         );
         updateKnownSession(data.session);
       } catch (error) {
@@ -490,6 +382,7 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
   }, [
     activeSessionRef,
     enqueueSessionSave,
+    hasSessionConflict,
     registerSessionConflict,
     updateKnownSession,
   ]);
@@ -497,41 +390,6 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
   const saveActiveSessionSnapshot = React.useCallback(async (snapshot: SessionThreadExport) => {
     await saveActiveSessionDocumentPatch({ snapshot });
   }, [saveActiveSessionDocumentPatch]);
-
-  const loadLatestConflictVersion = React.useCallback(() => {
-    const conflict = sessionConflictRef.current;
-    if (!conflict) return;
-    updateKnownSession(conflict.currentSession);
-    if (activeSessionRef.current?.id === conflict.sessionId) {
-      try {
-        localStorage.removeItem(`${SESSION_SNAPSHOT_CACHE_KEY_PREFIX}${conflict.sessionId}`);
-      } catch {
-        // ignore cache errors
-      }
-    }
-    sessionConflictRef.current = null;
-    setSessionConflict(null);
-  }, [activeSessionRef, updateKnownSession]);
-
-  const keepLocalConflictVersion = React.useCallback(async () => {
-    const conflict = sessionConflictRef.current;
-    if (!conflict || isResolvingConflict) return;
-    setIsResolvingConflict(true);
-    try {
-      const data = await patchSessionRequest(
-        conflict.sessionId,
-        conflict.attemptedPatch,
-        conflict.currentSession.version,
-      );
-      updateKnownSession(data.session);
-      sessionConflictRef.current = null;
-      setSessionConflict(null);
-    } catch (error) {
-      registerSessionConflict(conflict.sessionId, conflict.attemptedPatch, error);
-    } finally {
-      setIsResolvingConflict(false);
-    }
-  }, [isResolvingConflict, registerSessionConflict, updateKnownSession]);
 
   const value = React.useMemo<PersistedSessionsContextValue>(() => ({
     activeSession,
@@ -563,39 +421,12 @@ export function PersistedSessionsProvider({ children }: { children: React.ReactN
   return (
     <PersistedSessionsContext.Provider value={value}>
       {children}
-      {sessionConflict ? (
-        <div
-          role="alertdialog"
-          aria-labelledby="session-conflict-title"
-          aria-describedby="session-conflict-description"
-          className="fixed bottom-4 left-1/2 z-[100] w-[min(92vw,560px)] -translate-x-1/2 rounded-2xl border border-amber-500/40 bg-background/95 p-4 shadow-2xl backdrop-blur"
-        >
-          <p id="session-conflict-title" className="text-sm font-semibold text-foreground">
-            Session changed elsewhere
-          </p>
-          <p id="session-conflict-description" className="mt-1 text-sm text-muted-foreground">
-            Another tab, device, or agent saved a newer version. Choose which version should remain.
-          </p>
-          <div className="mt-4 flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
-              onClick={loadLatestConflictVersion}
-              disabled={isResolvingConflict}
-            >
-              Load latest
-            </button>
-            <button
-              type="button"
-              className="rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background disabled:opacity-60"
-              onClick={() => void keepLocalConflictVersion()}
-              disabled={isResolvingConflict}
-            >
-              {isResolvingConflict ? "Saving…" : "Keep my changes"}
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <SessionConflictDialog
+        conflict={sessionConflict}
+        isResolving={isResolvingConflict}
+        onKeepLocal={() => void keepLocalConflictVersion()}
+        onLoadLatest={loadLatestConflictVersion}
+      />
     </PersistedSessionsContext.Provider>
   );
 }
