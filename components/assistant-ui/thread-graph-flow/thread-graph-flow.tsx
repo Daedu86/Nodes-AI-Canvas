@@ -38,7 +38,6 @@ import { estimateDataUrlBytes } from "@/components/assistant-ui/thread-graph-flo
 import {
   artifactAccent,
   artifactTypeLabel,
-  CANVAS_BRANCH_CANCEL_FAILURE,
   CANVAS_BRANCH_RUN_NOTICE,
   CANVAS_PROMPT_DRAFT_NODE_ID,
   formatByteSize,
@@ -56,6 +55,7 @@ import {
 } from "@/components/assistant-ui/thread-graph-flow/artifact-presentation";
 import { useCanvasRunManager } from "@/components/assistant-ui/thread-graph-flow/use-canvas-run-manager";
 import { useCanvasBlockActions } from "@/components/assistant-ui/thread-graph-flow/use-canvas-block-actions";
+import { useCanvasBranchSubmission } from "@/components/assistant-ui/thread-graph-flow/use-canvas-branch-submission";
 import type {
   ThreadGraphFlowEdge,
   ThreadGraphFlowNode,
@@ -81,10 +81,7 @@ import {
   getAllowedBranchOperations,
   getBranchOperationDetail,
 } from "@/lib/thread-branching";
-import { executeBranchSpec } from "@/lib/thread-branching-runtime";
-import { ensureThreadIdle } from "@/lib/thread-run-control";
 import { getContextBudgetPolicy } from "@/lib/context-budget";
-import { toLlmContextArtifacts } from "@/lib/session-artifacts";
 
 export function ThreadGraphFlow() {
   const runtime = useAssistantRuntime();
@@ -141,8 +138,6 @@ export function ThreadGraphFlow() {
   const [densityMode, setDensityMode] = React.useState<FlowDensityMode>("overview");
   const [toolbarMenu, setToolbarMenu] = React.useState<"add" | "tools" | null>(null);
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(null);
-  const [isSubmittingBranch, setIsSubmittingBranch] = React.useState(false);
-  const [canvasDraftError, setCanvasDraftError] = React.useState<string | null>(null);
   const flowRenderModeKey = React.useMemo(
     () => `nodes.canvas.render-mode.v1:${activeSessionId ?? "unknown"}`,
     [activeSessionId],
@@ -162,18 +157,6 @@ export function ThreadGraphFlow() {
   const inspectorScrollRef = React.useRef<HTMLDivElement | null>(null);
   const toolbarMenuRef = React.useRef<HTMLDivElement | null>(null);
   const flowViewportRef = React.useRef<HTMLDivElement | null>(null);
-  const pendingDraftSubmissionRef = React.useRef(false);
-  const pendingOutputRunRef = React.useRef<{
-    beforeNodeIds: Set<string>;
-    sourcePromptId: string;
-    artifactIds: string[];
-  } | null>(null);
-  const canvasConversationNodesRef = React.useRef<ThreadGraphNodeModel[]>([]);
-  const requestErrorRef = React.useRef<string | null>(requestError);
-
-  React.useEffect(() => {
-    requestErrorRef.current = requestError;
-  }, [requestError]);
 
   React.useEffect(() => {
     setFlowRenderMode(readFlowRenderMode(flowRenderModeKey));
@@ -216,9 +199,6 @@ export function ThreadGraphFlow() {
     () => new Map(canvasConversationNodes.map((node) => [node.id, node] as const)),
     [canvasConversationNodes],
   );
-  React.useEffect(() => {
-    canvasConversationNodesRef.current = canvasConversationNodes;
-  }, [canvasConversationNodes]);
   const canvasPrompts = React.useMemo(
     () => sessionArtifacts.filter((artifact) => artifact.artifactType === "prompt"),
     [sessionArtifacts],
@@ -411,95 +391,18 @@ export function ThreadGraphFlow() {
   ],
 );
 
-  const handleCancelRun = React.useCallback(() => {
-    clearRequestError();
-    setCanvasDraftError(null);
-    pendingDraftSubmissionRef.current = false;
-    setIsSubmittingBranch(false);
-    try {
-      runtime.threads.main.cancelRun();
-    } catch {
-      const message = "Unable to cancel the current run.";
-      setCanvasDraftError(message);
-      setRequestError(message);
-    }
-  }, [clearRequestError, runtime.threads.main, setRequestError]);
-
-  const handleCancelPromptDraft = React.useCallback(() => {
-    pendingDraftSubmissionRef.current = false;
-    setIsSubmittingBranch(false);
-    setCanvasDraftError(null);
-    clearRequestError();
-    cancelDraft();
-  }, [cancelDraft, clearRequestError]);
-
-  const handleSubmitBranchDraft = React.useCallback(() => {
-    if (!draftBranchSpec || !draft || !llmEnabled) return;
-    const activeDraft = draft;
-
-    void (async () => {
-      let submitted = false;
-      try {
-        setIsSubmittingBranch(true);
-        setCanvasDraftError(null);
-        clearRequestError();
-
-        const threadReady = await ensureThreadIdle(runtime.threads.main);
-        if (!threadReady) {
-          pendingDraftSubmissionRef.current = false;
-          setCanvasDraftError(CANVAS_BRANCH_CANCEL_FAILURE);
-          setRequestError(CANVAS_BRANCH_CANCEL_FAILURE);
-          return;
-        }
-
-        pendingDraftSubmissionRef.current = true;
-        pendingOutputRunRef.current = {
-          beforeNodeIds: new Set(canvasConversationNodesRef.current.map((node) => node.id)),
-          sourcePromptId: CANVAS_PROMPT_DRAFT_NODE_ID,
-          artifactIds: [...activeDraft.outputArtifactIds],
-        };
-        const executed = executeBranchSpec(runtime.threads.main, draftBranchSpec, {
-          contextArtifacts:
-            draftContextArtifacts.length > 0
-              ? toLlmContextArtifacts(draftContextArtifacts)
-              : undefined,
-          contextNodeIds:
-            draftContextArtifacts.length > 0
-              ? draftContextArtifacts.map((artifact) => artifact.id)
-              : undefined,
-          historyMode,
-          inputArtifactIds: activeDraft.inputArtifactIds,
-          modelId,
-          outputArtifactIds: activeDraft.outputArtifactIds,
-          outputArtifactTypes: activeDraft.outputArtifactIds.map(
-            (artifactId) => artifactIndex.get(artifactId)?.semanticType ?? null,
-          ),
-          provider,
-          text: activeDraft.text,
-        });
-        if (!executed) {
-          pendingDraftSubmissionRef.current = false;
-          pendingOutputRunRef.current = null;
-          const message = "Branch draft is empty. Add a prompt before creating the branch.";
-          setCanvasDraftError(message);
-          setRequestError(message);
-          return;
-        }
-        submitted = true;
-      } catch {
-        pendingDraftSubmissionRef.current = false;
-        pendingOutputRunRef.current = null;
-        const message = "Canvas branching failed. Try again from the selected node.";
-        setCanvasDraftError(message);
-        setRequestError(message);
-      } finally {
-        if (!submitted) {
-          setIsSubmittingBranch(false);
-        }
-      }
-    })();
-  }, [
+  const {
+    canvasDraftError,
+    handleCancelPromptDraft,
+    handleCancelRun,
+    handleSubmitBranchDraft,
+    isSubmittingBranch,
+    setCanvasDraftError,
+  } = useCanvasBranchSubmission({
+    applyCompletedResponse,
     artifactIndex,
+    cancelDraft,
+    canvasConversationNodes,
     clearRequestError,
     draft,
     draftBranchSpec,
@@ -508,68 +411,10 @@ export function ThreadGraphFlow() {
     llmEnabled,
     modelId,
     provider,
-    runtime.threads.main,
+    requestError,
+    runtime,
     setRequestError,
-  ]);
-
-  React.useEffect(() => {
-    if (!requestError || !draft) return;
-    setCanvasDraftError(requestError);
-    if (pendingDraftSubmissionRef.current) {
-      pendingDraftSubmissionRef.current = false;
-      setIsSubmittingBranch(false);
-    }
-  }, [draft, requestError]);
-
-  React.useEffect(() => {
-    const unsubscribe = runtime.threads.main.unstable_on("runEnd", () => {
-      const pendingOutput = pendingOutputRunRef.current;
-      const resolveCompletedRun = (attempt: number) => {
-        const currentNodes = canvasConversationNodesRef.current;
-        const newNodes = pendingOutput
-          ? currentNodes.filter((node) => !pendingOutput.beforeNodeIds.has(node.id))
-          : [];
-        const responseNode = [...newNodes]
-          .sort((a, b) => (b.idx ?? 0) - (a.idx ?? 0))
-          .find((node) => node.role === "assistant");
-        const promptNode =
-          responseNode?.parentId
-            ? currentNodes.find((node) => node.id === responseNode.parentId) ?? null
-            : [...newNodes]
-                .sort((a, b) => (b.idx ?? 0) - (a.idx ?? 0))
-                .find((node) => node.role === "user") ?? null;
-
-        if (pendingOutput && responseNode && promptNode) {
-          applyCompletedResponse({
-            promptId: promptNode.id,
-            responseId: responseNode.id,
-            sourcePromptId: pendingOutput.sourcePromptId,
-            artifactIds: pendingOutput.artifactIds,
-            text: responseNode.text,
-          });
-          pendingOutputRunRef.current = null;
-        } else if (pendingOutput && attempt < 12) {
-          window.setTimeout(() => resolveCompletedRun(attempt + 1), 75);
-          return;
-        } else {
-          pendingOutputRunRef.current = null;
-        }
-
-        if (!pendingDraftSubmissionRef.current) return;
-        if (requestErrorRef.current) {
-          pendingDraftSubmissionRef.current = false;
-          setIsSubmittingBranch(false);
-          return;
-        }
-        pendingDraftSubmissionRef.current = false;
-        setCanvasDraftError(null);
-        cancelDraft();
-        setIsSubmittingBranch(false);
-      };
-      window.setTimeout(() => resolveCompletedRun(0), 0);
-    });
-    return unsubscribe;
-  }, [applyCompletedResponse, cancelDraft, runtime.threads.main]);
+  });
 
   const applyCanvasSelection = React.useCallback(
     (nodeId: string | null) => {
@@ -993,7 +838,13 @@ const { nodes: visibleFlowNodes, edges: visibleFlowEdges } = React.useMemo(
       beginDraft(selectedMessageNode.id, operation, initialText);
       setFlowRenderMode("2d");
     },
-    [beginDraft, clearRequestError, selectedMessageNode, setFlowRenderMode],
+    [
+      beginDraft,
+      clearRequestError,
+      selectedMessageNode,
+      setCanvasDraftError,
+      setFlowRenderMode,
+    ],
   );
 
   const {
