@@ -1,1 +1,1 @@
-persist final phase 3 diagnostic with checkout
+capture current isolated phase 3 status
