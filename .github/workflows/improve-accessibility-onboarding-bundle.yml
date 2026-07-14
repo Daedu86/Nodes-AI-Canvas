@@ -74,20 +74,28 @@ jobs:
           python <<'PY'
           from pathlib import Path
 
-          path = Path("components/assistant-ui/thread-graph-flow/canvas-sidebar.tsx")
-          text = path.read_text(encoding="utf-8")
+          sidebar_path = Path("components/assistant-ui/thread-graph-flow/canvas-sidebar.tsx")
+          sidebar = sidebar_path.read_text(encoding="utf-8")
           for action in (
               "onLinkEditModeChange(!linkEditMode);",
               "onCopyJson();",
           ):
-              action_position = text.index(action)
-              button_position = text.rfind("<button", 0, action_position)
-              type_position = text.index('type="button"', button_position, action_position)
-              line_end = text.index("\n", type_position)
+              action_position = sidebar.index(action)
+              button_position = sidebar.rfind("<button", 0, action_position)
+              type_position = sidebar.index('type="button"', button_position, action_position)
+              line_end = sidebar.index("\n", type_position)
               insertion = '\n                  role="menuitem"'
-              if 'role="menuitem"' not in text[type_position:action_position]:
-                  text = text[:line_end] + insertion + text[line_end:]
-          path.write_text(text, encoding="utf-8")
+              if 'role="menuitem"' not in sidebar[type_position:action_position]:
+                  sidebar = sidebar[:line_end] + insertion + sidebar[line_end:]
+          sidebar_path.write_text(sidebar, encoding="utf-8")
+
+          test_path = Path("tests/app-header.test.tsx")
+          test = test_path.read_text(encoding="utf-8")
+          marker = '''  beforeEach(() => {\n    localStorage.clear();\n'''
+          replacement = '''  beforeEach(() => {\n    localStorage.clear();\n    localStorage.setItem("nodes.workspace-onboarding.completed.v1", "1");\n'''
+          if test.count(marker) != 1:
+              raise RuntimeError("Could not update the AppHeader onboarding fixture.")
+          test_path.write_text(test.replace(marker, replacement, 1), encoding="utf-8")
           PY
 
       - name: Install dependencies
@@ -147,6 +155,7 @@ jobs:
             components/assistant-ui/thread-graph-flow/canvas-sidebar.tsx \
             lib/client/workspace-onboarding.ts \
             scripts/check-bundle-budget.mjs \
+            tests/app-header.test.tsx \
             tests/bundle-budget.test.mjs \
             tests/workspace-onboarding.test.ts
           git diff --check
