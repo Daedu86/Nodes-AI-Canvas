@@ -13,20 +13,18 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 5
     steps:
-      - name: Report phase 3 browser diagnostics
+      - name: Report focused diagnostic status
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: "29336566916"
         shell: bash
         run: |
-          gh run view "$RUN_ID" --repo "${{ github.repository }}" --log-failed > /tmp/phase3-failed.log
           {
-            echo 'Phase 3 browser diagnostics:'
+            echo 'Focused Phase 3 diagnostic status:'
             echo
-            echo '```text'
-            grep -Ei 'Failed to load LLM|llm/settings|auth|sign.?in|unauthorized|forbidden|combobox|Model|webServer|GET /api|POST /api|status=|error' /tmp/phase3-failed.log | tail -n 240 || true
+            echo '```json'
+            gh run list --repo "${{ github.repository }}" --workflow phase3-e2e-diagnostic.yml --limit 4 --json databaseId,status,conclusion,createdAt,updatedAt,headSha,displayTitle
             echo '```'
           } > /tmp/phase3-status.md
           gh issue comment 89 --repo "${{ github.repository }}" --body-file /tmp/phase3-status.md
