@@ -76,7 +76,10 @@ const collectIdentifiers = (node) => {
 };
 
 const renderIdentifiers = collectIdentifiers(renderStatement.expression);
-const returnNames = [...declaredNames].filter((name) => renderIdentifiers.has(name));
+const jsxLocalNameCollisions = new Set(["session", "memoryItems"]);
+const returnNames = [...declaredNames].filter(
+  (name) => renderIdentifiers.has(name) && !jsxLocalNameCollisions.has(name),
+);
 
 if (returnNames.length < 20) {
   throw new Error(`Unexpectedly small ProjectWorkspace controller surface: ${returnNames.length}`);
@@ -129,9 +132,7 @@ const logicText = logicStatements.map((statement) => statement.getText(sourceFil
 const guardText = guardStatement.getText(sourceFile);
 const renderText = renderStatement.expression.getText(sourceFile);
 const returnObject = returnNames.join(",\n    ");
-const destructuredViewNames = returnNames
-  .filter((name) => renderIdentifiers.has(name))
-  .join(",\n    ");
+const destructuredViewNames = returnNames.join(",\n    ");
 
 const controllerSource = `"use client";\n\n${controllerImports}\n\nconst encoder = new TextEncoder();\n\nexport function useProjectWorkspaceController() {\n${logicText}\n\n${guardText}\n\n  return {\n    ${returnObject},\n  };\n}\n`;
 
