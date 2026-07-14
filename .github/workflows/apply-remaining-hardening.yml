@@ -5,6 +5,7 @@ on:
     types: [opened]
 
 permissions:
+  actions: write
   contents: write
   issues: write
 
@@ -66,21 +67,31 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          git restore --worktree -- tsconfig.json
-          rm -f next-env.d.ts
-          rm .github/workflows/apply-remaining-hardening.yml
-          rm scripts/apply-remaining-hardening.mjs
-          rm scripts/fix-hardening-preflight.mjs
-          rm scripts/fix-hardening-test-fixtures.mjs
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --check
-          git commit -m "fix: complete repository hardening [skip vercel]"
-          git pull --rebase origin main
-          git push origin HEAD:main
-          gh issue comment "${{ github.event.issue.number }}" --body "Validation passed. E2E type checking, secure revision IDs, Markdown table escaping, and the blocking compatibility fixes were published directly to main."
-          gh issue close "${{ github.event.issue.number }}" --reason completed
+          set -o pipefail
+          {
+            echo '[publish] restoring generated configuration changes'
+            git restore --worktree -- tsconfig.json
+            rm -f next-env.d.ts
+            echo '[publish] removing temporary automation files'
+            rm .github/workflows/apply-remaining-hardening.yml
+            rm scripts/apply-remaining-hardening.mjs
+            rm scripts/fix-hardening-preflight.mjs
+            rm scripts/fix-hardening-test-fixtures.mjs
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            echo '[publish] staging validated changes'
+            git status --short
+            git add -A
+            git diff --cached --check
+            echo '[publish] creating commit'
+            git commit -m "fix: complete repository hardening [skip vercel]"
+            echo '[publish] pushing main'
+            git push origin HEAD:main
+            echo '[publish] updating trigger issue'
+            gh issue comment "${{ github.event.issue.number }}" --body "Validation passed. E2E type checking, secure revision IDs, Markdown table escaping, and the blocking compatibility fixes were published directly to main."
+            gh issue close "${{ github.event.issue.number }}" --reason completed
+            echo '[publish] completed'
+          } 2>&1 | tee /tmp/remaining-hardening-publish.log
 
       - name: Report validation failure
         if: failure()
@@ -89,15 +100,22 @@ jobs:
         shell: bash
         run: |
           {
-            echo 'Remaining hardening validation failed. No implementation commit was published.'
+            echo 'Remaining hardening validation or publication failed.'
             echo
-            echo 'High-signal errors:'
+            if [ -f /tmp/remaining-hardening-publish.log ]; then
+              echo 'Publish log:'
+              echo '```text'
+              cat /tmp/remaining-hardening-publish.log
+              echo '```'
+              echo
+            fi
+            echo 'Validation summary:'
             echo '```text'
             if [ -f /tmp/remaining-hardening.log ]; then
               grep -E '\[validate\]|error TS|Type error|Error:|FAIL |failed|threshold|budget|exceeded|warning' /tmp/remaining-hardening.log | tail -n 120 || true
               echo
               echo '--- final log lines ---'
-              tail -n 80 /tmp/remaining-hardening.log
+              tail -n 50 /tmp/remaining-hardening.log
             else
               echo 'Validation log was not created.'
             fi
