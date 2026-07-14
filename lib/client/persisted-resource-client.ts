@@ -3,6 +3,37 @@ export type ClientHttpError = Error & {
   status?: number;
 };
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : null;
+
+export function getClientHttpErrorMessage(error: unknown, fallback: string) {
+  const record = asRecord(error);
+  const payload = asRecord(record?.payload);
+  const payloadMessage = [payload?.error, payload?.message].find(
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
+  );
+  if (payloadMessage) return payloadMessage.trim();
+
+  if (typeof record?.status === "number") {
+    return `${fallback}: ${record.status}`;
+  }
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return fallback;
+}
+
+export function normalizeClientError(error: unknown, fallback: string): Error {
+  const message = getClientHttpErrorMessage(error, fallback);
+  if (error instanceof Error) {
+    error.message = message;
+    return error;
+  }
+  return new Error(message);
+}
+
 type FetchApiOptions = {
   allowedStatuses?: number[];
 };
@@ -109,4 +140,11 @@ export function prependUniqueResource<T extends { id: string }>(
   resource: T,
 ) {
   return [resource, ...resources.filter((item) => item.id !== resource.id)];
+}
+
+export function removeResourceById<T extends { id: string }>(
+  resources: T[],
+  resourceId: string,
+) {
+  return resources.filter((item) => item.id !== resourceId);
 }

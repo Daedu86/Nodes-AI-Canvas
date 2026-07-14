@@ -3,6 +3,11 @@
 import React from "react";
 import { useSession } from "next-auth/react";
 import type { ModelConfig } from "@/components/context/model-config";
+import {
+  fetchLlmSettings,
+  persistLlmSettings,
+  type LlmSettingsPolicy,
+} from "@/lib/client/llm-settings-client";
 import type { LlmProviderId } from "@/lib/llm/provider-catalog";
 import {
   cloneDefaultLlmSettingsState,
@@ -17,16 +22,6 @@ import {
   type ModelOption,
 } from "@/lib/model-options";
 
-type LlmSettingsResponse = {
-  settings: LlmSettingsState | null;
-  policy?: {
-    openrouter?: {
-      hasDeploymentKey?: boolean;
-      requireUserKey?: boolean;
-    };
-  };
-};
-
 type LlmSettingsContextValue = {
   availableModelOptions: ModelOption[];
   getSupportedModelConfig: (config?: Partial<ModelConfig> | null) => ModelConfig;
@@ -35,12 +30,7 @@ type LlmSettingsContextValue = {
   isSaving: boolean;
   lastSaveError: string | null;
   settings: LlmSettingsState;
-  policy: {
-    openrouter: {
-      hasDeploymentKey: boolean;
-      requireUserKey: boolean;
-    };
-  };
+  policy: LlmSettingsPolicy;
   saveSettingsNow: () => Promise<boolean>;
   clearProviderApiKey: (provider: "openrouter") => void;
   setProviderApiKey: (provider: "openrouter", value: string) => void;
@@ -125,62 +115,6 @@ const buildAvailableModelOptions = (settings: LlmSettingsState) => {
   const deduped = dedupeModelOptions(options);
   return deduped.length > 0 ? deduped : BUILTIN_MODEL_OPTIONS;
 };
-
-async function fetchLlmSettings() {
-  const response = await fetch("/api/llm/settings", {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to load LLM settings: ${response.status}`);
-  }
-  const data = (await response.json()) as LlmSettingsResponse;
-  return {
-    settings: data.settings ? normalizeLlmSettingsState(data.settings) : null,
-    policy: {
-      openrouter: {
-        hasDeploymentKey: Boolean(data.policy?.openrouter?.hasDeploymentKey),
-        requireUserKey: Boolean(data.policy?.openrouter?.requireUserKey),
-      },
-    },
-  };
-}
-
-async function persistLlmSettings(settings: LlmSettingsState) {
-  const response = await fetch("/api/llm/settings", {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      settings,
-    }),
-  });
-  if (!response.ok) {
-    let errorMessage = `Failed to save LLM settings: ${response.status}`;
-    try {
-      const payload = (await response.json()) as { error?: unknown };
-      if (typeof payload?.error === "string" && payload.error.trim().length > 0) {
-        errorMessage = payload.error;
-      }
-    } catch {
-      // ignore malformed json responses
-    }
-    throw new Error(errorMessage);
-  }
-  const data = (await response.json()) as LlmSettingsResponse;
-  return {
-    settings: normalizeLlmSettingsState(data.settings),
-    policy: {
-      openrouter: {
-        hasDeploymentKey: Boolean(data.policy?.openrouter?.hasDeploymentKey),
-        requireUserKey: Boolean(data.policy?.openrouter?.requireUserKey),
-      },
-    },
-  };
-}
 
 export function LlmSettingsProvider({
   children,

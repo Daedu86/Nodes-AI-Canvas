@@ -1,30 +1,20 @@
 "use client";
 
 import React from "react";
-import type {
-  ProjectMemoryItem,
-  ProjectMemorySourceKind,
-  ProjectMemoryType,
-} from "@/lib/memory-documents";
-
-type MemoryResponse = {
-  item: ProjectMemoryItem;
-};
-
-type MemoryListResponse = {
-  items: ProjectMemoryItem[];
-};
+import {
+  createMemoryItem as createMemoryItemRequest,
+  deleteMemoryItem as deleteMemoryItemRequest,
+  fetchMemoryItems,
+  type CreateMemoryItemInput,
+} from "@/lib/client/memory-client";
+import {
+  prependUniqueResource,
+  removeResourceById,
+} from "@/lib/client/persisted-resource-client";
+import type { ProjectMemoryItem } from "@/lib/memory-documents";
 
 type ReusableMemoryContextValue = {
-  createMemoryItem: (input: {
-    content: string;
-    sourceProjectId?: string | null;
-    sourceKeys?: string[];
-    sourceKind?: ProjectMemorySourceKind;
-    sourceSessionId?: string | null;
-    title: string;
-    type: ProjectMemoryType;
-  }) => Promise<ProjectMemoryItem>;
+  createMemoryItem: (input: CreateMemoryItemInput) => Promise<ProjectMemoryItem>;
   deleteMemoryItem: (memoryId: string) => Promise<void>;
   isReady: boolean;
   items: ProjectMemoryItem[];
@@ -33,28 +23,14 @@ type ReusableMemoryContextValue = {
 
 const ReusableMemoryContext = React.createContext<ReusableMemoryContextValue | null>(null);
 
-async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit) {
-  const response = await fetch(input, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
-  }
-  return (await response.json()) as T;
-}
-
 export function ReusableMemoryProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = React.useState<ProjectMemoryItem[]>([]);
   const [isReady, setIsReady] = React.useState(false);
 
   const refreshMemoryItems = React.useCallback(async () => {
-    const data = await fetchJson<MemoryListResponse>("/api/memory");
-    setItems(data.items);
-    return data.items;
+    const nextItems = await fetchMemoryItems();
+    setItems(nextItems);
+    return nextItems;
   }, []);
 
   React.useEffect(() => {
@@ -63,9 +39,7 @@ export function ReusableMemoryProvider({ children }: { children: React.ReactNode
       try {
         await refreshMemoryItems();
       } finally {
-        if (mounted) {
-          setIsReady(true);
-        }
+        if (mounted) setIsReady(true);
       }
     };
     void bootstrap();
@@ -74,38 +48,27 @@ export function ReusableMemoryProvider({ children }: { children: React.ReactNode
     };
   }, [refreshMemoryItems]);
 
-  const createMemoryItem = React.useCallback(async (input: {
-    content: string;
-    sourceProjectId?: string | null;
-    sourceKeys?: string[];
-    sourceKind?: ProjectMemorySourceKind;
-    sourceSessionId?: string | null;
-    title: string;
-    type: ProjectMemoryType;
-  }) => {
-    const data = await fetchJson<MemoryResponse>("/api/memory", {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-    setItems((prev) => [data.item, ...prev]);
-    return data.item;
+  const createMemoryItem = React.useCallback(async (input: CreateMemoryItemInput) => {
+    const item = await createMemoryItemRequest(input);
+    setItems((previous) => prependUniqueResource(previous, item));
+    return item;
   }, []);
 
   const deleteMemoryItem = React.useCallback(async (memoryId: string) => {
-    const response = await fetch(`/api/memory/${memoryId}`, { method: "DELETE" });
-    if (!response.ok && response.status !== 404) {
-      throw new Error(`Request failed: ${response.status}`);
-    }
-    setItems((prev) => prev.filter((item) => item.id !== memoryId));
+    await deleteMemoryItemRequest(memoryId);
+    setItems((previous) => removeResourceById(previous, memoryId));
   }, []);
 
-  const value = React.useMemo<ReusableMemoryContextValue>(() => ({
-    createMemoryItem,
-    deleteMemoryItem,
-    isReady,
-    items,
-    refreshMemoryItems,
-  }), [createMemoryItem, deleteMemoryItem, isReady, items, refreshMemoryItems]);
+  const value = React.useMemo<ReusableMemoryContextValue>(
+    () => ({
+      createMemoryItem,
+      deleteMemoryItem,
+      isReady,
+      items,
+      refreshMemoryItems,
+    }),
+    [createMemoryItem, deleteMemoryItem, isReady, items, refreshMemoryItems],
+  );
 
   return (
     <ReusableMemoryContext.Provider value={value}>

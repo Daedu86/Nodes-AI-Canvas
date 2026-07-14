@@ -3,6 +3,7 @@ import {
   buildActiveResourceStorageKey,
   dedupeResourceIds,
   prependUniqueResource,
+  removeResourceById,
   replaceResourceById,
 } from "@/lib/client/persisted-resource-client";
 
@@ -32,6 +33,22 @@ describe("persisted resource client helpers", () => {
     ).toEqual([
       { id: "a", value: 1 },
       { id: "b", value: 3 },
+    ]);
+  });
+
+  it("removes a resource by id without changing the remaining order", () => {
+    expect(
+      removeResourceById(
+        [
+          { id: "a", value: 1 },
+          { id: "b", value: 2 },
+          { id: "c", value: 3 },
+        ],
+        "b",
+      ),
+    ).toEqual([
+      { id: "a", value: 1 },
+      { id: "c", value: 3 },
     ]);
   });
 
