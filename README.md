@@ -171,6 +171,7 @@ Users can connect their own OpenRouter credentials and control which models appe
 - Group sessions into projects with shared context.
 - Compare alternatives in Arena and promote winners into memory.
 - Collaborate through secure project invitations and owner, editor, or viewer roles.
+- Use a per-user workspace guide and keyboard-accessible primary Chat and Canvas controls.
 - Use hosted OpenRouter models or a supported local development configuration.
 - Persist locally for development or use Supabase Postgres and Storage in production.
 
@@ -197,7 +198,7 @@ flowchart LR
   Repositories --> SupabaseDB[Supabase Postgres]
   Repositories --> SupabaseStorage[Supabase Storage]
   API --> Guards[Ownership, quotas, invitations, uploads]
-  CI[GitHub Actions] --> Quality[Lint, types, coverage, E2E, audits, CodeQL, Canvas budget]
+  CI[GitHub Actions] --> Quality[Lint, types, coverage, E2E, accessibility, audits, CodeQL, bundle and Canvas budgets]
 ```
 
 | Layer | Implementation |
@@ -208,7 +209,7 @@ flowchart LR
 | Persistence | Repository abstraction with file and Supabase implementations |
 | Visual workspace | React Flow-based Canvas and Arena |
 | Security | Server-side ownership, invitation, credential, upload, and quota enforcement |
-| Quality | ESLint, TypeScript, Vitest coverage, Playwright E2E, audits, CodeQL, and Canvas performance budgets |
+| Quality | ESLint, TypeScript, Vitest coverage, Playwright E2E and accessibility checks in Chromium and Firefox, audits, CodeQL, bundle budgets, and Canvas performance budgets |
 | Deployment | Vercel reference deployment with Supabase Postgres and Storage |
 
 ## Developer quick start
