@@ -54,7 +54,9 @@ jobs:
         run: npm run test:unit
 
       - name: Build and enforce bundle budget
-        run: npm run build:budget
+        run: |
+          npm run build:budget
+          git checkout -- tsconfig.json
 
       - name: Remove temporary validation workflow
         shell: bash
