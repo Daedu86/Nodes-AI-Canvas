@@ -4,7 +4,7 @@ import {
   createContentSecurityPolicy,
 } from "@/lib/server/browser-security";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const nonce = createBrowserRequestNonce();
   const contentSecurityPolicy = createContentSecurityPolicy(nonce);
   const requestHeaders = new Headers(request.headers);
