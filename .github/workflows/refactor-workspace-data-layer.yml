@@ -48,6 +48,49 @@ jobs:
         run: |
           echo "VALIDATION_STAGE=extraction" >> "$GITHUB_ENV"
           set -o pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/refactor-workspace-data-layer.py")
+          text = path.read_text(encoding="utf-8")
+          regex_block = '''# Ref-aware setters now update their refs synchronously.
+          sessions = re.sub(
+              r'(?m)^(\\s*)activeSessionRef\\.current = ([^\\n;]+);\\n\\1setActiveSession\\(\\2\\);',
+              r'\\1setActiveSession(\\2);',
+              sessions,
+          )
+          sessions = re.sub(
+              r'(?m)^(\\s*)sessionsRef\\.current = ([^\\n;]+);\\n\\1setSessions\\(\\2\\);',
+              r'\\1setSessions(\\2);',
+              sessions,
+          )
+          '''
+          if regex_block not in text:
+              raise RuntimeError("Could not relocate the session ref cleanup block.")
+          text = text.replace(regex_block, "", 1)
+          old_create = '''    const nextSessions = [data.session, ...sessionsRef.current];\\n    setSessions(nextSessions);\\n    setActiveSession(data.session);\\n'''
+          new_create = '''    const nextSessions = [data.session, ...sessionsRef.current];\\n    sessionsRef.current = nextSessions;\\n    activeSessionRef.current = data.session;\\n    setSessions(nextSessions);\\n    setActiveSession(data.session);\\n'''
+          if old_create not in text:
+              raise RuntimeError("Could not align the create-session transformation.")
+          text = text.replace(old_create, new_create, 1)
+          marker = 'SESSIONS_PATH.write_text(sessions, encoding="utf-8")\n'
+          cleanup = '''# Ref-aware setters now update their refs synchronously.
+          sessions = re.sub(
+              r'(?m)^(\\s*)activeSessionRef\\.current = ([^\\n;]+);\\n\\1setActiveSession\\(\\2\\);',
+              r'\\1setActiveSession(\\2);',
+              sessions,
+          )
+          sessions = re.sub(
+              r'(?m)^(\\s*)sessionsRef\\.current = ([^\\n;]+);\\n\\1setSessions\\(\\2\\);',
+              r'\\1setSessions(\\2);',
+              sessions,
+          )
+          '''
+          if marker not in text:
+              raise RuntimeError("Could not locate the session write marker.")
+          text = text.replace(marker, cleanup + marker, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
           python scripts/refactor-workspace-data-layer.py 2>&1 | tee /tmp/validation.log
 
       - name: Install dependencies
