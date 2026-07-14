@@ -23,7 +23,7 @@ env:
 
 jobs:
   migrate:
-    if: github.event.issue.title == '[automation] Migrate Next.js Proxy'
+    if: github.event.issue.title == '[automation] Migrate Next.js Proxy V2'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -49,50 +49,6 @@ jobs:
           echo "VALIDATION_STAGE=migration" >> "$GITHUB_ENV"
           set -o pipefail
           python scripts/migrate-next-proxy.py 2>&1 | tee /tmp/validation.log
-          python <<'PY'
-          from pathlib import Path
-
-          path = Path("tests/proxy.test.ts")
-          text = path.read_text(encoding="utf-8")
-          text = text.replace(
-              'import { unstable_doesProxyMatch } from "next/experimental/testing/server";\n',
-              "",
-              1,
-          )
-          old = '''  it("matches document routes while excluding APIs and framework assets", () => {
-    const nextConfig = {};
-    expect(unstable_doesProxyMatch({ config, nextConfig, url: "/" })).toBe(true);
-    expect(
-      unstable_doesProxyMatch({ config, nextConfig, url: "/projects/example" }),
-    ).toBe(true);
-    expect(
-      unstable_doesProxyMatch({ config, nextConfig, url: "/api/sessions" }),
-    ).toBe(false);
-    expect(
-      unstable_doesProxyMatch({
-        config,
-        nextConfig,
-        url: "/_next/static/chunks/app.js",
-      }),
-    ).toBe(false);
-    expect(
-      unstable_doesProxyMatch({ config, nextConfig, url: "/favicon.ico" }),
-    ).toBe(false);
-  });
-'''
-          new = '''  it("matches document routes while excluding APIs and framework assets", () => {
-    const matcher = new RegExp(`^${config.matcher[0]}$`, "u");
-    expect(matcher.test("/")).toBe(true);
-    expect(matcher.test("/projects/example")).toBe(true);
-    expect(matcher.test("/api/sessions")).toBe(false);
-    expect(matcher.test("/_next/static/chunks/app.js")).toBe(false);
-    expect(matcher.test("/favicon.ico")).toBe(false);
-  });
-'''
-          if text.count(old) != 1:
-              raise RuntimeError("Could not replace the experimental matcher test.")
-          path.write_text(text.replace(old, new, 1), encoding="utf-8")
-          PY
 
       - name: Install dependencies
         run: |
