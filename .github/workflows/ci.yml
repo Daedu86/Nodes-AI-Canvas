@@ -40,8 +40,10 @@ jobs:
         run: npm ci --no-audit --fund=false
       - name: Lint
         run: npm run format:check
-      - name: Type check
+      - name: Application type check
         run: npm run typecheck
+      - name: End-to-end type check
+        run: npm run typecheck:e2e
       - name: Verify end-to-end test discovery
         run: npm run test:e2e -- --list
 
