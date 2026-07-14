@@ -22,7 +22,8 @@ This roadmap communicates direction, not delivery guarantees. Priorities may cha
 - [x] Secure project invitations with owner, editor, and viewer roles.
 - [x] Per-user OpenRouter credentials with production encryption support.
 - [x] Local file persistence and Supabase cloud persistence.
-- [x] Unit, coverage, E2E, security, and Canvas performance gates in CI.
+- [x] Unit, coverage, E2E, accessibility, security, bundle, and Canvas performance gates in CI.
+- [x] Per-user first-run workspace guide for the primary Chat and Canvas workflow.
 - [x] Reproducible seeded product demo for presentations and evaluations.
 
 ## Now — product readiness
@@ -32,10 +33,12 @@ The current focus is making the product understandable, reliable, and evaluable 
 - [x] Public product narrative, screenshots, architecture overview, and 60-second demo guide.
 - [x] One-command local demo workspace.
 - [x] Public contribution, security, issue, and pull-request templates.
+- [x] Add per-user first-run onboarding for question → Canvas → structured context.
+- [x] Add automated axe, focus-trap, focus-restoration, and inert-panel checks in Chromium and Firefox.
 - [ ] Verify and publish a stable public demo URL with a controlled demo account or read-only experience.
-- [ ] Add first-run onboarding that teaches branch → Canvas → Arena → memory inside the product.
+- [ ] Extend onboarding through Arena winner selection and project memory reuse.
 - [ ] Add reusable starter projects for product discovery, research synthesis, technical design, and writing.
-- [ ] Complete keyboard and screen-reader review for the primary chat, Canvas, Arena, and project flows.
+- [ ] Complete manual keyboard and screen-reader review for Arena and project flows.
 - [ ] Improve responsive behavior for smaller laptop and tablet layouts.
 
 ## Next — team workflow
