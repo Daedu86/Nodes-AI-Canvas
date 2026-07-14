@@ -1,5 +1,4 @@
 "use client";
-
 import React from "react";
 import type { ModelConfig } from "@/components/context/model-config";
 import { type LlmSettingsPolicy } from "@/lib/client/llm-settings-client";
@@ -9,7 +8,6 @@ import { getSupportedModelConfig as getSupportedModelConfigFromOptions, type Mod
 import { buildAvailableModelOptions } from "@/components/context/llm-settings-model-options";
 import { useLlmSettingsActions } from "@/components/context/use-llm-settings-actions";
 import { useLlmSettingsPersistence } from "@/components/context/use-llm-settings-persistence";
-
 type LlmSettingsContextValue = {
     availableModelOptions: ModelOption[];
     getSupportedModelConfig: (config?: Partial<ModelConfig> | null) => ModelConfig;
@@ -37,105 +35,69 @@ type LlmSettingsContextValue = {
     setProviderValue: (provider: "ollama", field: "baseUrl", value: string) => void;
     toggleOpenRouterModel: (modelId: string) => void;
 };
-
 const LlmSettingsContext = React.createContext<LlmSettingsContextValue | null>(null);
-
-export function LlmSettingsProvider({
-  children,
-}: {
-  children: React.ReactNode;
+export function LlmSettingsProvider({ children, }: {
+    children: React.ReactNode;
 }) {
-  const {
-    settings,
-    setSettings,
-    policy,
-    isReady,
-    isSaving,
-    lastSaveError,
-    persistSettingsImmediately,
-    saveSettingsNow,
-    hasUnsavedChanges,
-  } = useLlmSettingsPersistence();
-  const {
-    setProviderApiKey,
-    clearProviderApiKey,
-    addOpenRouterApiKey,
-    removeOpenRouterApiKey,
-    setActiveOpenRouterApiKey,
-    addOllamaApiKey,
-    removeOllamaApiKey,
-    setActiveOllamaApiKey,
-    setProviderEnabled,
-    addOpenRouterCustomModel,
-    deleteOpenRouterBuiltinModel,
-    restoreOpenRouterBuiltinModel,
-    removeOpenRouterCustomModel,
-    setProviderModels,
-    setProviderValue,
-    toggleOpenRouterModel,
-  } = useLlmSettingsActions({ persistSettingsImmediately, setSettings });
-
-const availableModelOptions = React.useMemo(() => buildAvailableModelOptions(settings), [settings]);
-
-const getSupportedModelConfig = React.useCallback((config?: Partial<ModelConfig> | null) => getSupportedModelConfigFromOptions(config, availableModelOptions), [availableModelOptions]);
-
-const value = React.useMemo<LlmSettingsContextValue>(() => ({
-    availableModelOptions,
-    getSupportedModelConfig,
-    hasUnsavedChanges,
-    isReady,
-    isSaving,
-    lastSaveError,
-    settings,
-    policy,
-    saveSettingsNow,
-    clearProviderApiKey,
-    setProviderApiKey,
-    addOpenRouterApiKey,
-    removeOpenRouterApiKey,
-    setActiveOpenRouterApiKey,
-    addOllamaApiKey,
-    removeOllamaApiKey,
-    setActiveOllamaApiKey,
-    addOpenRouterCustomModel,
-    deleteOpenRouterBuiltinModel,
-    removeOpenRouterCustomModel,
-    restoreOpenRouterBuiltinModel,
-    setProviderEnabled,
-    setProviderModels,
-    setProviderValue,
-    toggleOpenRouterModel,
-}), [
-    availableModelOptions,
-    getSupportedModelConfig,
-    hasUnsavedChanges,
-    isReady,
-    isSaving,
-    lastSaveError,
-    settings,
-    policy,
-    saveSettingsNow,
-    clearProviderApiKey,
-    setProviderApiKey,
-    addOpenRouterApiKey,
-    removeOpenRouterApiKey,
-    setActiveOpenRouterApiKey,
-    addOllamaApiKey,
-    removeOllamaApiKey,
-    setActiveOllamaApiKey,
-    addOpenRouterCustomModel,
-    deleteOpenRouterBuiltinModel,
-    removeOpenRouterCustomModel,
-    restoreOpenRouterBuiltinModel,
-    setProviderEnabled,
-    setProviderModels,
-    setProviderValue,
-    toggleOpenRouterModel,
-]);
-
-return <LlmSettingsContext.Provider value={value}>{children}</LlmSettingsContext.Provider>;
+    const { settings, setSettings, policy, isReady, isSaving, lastSaveError, persistSettingsImmediately, saveSettingsNow, hasUnsavedChanges, } = useLlmSettingsPersistence();
+    const { setProviderApiKey, clearProviderApiKey, addOpenRouterApiKey, removeOpenRouterApiKey, setActiveOpenRouterApiKey, addOllamaApiKey, removeOllamaApiKey, setActiveOllamaApiKey, setProviderEnabled, addOpenRouterCustomModel, deleteOpenRouterBuiltinModel, restoreOpenRouterBuiltinModel, removeOpenRouterCustomModel, setProviderModels, setProviderValue, toggleOpenRouterModel, } = useLlmSettingsActions({ persistSettingsImmediately, setSettings });
+    const availableModelOptions = React.useMemo(() => buildAvailableModelOptions(settings), [settings]);
+    const getSupportedModelConfig = React.useCallback((config?: Partial<ModelConfig> | null) => getSupportedModelConfigFromOptions(config, availableModelOptions), [availableModelOptions]);
+    const value = React.useMemo<LlmSettingsContextValue>(() => ({
+        availableModelOptions,
+        getSupportedModelConfig,
+        hasUnsavedChanges,
+        isReady,
+        isSaving,
+        lastSaveError,
+        settings,
+        policy,
+        saveSettingsNow,
+        clearProviderApiKey,
+        setProviderApiKey,
+        addOpenRouterApiKey,
+        removeOpenRouterApiKey,
+        setActiveOpenRouterApiKey,
+        addOllamaApiKey,
+        removeOllamaApiKey,
+        setActiveOllamaApiKey,
+        addOpenRouterCustomModel,
+        deleteOpenRouterBuiltinModel,
+        removeOpenRouterCustomModel,
+        restoreOpenRouterBuiltinModel,
+        setProviderEnabled,
+        setProviderModels,
+        setProviderValue,
+        toggleOpenRouterModel,
+    }), [
+        availableModelOptions,
+        getSupportedModelConfig,
+        hasUnsavedChanges,
+        isReady,
+        isSaving,
+        lastSaveError,
+        settings,
+        policy,
+        saveSettingsNow,
+        clearProviderApiKey,
+        setProviderApiKey,
+        addOpenRouterApiKey,
+        removeOpenRouterApiKey,
+        setActiveOpenRouterApiKey,
+        addOllamaApiKey,
+        removeOllamaApiKey,
+        setActiveOllamaApiKey,
+        addOpenRouterCustomModel,
+        deleteOpenRouterBuiltinModel,
+        removeOpenRouterCustomModel,
+        restoreOpenRouterBuiltinModel,
+        setProviderEnabled,
+        setProviderModels,
+        setProviderValue,
+        toggleOpenRouterModel,
+    ]);
+    return <LlmSettingsContext.Provider value={value}>{children}</LlmSettingsContext.Provider>;
 }
-
 export function useLlmSettings() {
     const context = React.useContext(LlmSettingsContext);
     if (!context) {

@@ -1,6 +1,5 @@
 import { type LlmSettingsState } from "@/lib/llm/user-settings";
 import { BUILTIN_MODEL_OPTIONS, createDynamicModelOptions, dedupeModelOptions, type ModelOption } from "@/lib/model-options";
-
 export const buildAvailableModelOptions = (settings: LlmSettingsState) => {
     const options: ModelOption[] = [];
     const enabledOpenRouterIds = new Set(settings.providers.openrouter.enabledModels);
