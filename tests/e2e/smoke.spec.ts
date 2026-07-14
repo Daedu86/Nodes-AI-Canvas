@@ -165,6 +165,7 @@ async function ensureSignedIn(page: Page) {
   await expect(passwordInput).toHaveValue(DEV_AUTH_PASSWORD);
   await loginButton.click();
   await expect(composer).toBeVisible({ timeout: 15_000 });
+  await dismissWorkspaceGuide(page);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -180,6 +181,7 @@ async function gotoChat(page: Page, options?: { title?: string }) {
   await page.goto(`/?sessionId=${created.session.id}`, { waitUntil: "domcontentloaded" });
   const composer = page.getByPlaceholder("Write a message...");
   await expect(composer).toBeVisible({ timeout: 15_000 });
+  await dismissWorkspaceGuide(page);
 }
 
 async function createAndOpenSession(page: Page) {
@@ -189,6 +191,7 @@ async function createAndOpenSession(page: Page) {
   });
   await page.goto(`/?sessionId=${created.session.id}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByPlaceholder("Write a message...")).toBeVisible({ timeout: 15_000 });
+  await dismissWorkspaceGuide(page);
   return created.session.id;
 }
 
@@ -199,7 +202,18 @@ async function createAndOpenNamedSession(page: Page, title: string) {
   });
   await page.goto(`/?sessionId=${created.session.id}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByPlaceholder("Write a message...")).toBeVisible({ timeout: 15_000 });
+  await dismissWorkspaceGuide(page);
   return created.session.id;
+}
+
+async function dismissWorkspaceGuide(page: Page) {
+  const guide = page.getByRole("dialog", {
+    name: "Turn a question into a structured decision",
+  });
+  if (!(await guide.isVisible().catch(() => false))) return;
+
+  await guide.getByRole("button", { name: "Close workspace guide" }).click();
+  await expect(guide).toBeHidden();
 }
 
 async function sendPrompt(
@@ -207,6 +221,7 @@ async function sendPrompt(
   prompt: string,
   options?: ReplyOptions,
 ) {
+  await dismissWorkspaceGuide(page);
   const composer = page.getByPlaceholder("Write a message...");
   const rawSelectedModel =
     options?.model ??

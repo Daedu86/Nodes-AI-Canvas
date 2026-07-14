@@ -94,6 +94,7 @@ async function ensureSignedIn(page: Page) {
   await page.locator("#dev-password").fill(DEV_AUTH_PASSWORD);
   await loginButton.click();
   await expect(composer).toBeVisible({ timeout: 15_000 });
+  await dismissWorkspaceGuide(page);
 }
 
 async function createAndOpenNamedSession(page: Page, title: string) {
@@ -104,10 +105,22 @@ async function createAndOpenNamedSession(page: Page, title: string) {
   });
   await page.goto(`/?sessionId=${created.session.id}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByPlaceholder("Write a message...")).toBeVisible({ timeout: 15_000 });
+  await dismissWorkspaceGuide(page);
   return created.session.id;
 }
 
+async function dismissWorkspaceGuide(page: Page) {
+  const guide = page.getByRole("dialog", {
+    name: "Turn a question into a structured decision",
+  });
+  if (!(await guide.isVisible().catch(() => false))) return;
+
+  await guide.getByRole("button", { name: "Close workspace guide" }).click();
+  await expect(guide).toBeHidden();
+}
+
 async function sendPrompt(page: Page, prompt: string) {
+  await dismissWorkspaceGuide(page);
   const composer = page.getByPlaceholder("Write a message...");
   await composer.fill(prompt);
   const requestPromise = page.waitForRequest(
