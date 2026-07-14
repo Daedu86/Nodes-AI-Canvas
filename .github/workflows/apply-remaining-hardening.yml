@@ -5,7 +5,6 @@ on:
     types: [opened]
 
 permissions:
-  actions: write
   contents: write
   issues: write
 
@@ -62,24 +61,23 @@ jobs:
             echo '[validate] all gates passed'
           } 2>&1 | tee /tmp/remaining-hardening.log
 
-      - name: Publish validated changes to main
+      - name: Publish validated code changes to main
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -o pipefail
           {
-            echo '[publish] restoring generated configuration changes'
-            git restore --worktree -- tsconfig.json
+            echo '[publish] restoring generated and workflow-only changes'
+            git restore --worktree -- tsconfig.json .github/workflows/ci.yml
             rm -f next-env.d.ts
-            echo '[publish] removing temporary automation files'
-            rm .github/workflows/apply-remaining-hardening.yml
+            echo '[publish] removing temporary transformation scripts'
             rm scripts/apply-remaining-hardening.mjs
             rm scripts/fix-hardening-preflight.mjs
             rm scripts/fix-hardening-test-fixtures.mjs
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            echo '[publish] staging validated changes'
+            echo '[publish] staging validated non-workflow changes'
             git status --short
             git add -A
             git diff --cached --check
@@ -88,7 +86,7 @@ jobs:
             echo '[publish] pushing main'
             git push origin HEAD:main
             echo '[publish] updating trigger issue'
-            gh issue comment "${{ github.event.issue.number }}" --body "Validation passed. E2E type checking, secure revision IDs, Markdown table escaping, and the blocking compatibility fixes were published directly to main."
+            gh issue comment "${{ github.event.issue.number }}" --body "Validation passed. The validated code changes were published directly to main. CI workflow finalization is being applied separately through the GitHub connection."
             gh issue close "${{ github.event.issue.number }}" --reason completed
             echo '[publish] completed'
           } 2>&1 | tee /tmp/remaining-hardening-publish.log
