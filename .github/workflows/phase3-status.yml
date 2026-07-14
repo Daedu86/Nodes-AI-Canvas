@@ -13,18 +13,20 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Report latest phase 3 runs
+      - name: Report phase 3 browser diagnostics
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_ID: "29336566916"
         shell: bash
         run: |
+          gh run view "$RUN_ID" --repo "${{ github.repository }}" --log-failed > /tmp/phase3-failed.log
           {
-            echo 'Phase 3 workflow status:'
+            echo 'Phase 3 browser diagnostics:'
             echo
-            echo '```json'
-            gh run list --repo "${{ github.repository }}" --workflow phase3-hardening.yml --limit 6 --json databaseId,status,conclusion,createdAt,updatedAt,headSha,event,displayTitle
+            echo '```text'
+            grep -Ei 'Failed to load LLM|llm/settings|auth|sign.?in|unauthorized|forbidden|combobox|Model|webServer|GET /api|POST /api|status=|error' /tmp/phase3-failed.log | tail -n 240 || true
             echo '```'
           } > /tmp/phase3-status.md
           gh issue comment 89 --repo "${{ github.repository }}" --body-file /tmp/phase3-status.md
