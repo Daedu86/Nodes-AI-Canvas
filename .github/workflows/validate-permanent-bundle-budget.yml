@@ -45,23 +45,37 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci --no-audit --fund=false
+        run: |
+          echo "VALIDATION_STAGE=dependency installation" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm ci --no-audit --fund=false 2>&1 | tee /tmp/validation.log
 
       - name: Validate formatting and types
-        run: npm run format:check && npm run typecheck
+        run: |
+          echo "VALIDATION_STAGE=formatting and TypeScript" >> "$GITHUB_ENV"
+          set -o pipefail
+          (npm run format:check && npm run typecheck) 2>&1 | tee /tmp/validation.log
 
       - name: Run unit tests
-        run: npm run test:unit
+        run: |
+          echo "VALIDATION_STAGE=unit tests" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm run test:unit 2>&1 | tee /tmp/validation.log
 
       - name: Build and enforce bundle budget
         run: |
-          npm run build:budget
-          git checkout -- tsconfig.json
+          echo "VALIDATION_STAGE=production build and bundle budget" >> "$GITHUB_ENV"
+          set -o pipefail
+          npm run build:budget 2>&1 | tee /tmp/validation.log
+          git restore --worktree tsconfig.json next-env.d.ts 2>/dev/null || true
+          git status --short | tee -a /tmp/validation.log
 
       - name: Remove temporary validation workflow
         shell: bash
         run: |
+          echo "VALIDATION_STAGE=temporary workflow cleanup" >> "$GITHUB_ENV"
           set -euo pipefail
+          exec > >(tee /tmp/publish.log) 2>&1
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git rm .github/workflows/validate-permanent-bundle-budget.yml
@@ -78,4 +92,20 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "Permanent CI bundle-budget validation failed. The temporary workflow remains available for diagnosis."
+        shell: bash
+        run: |
+          {
+            echo "Validation failed during **${VALIDATION_STAGE:-preflight}**."
+            echo
+            echo "<details><summary>Relevant log tail</summary>"
+            echo
+            echo '```text'
+            if [[ -s /tmp/publish.log ]]; then
+              tail -c 12000 /tmp/publish.log
+            else
+              tail -c 12000 /tmp/validation.log 2>/dev/null || echo "No command log was captured."
+            fi
+            echo '```'
+            echo "</details>"
+          } > /tmp/validation-comment.md
+          gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body-file /tmp/validation-comment.md
