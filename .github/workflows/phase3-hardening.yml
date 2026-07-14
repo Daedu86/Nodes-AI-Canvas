@@ -86,6 +86,32 @@ jobs:
           if old_import not in session_source:
               raise SystemExit("session fixture import marker not found")
           session_path.write_text(session_source.replace(old_import, new_import))
+
+          persistence_test_path = Path("tests/session-persistence-critical.test.ts")
+          persistence_test = persistence_test_path.read_text()
+          old_assertion = '''    expect(fetchMock).toHaveBeenCalledWith(
+              "/api/sessions/session/1",
+              expect.objectContaining({
+                body: JSON.stringify({ expectedVersion: 1, title: "Updated" }),
+                keepalive: true,
+                method: "PATCH",
+              }),
+            );'''
+          new_assertion = '''    const [requestUrl, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+            expect(requestUrl).toBe("/api/sessions/session/1");
+            expect(requestInit).toEqual(
+              expect.objectContaining({
+                keepalive: true,
+                method: "PATCH",
+              }),
+            );
+            expect(JSON.parse(String(requestInit.body))).toEqual({
+              expectedVersion: 1,
+              title: "Updated",
+            });'''
+          if old_assertion not in persistence_test:
+              raise SystemExit("session patch assertion marker not found")
+          persistence_test_path.write_text(persistence_test.replace(old_assertion, new_assertion))
           PY
             npm run format
             npm run check
