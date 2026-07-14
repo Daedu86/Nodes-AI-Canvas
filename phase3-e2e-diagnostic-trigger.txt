@@ -1,1 +1,1 @@
-run focused model-label diagnostic
+run structural model-label diagnostic
