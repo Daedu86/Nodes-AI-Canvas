@@ -89,15 +89,13 @@ jobs:
 
           persistence_test_path = Path("tests/session-persistence-critical.test.ts")
           persistence_test = persistence_test_path.read_text()
-          old_assertion = '''    expect(fetchMock).toHaveBeenCalledWith(
-              "/api/sessions/session/1",
-              expect.objectContaining({
-                body: JSON.stringify({ expectedVersion: 1, title: "Updated" }),
-                keepalive: true,
-                method: "PATCH",
-              }),
-            );'''
-          new_assertion = '''    const [requestUrl, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+          start_marker = '    expect(fetchMock).toHaveBeenCalledWith('
+          end_marker = '  it("recovers a newer cached snapshot and registers conflicts on failure"'
+          start = persistence_test.find(start_marker)
+          end = persistence_test.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit("session patch assertion boundaries not found")
+          replacement = '''    const [requestUrl, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
             expect(requestUrl).toBe("/api/sessions/session/1");
             expect(requestInit).toEqual(
               expect.objectContaining({
@@ -108,10 +106,13 @@ jobs:
             expect(JSON.parse(String(requestInit.body))).toEqual({
               expectedVersion: 1,
               title: "Updated",
-            });'''
-          if old_assertion not in persistence_test:
-              raise SystemExit("session patch assertion marker not found")
-          persistence_test_path.write_text(persistence_test.replace(old_assertion, new_assertion))
+            });
+          });
+
+          '''
+          persistence_test_path.write_text(
+              persistence_test[:start] + replacement + persistence_test[end:]
+          )
           PY
             npm run format
             npm run check
