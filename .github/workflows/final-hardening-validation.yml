@@ -43,12 +43,22 @@ jobs:
 
           smoke_path = Path("tests/e2e/smoke.spec.ts")
           smoke = smoke_path.read_text(encoding="utf-8")
-          old_selector = 'page.getByRole("button", { name: "Create prompt node" })'
-          new_selector = 'page.getByRole("button", { name: "Add Prompt block" })'
-          if old_selector in smoke:
-              smoke = smoke.replace(old_selector, new_selector, 1)
-          elif new_selector not in smoke:
-              raise RuntimeError("Prompt block selector marker was not found")
+
+          selector_replacements = [
+              (
+                  'page.getByRole("button", { name: "Create prompt node" })',
+                  'page.getByRole("button", { name: "Add Prompt block" })',
+              ),
+              (
+                  '  await page.getByRole("button", { name: /Canvas tools/i }).click();\n  await page.getByRole("button", { name: /Copy JSON/i }).click();',
+                  '  await page.getByRole("button", { name: "Copy JSON" }).click();',
+              ),
+          ]
+          for old, new in selector_replacements:
+              if old in smoke:
+                  smoke = smoke.replace(old, new, 1)
+              elif new not in smoke:
+                  raise RuntimeError(f"Smoke selector marker was not found: {old}")
           smoke_path.write_text(smoke, encoding="utf-8")
 
           runtime_path = Path("lib/assistant-edit-runtime.ts")
@@ -72,46 +82,6 @@ jobs:
           else:
               runtime = runtime[:start] + replacement + runtime[end:]
           runtime_path.write_text(runtime, encoding="utf-8")
-
-          thread_path = Path("components/assistant-ui/thread.tsx")
-          thread = thread_path.read_text(encoding="utf-8")
-          thread = thread.replace(
-              'import { ThreadPrimitive } from "@assistant-ui/react";',
-              'import { ThreadPrimitive, useAssistantRuntime } from "@assistant-ui/react";',
-              1,
-          )
-          thread = thread.replace('import type { FC } from "react";', 'import React, { type FC } from "react";', 1)
-          old_component = '''export const Thread: FC = () => {
-            return (
-          '''
-          new_component = '''export const Thread: FC = () => {
-            const runtime = useAssistantRuntime();
-            const subscribeToThread = React.useCallback(
-              (onStoreChange: () => void) => runtime.threads.main.subscribe(onStoreChange),
-              [runtime],
-            );
-            const getMessageTopology = React.useCallback(
-              () => runtime.threads.main.getState().messages.map((message) => message.id).join("|"),
-              [runtime],
-            );
-            const messageTopology = React.useSyncExternalStore(
-              subscribeToThread,
-              getMessageTopology,
-              () => "",
-            );
-
-            return (
-          '''
-          if old_component in thread:
-              thread = thread.replace(old_component, new_component, 1)
-          elif "const messageTopology = React.useSyncExternalStore" not in thread:
-              raise RuntimeError("Thread component marker was not found")
-          thread = thread.replace(
-              "          <ThreadPrimitive.Messages\n",
-              "          <ThreadPrimitive.Messages\n            key={messageTopology || \"empty\"}\n",
-              1,
-          )
-          thread_path.write_text(thread, encoding="utf-8")
           PY
 
       - name: Set up Node.js
@@ -125,7 +95,7 @@ jobs:
 
       - name: Lint and type-check focused changes
         run: |
-          npx eslint lib/assistant-edit-runtime.ts components/assistant-ui/thread.tsx tests/e2e/smoke.spec.ts --fix
+          npx eslint lib/assistant-edit-runtime.ts tests/e2e/smoke.spec.ts --fix
           npm run typecheck
           npm run typecheck:e2e
 
@@ -136,7 +106,7 @@ jobs:
         run: >-
           npx playwright test tests/e2e/smoke.spec.ts
           --workers=1
-          --grep "runs the first prompt directly from an empty flow canvas|persists edit branching across reloads"
+          --grep "copies graph JSON after a reply|runs the first prompt directly from an empty flow canvas|persists edit branching across reloads"
 
       - name: Upload focused failure artifacts
         if: failure()
@@ -152,12 +122,12 @@ jobs:
       - name: Publish validated repair to main
         shell: bash
         run: |
-          if git diff --quiet -- lib/assistant-edit-runtime.ts components/assistant-ui/thread.tsx tests/e2e/smoke.spec.ts; then
+          if git diff --quiet -- lib/assistant-edit-runtime.ts tests/e2e/smoke.spec.ts; then
             echo "No focused shard repair was required."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lib/assistant-edit-runtime.ts components/assistant-ui/thread.tsx tests/e2e/smoke.spec.ts
+          git add lib/assistant-edit-runtime.ts tests/e2e/smoke.spec.ts
           git commit -m "fix: stabilize assistant edit branching [skip vercel]"
           git push origin HEAD:main
