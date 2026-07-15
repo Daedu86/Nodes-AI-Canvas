@@ -72,6 +72,46 @@ jobs:
           else:
               runtime = runtime[:start] + replacement + runtime[end:]
           runtime_path.write_text(runtime, encoding="utf-8")
+
+          thread_path = Path("components/assistant-ui/thread.tsx")
+          thread = thread_path.read_text(encoding="utf-8")
+          thread = thread.replace(
+              'import { ThreadPrimitive } from "@assistant-ui/react";',
+              'import { ThreadPrimitive, useAssistantRuntime } from "@assistant-ui/react";',
+              1,
+          )
+          thread = thread.replace('import type { FC } from "react";', 'import React, { type FC } from "react";', 1)
+          old_component = '''export const Thread: FC = () => {
+            return (
+          '''
+          new_component = '''export const Thread: FC = () => {
+            const runtime = useAssistantRuntime();
+            const subscribeToThread = React.useCallback(
+              (onStoreChange: () => void) => runtime.threads.main.subscribe(onStoreChange),
+              [runtime],
+            );
+            const getMessageTopology = React.useCallback(
+              () => runtime.threads.main.getState().messages.map((message) => message.id).join("|"),
+              [runtime],
+            );
+            const messageTopology = React.useSyncExternalStore(
+              subscribeToThread,
+              getMessageTopology,
+              () => "",
+            );
+
+            return (
+          '''
+          if old_component in thread:
+              thread = thread.replace(old_component, new_component, 1)
+          elif "const messageTopology = React.useSyncExternalStore" not in thread:
+              raise RuntimeError("Thread component marker was not found")
+          thread = thread.replace(
+              "          <ThreadPrimitive.Messages\n",
+              "          <ThreadPrimitive.Messages\n            key={messageTopology || \"empty\"}\n",
+              1,
+          )
+          thread_path.write_text(thread, encoding="utf-8")
           PY
 
       - name: Set up Node.js
@@ -85,7 +125,7 @@ jobs:
 
       - name: Lint and type-check focused changes
         run: |
-          npx eslint lib/assistant-edit-runtime.ts tests/e2e/smoke.spec.ts --fix
+          npx eslint lib/assistant-edit-runtime.ts components/assistant-ui/thread.tsx tests/e2e/smoke.spec.ts --fix
           npm run typecheck
           npm run typecheck:e2e
 
@@ -98,15 +138,26 @@ jobs:
           --workers=1
           --grep "runs the first prompt directly from an empty flow canvas|persists edit branching across reloads"
 
+      - name: Upload focused failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: final-shard-focused-artifacts
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Publish validated repair to main
         shell: bash
         run: |
-          if git diff --quiet -- lib/assistant-edit-runtime.ts tests/e2e/smoke.spec.ts; then
+          if git diff --quiet -- lib/assistant-edit-runtime.ts components/assistant-ui/thread.tsx tests/e2e/smoke.spec.ts; then
             echo "No focused shard repair was required."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add lib/assistant-edit-runtime.ts tests/e2e/smoke.spec.ts
+          git add lib/assistant-edit-runtime.ts components/assistant-ui/thread.tsx tests/e2e/smoke.spec.ts
           git commit -m "fix: stabilize assistant edit branching [skip vercel]"
           git push origin HEAD:main
