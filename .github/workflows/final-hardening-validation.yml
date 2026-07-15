@@ -51,10 +51,10 @@ jobs:
           elif new_prompt_selector not in smoke:
               raise RuntimeError("Prompt block selector marker was not found")
 
-          old_copy = '''  await page.getByRole("button", { name: /Canvas tools/i }).click();
-            await page.getByRole("button", { name: /Copy JSON/i }).click();'''
-          intermediate_copy = '  await page.getByRole("button", { name: "Copy JSON" }).click();'
-          collapse_copy = '''  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+          old_prompt_open = '''  await createPromptButton.click();
+            const promptNode = page'''
+          new_prompt_open = '''  await createPromptButton.click();
+            const blockLibrary = page.getByRole("complementary", { name: "Block library" });
             const collapseBlockLibrary = blockLibrary.getByRole("button", {
               name: "Collapse block library",
             });
@@ -64,10 +64,18 @@ jobs:
                 blockLibrary.getByRole("button", { name: "Expand block library" }),
               ).toBeVisible();
             }
-
             await page.getByRole("button", { name: "Fit View" }).click();
-            await page.getByRole("button", { name: "Copy JSON" }).click();'''
-          new_copy = '''  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+
+            const promptNode = page'''
+          if old_prompt_open in smoke:
+              smoke = smoke.replace(old_prompt_open, new_prompt_open, 1)
+          elif new_prompt_open not in smoke:
+              raise RuntimeError("Prompt viewport marker was not found")
+
+          old_copy = '''  await page.getByRole("button", { name: /Canvas tools/i }).click();
+            await page.getByRole("button", { name: /Copy JSON/i }).click();'''
+          intermediate_copy = '  await page.getByRole("button", { name: "Copy JSON" }).click();'
+          force_copy = '''  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
             const collapseBlockLibrary = blockLibrary.getByRole("button", {
               name: "Collapse block library",
             });
@@ -80,10 +88,28 @@ jobs:
 
             await page.getByRole("button", { name: "Fit View" }).click();
             await page.getByRole("button", { name: "Copy JSON" }).click({ force: true });'''
+          new_copy = '''  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+            const collapseBlockLibrary = blockLibrary.getByRole("button", {
+              name: "Collapse block library",
+            });
+            if (await collapseBlockLibrary.isVisible().catch(() => false)) {
+              await collapseBlockLibrary.click();
+              await expect(
+                blockLibrary.getByRole("button", { name: "Expand block library" }),
+              ).toBeVisible();
+            }
+
+            await page.getByRole("button", { name: "Fit View" }).click();
+            await page.getByRole("button", { name: "Copy JSON" }).click({ force: true });
+            await expect
+              .poll(async () => page.evaluate(async () => navigator.clipboard.readText()), {
+                timeout: 5_000,
+              })
+              .toMatch(/^\\s*\\{/);'''
           if old_copy in smoke:
               smoke = smoke.replace(old_copy, new_copy, 1)
-          elif collapse_copy in smoke:
-              smoke = smoke.replace(collapse_copy, new_copy, 1)
+          elif force_copy in smoke:
+              smoke = smoke.replace(force_copy, new_copy, 1)
           elif intermediate_copy in smoke:
               smoke = smoke.replace(intermediate_copy, new_copy, 1)
           elif new_copy not in smoke:
