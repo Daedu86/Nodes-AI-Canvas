@@ -6,6 +6,7 @@ const port = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
 const baseURL = `http://localhost:${port}`;
 const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL;
 const browserName = process.env.PLAYWRIGHT_BROWSER_NAME === "firefox" ? "firefox" : "chromium";
+const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER === "1";
 const playwrightStateDir = path.join(os.tmpdir(), "ai-canvas-playwright");
 const playwrightRunId = (process.env.PLAYWRIGHT_RUN_ID ?? String(process.pid)).replace(
   /[^a-zA-Z0-9_-]/gu,
@@ -44,9 +45,9 @@ export default defineConfig({
     command: `npm run dev -- --hostname localhost --port ${port}`,
     url: baseURL,
     timeout: 120_000,
-    // Always start an isolated test server so E2E runs keep their own
-    // mock LLM and on-disk stores instead of accidentally reusing a local dev app.
-    reuseExistingServer: false,
+    // CI starts an isolated server by default. Local validation can explicitly
+    // reuse a matching harness to avoid orphaned Next child processes on Windows.
+    reuseExistingServer,
     env: {
       ...process.env,
       AUTH_ENABLE_DEV_CREDENTIALS: "1",

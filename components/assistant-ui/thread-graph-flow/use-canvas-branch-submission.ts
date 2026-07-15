@@ -3,7 +3,6 @@
 import { useAssistantRuntime } from "@assistant-ui/react";
 import React from "react";
 import type { ContextScope, GraphBranchIntent } from "@/components/context/graph-branch-intent";
-import type { HistoryMode } from "@/components/context/history-mode";
 import type { ModelProvider } from "@/components/context/model-config";
 import {
   CANVAS_BRANCH_CANCEL_FAILURE,
@@ -35,7 +34,6 @@ type UseCanvasBranchSubmissionOptions = {
   draft: GraphBranchIntent | null;
   draftBranchSpec: BranchSpec | null;
   draftContextArtifacts: SessionArtifact[];
-  historyMode: HistoryMode;
   llmEnabled: boolean;
   modelId: string;
   provider: ModelProvider;
@@ -125,7 +123,6 @@ export function useCanvasBranchSubmission({
   draft,
   draftBranchSpec,
   draftContextArtifacts,
-  historyMode,
   llmEnabled,
   modelId,
   provider,
@@ -257,7 +254,6 @@ export function useCanvasBranchSubmission({
     draft,
     draftBranchSpec,
     draftContextArtifacts,
-    historyMode,
     llmEnabled,
     modelId,
     provider,

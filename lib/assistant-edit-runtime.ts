@@ -71,27 +71,12 @@ export const executeAssistantEditBranch = async (
   }
 
   const previousExport = threadRuntime.export();
-  const currentMessages = threadRuntime.getState().messages;
-  const parentIndex = currentMessages.findIndex((entry) => entry.id === options.parentId);
-  if (parentIndex === -1) {
-    return false;
-  }
-
-  const exported = threadRuntime.export();
-  const hasParent = exported.messages.some(
+  const hasParent = previousExport.messages.some(
     (entry) => entry.message?.id === options.parentId,
   );
   if (!hasParent) {
     return false;
   }
-  threadRuntime.import({
-    ...exported,
-    headId: options.parentId,
-  });
-
-  await new Promise<void>((resolve) => {
-    window.setTimeout(resolve, 0);
-  });
 
   let handledRunEnd = false;
   const unsubscribeRunEnd = threadRuntime.unstable_on("runEnd", () => {

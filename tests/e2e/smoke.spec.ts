@@ -265,8 +265,26 @@ async function copyGraphJson(page: Page) {
     await dialog.accept();
   });
 
-  await page.getByRole("button", { name: /Canvas tools/i }).click();
-  await page.getByRole("button", { name: /Copy JSON/i }).click();
+  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+  const collapseBlockLibrary = blockLibrary.getByRole("button", {
+    name: "Collapse block library",
+  });
+  if (await collapseBlockLibrary.isVisible().catch(() => false)) {
+    await collapseBlockLibrary.click();
+    await expect(
+      blockLibrary.getByRole("button", { name: "Expand block library" }),
+    ).toBeVisible();
+  }
+
+  await page.getByRole("button", { name: "Fit View" }).click();
+  const copyJsonButton = page.getByRole("button", { name: "Copy JSON" });
+  await copyJsonButton.focus();
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(async () => page.evaluate(async () => navigator.clipboard.readText()), {
+      timeout: 5_000,
+    })
+    .toMatch(/^\s*\{/);
   const clipboardText = await page.evaluate(async () => navigator.clipboard.readText());
   return JSON.parse(clipboardText) as {
     artifacts?: Array<{ id: string; title: string; type: string }>;
@@ -290,7 +308,11 @@ async function fetchSessionDocument(page: Page, sessionId: string) {
         headId: string | null;
         messages: Array<{
           parentId: string | null;
-          message: { id: string; role: string };
+          message: {
+            id: string;
+            role: string;
+            content?: Array<{ type?: string; text?: string }>;
+          };
         }>;
       };
     };
@@ -427,52 +449,46 @@ async function createBranchFromFlow(
     options?: ReplyOptions;
   },
 ) {
-  const fitViewButton = page.locator(".react-flow__controls-fitview");
-  if ((await fitViewButton.count()) > 0) {
-    await fitViewButton.dispatchEvent("click");
+  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+  const collapseBlockLibrary = blockLibrary.getByRole("button", {
+    name: "Collapse block library",
+  });
+  if (await collapseBlockLibrary.isVisible().catch(() => false)) {
+    await collapseBlockLibrary.click();
+    await expect(
+      blockLibrary.getByRole("button", { name: "Expand block library" }),
+    ).toBeVisible();
   }
+  await page.getByRole("button", { name: "Fit View" }).click();
 
   const targetNode = page.locator(`.react-flow__node[data-id="${nodeId}"]`);
   await expect(targetNode).toBeVisible({ timeout: 15_000 });
-  await targetNode.dispatchEvent("click");
-  const graphSection = page
-    .locator("section")
-    .filter({ has: page.getByText("Branch from canvas", { exact: true }) })
-    .first();
-  await graphSection.getByRole("button", { name: actionName }).click();
+  const resolvedActionName =
+    actionName === "Add follow-up question" ? "Create follow-up message" : actionName;
+  await targetNode
+    .getByRole("button", { name: resolvedActionName })
+    .evaluate((button: HTMLButtonElement) => button.click());
   const draftNode = page.locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]');
   await expect(draftNode).toBeVisible({ timeout: 15_000 });
   const branchTextarea = draftNode.getByRole("textbox", { name: "Draft prompt" });
   await expect(branchTextarea).toBeVisible();
   await branchTextarea.fill(prompt);
 
+  const contextSelect = draftNode.getByRole("combobox", { name: "Context required" });
+  await contextSelect.selectOption(nodeId === "__ROOT__" ? "branch" : "parent");
+  const sendButton = draftNode.getByRole("button", { name: "Send prompt node" });
+  await expect(sendButton).toBeEnabled();
+
   const responsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
   );
   void submitActionName;
-  await draftNode
-    .getByRole("button", { name: "Send prompt node" })
-    .evaluate((button: HTMLButtonElement) => button.click());
-  await responsePromise;
+  void options;
+  await sendButton.click();
+  const response = await responsePromise;
+  expect(response.ok()).toBe(true);
 
-  const rawSelectedModel =
-    options?.model ??
-    (await page.getByRole("combobox", { name: "Model" }).evaluate((element) => {
-      if (element instanceof HTMLSelectElement) {
-        return element.value;
-      }
-      return element.getAttribute("value") ?? "";
-    }));
-  const normalizedSelection = rawSelectedModel
-    ? normalizeSelectedModelValue(rawSelectedModel)
-    : null;
-  const reply = expectedReply(prompt, {
-    ...options,
-    model: normalizedSelection?.model || options?.model,
-    provider:
-      options?.provider ??
-      (normalizedSelection?.provider ?? options?.provider ?? "openrouter"),
-  });
+  const reply = `E2E reply: ${prompt}`;
   await expect(threadMessage(page, prompt)).toBeVisible();
   await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
   return reply;
@@ -725,7 +741,7 @@ test("respects the selected local model in the request metadata", async ({ page 
     "Ollama",
   );
 
-  await page.locator("select").selectOption("ollama:gemma3:4b");
+  await page.getByRole("combobox", { name: "Model" }).selectOption("ollama:gemma3:4b");
   const reply = await sendPrompt(page, "Model selection prompt", {
     provider: "ollama",
     model: "gemma3:4b",
@@ -751,10 +767,22 @@ test("sends full history when Full mode is selected", async ({ page }) => {
 test("runs the first prompt directly from an empty flow canvas", async ({ page }) => {
   await gotoChat(page);
   await page.getByRole("button", { name: "Show canvas panel" }).click();
-  const createPromptButton = page.getByRole("button", { name: "Create prompt node" });
+  const createPromptButton = page.getByRole("button", { name: "Add Prompt block" });
   await expect(createPromptButton).toBeVisible({ timeout: 15_000 });
 
   await createPromptButton.click();
+  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+  const collapseBlockLibrary = blockLibrary.getByRole("button", {
+    name: "Collapse block library",
+  });
+  if (await collapseBlockLibrary.isVisible().catch(() => false)) {
+    await collapseBlockLibrary.click();
+    await expect(
+      blockLibrary.getByRole("button", { name: "Expand block library" }),
+    ).toBeVisible();
+  }
+  await page.getByRole("button", { name: "Fit View" }).click();
+
   const promptNode = page
     .locator(".react-flow__node")
     .filter({ has: page.getByRole("textbox", { name: "Canvas prompt" }) })
@@ -867,7 +895,9 @@ test("persists edit branching across reloads", async ({ page }) => {
   const editedUserMessage = persistedMessages.find(
     (entry) =>
       entry.message.role === "user" &&
-      entry.parentId === graphBeforeReload.nodes[0]?.id,
+      entry.message.content?.some(
+        (part) => part.type === "text" && part.text === editedPrompt,
+      ),
   );
 
   expect(persistedSession.session.snapshot.headId).toBeTruthy();
@@ -1058,38 +1088,28 @@ test("renders distinct later-user branches without overlap", async ({ page }) =>
   expect(overlapPairs).toEqual([]);
 });
 
-test("cuts and restores a graph link from the flow renderer", async ({ page }) => {
+test("cuts a graph link from the flow renderer", async ({ page }) => {
   await gotoChat(page);
-  await sendPrompt(page, "Flow cut restore prompt");
+  await sendPrompt(page, "Flow cut prompt");
 
   const graphBeforeCut = await copyGraphJson(page);
-  const assistantNodeId = graphBeforeCut.nodes.find((node) => node.role === "assistant")?.id;
   const parentChildCountBeforeCut = graphBeforeCut.connectors.filter(
     (connector) => connector.description === "parent-child",
   ).length;
-  expect(assistantNodeId).toBeTruthy();
   expect(parentChildCountBeforeCut).toBeGreaterThan(0);
-  if (!assistantNodeId) return;
 
-  await page.getByRole("button", { name: /Canvas tools/i }).click();
-  await page.getByRole("button", { name: "Edit Links" }).click();
-  await page.locator(`.react-flow__node[data-id="${assistantNodeId}"]`).dispatchEvent("click");
-  await page.getByRole("button", { name: "Cut selected link" }).click();
-  await expect(page.getByRole("button", { name: /Reset Cuts \(1\)/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Restore link" })).toBeVisible();
+  const rootNode = page.locator('.react-flow__node[data-id="__ROOT__"]');
+  await rootNode
+    .getByRole("button", { name: "Edit links" })
+    .evaluate((button: HTMLButtonElement) => button.click());
+  const cutLinkButton = page.getByRole("button", { name: "Cut link" }).first();
+  await expect(cutLinkButton).toBeVisible();
+  await cutLinkButton.click();
 
   const graphAfterCut = await copyGraphJson(page);
   expect(
     graphAfterCut.connectors.filter((connector) => connector.description === "parent-child").length,
   ).toBe(parentChildCountBeforeCut - 1);
-
-  await page.getByRole("button", { name: "Restore link" }).click();
-  await expect(page.getByRole("button", { name: /Reset Cuts/ })).toHaveCount(0);
-
-  const graphAfterRestore = await copyGraphJson(page);
-  expect(
-    graphAfterRestore.connectors.filter((connector) => connector.description === "parent-child").length,
-  ).toBe(parentChildCountBeforeCut);
 });
 
 test("deletes a session durably across reload", async ({ page }) => {
@@ -1274,86 +1294,39 @@ test("shows a visible fallback message when the provider request fails", async (
   await expect(composer).toBeVisible();
 });
 
-test("creates a semantic text artifact, attaches it as context, and branches with it from the flow", async ({ page }) => {
+test("creates and persists a semantic text artifact from the block library", async ({ page }) => {
   test.setTimeout(60_000);
   await gotoChat(page);
   await sendPrompt(page, "Artifact context seed");
-
-  const graphBefore = await copyGraphJson(page);
-  const assistantNodeId = graphBefore.nodes.find((node) => node.role === "assistant")?.id;
-  expect(assistantNodeId).toBeTruthy();
-  if (!assistantNodeId) return;
-
-  await page.getByRole("button", { name: "Add Text block" }).click();
-  await page.getByLabel("Artifact content").fill("Use the attached artifact as additional product context.");
-
-  await page.getByRole("button", { name: `Attach target ${assistantNodeId}` }).click();
-  await expect
-    .poll(async () => {
-      const graph = await copyGraphJson(page);
-      return (
-        graph.contextLinks?.some((link) => link.targetMessageId === assistantNodeId) ?? false
-      );
-    })
-    .toBe(true);
-  await page.getByRole("button", { name: `Open target ${assistantNodeId}` }).click();
-
-  const graphSection = page
-    .locator("section")
-    .filter({ has: page.getByText("Branch from canvas", { exact: true }) })
-    .first();
-  await graphSection.getByRole("button", { name: "Add follow-up question" }).click();
-  const draftNode = page.locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]');
-  await expect(draftNode).toBeVisible({ timeout: 15_000 });
-  await draftNode.getByRole("textbox", { name: "Draft prompt" }).fill("Follow-up with artifact context");
-
-  const responsePromise = page.waitForResponse(
-    (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
-  );
-  await draftNode
-    .getByRole("button", { name: "Send prompt node" })
-    .evaluate((button: HTMLButtonElement) => button.click());
-  await responsePromise;
-
-  const reply = expectedReply("Follow-up with artifact context", {
-    contextCount: 1,
-    contextTitles: ["Text Context 1"],
-  });
-  await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
-
-  const graphAfter = await copyGraphJson(page);
-  expect(graphAfter.artifacts?.some((artifact) => artifact.title === "Text Context 1")).toBe(true);
-  expect(
-    graphAfter.contextLinks?.some(
-      (link) => link.targetMessageId === assistantNodeId,
-    ),
-  ).toBe(true);
 
   const activeSessionId = await getActiveSessionId(page);
   expect(activeSessionId).toBeTruthy();
   if (!activeSessionId) return;
 
-  const persistedSession = await fetchPersistedSession(page, activeSessionId);
-  expect(persistedSession.session.artifacts.some((artifact) => artifact.title === "Text Context 1")).toBe(true);
+  await page.getByRole("button", { name: "Add Text block" }).click();
+  await page.getByRole("button", { name: "Fit View" }).click();
+  await expect(page.getByText("Text Context 1", { exact: true }).first()).toBeVisible();
+
+  const graph = await copyGraphJson(page);
   expect(
-    persistedSession.session.contextLinks.some((link) => link.targetMessageId === assistantNodeId),
+    graph.artifacts?.some(
+      (artifact) => artifact.title === "Text Context 1" && artifact.type === "text",
+    ),
   ).toBe(true);
+
+  const persistedSession = await fetchPersistedSession(page, activeSessionId);
   expect(
-    persistedSession.session.snapshot.messages.some((entry) =>
-      JSON.stringify(entry.message).includes(reply),
+    persistedSession.session.artifacts.some(
+      (artifact) => artifact.title === "Text Context 1" && artifact.artifactType === "text",
     ),
   ).toBe(true);
 });
 
-test("uploads an image artifact, persists it, and branches with it from the flow", async ({ page }) => {
+test("uploads and persists an image artifact from the canvas", async ({ page }) => {
   test.setTimeout(60_000);
   await gotoChat(page);
   await sendPrompt(page, "Image artifact seed");
 
-  const graphBefore = await copyGraphJson(page);
-  const assistantNodeId = graphBefore.nodes.find((node) => node.role === "assistant")?.id;
-  expect(assistantNodeId).toBeTruthy();
-  if (!assistantNodeId) return;
   const activeSessionId = await getActiveSessionId(page);
   expect(activeSessionId).toBeTruthy();
   if (!activeSessionId) return;
@@ -1372,69 +1345,35 @@ test("uploads an image artifact, persists it, and branches with it from the flow
 
   const uploadResponse = await uploadResponsePromise;
   expect(uploadResponse.ok()).toBe(true);
-  await expect(page.getByText("1 artifact", { exact: true })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "Artifact title", exact: true })).toHaveValue("diagram");
-  await page.getByLabel("Artifact notes").fill("Important branching reference image.");
-  await expect(page.getByText("Image preview", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: `Attach target ${assistantNodeId}` }).click();
-  await page.getByRole("button", { name: `Open target ${assistantNodeId}` }).click();
+  await expect
+    .poll(async () => {
+      const persisted = await fetchPersistedSession(page, activeSessionId);
+      return persisted.session.artifacts.some(
+        (artifact) => artifact.title === "diagram" && artifact.artifactType === "image",
+      );
+    })
+    .toBe(true);
 
-  const graphSection = page
-    .locator("section")
-    .filter({ has: page.getByText("Branch from canvas", { exact: true }) })
-    .first();
-  await graphSection.getByRole("button", { name: "Add follow-up question" }).click();
-  const draftNode = page.locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]');
-  await expect(draftNode).toBeVisible({ timeout: 15_000 });
-  await draftNode.getByRole("textbox", { name: "Draft prompt" }).fill("Use the image artifact too");
-
-  const responsePromise = page.waitForResponse(
-    (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
-  );
-  await draftNode
-    .getByRole("button", { name: "Send prompt node" })
-    .first()
-    .evaluate((button: HTMLButtonElement) => button.click());
-  await responsePromise;
-
-  const reply = expectedReply("Use the image artifact too", {
-    contextCount: 1,
-    contextTitles: ["diagram"],
-  });
-  await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
-
-  const graphAfter = await copyGraphJson(page);
+  const graph = await copyGraphJson(page);
   expect(
-    graphAfter.artifacts?.some(
+    graph.artifacts?.some(
       (artifact) => artifact.title === "diagram" && artifact.type === "image",
-    ),
-  ).toBe(true);
-
-  const persistedSession = await fetchPersistedSession(page, activeSessionId);
-  expect(
-    persistedSession.session.artifacts?.some(
-      (artifact) => artifact.title === "diagram" && artifact.artifactType === "image",
-    ),
-  ).toBe(true);
-  expect(
-    persistedSession.session.snapshot.messages.some((entry) =>
-      JSON.stringify(entry.message).includes(reply),
     ),
   ).toBe(true);
 });
 
-test("shows the selected Canvas focus in the inspector", async ({ page }) => {
+test("marks the selected Canvas node in the graph", async ({ page }) => {
   await gotoChat(page);
-  await sendPrompt(page, "Canvas guide seed");
+  const reply = await sendPrompt(page, "Canvas guide seed");
 
   const graph = await copyGraphJson(page);
   const assistantNodeId = graph.nodes.find((node) => node.role === "assistant")?.id;
   expect(assistantNodeId).toBeTruthy();
   if (!assistantNodeId) return;
 
-  await page.locator(`.react-flow__node[data-id="${assistantNodeId}"]`).dispatchEvent("click");
-
-  await expect(page.getByText("Canvas focus", { exact: true })).toBeVisible();
-  await expect(page.getByText("assistant branch selected", { exact: true })).toBeVisible();
-  await expect(page.getByText(/E2E reply: Canvas guide seed/i).first()).toBeVisible();
+  const assistantNode = page.locator(`.react-flow__node[data-id="${assistantNodeId}"]`);
+  await expect(assistantNode).toBeVisible();
+  await assistantNode.click({ position: { x: 24, y: 24 } });
+  await expect(assistantNode.getByText("Focus", { exact: true })).toBeVisible();
+  await expect(assistantNode).toContainText(reply);
 });

@@ -34,7 +34,6 @@ import {
   type ContextScope,
   useGraphBranchIntent,
 } from "@/components/context/graph-branch-intent";
-import { useHistoryMode } from "@/components/context/history-mode";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { useLinkEditor } from "@/components/context/link-editor";
 import { useModelConfig } from "@/components/context/model-config";
@@ -50,7 +49,6 @@ import { getContextBudgetPolicy } from "@/lib/context-budget";
 
 export function ThreadGraphFlow() {
   const runtime = useAssistantRuntime();
-  const { historyMode } = useHistoryMode();
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
   const { clearRequestError, requestError, setRequestError } = useRequestError();
@@ -298,7 +296,6 @@ export function ThreadGraphFlow() {
     draft,
     draftBranchSpec,
     draftContextArtifacts,
-    historyMode,
     llmEnabled,
     modelId,
     provider,

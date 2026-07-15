@@ -167,11 +167,24 @@ async function readSessionDocumentFromPath(filePath: string): Promise<StoredSess
 async function readAllSessionDocuments() {
   await ensureStoreDir();
   const entries = await fs.readdir(getSessionStoreDir(), { withFileTypes: true });
-  return Promise.all(
+  const sessions = await Promise.all(
     entries
       .filter((entry) => entry.isFile() && entry.name.endsWith(SESSION_FILE_EXTENSION))
-      .map((entry) => readSessionDocumentFromPath(path.join(getSessionStoreDir(), entry.name))),
+      .map(async (entry) => {
+        try {
+          return await readSessionDocumentFromPath(
+            path.join(getSessionStoreDir(), entry.name),
+          );
+        } catch (error) {
+          // A concurrent delete can remove a file after readdir but before readFile.
+          if (isMissingSessionError(error)) {
+            return null;
+          }
+          throw error;
+        }
+      }),
   );
+  return sessions.filter((session): session is StoredSession => session !== null);
 }
 
 async function claimSessionOwnerIfNeeded(session: StoredSession, ownerId: string) {
