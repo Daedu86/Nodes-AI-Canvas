@@ -60,7 +60,9 @@ jobs:
             });
             if (await collapseBlockLibrary.isVisible().catch(() => false)) {
               await collapseBlockLibrary.click();
-              await expect(collapseBlockLibrary).toHaveAttribute("aria-expanded", "false");
+              await expect(
+                blockLibrary.getByRole("button", { name: "Expand block library" }),
+              ).toBeVisible();
             }
 
             await page.getByRole("button", { name: "Fit View" }).click();
