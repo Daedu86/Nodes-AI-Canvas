@@ -53,41 +53,24 @@ jobs:
 
           runtime_path = Path("lib/assistant-edit-runtime.ts")
           runtime = runtime_path.read_text(encoding="utf-8")
-          old_runtime = '''  const previousExport = threadRuntime.export();
-          const currentMessages = threadRuntime.getState().messages;
-          const parentIndex = currentMessages.findIndex((entry) => entry.id === options.parentId);
-          if (parentIndex === -1) {
-            return false;
-          }
-
-          const exported = threadRuntime.export();
-          const hasParent = exported.messages.some(
-            (entry) => entry.message?.id === options.parentId,
-          );
-          if (!hasParent) {
-            return false;
-          }
-          threadRuntime.import({
-            ...exported,
-            headId: options.parentId,
-          });
-
-          await new Promise<void>((resolve) => {
-            window.setTimeout(resolve, 0);
-          });
-          '''
-          new_runtime = '''  const previousExport = threadRuntime.export();
+          replacement = '''  const previousExport = threadRuntime.export();
           const hasParent = previousExport.messages.some(
             (entry) => entry.message?.id === options.parentId,
           );
           if (!hasParent) {
             return false;
           }
+
           '''
-          if old_runtime in runtime:
-              runtime = runtime.replace(old_runtime, new_runtime, 1)
-          elif new_runtime not in runtime:
-              raise RuntimeError("Assistant edit runtime marker was not found")
+          start_marker = "  const previousExport = threadRuntime.export();"
+          end_marker = "  let handledRunEnd = false;"
+          start = runtime.find(start_marker)
+          end = runtime.find(end_marker, start if start >= 0 else 0)
+          if start < 0 or end < 0:
+              if replacement.strip() not in runtime:
+                  raise RuntimeError("Assistant edit runtime structural markers were not found")
+          else:
+              runtime = runtime[:start] + replacement + runtime[end:]
           runtime_path.write_text(runtime, encoding="utf-8")
           PY
 
