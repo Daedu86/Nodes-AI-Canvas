@@ -17,7 +17,7 @@ jobs:
   repair:
     if: github.event.pull_request.head.ref == 'automation/final-hardening-validation'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 55
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
@@ -44,21 +44,33 @@ jobs:
           smoke_path = Path("tests/e2e/smoke.spec.ts")
           smoke = smoke_path.read_text(encoding="utf-8")
 
-          selector_replacements = [
-              (
-                  'page.getByRole("button", { name: "Create prompt node" })',
-                  'page.getByRole("button", { name: "Add Prompt block" })',
-              ),
-              (
-                  '  await page.getByRole("button", { name: /Canvas tools/i }).click();\n  await page.getByRole("button", { name: /Copy JSON/i }).click();',
-                  '  await page.getByRole("button", { name: "Copy JSON" }).click();',
-              ),
-          ]
-          for old, new in selector_replacements:
-              if old in smoke:
-                  smoke = smoke.replace(old, new, 1)
-              elif new not in smoke:
-                  raise RuntimeError(f"Smoke selector marker was not found: {old}")
+          old_prompt_selector = 'page.getByRole("button", { name: "Create prompt node" })'
+          new_prompt_selector = 'page.getByRole("button", { name: "Add Prompt block" })'
+          if old_prompt_selector in smoke:
+              smoke = smoke.replace(old_prompt_selector, new_prompt_selector, 1)
+          elif new_prompt_selector not in smoke:
+              raise RuntimeError("Prompt block selector marker was not found")
+
+          old_copy = '''  await page.getByRole("button", { name: /Canvas tools/i }).click();
+            await page.getByRole("button", { name: /Copy JSON/i }).click();'''
+          intermediate_copy = '  await page.getByRole("button", { name: "Copy JSON" }).click();'
+          new_copy = '''  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+            const collapseBlockLibrary = blockLibrary.getByRole("button", {
+              name: "Collapse block library",
+            });
+            if (await collapseBlockLibrary.isVisible().catch(() => false)) {
+              await collapseBlockLibrary.click();
+              await expect(collapseBlockLibrary).toHaveAttribute("aria-expanded", "false");
+            }
+
+            await page.getByRole("button", { name: "Fit View" }).click();
+            await page.getByRole("button", { name: "Copy JSON" }).click();'''
+          if old_copy in smoke:
+              smoke = smoke.replace(old_copy, new_copy, 1)
+          elif intermediate_copy in smoke:
+              smoke = smoke.replace(intermediate_copy, new_copy, 1)
+          elif new_copy not in smoke:
+              raise RuntimeError("Copy JSON helper marker was not found")
           smoke_path.write_text(smoke, encoding="utf-8")
 
           runtime_path = Path("lib/assistant-edit-runtime.ts")
@@ -107,6 +119,9 @@ jobs:
           npx playwright test tests/e2e/smoke.spec.ts
           --workers=1
           --grep "copies graph JSON after a reply|runs the first prompt directly from an empty flow canvas|persists edit branching across reloads"
+
+      - name: Run complete shard 2 of 4
+        run: npm run test:e2e -- --workers=1 --shard=2/4
 
       - name: Upload focused failure artifacts
         if: failure()
