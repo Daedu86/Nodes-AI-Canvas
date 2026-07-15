@@ -95,16 +95,28 @@ describe("mergeRuntimeBranchIntoSessionSnapshot", () => {
     expect(merged.messages).toContainEqual({ parentId: "root", message: newAssistant });
   });
 
-  it("persists substantive optimistic assistant output without the marker", () => {
+  it("replaces a substantive optimistic assistant with one stable child", () => {
     const root = message("root", "user", "Question");
     const optimistic = {
       ...message("optimistic", "assistant", "Rendered answer"),
       metadata: { custom: {}, isOptimistic: true },
     };
-    const merged = mergeRuntimeBranchIntoSessionSnapshot(null, [root, optimistic]);
-    expect(merged.headId).toBe("optimistic");
-    expect(merged.messages).toHaveLength(2);
-    expect(merged.messages[1]?.message.metadata).toEqual({ custom: {} });
+    const whileStreaming = mergeRuntimeBranchIntoSessionSnapshot(null, [root, optimistic]);
+    expect(whileStreaming.headId).toBe("root");
+    expect(whileStreaming.messages).toEqual([{ parentId: null, message: root }]);
+
+    const stable = message("server-assistant", "assistant", "Rendered answer");
+    const settled = mergeRuntimeBranchIntoSessionSnapshot(whileStreaming, [root, stable]);
+    expect(settled.headId).toBe("server-assistant");
+    expect(settled.messages).toEqual([
+      { parentId: null, message: root },
+      { parentId: "root", message: stable },
+    ]);
+    expect(
+      settled.messages.filter(
+        (entry) => entry.parentId === "root" && entry.message.role === "assistant",
+      ),
+    ).toHaveLength(1);
   });
 
   it("does not persist empty optimistic placeholders", () => {

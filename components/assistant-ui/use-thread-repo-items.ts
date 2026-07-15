@@ -308,15 +308,31 @@ export function useThreadRepoItems(
 
     readExport();
     const unsubscribes: Array<(() => void) | undefined> = [];
+    const settledReadTimeouts = new Set<number>();
     unsubscribes.push(thread.subscribe(readExport));
     THREAD_EVENTS.forEach((event) => {
-      unsubscribes.push(thread.unstable_on(event, readExport));
+      if (event !== "runEnd") {
+        unsubscribes.push(thread.unstable_on(event, readExport));
+        return;
+      }
+      unsubscribes.push(
+        thread.unstable_on(event, () => {
+          readExport();
+          const timeoutId = window.setTimeout(() => {
+            settledReadTimeouts.delete(timeoutId);
+            readExport();
+          }, 50);
+          settledReadTimeouts.add(timeoutId);
+        }),
+      );
     });
     window.addEventListener(SESSION_RUNTIME_CHANGED_EVENT, readExport);
 
     return () => {
       window.removeEventListener(SESSION_RUNTIME_CHANGED_EVENT, readExport);
       isMounted = false;
+      settledReadTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      settledReadTimeouts.clear();
       unsubscribes.forEach((unsubscribe) => {
         try {
           unsubscribe?.();

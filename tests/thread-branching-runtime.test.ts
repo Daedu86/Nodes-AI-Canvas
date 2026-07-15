@@ -78,6 +78,7 @@ describe("thread branching runtime", () => {
 
     expect(executed).toBe(true);
     expect(publicAppend).not.toHaveBeenCalled();
+    expect(internalAppend).toHaveBeenCalledTimes(1);
     expect(internalAppend).toHaveBeenCalledWith(
       expect.objectContaining({
         parentId: null,
@@ -100,6 +101,7 @@ describe("thread branching runtime", () => {
     });
 
     expect(executed).toBe(true);
+    expect(publicAppend).toHaveBeenCalledTimes(1);
     expect(publicAppend).toHaveBeenCalledWith(
       expect.objectContaining({
         parentId: null,

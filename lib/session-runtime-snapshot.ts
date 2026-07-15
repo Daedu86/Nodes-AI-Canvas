@@ -31,42 +31,20 @@ const mergePersistedContextScope = (
 
 type PersistableRuntimeMessage = Record<string, unknown> & { id: string };
 
-const hasSubstantiveContent = (message: Record<string, unknown>) => {
-  if (!Array.isArray(message.content)) return false;
-  return message.content.some((part) => {
-    if (!isRecord(part)) return false;
-    if (typeof part.text === "string") return part.text.trim().length > 0;
-    return Object.keys(part).some((key) => key !== "type");
-  });
-};
-
 const normalizePersistableRuntimeMessage = (
   message: Record<string, unknown>,
 ): PersistableRuntimeMessage | null => {
   if (typeof message.id !== "string" || message.id.length === 0) return null;
   const messageId = message.id;
   const metadata = isRecord(message.metadata) ? message.metadata : null;
+  // The AI SDK can replace a streaming assistant's provisional id with the
+  // server id. Persisting the provisional message would turn that id swap into
+  // an extra assistant branch, so wait for the stable, non-optimistic message.
+  if (metadata?.isOptimistic === true) return null;
 
-  if (metadata?.isOptimistic !== true) {
-    return {
-      ...message,
-      id: messageId,
-    };
-  }
-
-  // AI SDK 7 responses remain marked optimistic in react-ai-sdk 1.3.x even
-  // after visible content has arrived. Persist substantive assistant output,
-  // but continue ignoring empty placeholders.
-  if (message.role !== "assistant" || !hasSubstantiveContent(message)) {
-    return null;
-  }
-
-  const nextMetadata = { ...metadata };
-  delete nextMetadata.isOptimistic;
   return {
     ...message,
     id: messageId,
-    metadata: nextMetadata,
   };
 };
 

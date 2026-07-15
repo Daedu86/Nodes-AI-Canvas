@@ -441,12 +441,14 @@ async function createBranchFromFlow(
     submitActionName,
     prompt,
     options,
+    submitAttempts = 1,
   }: {
     nodeId: string;
     actionName: string;
     submitActionName?: string;
     prompt: string;
     options?: ReplyOptions;
+    submitAttempts?: number;
   },
 ) {
   const blockLibrary = page.getByRole("complementary", { name: "Block library" });
@@ -484,7 +486,15 @@ async function createBranchFromFlow(
   );
   void submitActionName;
   void options;
-  await sendButton.click();
+  if (submitAttempts === 1) {
+    await sendButton.click();
+  } else {
+    await sendButton.evaluate((button: HTMLButtonElement, attempts) => {
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        button.click();
+      }
+    }, submitAttempts);
+  }
   const response = await responsePromise;
   expect(response.ok()).toBe(true);
 
@@ -948,20 +958,47 @@ test("creates a sibling user branch from a flow user node", async ({ page }) => 
   expect(laterUserNodeId).toBeTruthy();
   if (!laterUserNodeId) return;
 
+  const originalNode = graphBeforeBranch.nodes.find((node) => node.id === laterUserNodeId);
+  expect(originalNode).toBeDefined();
+  if (!originalNode) return;
+  const nodeIdsBeforeBranch = new Set(graphBeforeBranch.nodes.map((node) => node.id));
+  const branchChatRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().includes("/api/chat")) {
+      branchChatRequests.push(request.url());
+    }
+  });
+
   await createBranchFromFlow(page, {
     nodeId: laterUserNodeId,
     actionName: "Create sibling branch",
     prompt: "Flow user sibling alternative",
+    submitAttempts: 3,
   });
+
+  await expect(
+    page.locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]'),
+  ).toHaveCount(0, { timeout: 15_000 });
+  await page.waitForTimeout(750);
 
   const graphAfterBranch = await copyGraphJson(page);
-  const userSiblingConnectors = graphAfterBranch.connectors.filter((connector) => {
-    if (connector.description !== "siblings" || connector.parentId === null) return false;
-    const childNode = graphAfterBranch.nodes.find((node) => node.id === connector.childId);
-    return childNode?.role === "user";
-  });
+  const newConversationNodes = graphAfterBranch.nodes.filter(
+    (node) => !nodeIdsBeforeBranch.has(node.id) && !node.isBridge,
+  );
+  const newUserNodes = newConversationNodes.filter((node) => node.role === "user");
+  const newAssistantNodes = newConversationNodes.filter((node) => node.role === "assistant");
 
-  expect(userSiblingConnectors.length).toBeGreaterThan(0);
+  expect(branchChatRequests).toHaveLength(1);
+  expect(newConversationNodes).toHaveLength(2);
+  expect(newUserNodes).toHaveLength(1);
+  expect(newAssistantNodes).toHaveLength(1);
+  expect(newUserNodes[0]?.parentId).toBe(originalNode.parentId);
+  expect(newAssistantNodes[0]?.parentId).toBe(newUserNodes[0]?.id);
+  expect(
+    graphAfterBranch.nodes.filter(
+      (node) => node.role === "assistant" && node.parentId === newUserNodes[0]?.id,
+    ),
+  ).toHaveLength(1);
 });
 
 test("creates a sibling user branch from a chat user node", async ({ page }) => {

@@ -132,6 +132,7 @@ export function useCanvasBranchSubmission({
 }: UseCanvasBranchSubmissionOptions) {
   const [isSubmittingBranch, setIsSubmittingBranch] = React.useState(false);
   const [canvasDraftError, setCanvasDraftError] = React.useState<string | null>(null);
+  const branchSubmissionLockRef = React.useRef(false);
   const pendingDraftSubmissionRef = React.useRef(false);
   const pendingOutputRunRef = React.useRef<PendingOutputRun | null>(null);
   const canvasConversationNodesRef = React.useRef<ThreadGraphNodeModel[]>(
@@ -150,6 +151,7 @@ export function useCanvasBranchSubmission({
   const handleCancelRun = React.useCallback(() => {
     clearRequestError();
     setCanvasDraftError(null);
+    branchSubmissionLockRef.current = false;
     pendingDraftSubmissionRef.current = false;
     setIsSubmittingBranch(false);
     try {
@@ -162,6 +164,7 @@ export function useCanvasBranchSubmission({
   }, [clearRequestError, runtime.threads.main, setRequestError]);
 
   const handleCancelPromptDraft = React.useCallback(() => {
+    branchSubmissionLockRef.current = false;
     pendingDraftSubmissionRef.current = false;
     setIsSubmittingBranch(false);
     setCanvasDraftError(null);
@@ -177,6 +180,8 @@ export function useCanvasBranchSubmission({
       setRequestError(message);
       return;
     }
+    if (branchSubmissionLockRef.current) return;
+    branchSubmissionLockRef.current = true;
     const activeDraft = { ...draft, contextScope: draft.contextScope };
 
     void (async () => {
@@ -188,11 +193,13 @@ export function useCanvasBranchSubmission({
 
         const threadReady = await ensureThreadIdle(runtime.threads.main);
         if (!threadReady) {
+          branchSubmissionLockRef.current = false;
           pendingDraftSubmissionRef.current = false;
           setCanvasDraftError(CANVAS_BRANCH_CANCEL_FAILURE);
           setRequestError(CANVAS_BRANCH_CANCEL_FAILURE);
           return;
         }
+        if (!branchSubmissionLockRef.current) return;
 
         pendingDraftSubmissionRef.current = true;
         pendingOutputRunRef.current = {
@@ -228,6 +235,7 @@ export function useCanvasBranchSubmission({
           text: activeDraft.text,
         });
         if (!executed) {
+          branchSubmissionLockRef.current = false;
           pendingDraftSubmissionRef.current = false;
           pendingOutputRunRef.current = null;
           const message = "Branch draft is empty. Add a prompt before creating the branch.";
@@ -237,6 +245,7 @@ export function useCanvasBranchSubmission({
         }
         submitted = true;
       } catch {
+        branchSubmissionLockRef.current = false;
         pendingDraftSubmissionRef.current = false;
         pendingOutputRunRef.current = null;
         const message = "Canvas branching failed. Try again from the selected node.";
@@ -264,7 +273,8 @@ export function useCanvasBranchSubmission({
   React.useEffect(() => {
     if (!requestError || !draft) return;
     setCanvasDraftError(requestError);
-    if (pendingDraftSubmissionRef.current) {
+    if (branchSubmissionLockRef.current || pendingDraftSubmissionRef.current) {
+      branchSubmissionLockRef.current = false;
       pendingDraftSubmissionRef.current = false;
       setIsSubmittingBranch(false);
     }
@@ -297,10 +307,12 @@ export function useCanvasBranchSubmission({
 
         if (!pendingDraftSubmissionRef.current) return;
         if (requestErrorRef.current) {
+          branchSubmissionLockRef.current = false;
           pendingDraftSubmissionRef.current = false;
           setIsSubmittingBranch(false);
           return;
         }
+        branchSubmissionLockRef.current = false;
         pendingDraftSubmissionRef.current = false;
         setCanvasDraftError(null);
         cancelDraft();
