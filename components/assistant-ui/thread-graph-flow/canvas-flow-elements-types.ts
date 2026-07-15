@@ -39,6 +39,10 @@ export type CanvasFlowElementsParams = {
   getArtifactsForTarget: SessionArtifactsApi["getArtifactsForTarget"];
   handleCancelPromptDraft: () => void;
   handleNodeBranchOperation?: (nodeId: string, operation: BranchOperation) => void;
+  onNodeContextScopeChange?: (
+    nodeId: string,
+    scope: "parent" | "branch" | "tree",
+  ) => void;
   onCopyGraphJson?: () => void;
   onToggleLinkEdit?: () => void;
   handleCancelRun: () => void;
@@ -55,7 +59,7 @@ export type CanvasFlowElementsParams = {
   requestError: string | null;
   runCanvasPrompt: CanvasRunManagerApi["runPrompt"];
   setDraftText: (value: string) => void;
-  setDraftContextScope: (scope: "parent" | "branch" | "tree") => void;
+  setDraftContextScope?: (scope: "parent" | "branch" | "tree") => void;
   updateArtifact: SessionArtifactsApi["updateArtifact"];
 };
 

@@ -46,6 +46,19 @@ describe("mergeSessionSnapshotRepositories", () => {
     expect(merged.messages).toContainEqual({ parentId: "root", message: oldAssistant });
     expect(merged.messages).toContainEqual({ parentId: "root", message: newAssistant });
   });
+
+  it("preserves a persisted context scope when the runtime export omits it", () => {
+    const persisted = message("root", "user", "Question");
+    persisted.metadata.custom = { contextScope: "tree" };
+    const runtime = message("root", "user", "Question");
+    const merged = mergeSessionSnapshotRepositories(
+      { headId: "root", messages: [{ parentId: null, message: persisted }] },
+      { headId: "root", messages: [{ parentId: null, message: runtime }] },
+    );
+    expect(merged.messages[0]?.message.metadata).toMatchObject({
+      custom: { contextScope: "tree" },
+    });
+  });
 });
 
 describe("mergeRuntimeBranchIntoSessionSnapshot", () => {

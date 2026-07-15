@@ -54,7 +54,8 @@ export function buildConversationFlowNodes({
   overrides,
   resolveModelVisual,
   handleNodeBranchOperation,
-}: Pick<CanvasFlowElementsParams, "canvasConversationNodes" | "overrides" | "handleNodeBranchOperation"> & {
+  onNodeContextScopeChange,
+}: Pick<CanvasFlowElementsParams, "canvasConversationNodes" | "overrides" | "handleNodeBranchOperation" | "onNodeContextScopeChange"> & {
   linkedArtifactCountByTarget: ReadonlyMap<string, number>;
   resolveModelVisual: ReturnType<typeof createCanvasModelVisualResolver>;
 }): ThreadGraphFlowNode[] {
@@ -72,6 +73,7 @@ export function buildConversationFlowNodes({
           typeof node.branchId === "string" || typeof node.branchId === "number"
             ? node.branchId
             : null,
+        contextScope: node.contextScope ?? null,
         depth: node.depth,
         editedFromId: node.editedFromId ?? null,
         emphasis: "normal",
@@ -93,6 +95,9 @@ export function buildConversationFlowNodes({
         title: null,
         onBranchOperation: handleNodeBranchOperation
           ? (operation) => handleNodeBranchOperation(node.id, operation)
+          : undefined,
+        onContextScopeChange: onNodeContextScopeChange
+          ? (scope) => onNodeContextScopeChange(node.id, scope)
           : undefined,
       },
     } satisfies ThreadGraphFlowNode;

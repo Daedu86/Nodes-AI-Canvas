@@ -107,4 +107,36 @@ describe("thread branching runtime", () => {
       }),
     );
   });
+
+  it("rejects required canvas drafts without context and serializes scoped context", () => {
+    expect(
+      buildBranchAppendMessage(baseSpec, {
+        historyMode: "full",
+        modelId: "openrouter/free",
+        provider: "openrouter",
+        requireContextScope: true,
+        text: "Canvas draft",
+      }),
+    ).toBeNull();
+
+    expect(
+      buildBranchAppendMessage(baseSpec, {
+        contextMessages: [{ role: "user", content: "Earlier prompt" }],
+        contextScope: "branch",
+        historyMode: "full",
+        modelId: "openrouter/free",
+        provider: "openrouter",
+        requireContextScope: true,
+        text: "Canvas draft",
+      }),
+    ).toMatchObject({
+      metadata: { custom: { contextScope: "branch" } },
+      runConfig: {
+        custom: {
+          contextMessages: [{ role: "user", content: "Earlier prompt" }],
+          contextScope: "branch",
+        },
+      },
+    });
+  });
 });

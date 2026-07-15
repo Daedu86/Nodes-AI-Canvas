@@ -2,7 +2,7 @@
 
 import { useAssistantRuntime } from "@assistant-ui/react";
 import React from "react";
-import type { GraphBranchIntent } from "@/components/context/graph-branch-intent";
+import type { ContextScope, GraphBranchIntent } from "@/components/context/graph-branch-intent";
 import type { HistoryMode } from "@/components/context/history-mode";
 import type { ModelProvider } from "@/components/context/model-config";
 import {
@@ -49,6 +49,55 @@ type PendingOutputRun = {
   sourcePromptId: string;
   artifactIds: string[];
 };
+
+export function buildCanvasContextMessages(
+  nodes: ThreadGraphNodeModel[],
+  parentId: string | null,
+  scope: ContextScope,
+  promptText: string,
+) {
+  type ScopedContextMessage = {
+    id?: string;
+    role: "user" | "assistant";
+    content: string;
+  };
+  const byId = new Map(nodes.map((node) => [node.id, node] as const));
+  const toMessage = (node: ThreadGraphNodeModel | undefined): ScopedContextMessage | null =>
+    node && (node.role === "user" || node.role === "assistant")
+      ? { id: node.id, role: node.role as "user" | "assistant", content: node.text }
+      : null;
+  let history: ScopedContextMessage[] = [];
+
+  if (scope === "parent") {
+    const message = parentId ? toMessage(byId.get(parentId)) : null;
+    history = message ? [message] : [];
+  } else if (scope === "branch") {
+    const lineage: ThreadGraphNodeModel[] = [];
+    const visited = new Set<string>();
+    let current = parentId ? byId.get(parentId) : undefined;
+    while (current && !visited.has(current.id)) {
+      visited.add(current.id);
+      lineage.push(current);
+      current = current.parentId ? byId.get(current.parentId) : undefined;
+    }
+    history = lineage.reverse().flatMap((node) => {
+      const message = toMessage(node);
+      return message ? [message] : [];
+    });
+  } else {
+    history = [...nodes]
+      .sort((a, b) => a.idx - b.idx || a.id.localeCompare(b.id))
+      .flatMap((node) => {
+        const message = toMessage(node);
+        return message ? [message] : [];
+      });
+  }
+
+  return [
+    ...history,
+    { role: "user" as const, content: promptText.trim() },
+  ].filter((message) => message.content.length > 0);
+}
 
 export function findCompletedCanvasRunNodes(
   currentNodes: ThreadGraphNodeModel[],
@@ -125,7 +174,13 @@ export function useCanvasBranchSubmission({
 
   const handleSubmitBranchDraft = React.useCallback(() => {
     if (!draftBranchSpec || !draft || !llmEnabled) return;
-    const activeDraft = draft;
+    if (!draft.contextScope) {
+      const message = "Choose Parent, Branch, or Tree context before running this draft.";
+      setCanvasDraftError(message);
+      setRequestError(message);
+      return;
+    }
+    const activeDraft = { ...draft, contextScope: draft.contextScope };
 
     void (async () => {
       let submitted = false;
@@ -149,6 +204,13 @@ export function useCanvasBranchSubmission({
           artifactIds: [...activeDraft.outputArtifactIds],
         };
         const executed = executeBranchSpec(runtime.threads.main, draftBranchSpec, {
+          contextScope: activeDraft.contextScope,
+          contextMessages: buildCanvasContextMessages(
+            canvasConversationNodesRef.current,
+            draftBranchSpec.parentId,
+            activeDraft.contextScope,
+            activeDraft.text,
+          ),
           contextArtifacts:
             draftContextArtifacts.length > 0
               ? toLlmContextArtifacts(draftContextArtifacts)
@@ -157,7 +219,7 @@ export function useCanvasBranchSubmission({
             draftContextArtifacts.length > 0
               ? draftContextArtifacts.map((artifact) => artifact.id)
               : undefined,
-          historyMode,
+          historyMode: activeDraft.contextScope === "parent" ? "last" : "full",
           inputArtifactIds: activeDraft.inputArtifactIds,
           modelId,
           outputArtifactIds: activeDraft.outputArtifactIds,
@@ -165,6 +227,7 @@ export function useCanvasBranchSubmission({
             (artifactId) => artifactIndex.get(artifactId)?.semanticType ?? null,
           ),
           provider,
+          requireContextScope: true,
           text: activeDraft.text,
         });
         if (!executed) {

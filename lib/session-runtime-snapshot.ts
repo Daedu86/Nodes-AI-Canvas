@@ -3,6 +3,32 @@ import type { SessionThreadExport } from "@/lib/session-documents";
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
+const mergePersistedContextScope = (
+  previous: Record<string, unknown>,
+  next: Record<string, unknown>,
+) => {
+  const previousMetadata = isRecord(previous.metadata) ? previous.metadata : {};
+  const previousCustom = isRecord(previousMetadata.custom) ? previousMetadata.custom : {};
+  const scope = previousCustom.contextScope;
+  if (scope !== "parent" && scope !== "branch" && scope !== "tree") return next;
+  const nextMetadata = isRecord(next.metadata) ? next.metadata : {};
+  const nextCustom = isRecord(nextMetadata.custom) ? nextMetadata.custom : {};
+  if (
+    nextCustom.contextScope === "parent" ||
+    nextCustom.contextScope === "branch" ||
+    nextCustom.contextScope === "tree"
+  ) {
+    return next;
+  }
+  return {
+    ...next,
+    metadata: {
+      ...nextMetadata,
+      custom: { ...nextCustom, contextScope: scope },
+    },
+  };
+};
+
 type PersistableRuntimeMessage = Record<string, unknown> & { id: string };
 
 const hasSubstantiveContent = (message: Record<string, unknown>) => {
@@ -63,7 +89,11 @@ export const mergeSessionSnapshotRepositories = (
         indexById.set(id, messages.length);
         messages.push(nextEntry);
       } else {
-        messages[existingIndex] = nextEntry;
+        const previous = messages[existingIndex]!;
+        messages[existingIndex] = {
+          ...nextEntry,
+          message: mergePersistedContextScope(previous.message, nextEntry.message),
+        };
       }
     });
   });
@@ -101,7 +131,11 @@ export const mergeRuntimeBranchIntoSessionSnapshot = (
       mergedMessages.push(nextEntry);
       return;
     }
-    mergedMessages[existingIndex] = nextEntry;
+    const previous = mergedMessages[existingIndex]!;
+    mergedMessages[existingIndex] = {
+      ...nextEntry,
+      message: mergePersistedContextScope(previous.message, nextEntry.message),
+    };
   });
 
   return {

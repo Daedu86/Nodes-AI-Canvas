@@ -1,5 +1,6 @@
 import type { ThreadRuntime } from "@assistant-ui/react";
 import type { HistoryMode, ModelProvider } from "@/components/context/session-ui-state";
+import type { ContextScope } from "@/components/context/graph-branch-intent";
 import type { BranchSpec } from "@/lib/thread-branching";
 import {
   getOutputFormatInstruction,
@@ -22,6 +23,9 @@ export type ExecuteBranchSpecOptions = {
   outputArtifactIds?: string[];
   outputArtifactTypes?: Array<SessionArtifactSemanticType | null | undefined>;
   historyMode: HistoryMode;
+  contextScope?: ContextScope | null;
+  contextMessages?: Array<{ id?: string; role: "system" | "user" | "assistant"; content: string }>;
+  requireContextScope?: boolean;
   modelId: string;
   provider: ModelProvider;
   text: string;
@@ -37,13 +41,15 @@ export const buildBranchAppendMessage = (
   const {
     contextArtifacts,
     contextNodeIds,
+    contextScope,
+    contextMessages,
     historyMode,
     modelId,
     provider,
     text,
   } = options;
   const trimmedText = text.trim();
-  if (!trimmedText) return null;
+  if (!trimmedText || (options.requireContextScope && !contextScope)) return null;
 
   const inputArtifactIds = uniqueIds(
     options.inputArtifactIds ?? contextArtifacts?.map((artifact) => artifact.id),
@@ -64,6 +70,7 @@ export const buildBranchAppendMessage = (
         branchAnchorId: spec.anchorId,
         branchAnchorRole: spec.anchorRole,
         branchOperation: spec.operation,
+        ...(contextScope ? { contextScope } : {}),
         ...(contextNodeIds && contextNodeIds.length > 0
           ? { contextNodeIds: [...contextNodeIds] }
           : {}),
@@ -76,6 +83,10 @@ export const buildBranchAppendMessage = (
         ...(contextArtifacts && contextArtifacts.length > 0
           ? { contextArtifacts }
           : {}),
+        ...(contextMessages && contextMessages.length > 0
+          ? { contextMessages }
+          : {}),
+        ...(contextScope ? { contextScope } : {}),
         ...(inputArtifactIds.length > 0 ? { inputArtifactIds } : {}),
         ...(outputArtifactIds.length > 0 ? { outputArtifactIds } : {}),
         historyMode,

@@ -32,6 +32,7 @@ export const INVALID_CHAT_REQUEST_CODE = "invalid_request";
 
 const providerSchema = z.enum(LLM_PROVIDER_IDS);
 const historyModeSchema = z.enum(["last", "full"]);
+const contextScopeSchema = z.enum(["parent", "branch", "tree"]);
 const chatTriggerSchema = z.enum(["submit-message", "regenerate-message"]);
 const boundedIdentifierSchema = z.string().trim().min(1).max(256);
 const optionalNullableStringSchema = z.string().max(2_048).nullable().optional();
@@ -53,14 +54,33 @@ const contextArtifactSchema = z
   })
   .strict();
 
+const scopedContextMessageSchema = z
+  .object({
+    id: boundedIdentifierSchema.optional(),
+    role: z.enum(["system", "user", "assistant"]),
+    content: z.string().max(MAX_TEXT_CONTENT_CHARS),
+  })
+  .strict();
+
 const modelResolutionCustomSchema = z
   .object({
     contextArtifacts: z.array(contextArtifactSchema).max(MAX_CONTEXT_ARTIFACTS).optional(),
+    contextMessages: z.array(scopedContextMessageSchema).max(MAX_CHAT_MESSAGES).optional(),
+    contextScope: contextScopeSchema.optional(),
     historyMode: historyModeSchema.optional(),
     model: boundedIdentifierSchema.optional(),
     provider: providerSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.contextMessages && value.contextMessages.length > 0 && !value.contextScope) {
+      context.addIssue({
+        code: "custom",
+        message: "A context scope is required when scoped context messages are supplied.",
+        path: ["contextScope"],
+      });
+    }
+  });
 
 const modelResolutionSchema = z
   .object({
@@ -262,13 +282,21 @@ export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
     body.runConfig?.custom?.historyMode ??
     body.runConfig?.historyMode ??
     body.historyMode;
+  const scopedMessages = normalizeMessages(
+    body.metadata?.custom?.contextMessages ??
+      body.runConfig?.custom?.contextMessages ??
+      [],
+  );
 
   return {
     body,
     contextArtifacts,
     historyMode,
     messages,
-    messagesToSend: selectMessagesForHistoryMode(messages, historyMode),
+    messagesToSend:
+      scopedMessages.length > 0
+        ? scopedMessages
+        : selectMessagesForHistoryMode(messages, historyMode),
     rawMessages,
     requestedModel: getRequestedModelConfig(body),
     system: body.system,

@@ -14,7 +14,10 @@ import {
 } from "@/components/assistant-ui/thread-graph-flow/canvas-workspace-utils";
 import { useCanvasRunManager } from "@/components/assistant-ui/thread-graph-flow/use-canvas-run-manager";
 import { useCanvasBlockActions } from "@/components/assistant-ui/thread-graph-flow/use-canvas-block-actions";
-import { useCanvasBranchSubmission } from "@/components/assistant-ui/thread-graph-flow/use-canvas-branch-submission";
+import {
+  buildCanvasContextMessages,
+  useCanvasBranchSubmission,
+} from "@/components/assistant-ui/thread-graph-flow/use-canvas-branch-submission";
 import { useCanvasSessionState } from "@/components/assistant-ui/thread-graph-flow/use-canvas-session-state";
 import { useCanvasViewportController } from "@/components/assistant-ui/thread-graph-flow/use-canvas-viewport-controller";
 import { useCanvasGraphViewModel } from "@/components/assistant-ui/thread-graph-flow/use-canvas-graph-view-model";
@@ -27,7 +30,10 @@ import {
   type LinkConnectorPref,
   type Node as ThreadGraphNodeModel,
 } from "@/components/assistant-ui/thread-graph/graph-types";
-import { useGraphBranchIntent } from "@/components/context/graph-branch-intent";
+import {
+  type ContextScope,
+  useGraphBranchIntent,
+} from "@/components/context/graph-branch-intent";
 import { useHistoryMode } from "@/components/context/history-mode";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { useLinkEditor } from "@/components/context/link-editor";
@@ -48,7 +54,7 @@ export function ThreadGraphFlow() {
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
   const { clearRequestError, requestError, setRequestError } = useRequestError();
-  const { activeSession, activeSessionId } = usePersistedSessions();
+  const { activeSession, activeSessionId, saveActiveSessionSnapshot } = usePersistedSessions();
   const {
     canvasSelectionId,
     focusedMessageId,
@@ -95,6 +101,26 @@ export function ThreadGraphFlow() {
   } = useGraphBranchIntent();
   const [blockLibraryCollapsed, setBlockLibraryCollapsed] = React.useState(false);
   const [connectionError, setConnectionError] = React.useState<string | null>(null);
+  const contextScopeStorageKey = `nodes.canvas-context-scopes.v1:${activeSessionId ?? "default"}`;
+  const [nodeContextScopes, setNodeContextScopes] = React.useState<Record<string, ContextScope>>({});
+  const contextScopesHydratedForRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(contextScopeStorageKey) ?? "{}") as Record<string, unknown>;
+      const valid = Object.fromEntries(
+        Object.entries(parsed).filter(([, scope]) => scope === "parent" || scope === "branch" || scope === "tree"),
+      ) as Record<string, ContextScope>;
+      setNodeContextScopes(valid);
+    } catch {
+      setNodeContextScopes({});
+    }
+    contextScopesHydratedForRef.current = contextScopeStorageKey;
+  }, [contextScopeStorageKey]);
+  React.useEffect(() => {
+    if (typeof window === "undefined" || contextScopesHydratedForRef.current !== contextScopeStorageKey) return;
+    window.localStorage.setItem(contextScopeStorageKey, JSON.stringify(nodeContextScopes));
+  }, [contextScopeStorageKey, nodeContextScopes]);
   const contextBudgetPolicy = React.useMemo(
     () => getContextBudgetPolicy({ modelId, provider }),
     [modelId, provider],
@@ -111,7 +137,12 @@ export function ThreadGraphFlow() {
     [repoItems, bridgeNodeIds, getParentId],
   );
   const canvasConversationNodes = React.useMemo<ThreadGraphNodeModel[]>(() => {
-    if (nodes.length > 0) return nodes;
+    if (nodes.length > 0) {
+      return nodes.map((node) => ({
+        ...node,
+        contextScope: nodeContextScopes[node.id] ?? node.contextScope ?? null,
+      }));
+    }
     return [
       {
         id: ROOT_NODE_ID,
@@ -126,7 +157,7 @@ export function ThreadGraphFlow() {
         provider: null,
       },
     ];
-  }, [nodes]);
+  }, [nodeContextScopes, nodes]);
   const nodeIndex = React.useMemo(
     () => new Map(canvasConversationNodes.map((node) => [node.id, node] as const)),
     [canvasConversationNodes],
@@ -237,6 +268,15 @@ export function ThreadGraphFlow() {
     if (!draftAnchorNode || !draft) return null;
     return buildBranchSpec(draftAnchorNode, draft.operation);
   }, [draft, draftAnchorNode]);
+  const draftContextMessageCount = React.useMemo(() => {
+    if (!draft?.contextScope || !draftBranchSpec) return 0;
+    return buildCanvasContextMessages(
+      canvasConversationNodes,
+      draftBranchSpec.parentId,
+      draft.contextScope,
+      "",
+    ).length;
+  }, [canvasConversationNodes, draft?.contextScope, draftBranchSpec]);
   const draftDetail = React.useMemo(
     () => (draft ? getBranchOperationDetail(draft.operation) : null),
     [draft],
@@ -285,7 +325,9 @@ export function ThreadGraphFlow() {
         anchor.role === "user" && operation !== "create-follow-up-prompt"
           ? anchor.text
           : "";
-      beginDraft(anchor.id, operation, initialText);
+      beginDraft(anchor.id, operation, initialText, {
+        contextScope: anchor.contextScope ?? null,
+      });
       applyCanvasSelection(CANVAS_PROMPT_DRAFT_NODE_ID);
       setFlowRenderMode("2d");
     },
@@ -297,6 +339,37 @@ export function ThreadGraphFlow() {
       setCanvasDraftError,
       setFlowRenderMode,
     ],
+  );
+  const handleNodeContextScopeChange = React.useCallback(
+    (nodeId: string, contextScope: ContextScope) => {
+      setNodeContextScopes((current) => ({ ...current, [nodeId]: contextScope }));
+      if (!activeSession || nodeId === ROOT_NODE_ID) return;
+      const nextSnapshot = {
+        ...activeSession.snapshot,
+        messages: activeSession.snapshot.messages.map((entry) => {
+          if (entry.message.id !== nodeId) return entry;
+          const metadata =
+            typeof entry.message.metadata === "object" && entry.message.metadata !== null
+              ? (entry.message.metadata as Record<string, unknown>)
+              : {};
+          const custom =
+            typeof metadata.custom === "object" && metadata.custom !== null
+              ? (metadata.custom as Record<string, unknown>)
+              : {};
+          return {
+            ...entry,
+            message: {
+              ...entry.message,
+              metadata: { ...metadata, custom: { ...custom, contextScope } },
+            },
+          };
+        }),
+      };
+      void saveActiveSessionSnapshot(nextSnapshot).catch(() => {
+        setConnectionError("Could not save this node's context selection.");
+      });
+    },
+    [activeSession, saveActiveSessionSnapshot],
   );
 
   const {
@@ -325,11 +398,12 @@ export function ThreadGraphFlow() {
     draft,
     draftAnchorNode,
     draftBranchSpec,
-    draftContextCount: draftContextArtifacts.length,
+    draftContextCount: draftContextMessageCount,
     draftDetail,
     getArtifactsForTarget,
     handleCancelPromptDraft,
     handleNodeBranchOperation,
+    onNodeContextScopeChange: handleNodeContextScopeChange,
     handleCancelRun,
     handleCutEdge,
     handleSubmitBranchDraft,

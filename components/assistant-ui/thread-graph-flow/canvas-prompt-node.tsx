@@ -14,7 +14,8 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
   const status = data.promptStatus ?? (data.draftBusy ? "running" : "idle");
   const busy = status === "running" || status === "queued" || Boolean(data.draftBusy);
   const disabled = Boolean(data.draftDisabled);
-  const canSubmit = !disabled && !busy && text.trim().length > 0;
+  const contextScope = data.draftContextScope ?? null;
+  const canSubmit = !disabled && !busy && text.trim().length > 0 && (persistent || contextScope !== null);
   const contextCount = data.draftContextCount ?? 0;
   const outputCount = data.draftOutputCount ?? 0;
 
@@ -48,7 +49,7 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
               ) : null}
               {contextCount > 0 ? (
                 <span className="rounded-full border border-violet-300/35 bg-violet-400/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-100">
-                  {contextCount} in
+                  {!persistent && contextScope ? `${contextCount} messages` : `${contextCount} in`}
                 </span>
               ) : null}
               {outputCount > 0 ? (
@@ -69,6 +70,15 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
         </div>
 
         <div className="relative mt-3 space-y-2">
+          {!persistent ? (
+            <label className="block text-xs text-slate-200">
+              <span className="mb-1 block font-medium">Context required</span>
+              <select value={contextScope ?? ""} onChange={(event) => data.onDraftContextScopeChange?.(event.target.value as "parent" | "branch" | "tree")} className="nodrag nowheel h-9 w-full rounded-lg border border-white/15 bg-white/[0.06] px-2 text-xs text-slate-100">
+                <option value="" disabled>Select context before running</option>
+                <option value="parent">Parent message</option><option value="branch">Branch lineage</option><option value="tree">Full tree</option>
+              </select>
+            </label>
+          ) : null}
           <textarea
             aria-label={persistent ? "Canvas prompt" : "Draft prompt"}
             rows={5}
@@ -92,6 +102,7 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
               {data.draftError}
             </div>
           ) : null}
+          {!persistent && !contextScope ? <p className="text-xs text-amber-200">Choose context to enable Run.</p> : null}
           {disabled ? (
             <div className="rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">
               AI requests are disabled. Enable AI in the header to run this prompt.

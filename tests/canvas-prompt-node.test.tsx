@@ -28,6 +28,7 @@ const renderPromptNode = (overrides: Partial<ThreadGraphFlowNodeData> = {}) => {
   const onDraftSubmit = vi.fn();
   const onDraftTextChange = vi.fn();
   const data: ThreadGraphFlowNodeData = {
+    draftContextScope: "branch",
     draftDetail: baseDetail,
     draftText: "Initial prompt",
     kind: "prompt-draft",
@@ -96,6 +97,21 @@ describe("CanvasPromptNode", () => {
 
     expect(onDraftSubmit).toHaveBeenCalledTimes(1);
     expect(onDraftCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires a context scope before Run", () => {
+    const onDraftContextScopeChange = vi.fn();
+    const { onDraftSubmit } = renderPromptNode({
+      draftContextScope: null,
+      onDraftContextScopeChange,
+    });
+
+    expect((screen.getByRole("button", { name: "Send prompt node" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Choose context to enable Run.")).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "tree" } });
+    expect(onDraftContextScopeChange).toHaveBeenCalledWith("tree");
+    fireEvent.click(screen.getByRole("button", { name: "Send prompt node" }));
+    expect(onDraftSubmit).not.toHaveBeenCalled();
   });
 
   it("disables editing and submit while busy or when AI is disabled", () => {

@@ -152,6 +152,33 @@ describe("chat request validation", () => {
     });
   });
 
+  it("uses scoped messages and rejects them without an explicit context scope", () => {
+    const withoutScope = chatRequestBodySchema.safeParse({
+      messages: [validMessage],
+      runConfig: { custom: { contextMessages: [{ role: "user", content: "Parent" }] } },
+    });
+    expect(withoutScope.success).toBe(false);
+
+    const parsed = chatRequestBodySchema.parse({
+      messages: [validMessage],
+      runConfig: {
+        custom: {
+          contextScope: "tree",
+          contextMessages: [
+            { id: "u-1", role: "user", content: "First branch" },
+            { id: "a-1", role: "assistant", content: "First reply" },
+            { role: "user", content: "Current prompt" },
+          ],
+        },
+      },
+    });
+    expect(prepareChatRequest(parsed).messagesToSend.map((message) => message.content)).toEqual([
+      "First branch",
+      "First reply",
+      "Current prompt",
+    ]);
+  });
+
   it("returns a structured error for malformed JSON", async () => {
     const result = await parseChatRequest(
       new Request("http://nodes.test/api/chat", {

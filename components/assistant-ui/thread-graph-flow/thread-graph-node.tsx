@@ -255,6 +255,25 @@ export const ThreadGraphNode = memo(({ data, selected, dragging }: NodeProps<Thr
             </span>
           ) : null}
         </div>
+        {!isBridge && data.onContextScopeChange ? (
+          <label className="nodrag nopan relative mt-3 block text-[11px] text-slate-300">
+            <span className="mb-1 block font-medium uppercase tracking-[0.14em]">Context</span>
+            <select
+              value={data.contextScope ?? ""}
+              onChange={(event) =>
+                data.onContextScopeChange?.(
+                  event.target.value as "parent" | "branch" | "tree",
+                )
+              }
+              className="nowheel h-8 w-full rounded-lg border border-white/15 bg-white/[0.06] px-2 text-xs text-slate-100"
+            >
+              <option value="" disabled>Select context</option>
+              <option value="parent" disabled={isRoot}>Parent message</option>
+              <option value="branch">Branch lineage</option>
+              <option value="tree">Full tree</option>
+            </select>
+          </label>
+        ) : null}
         {branchAction && data.onBranchOperation ? (
           <button
             type="button"

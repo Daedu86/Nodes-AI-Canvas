@@ -12,6 +12,7 @@ export type Node = {
   isBridge?: boolean;
   model?: string | null;
   provider?: string | null;
+  contextScope?: "parent" | "branch" | "tree" | null;
 };
 
 export type ConnectorId =

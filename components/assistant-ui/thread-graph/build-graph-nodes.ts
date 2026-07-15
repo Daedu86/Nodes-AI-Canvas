@@ -55,6 +55,12 @@ export const buildThreadGraphNodes = ({
     const isBridge = bridgeNodeIds.has(id);
     const customModel = typeof metadataCustom.model === "string" ? metadataCustom.model : null;
     const customProvider = typeof metadataCustom.provider === "string" ? metadataCustom.provider : null;
+    const contextScope =
+      metadataCustom.contextScope === "parent" ||
+      metadataCustom.contextScope === "branch" ||
+      metadataCustom.contextScope === "tree"
+        ? metadataCustom.contextScope
+        : null;
     const registryEntry = id ? getModelEntry(id) : undefined;
     const model = customModel ?? registryEntry?.model ?? null;
     const provider = customProvider ?? registryEntry?.provider ?? null;
@@ -72,6 +78,7 @@ export const buildThreadGraphNodes = ({
       isBridge,
       model,
       provider,
+      contextScope,
     } satisfies Node;
   });
 
