@@ -39,43 +39,23 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
+          import re
           from pathlib import Path
 
           smoke_path = Path("tests/e2e/smoke.spec.ts")
           smoke = smoke_path.read_text(encoding="utf-8")
 
-          old_prompt_selector = 'page.getByRole("button", { name: "Create prompt node" })'
-          new_prompt_selector = 'page.getByRole("button", { name: "Add Prompt block" })'
-          if old_prompt_selector in smoke:
-              smoke = smoke.replace(old_prompt_selector, new_prompt_selector, 1)
-          elif new_prompt_selector not in smoke:
-              raise RuntimeError("Prompt block selector marker was not found")
+          smoke = smoke.replace(
+              'page.getByRole("button", { name: "Create prompt node" })',
+              'page.getByRole("button", { name: "Add Prompt block" })',
+          )
 
-          old_prompt_open = '''  await createPromptButton.click();
-            const promptNode = page'''
-          new_prompt_open = '''  await createPromptButton.click();
-            const blockLibrary = page.getByRole("complementary", { name: "Block library" });
-            const collapseBlockLibrary = blockLibrary.getByRole("button", {
-              name: "Collapse block library",
+          copy_helper = '''async function copyGraphJson(page: Page) {
+            page.once("dialog", async (dialog) => {
+              await dialog.accept();
             });
-            if (await collapseBlockLibrary.isVisible().catch(() => false)) {
-              await collapseBlockLibrary.click();
-              await expect(
-                blockLibrary.getByRole("button", { name: "Expand block library" }),
-              ).toBeVisible();
-            }
-            await page.getByRole("button", { name: "Fit View" }).click();
 
-            const promptNode = page'''
-          if old_prompt_open in smoke:
-              smoke = smoke.replace(old_prompt_open, new_prompt_open, 1)
-          elif new_prompt_open not in smoke:
-              raise RuntimeError("Prompt viewport marker was not found")
-
-          old_copy = '''  await page.getByRole("button", { name: /Canvas tools/i }).click();
-            await page.getByRole("button", { name: /Copy JSON/i }).click();'''
-          intermediate_copy = '  await page.getByRole("button", { name: "Copy JSON" }).click();'
-          new_copy = '''  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+            const blockLibrary = page.getByRole("complementary", { name: "Block library" });
             const collapseBlockLibrary = blockLibrary.getByRole("button", {
               name: "Collapse block library",
             });
@@ -94,8 +74,29 @@ jobs:
               .poll(async () => page.evaluate(async () => navigator.clipboard.readText()), {
                 timeout: 5_000,
               })
-              .toMatch(/^\\s*\\{/);'''
-          force_copy = '''  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+              .toMatch(/^\\s*\\{/);
+            const clipboardText = await page.evaluate(async () => navigator.clipboard.readText());
+            return JSON.parse(clipboardText) as {
+              artifacts?: Array<{ id: string; title: string; type: string }>;
+              contextLinks?: Array<{ artifactId: string; targetMessageId: string }>;
+              nodes: Array<{ id: string; role: string; parentId: string | null; isBridge?: boolean }>;
+              connectors: Array<{ parentId: string | null; childId: string; description?: string }>;
+            };
+          }
+
+          async function listSessionIds'''
+          smoke, count = re.subn(
+              r'async function copyGraphJson\(page: Page\) \{.*?\n\}\n\nasync function listSessionIds',
+              copy_helper,
+              smoke,
+              count=1,
+              flags=re.DOTALL,
+          )
+          if count != 1:
+              raise RuntimeError(f"Expected one copyGraphJson helper, replaced {count}")
+
+          prompt_setup = '''await createPromptButton.click();
+            const blockLibrary = page.getByRole("complementary", { name: "Block library" });
             const collapseBlockLibrary = blockLibrary.getByRole("button", {
               name: "Collapse block library",
             });
@@ -105,73 +106,86 @@ jobs:
                 blockLibrary.getByRole("button", { name: "Expand block library" }),
               ).toBeVisible();
             }
-
             await page.getByRole("button", { name: "Fit View" }).click();
-            await page.getByRole("button", { name: "Copy JSON" }).click({ force: true });
-            await expect
-              .poll(async () => page.evaluate(async () => navigator.clipboard.readText()), {
-                timeout: 5_000,
-              })
-              .toMatch(/^\\s*\\{/);'''
-          if old_copy in smoke:
-              smoke = smoke.replace(old_copy, new_copy, 1)
-          elif force_copy in smoke:
-              smoke = smoke.replace(force_copy, new_copy, 1)
-          elif intermediate_copy in smoke:
-              smoke = smoke.replace(intermediate_copy, new_copy, 1)
-          elif new_copy not in smoke:
-              raise RuntimeError("Copy JSON helper marker was not found")
 
-          old_message_type = 'message: { id: string; role: string };'
-          new_message_type = '''message: {
-                    id: string;
-                    role: string;
-                    content?: Array<{ type?: string; text?: string }>;
-                  };'''
-          if old_message_type in smoke:
-              smoke = smoke.replace(old_message_type, new_message_type, 1)
-          elif new_message_type not in smoke:
-              raise RuntimeError("Persisted message type marker was not found")
+            const promptNode = page'''
+          smoke, count = re.subn(
+              r'await createPromptButton\.click\(\);\n\s*const promptNode = page',
+              prompt_setup,
+              smoke,
+              count=1,
+          )
+          if count != 1:
+              raise RuntimeError(f"Expected one empty-canvas prompt setup, replaced {count}")
 
-          old_edited_lookup = '''  const editedUserMessage = persistedMessages.find(
-            (entry) =>
-              entry.message.role === "user" &&
-              entry.parentId === graphBeforeReload.nodes[0]?.id,
-          );'''
-          new_edited_lookup = '''  const editedUserMessage = persistedMessages.find(
+          session_helper = '''async function fetchSessionDocument(page: Page, sessionId: string) {
+            return fetchAppJson<{
+              session: {
+                snapshot: {
+                  headId: string | null;
+                  messages: Array<{
+                    parentId: string | null;
+                    message: {
+                      id: string;
+                      role: string;
+                      content?: Array<{ type?: string; text?: string }>;
+                    };
+                  }>;
+                };
+              };
+            }>(page, `/api/sessions/${sessionId}`);
+          }
+
+          async function fetchPersistedSession'''
+          smoke, count = re.subn(
+              r'async function fetchSessionDocument\(page: Page, sessionId: string\) \{.*?\n\}\n\nasync function fetchPersistedSession',
+              session_helper,
+              smoke,
+              count=1,
+              flags=re.DOTALL,
+          )
+          if count != 1:
+              raise RuntimeError(f"Expected one fetchSessionDocument helper, replaced {count}")
+
+          edited_lookup = '''const editedUserMessage = persistedMessages.find(
             (entry) =>
               entry.message.role === "user" &&
               entry.message.content?.some(
                 (part) => part.type === "text" && part.text === editedPrompt,
               ),
           );'''
-          if old_edited_lookup in smoke:
-              smoke = smoke.replace(old_edited_lookup, new_edited_lookup, 1)
-          elif new_edited_lookup not in smoke:
-              raise RuntimeError("Edited branch persistence marker was not found")
+          smoke, count = re.subn(
+              r'const editedUserMessage = persistedMessages\.find\(.*?\n\s*\);',
+              edited_lookup,
+              smoke,
+              count=1,
+              flags=re.DOTALL,
+          )
+          if count != 1:
+              raise RuntimeError(f"Expected one edited branch lookup, replaced {count}")
 
           smoke_path.write_text(smoke, encoding="utf-8")
 
           runtime_path = Path("lib/assistant-edit-runtime.ts")
           runtime = runtime_path.read_text(encoding="utf-8")
-          replacement = '''  const previousExport = threadRuntime.export();
-          const hasParent = previousExport.messages.some(
-            (entry) => entry.message?.id === options.parentId,
-          );
-          if (!hasParent) {
-            return false;
-          }
+          runtime_replacement = '''  const previousExport = threadRuntime.export();
+            const hasParent = previousExport.messages.some(
+              (entry) => entry.message?.id === options.parentId,
+            );
+            if (!hasParent) {
+              return false;
+            }
 
-          '''
-          start_marker = "  const previousExport = threadRuntime.export();"
-          end_marker = "  let handledRunEnd = false;"
-          start = runtime.find(start_marker)
-          end = runtime.find(end_marker, start if start >= 0 else 0)
-          if start < 0 or end < 0:
-              if replacement.strip() not in runtime:
-                  raise RuntimeError("Assistant edit runtime structural markers were not found")
-          else:
-              runtime = runtime[:start] + replacement + runtime[end:]
+            let handledRunEnd = false;'''
+          runtime, count = re.subn(
+              r'  const previousExport = threadRuntime\.export\(\);.*?  let handledRunEnd = false;',
+              runtime_replacement,
+              runtime,
+              count=1,
+              flags=re.DOTALL,
+          )
+          if count != 1:
+              raise RuntimeError(f"Expected one assistant edit transition, replaced {count}")
           runtime_path.write_text(runtime, encoding="utf-8")
           PY
 
@@ -216,12 +230,12 @@ jobs:
       - name: Publish validated repair to main
         shell: bash
         run: |
-          if git diff --quiet -- lib/assistant-edit-runtime.ts tests/e2e/smoke.spec.ts; then
-            echo "No focused shard repair was required."
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add lib/assistant-edit-runtime.ts tests/e2e/smoke.spec.ts
+          if git diff --cached --quiet; then
+            echo "No focused shard repair was required."
+            exit 0
+          fi
           git commit -m "fix: stabilize assistant edit branching [skip vercel]"
           git push origin HEAD:main
