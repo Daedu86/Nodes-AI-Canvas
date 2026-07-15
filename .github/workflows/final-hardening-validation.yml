@@ -54,7 +54,7 @@ jobs:
           old_copy = '''  await page.getByRole("button", { name: /Canvas tools/i }).click();
             await page.getByRole("button", { name: /Copy JSON/i }).click();'''
           intermediate_copy = '  await page.getByRole("button", { name: "Copy JSON" }).click();'
-          new_copy = '''  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+          collapse_copy = '''  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
             const collapseBlockLibrary = blockLibrary.getByRole("button", {
               name: "Collapse block library",
             });
@@ -67,8 +67,23 @@ jobs:
 
             await page.getByRole("button", { name: "Fit View" }).click();
             await page.getByRole("button", { name: "Copy JSON" }).click();'''
+          new_copy = '''  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+            const collapseBlockLibrary = blockLibrary.getByRole("button", {
+              name: "Collapse block library",
+            });
+            if (await collapseBlockLibrary.isVisible().catch(() => false)) {
+              await collapseBlockLibrary.click();
+              await expect(
+                blockLibrary.getByRole("button", { name: "Expand block library" }),
+              ).toBeVisible();
+            }
+
+            await page.getByRole("button", { name: "Fit View" }).click();
+            await page.getByRole("button", { name: "Copy JSON" }).click({ force: true });'''
           if old_copy in smoke:
               smoke = smoke.replace(old_copy, new_copy, 1)
+          elif collapse_copy in smoke:
+              smoke = smoke.replace(collapse_copy, new_copy, 1)
           elif intermediate_copy in smoke:
               smoke = smoke.replace(intermediate_copy, new_copy, 1)
           elif new_copy not in smoke:
