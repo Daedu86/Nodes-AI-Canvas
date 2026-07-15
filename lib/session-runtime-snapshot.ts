@@ -30,6 +30,22 @@ const mergePersistedContextScope = (
 };
 
 type PersistableRuntimeMessage = Record<string, unknown> & { id: string };
+const RUNTIME_OPTIMISTIC_CUSTOM_KEY = "__nodesRuntimeOptimistic";
+
+const hasSubstantiveContent = (message: Record<string, unknown>) => {
+  if (!Array.isArray(message.content)) return false;
+  return message.content.some((part) => {
+    if (!isRecord(part)) return false;
+    if (typeof part.text === "string") return part.text.trim().length > 0;
+    return Object.keys(part).some((key) => key !== "type");
+  });
+};
+
+const isTransientRuntimeAssistant = (message: Record<string, unknown>) => {
+  const metadata = isRecord(message.metadata) ? message.metadata : null;
+  const custom = metadata && isRecord(metadata.custom) ? metadata.custom : null;
+  return custom?.[RUNTIME_OPTIMISTIC_CUSTOM_KEY] === true;
+};
 
 const normalizePersistableRuntimeMessage = (
   message: Record<string, unknown>,
@@ -37,14 +53,29 @@ const normalizePersistableRuntimeMessage = (
   if (typeof message.id !== "string" || message.id.length === 0) return null;
   const messageId = message.id;
   const metadata = isRecord(message.metadata) ? message.metadata : null;
-  // The AI SDK can replace a streaming assistant's provisional id with the
-  // server id. Persisting the provisional message would turn that id swap into
-  // an extra assistant branch, so wait for the stable, non-optimistic message.
-  if (metadata?.isOptimistic === true) return null;
+  if (metadata?.isOptimistic !== true) {
+    return { ...message, id: messageId };
+  }
+
+  // The adapter can retain the optimistic flag even after content is complete.
+  // Keep visible output, but tag only in-flight versions so an id swap replaces
+  // the transient record instead of creating another assistant branch.
+  if (message.role !== "assistant" || !hasSubstantiveContent(message)) return null;
+  const status = isRecord(message.status) ? message.status : null;
+  const nextMetadata = { ...metadata };
+  delete nextMetadata.isOptimistic;
+  const nextCustom = isRecord(metadata.custom) ? { ...metadata.custom } : {};
+  if (status?.type === "complete") {
+    delete nextCustom[RUNTIME_OPTIMISTIC_CUSTOM_KEY];
+  } else {
+    nextCustom[RUNTIME_OPTIMISTIC_CUSTOM_KEY] = true;
+  }
+  nextMetadata.custom = nextCustom;
 
   return {
     ...message,
     id: messageId,
+    metadata: nextMetadata,
   };
 };
 
@@ -90,11 +121,16 @@ export const mergeRuntimeBranchIntoSessionSnapshot = (
   }));
   const indexById = new Map<string, number>();
 
-  mergedMessages.forEach((entry, index) => {
-    if (typeof entry.message.id === "string") {
-      indexById.set(entry.message.id, index);
-    }
-  });
+  const rebuildIndex = () => {
+    indexById.clear();
+    mergedMessages.forEach((entry, index) => {
+      if (typeof entry.message.id === "string") {
+        indexById.set(entry.message.id, index);
+      }
+    });
+  };
+
+  rebuildIndex();
 
   const branchMessages = runtimeBranch
     .map(normalizePersistableRuntimeMessage)
@@ -102,6 +138,24 @@ export const mergeRuntimeBranchIntoSessionSnapshot = (
   branchMessages.forEach((message, index) => {
     const parentId = index === 0 ? null : branchMessages[index - 1]!.id;
     const nextEntry = { parentId, message };
+
+    if (message.role === "assistant") {
+      let removedTransient = false;
+      for (let entryIndex = mergedMessages.length - 1; entryIndex >= 0; entryIndex -= 1) {
+        const entry = mergedMessages[entryIndex]!;
+        if (
+          entry.parentId === parentId &&
+          entry.message.role === "assistant" &&
+          entry.message.id !== message.id &&
+          isTransientRuntimeAssistant(entry.message)
+        ) {
+          mergedMessages.splice(entryIndex, 1);
+          removedTransient = true;
+        }
+      }
+      if (removedTransient) rebuildIndex();
+    }
+
     const existingIndex = indexById.get(message.id);
 
     if (existingIndex === undefined) {

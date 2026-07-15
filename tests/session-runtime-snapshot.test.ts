@@ -99,14 +99,29 @@ describe("mergeRuntimeBranchIntoSessionSnapshot", () => {
     const root = message("root", "user", "Question");
     const optimistic = {
       ...message("optimistic", "assistant", "Rendered answer"),
+      status: { type: "running" },
       metadata: { custom: {}, isOptimistic: true },
     };
     const whileStreaming = mergeRuntimeBranchIntoSessionSnapshot(null, [root, optimistic]);
-    expect(whileStreaming.headId).toBe("root");
-    expect(whileStreaming.messages).toEqual([{ parentId: null, message: root }]);
+    expect(whileStreaming.headId).toBe("optimistic");
+    expect(whileStreaming.messages).toHaveLength(2);
+    expect(whileStreaming.messages[1]?.message.metadata).toEqual({
+      custom: { __nodesRuntimeOptimistic: true },
+    });
+
+    const swappedOptimistic = {
+      ...optimistic,
+      id: "optimistic-swapped",
+    };
+    const afterIdSwap = mergeRuntimeBranchIntoSessionSnapshot(whileStreaming, [
+      root,
+      swappedOptimistic,
+    ]);
+    expect(afterIdSwap.messages).toHaveLength(2);
+    expect(afterIdSwap.messages[1]?.message.id).toBe("optimistic-swapped");
 
     const stable = message("server-assistant", "assistant", "Rendered answer");
-    const settled = mergeRuntimeBranchIntoSessionSnapshot(whileStreaming, [root, stable]);
+    const settled = mergeRuntimeBranchIntoSessionSnapshot(afterIdSwap, [root, stable]);
     expect(settled.headId).toBe("server-assistant");
     expect(settled.messages).toEqual([
       { parentId: null, message: root },
