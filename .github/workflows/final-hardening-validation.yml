@@ -87,7 +87,7 @@ jobs:
           async function listSessionIds'''
           smoke, count = re.subn(
               r'async function copyGraphJson\(page: Page\) \{.*?\n\}\n\nasync function listSessionIds',
-              copy_helper,
+              lambda _: copy_helper,
               smoke,
               count=1,
               flags=re.DOTALL,
@@ -111,7 +111,7 @@ jobs:
             const promptNode = page'''
           smoke, count = re.subn(
               r'await createPromptButton\.click\(\);\n\s*const promptNode = page',
-              prompt_setup,
+              lambda _: prompt_setup,
               smoke,
               count=1,
           )
@@ -139,7 +139,7 @@ jobs:
           async function fetchPersistedSession'''
           smoke, count = re.subn(
               r'async function fetchSessionDocument\(page: Page, sessionId: string\) \{.*?\n\}\n\nasync function fetchPersistedSession',
-              session_helper,
+              lambda _: session_helper,
               smoke,
               count=1,
               flags=re.DOTALL,
@@ -156,7 +156,7 @@ jobs:
           );'''
           smoke, count = re.subn(
               r'const editedUserMessage = persistedMessages\.find\(.*?\n\s*\);',
-              edited_lookup,
+              lambda _: edited_lookup,
               smoke,
               count=1,
               flags=re.DOTALL,
@@ -179,7 +179,7 @@ jobs:
             let handledRunEnd = false;'''
           runtime, count = re.subn(
               r'  const previousExport = threadRuntime\.export\(\);.*?  let handledRunEnd = false;',
-              runtime_replacement,
+              lambda _: runtime_replacement,
               runtime,
               count=1,
               flags=re.DOTALL,
