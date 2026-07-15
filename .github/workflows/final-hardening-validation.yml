@@ -87,7 +87,12 @@ jobs:
             }
 
             await page.getByRole("button", { name: "Fit View" }).click();
-            await page.getByRole("button", { name: "Copy JSON" }).click({ force: true });'''
+            await page.getByRole("button", { name: "Copy JSON" }).click({ force: true });
+            await expect
+              .poll(async () => page.evaluate(async () => navigator.clipboard.readText()), {
+                timeout: 5_000,
+              })
+              .toMatch(/^\\s*\\{/);'''
           new_copy = '''  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
             const collapseBlockLibrary = blockLibrary.getByRole("button", {
               name: "Collapse block library",
@@ -100,7 +105,9 @@ jobs:
             }
 
             await page.getByRole("button", { name: "Fit View" }).click();
-            await page.getByRole("button", { name: "Copy JSON" }).click({ force: true });
+            const copyJsonButton = page.getByRole("button", { name: "Copy JSON" });
+            await copyJsonButton.focus();
+            await page.keyboard.press("Enter");
             await expect
               .poll(async () => page.evaluate(async () => navigator.clipboard.readText()), {
                 timeout: 5_000,
