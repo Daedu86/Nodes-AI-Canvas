@@ -204,13 +204,14 @@ export function createLanguageModel(
       if (!apiKey) {
         throw new Error("Missing OpenRouter API key");
       }
-      return createOpenAI({
+      const openRouter = createOpenAI({
         apiKey,
         baseURL: OPENROUTER_BASE_URL,
         fetch: createOpenRouterFetchWithFallbacks(config),
         headers: getOpenRouterMetadataHeaders(),
         name: "openrouter",
-      })(config.modelId);
+      });
+      return openRouter.chat(config.modelId);
     }
     case "ollama":
     default:
