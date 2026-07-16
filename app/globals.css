@@ -140,3 +140,18 @@
     background: transparent;
   }
 }
+
+@layer base {
+  .react-flow__node select.nowheel {
+    color-scheme: dark;
+  }
+
+  .react-flow__node select.nowheel option {
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+
+  .react-flow__node select.nowheel option:disabled {
+    color: #64748b;
+  }
+}
