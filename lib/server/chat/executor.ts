@@ -113,6 +113,70 @@ const createUnstartedTiming = (
   };
 };
 
+const sanitizeDiagnosticText = (value: string, maxLength = 500) =>
+  [...value]
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code >= 32 && code !== 127;
+    })
+    .join("")
+    .replace(/(?:sk-or-v1-|sk-)[A-Za-z0-9_-]{12,}/g, "[redacted-token]")
+    .slice(0, maxLength);
+
+const parseDiagnosticJson = (value: unknown): unknown => {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+};
+
+const getSafeProviderErrorMessage = (
+  error: unknown,
+  seen = new Set<unknown>(),
+): string | null => {
+  if (error == null || seen.has(error)) return null;
+  if (typeof error === "string") {
+    const message = sanitizeDiagnosticText(error.trim());
+    return message || null;
+  }
+  if (typeof error !== "object") return null;
+
+  seen.add(error);
+  const record = error as Record<string, unknown>;
+  const candidates: unknown[] = [];
+
+  if (error instanceof Error && error.message) candidates.push(error.message);
+  for (const key of ["message", "responseBody", "body", "data", "error", "cause", "lastError"]) {
+    if (record[key] != null) candidates.push(parseDiagnosticJson(record[key]));
+  }
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string") {
+      const message = sanitizeDiagnosticText(candidate.trim());
+      if (message) return message;
+      continue;
+    }
+    const nested = getSafeProviderErrorMessage(candidate, seen);
+    if (nested) return nested;
+  }
+  return null;
+};
+
+const getSafeProviderErrorCode = (error: unknown): string | number | null => {
+  if (!error || typeof error !== "object") return null;
+  const record = error as Record<string, unknown>;
+  const nested =
+    record.error && typeof record.error === "object"
+      ? (record.error as Record<string, unknown>)
+      : null;
+  const value = record.code ?? nested?.code;
+  return typeof value === "string" || typeof value === "number"
+    ? sanitizeDiagnosticText(String(value), 96)
+    : null;
+};
+
 const logSafeAttemptError = (options: {
   auditContext: ChatAuditContext;
   error: unknown;
@@ -127,6 +191,8 @@ const logSafeAttemptError = (options: {
       event: "llm_attempt_error",
       modelId: options.model.modelId,
       provider: options.model.provider,
+      providerErrorCode: getSafeProviderErrorCode(options.error),
+      providerMessage: getSafeProviderErrorMessage(options.error),
       requestId: options.auditContext.requestId,
       source: "nodes-llm-observability",
       status: options.status,
