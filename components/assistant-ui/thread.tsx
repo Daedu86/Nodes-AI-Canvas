@@ -26,7 +26,7 @@ export const Thread: FC = () => {
         <ThreadPrimitive.Viewport
           autoScroll
           data-testid="thread-viewport"
-          className="flex h-full flex-col items-stretch overflow-y-auto bg-inherit px-5 py-7"
+          className="flex h-full scroll-pb-40 flex-col items-stretch overflow-y-auto bg-inherit px-5 py-7"
         >
           <ThreadWelcome />
 
@@ -45,7 +45,8 @@ export const Thread: FC = () => {
           </ThreadPrimitive.If>
 
           <ThreadPrimitive.If empty={false}>
-            <div className="sticky bottom-0 mt-auto flex w-full max-w-[var(--thread-max-width)] flex-col items-center justify-end gap-2 bg-inherit pb-4">
+            <div aria-hidden className="h-32 w-full shrink-0 sm:h-28" />
+            <div className="sticky bottom-0 z-20 mt-auto flex w-full max-w-[var(--thread-max-width)] flex-col items-center justify-end gap-2 bg-background/95 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-18px_34px_-28px_rgba(15,23,42,0.45)] backdrop-blur-md">
               <ThreadScrollToBottom />
               <Composer />
             </div>
