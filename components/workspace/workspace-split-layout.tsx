@@ -161,24 +161,34 @@ export function WorkspaceSplitLayout({
               isSingleOpenPane ? "overflow-x-hidden" : ""
             }`}
           >
-            {visibleSplitPanes.map((pane) => (
-              <div
-                key={pane.id}
-                className={isSingleOpenPane ? "min-h-0 min-w-0 flex-1" : "min-h-0 shrink-0"}
-                style={
-                  isSingleOpenPane
-                    ? undefined
-                    : {
-                        minWidth: pane.minWidth,
-                        width: pane.idealWidth,
-                      }
-                }
-              >
-                <WorkspacePanelShell label={`${pane.label} workspace`}>
-                  {pane.panel}
-                </WorkspacePanelShell>
-              </div>
-            ))}
+            {visibleSplitPanes.map((pane) => {
+              const isFlexibleCanvas = !isSingleOpenPane && pane.id === "canvas";
+
+              return (
+                <div
+                  key={pane.id}
+                  className={
+                    isSingleOpenPane || isFlexibleCanvas
+                      ? "min-h-0 min-w-0 flex-1"
+                      : "min-h-0 shrink-0"
+                  }
+                  style={
+                    isSingleOpenPane
+                      ? undefined
+                      : isFlexibleCanvas
+                        ? { minWidth: pane.minWidth }
+                        : {
+                            minWidth: pane.minWidth,
+                            width: pane.idealWidth,
+                          }
+                  }
+                >
+                  <WorkspacePanelShell label={`${pane.label} workspace`}>
+                    {pane.panel}
+                  </WorkspacePanelShell>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
