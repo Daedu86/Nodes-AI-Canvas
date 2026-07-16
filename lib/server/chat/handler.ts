@@ -28,6 +28,15 @@ const createEmptyChatResponse = () => {
   return createUIMessageStreamResponse({ stream });
 };
 
+const getContentLength = (content: unknown) => {
+  if (typeof content === "string") return content.length;
+  try {
+    return JSON.stringify(content).length;
+  } catch {
+    return null;
+  }
+};
+
 export async function handleChatPost(
   req: Request,
   user: AuthenticatedUser,
@@ -48,6 +57,24 @@ export async function handleChatPost(
     sentMessageCount: request.messagesToSend.length,
     toolCount: Object.keys(request.tools ?? {}).length,
   });
+
+  console.info(
+    "[nodes-chat-shape]",
+    JSON.stringify({
+      contextScope:
+        request.body.metadata?.custom?.contextScope ??
+        request.body.runConfig?.custom?.contextScope ??
+        null,
+      event: "chat_message_shape",
+      historyMode: request.historyMode ?? null,
+      requestId: auditContext.requestId,
+      roles: request.messagesToSend.map((message) => message.role),
+      contentLengths: request.messagesToSend.map((message) =>
+        getContentLength(message.modelContent),
+      ),
+      source: "nodes-llm-observability",
+    }),
+  );
 
   if (request.messagesToSend.length === 0) {
     return createEmptyChatResponse();
