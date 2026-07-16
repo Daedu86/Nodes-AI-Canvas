@@ -1,3 +1,5 @@
+import type { SessionThreadExport } from "@/lib/session-documents";
+
 const listeners = new Set<() => void>();
 const persistenceSuspensionTokens = new Set<symbol>();
 
@@ -6,10 +8,24 @@ let forcePersistHandlerCount = 0;
 
 export const FORCE_PERSIST_SESSION_EVENT = "assistant-ui:force-persist-session";
 export const SESSION_RUNTIME_CHANGED_EVENT = "assistant-ui:session-runtime-changed";
+export const SESSION_RUNTIME_REPLACED_EVENT = "assistant-ui:session-runtime-replaced";
+
+export type SessionRuntimeReplacedEventDetail = {
+  snapshot: SessionThreadExport;
+};
 
 export const notifySessionRuntimeChanged = () => {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(SESSION_RUNTIME_CHANGED_EVENT));
+};
+
+export const notifySessionRuntimeReplaced = (snapshot: SessionThreadExport) => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<SessionRuntimeReplacedEventDetail>(SESSION_RUNTIME_REPLACED_EVENT, {
+      detail: { snapshot },
+    }),
+  );
 };
 
 export type SessionPersistSuspensionToken = symbol;

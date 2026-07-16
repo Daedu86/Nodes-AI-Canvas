@@ -34,6 +34,18 @@ const makeItem = ({
 });
 
 describe("normalizeThreadRepoItems", () => {
+  it("excludes synthetic provider-error messages from the conversation graph", () => {
+    const rootUser = makeItem({ id: "root-user", role: "user", parentId: null });
+    const providerError = makeItem({
+      id: "__error__temporary",
+      role: "assistant",
+      parentId: "root-user",
+    });
+
+    const { items } = normalizeThreadRepoItems([rootUser, providerError]);
+    expect(items.map((item) => item.message.id)).toEqual(["root-user"]);
+  });
+
   it("reparents assistant edits under their bridge and removes sibling linkage", () => {
     const rootUser = makeItem({ id: "root-user", role: "user", parentId: null });
     const originalAssistant = makeItem({

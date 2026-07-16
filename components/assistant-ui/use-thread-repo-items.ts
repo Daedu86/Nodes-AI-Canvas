@@ -12,12 +12,19 @@ import {
   mergeRuntimeBranchIntoSessionSnapshot,
   mergeSessionSnapshotRepositories,
 } from "@/lib/session-runtime-snapshot";
-import { SESSION_RUNTIME_CHANGED_EVENT } from "@/lib/session-persist-sync";
+import {
+  SESSION_RUNTIME_CHANGED_EVENT,
+  SESSION_RUNTIME_REPLACED_EVENT,
+  type SessionRuntimeReplacedEventDetail,
+} from "@/lib/session-persist-sync";
 
 type ThreadRuntimeEventType = "initialize" | "runStart" | "runEnd" | "modelContextUpdate";
 type ThreadExport = ReturnType<AssistantRuntime["threads"]["main"]["export"]>;
 
 export type ThreadRepoItem = ThreadExport["messages"][number];
+
+const isSyntheticErrorItem = (item: ThreadRepoItem) =>
+  item.message?.id.startsWith("__error__") ?? false;
 
 type Options = {
   enabled?: boolean;
@@ -124,6 +131,7 @@ export type NormalizedThreadRepo = {
 export const normalizeThreadRepoItems = (
   items: ThreadRepoItem[],
 ): NormalizedThreadRepo => {
+  items = items.filter((item) => !isSyntheticErrorItem(item));
   if (items.length === 0) {
     return { items, order: new Map(), bridges: new Set() };
   }
@@ -231,6 +239,32 @@ export function useThreadRepoItems(
     }
 
     let isMounted = true;
+    const applyItems = (nextItems: ThreadRepoItem[]) => {
+      if (!isMounted) return;
+
+      // Record model/provider once per message (without mutating message data).
+      nextItems.forEach((item) => {
+        const id = item.message?.id;
+        if (!id) return;
+        if (seenIdsRef.current.has(id)) return;
+        seenIdsRef.current.add(id);
+        const existing = getModelEntry(id);
+        if (existing) return;
+        const derived = coalesceModelEntry(
+          item,
+          defaultModelId && defaultProvider
+            ? { modelId: defaultModelId, provider: defaultProvider }
+            : undefined,
+        );
+        if (derived) {
+          rememberModelEntry(id, derived);
+        }
+      });
+
+      itemsRef.current = nextItems;
+      setItems(nextItems);
+    };
+
     const readExport = () => {
       if (!isMounted) return;
       try {
@@ -278,31 +312,15 @@ export function useThreadRepoItems(
           repositorySnapshot,
           visibleBranch,
         );
-        const nextItems = mergedSnapshot.messages as unknown as ThreadRepoItem[];
+        const nextItems = (
+          mergedSnapshot.messages as unknown as ThreadRepoItem[]
+        ).filter((item) => !isSyntheticErrorItem(item));
 
-        // Record model/provider once per message (without mutating message data).
-        nextItems.forEach((item) => {
-          const id = item.message?.id;
-          if (!id) return;
-          if (seenIdsRef.current.has(id)) return;
-          seenIdsRef.current.add(id);
-          const existing = getModelEntry(id);
-          if (existing) return;
-          const derived = coalesceModelEntry(
-            item,
-            defaultModelId && defaultProvider
-              ? { modelId: defaultModelId, provider: defaultProvider }
-              : undefined,
-          );
-          if (derived) {
-            rememberModelEntry(id, derived);
-          }
-        });
-
-        itemsRef.current = nextItems;
-        setItems(nextItems);
+        applyItems(nextItems);
       } catch {
-        if (isMounted) setItems([]);
+        // Keep the last known repository while an external runtime replacement
+        // is still settling; clearing here makes Canvas flash empty and can
+        // expose provisional nodes between adapter updates.
       }
     };
 
@@ -327,9 +345,32 @@ export function useThreadRepoItems(
       );
     });
     window.addEventListener(SESSION_RUNTIME_CHANGED_EVENT, readExport);
+    const handleRuntimeReplaced = (event: Event) => {
+      const detail = (event as CustomEvent<SessionRuntimeReplacedEventDetail>).detail;
+      const snapshot = detail?.snapshot;
+      if (snapshot && Array.isArray(snapshot.messages)) {
+        applyItems(
+          (snapshot.messages as unknown as ThreadRepoItem[]).filter(
+            (item) => !isSyntheticErrorItem(item),
+          ),
+        );
+      }
+
+      // The exact restored snapshot is visible immediately. Follow-up reads
+      // reconcile any final adapter notification without first emptying Canvas.
+      [0, 50, 150].forEach((delayMs) => {
+        const timeoutId = window.setTimeout(() => {
+          settledReadTimeouts.delete(timeoutId);
+          readExport();
+        }, delayMs);
+        settledReadTimeouts.add(timeoutId);
+      });
+    };
+    window.addEventListener(SESSION_RUNTIME_REPLACED_EVENT, handleRuntimeReplaced);
 
     return () => {
       window.removeEventListener(SESSION_RUNTIME_CHANGED_EVENT, readExport);
+      window.removeEventListener(SESSION_RUNTIME_REPLACED_EVENT, handleRuntimeReplaced);
       isMounted = false;
       settledReadTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
       settledReadTimeouts.clear();

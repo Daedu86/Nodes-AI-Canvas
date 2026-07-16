@@ -1,6 +1,12 @@
 "use client";
 
 import { useAssistantRuntime } from "@assistant-ui/react";
+import {
+  getExternalStoreMessages,
+  type MessageFormatRepository,
+  type ThreadMessage,
+} from "@assistant-ui/core";
+import type { UIMessage } from "ai";
 import React from "react";
 import type { ContextScope, GraphBranchIntent } from "@/components/context/graph-branch-intent";
 import type { ModelProvider } from "@/components/context/model-config";
@@ -12,7 +18,10 @@ import { buildBranchSpec } from "@/lib/thread-branching";
 import { executeBranchSpec } from "@/lib/thread-branching-runtime";
 import { ensureThreadIdle } from "@/lib/thread-run-control";
 import { toLlmContextArtifacts, type SessionArtifact } from "@/lib/session-artifacts";
+import type { SessionThreadExport } from "@/lib/session-documents";
 import {
+  forceSessionPersist,
+  notifySessionRuntimeReplaced,
   resumeSessionPersist,
   suspendSessionPersist,
   type SessionPersistSuspensionToken,
@@ -22,6 +31,18 @@ import type { Node as ThreadGraphNodeModel } from "@/components/assistant-ui/thr
 type AssistantRuntime = NonNullable<ReturnType<typeof useAssistantRuntime>>;
 type BranchSpec = ReturnType<typeof buildBranchSpec>;
 type ThreadExport = ReturnType<AssistantRuntime["threads"]["main"]["export"]>;
+type ThreadExportEntry = ThreadExport["messages"][number];
+type MainThreadRuntime = AssistantRuntime["threads"]["main"];
+type ThreadExternalState = MessageFormatRepository<UIMessage>;
+
+type InternalThreadControl = MainThreadRuntime & {
+  __internal_threadBinding?: {
+    getState?: () => {
+      getMessageById?: (messageId: string) => unknown;
+      switchToBranch?: (branchId: string) => void;
+    };
+  };
+};
 
 type CompletedResponseInput = {
   promptId: string;
@@ -49,16 +70,348 @@ type UseCanvasBranchSubmissionOptions = {
 };
 
 type PendingOutputRun = {
-  beforeNodeIds: Set<string>;
+  beforeMessageIds: Set<string>;
   sourcePromptId: string;
   artifactIds: string[];
   preSubmitSnapshot: ThreadExport;
+  preSubmitExternalState: ThreadExternalState;
   persistSuspensionToken: SessionPersistSuspensionToken;
   submissionToken: number;
 };
 
 const ASSISTANT_FIRST_PARENT_CONTEXT =
   "Continue from the saved assistant response below; treat it as conversation context.";
+const COMPLETED_RUN_RETRY_DELAY_MS = 75;
+const COMPLETED_RUN_MAX_ATTEMPTS = 200;
+
+export function orderThreadSnapshotForImport(snapshot: ThreadExport): ThreadExport {
+  const entryById = new Map(
+    snapshot.messages.map((entry) => [entry.message.id, entry] as const),
+  );
+  const ordered: ThreadExportEntry[] = [];
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const invalid = new Set<string>();
+
+  const visit = (entry: ThreadExportEntry): boolean => {
+    const id = entry.message.id;
+    if (visited.has(id)) return true;
+    if (invalid.has(id)) return false;
+    if (visiting.has(id)) {
+      invalid.add(id);
+      return false;
+    }
+    visiting.add(id);
+    if (entry.parentId) {
+      const parent = entryById.get(entry.parentId);
+      if (!parent || !visit(parent)) {
+        visiting.delete(id);
+        invalid.add(id);
+        return false;
+      }
+    }
+    visiting.delete(id);
+    visited.add(id);
+    ordered.push(entry);
+    return true;
+  };
+
+  snapshot.messages.forEach(visit);
+  if (snapshot.headId && !visited.has(snapshot.headId)) {
+    throw new Error("The active Canvas branch has an invalid parent chain.");
+  }
+  return { ...snapshot, messages: ordered };
+}
+
+export function repairThreadSnapshotFromVisibleBranch(
+  snapshot: ThreadExport,
+  visibleMessages: readonly ThreadExportEntry["message"][],
+): ThreadExport {
+  const messages = [...snapshot.messages];
+  const indexById = new Map(
+    messages.map((entry, index) => [entry.message.id, index] as const),
+  );
+
+  visibleMessages.forEach((message, index) => {
+    const entry = {
+      parentId: visibleMessages[index - 1]?.id ?? null,
+      message,
+    } as ThreadExportEntry;
+    const existingIndex = indexById.get(message.id);
+    if (existingIndex === undefined) {
+      indexById.set(message.id, messages.length);
+      messages.push(entry);
+    } else {
+      messages[existingIndex] = entry;
+    }
+  });
+
+  return orderThreadSnapshotForImport({
+    ...snapshot,
+    headId: visibleMessages.at(-1)?.id ?? snapshot.headId ?? null,
+    messages,
+  });
+}
+
+const isUiMessage = (value: unknown): value is UIMessage =>
+  !!value &&
+  typeof value === "object" &&
+  typeof (value as { id?: unknown }).id === "string" &&
+  ((value as { role?: unknown }).role === "user" ||
+    (value as { role?: unknown }).role === "assistant" ||
+    (value as { role?: unknown }).role === "system") &&
+  Array.isArray((value as { parts?: unknown }).parts);
+
+export function collectVisibleExternalMessageChain(
+  visibleMessages: readonly ThreadMessage[],
+  externalState: ThreadExternalState,
+): UIMessage[] {
+  const durableMessages = visibleMessages.filter(
+    (message) => !message.id.startsWith("__error__"),
+  );
+  const fallbackById = new Map(
+    externalState.messages
+      .filter((entry) => isUiMessage(entry.message))
+      .map((entry) => [entry.message.id, entry.message] as const),
+  );
+  const seenExternalIds = new Set<string>();
+
+  return durableMessages.flatMap((message) => {
+    const boundMessages = getExternalStoreMessages<UIMessage>(message);
+    const validBoundMessages = boundMessages.every(isUiMessage)
+      ? boundMessages
+      : [];
+    const fallbackMessage = fallbackById.get(message.id);
+    const rawMessages =
+      validBoundMessages.length > 0
+        ? validBoundMessages
+        : fallbackMessage
+          ? [fallbackMessage]
+          : [];
+
+    if (rawMessages.length === 0) {
+      throw new Error(
+        `The external message backing Canvas node ${message.id} is unavailable.`,
+      );
+    }
+    rawMessages.forEach((rawMessage) => {
+      if (seenExternalIds.has(rawMessage.id)) {
+        throw new Error(`The external conversation contains duplicate message ${rawMessage.id}.`);
+      }
+      seenExternalIds.add(rawMessage.id);
+    });
+    return rawMessages;
+  });
+}
+
+function orderExternalStateForRestore(
+  externalState: ThreadExternalState,
+): ThreadExternalState {
+  const entryById = new Map(
+    externalState.messages.map((entry) => [entry.message.id, entry] as const),
+  );
+  if (entryById.size !== externalState.messages.length) {
+    throw new Error("The external conversation contains duplicate message ids.");
+  }
+
+  const ordered: ThreadExternalState["messages"] = [];
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (id: string) => {
+    if (visited.has(id)) return;
+    if (visiting.has(id)) {
+      throw new Error("The external conversation contains a parent cycle.");
+    }
+    const entry = entryById.get(id);
+    if (!entry) {
+      throw new Error(`The external conversation is missing parent ${id}.`);
+    }
+    visiting.add(id);
+    if (entry.parentId) visit(entry.parentId);
+    visiting.delete(id);
+    visited.add(id);
+    ordered.push(entry);
+  };
+
+  externalState.messages.forEach((entry) => visit(entry.message.id));
+  if (externalState.headId && !entryById.has(externalState.headId)) {
+    throw new Error("The external conversation head is unavailable.");
+  }
+  return { ...externalState, messages: ordered };
+}
+
+export function repairExternalStateFromVisibleBranch(
+  externalState: ThreadExternalState,
+  visibleMessages: readonly UIMessage[],
+): ThreadExternalState {
+  if (
+    !externalState ||
+    typeof externalState !== "object" ||
+    !Array.isArray((externalState as { messages?: unknown }).messages)
+  ) {
+    throw new Error("The external conversation state is unavailable.");
+  }
+  const repository = externalState;
+  const messages = repository.messages.filter(
+    (entry) => !entry.message.id.startsWith("__error__"),
+  );
+  const indexById = new Map(
+    messages.map((entry, index) => [entry.message.id, index] as const),
+  );
+  visibleMessages.forEach((message, index) => {
+    const entry = {
+      parentId: visibleMessages[index - 1]?.id ?? null,
+      message,
+    };
+    const existingIndex = indexById.get(message.id);
+    if (existingIndex === undefined) {
+      indexById.set(message.id, messages.length);
+      messages.push(entry);
+    } else {
+      messages[existingIndex] = entry;
+    }
+  });
+
+  return orderExternalStateForRestore({
+    ...repository,
+    headId: visibleMessages.at(-1)?.id ?? repository.headId ?? null,
+    messages,
+  });
+}
+
+const getExportedMessageText = (entry: ThreadExportEntry) =>
+  entry.message.content
+    .flatMap((part) => (part.type === "text" ? [part.text] : []))
+    .join("\n")
+    .trim();
+
+export function findCompletedRuntimeRun(
+  snapshot: ThreadExport,
+  beforeMessageIds: ReadonlySet<string>,
+) {
+  const newEntries = snapshot.messages.filter(
+    (entry) => !beforeMessageIds.has(entry.message.id),
+  );
+  const promptById = new Map(
+    newEntries
+      .filter((entry) => entry.message.role === "user")
+      .map((entry) => [entry.message.id, entry] as const),
+  );
+  const responseEntry = [...newEntries].reverse().find((entry) => {
+    if (
+      entry.message.role !== "assistant" ||
+      entry.message.id.startsWith("__error__") ||
+      !entry.parentId
+    ) {
+      return false;
+    }
+    return (
+      promptById.has(entry.parentId) &&
+      (!entry.message.status || entry.message.status.type === "complete") &&
+      getExportedMessageText(entry).length > 0
+    );
+  });
+  const promptEntry = responseEntry?.parentId
+    ? promptById.get(responseEntry.parentId) ?? null
+    : null;
+
+  return {
+    promptEntry,
+    responseEntry: responseEntry ?? null,
+    responseText: responseEntry ? getExportedMessageText(responseEntry) : "",
+  };
+}
+
+const waitForCanvasCommit = async () => {
+  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+};
+
+const waitForAdapterSettle = async (delayMs = 100) => {
+  await new Promise<void>((resolve) => window.setTimeout(resolve, delayMs));
+  await waitForCanvasCommit();
+};
+
+async function restoreThreadSnapshot(
+  thread: MainThreadRuntime,
+  snapshot: ThreadExport,
+  externalState: ThreadExternalState,
+) {
+  const importableSnapshot = orderThreadSnapshotForImport(snapshot);
+  if (importableSnapshot.messages.length !== snapshot.messages.length) {
+    throw new Error("The saved Canvas repository has an invalid parent topology.");
+  }
+  const importableExternalState = orderExternalStateForRestore(externalState);
+  const expectedHeadId = importableSnapshot.headId ?? null;
+  const expectedIds = new Set(importableSnapshot.messages.map((entry) => entry.message.id));
+  const expectedParentById = new Map(
+    importableSnapshot.messages.map((entry) => [entry.message.id, entry.parentId] as const),
+  );
+
+  // Remove provisional external messages from the AI SDK store itself. A
+  // repository import alone cannot prevent useChat's failed-send state from
+  // replaying that user message on the next adapter reconciliation.
+  const unexpectedVisibleIds = thread
+    .getState()
+    .messages.map((message) => message.id)
+    .filter((id) => !expectedIds.has(id) && !id.startsWith("__error__"))
+    .reverse();
+  for (const messageId of unexpectedVisibleIds) {
+    try {
+      await thread.deleteMessage(messageId);
+      await waitForAdapterSettle();
+    } catch {
+      // A concurrent adapter update may already have removed this message.
+    }
+  }
+
+  const matchesExpectedSnapshot = () => {
+    const restored = thread.export();
+    const restoredEntries = restored.messages.filter(
+      (entry) => !entry.message.id.startsWith("__error__"),
+    );
+    const restoredIds = new Set(restoredEntries.map((entry) => entry.message.id));
+    return (
+      (restored.headId ?? null) === expectedHeadId &&
+      expectedIds.size === restoredIds.size &&
+      [...expectedIds].every((id) => restoredIds.has(id)) &&
+      restoredEntries.every(
+        (entry) => expectedParentById.get(entry.message.id) === entry.parentId,
+      )
+    );
+  };
+
+  // A failed AI SDK request can enqueue one final adapter update after runEnd.
+  // Restore until the exact snapshot remains stable across a settle window.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const internalState = (thread as InternalThreadControl).__internal_threadBinding?.getState?.();
+    if (
+      expectedHeadId &&
+      internalState?.getMessageById?.(expectedHeadId) &&
+      typeof internalState.switchToBranch === "function"
+    ) {
+      internalState.switchToBranch(expectedHeadId);
+    } else {
+      // External-store reset updates the adapter first. This lets React unmount
+      // provisional resources before the repository is cleared.
+      thread.reset();
+    }
+
+    await waitForAdapterSettle();
+    thread.importExternalState(importableExternalState);
+    await waitForAdapterSettle();
+    if (!matchesExpectedSnapshot()) continue;
+    await waitForAdapterSettle(150);
+    if (matchesExpectedSnapshot()) {
+      notifySessionRuntimeReplaced(
+        importableSnapshot as unknown as SessionThreadExport,
+      );
+      return;
+    }
+  }
+
+  throw new Error("The previous Canvas branch could not be restored.");
+}
 
 export function buildCanvasContextMessages(
   nodes: ThreadGraphNodeModel[],
@@ -210,41 +563,46 @@ export function useCanvasBranchSubmission({
         return false;
       }
 
-      // Detach the transaction before cancelRun/import because either operation
-      // may synchronously emit runEnd or repository subscription callbacks.
+      // Detach the transaction before cancellation/restoration because either
+      // operation may synchronously emit runEnd or repository callbacks.
       pendingOutputRunRef.current = null;
       pendingDraftSubmissionRef.current = false;
       clearResolveCompletedRunTimer();
-      try {
-        runtime.threads.main.cancelRun();
-      } catch {
-        // The provider may already have ended the failed run.
-      }
+      void (async () => {
+        let finalMessage = message;
+        try {
+          if (runtime.threads.main.getState().isRunning) {
+            try {
+              runtime.threads.main.cancelRun();
+            } catch {
+              // The provider may end between the state read and cancellation.
+            }
+            await ensureThreadIdle(runtime.threads.main);
+          }
+          await restoreThreadSnapshot(
+            runtime.threads.main,
+            pending.preSubmitSnapshot,
+            pending.preSubmitExternalState,
+          );
+        } catch (error) {
+          console.error("Canvas branch rollback failed", error);
+          finalMessage = finalMessage
+            ? `${finalMessage} The provisional branch could not be rolled back; reload before retrying.`
+            : "The provisional branch could not be rolled back; reload before retrying.";
+        } finally {
+          // Only this transaction's opaque token can resume persistence.
+          resumeSessionPersist(pending.persistSuspensionToken);
+        }
 
-      let restored = false;
-      try {
-        runtime.threads.main.import(pending.preSubmitSnapshot);
-        restored = true;
-      } catch {
-        // Keep the original provider error when available, while making a failed
-        // rollback explicit so the user knows a reload may be necessary.
-        message = message
-          ? `${message} The provisional branch could not be rolled back; reload before retrying.`
-          : "The provisional branch could not be rolled back; reload before retrying.";
-      } finally {
-        // The runtime is now either restored or explicitly failed. Only this
-        // transaction's opaque persistence token can resume saving.
-        resumeSessionPersist(pending.persistSuspensionToken);
-      }
-
-      branchSubmissionLockRef.current = false;
-      setIsSubmittingBranch(false);
-      if (message) {
-        requestErrorRef.current = message;
-        setCanvasDraftError(message);
-        setRequestError(message);
-      }
-      return restored;
+        branchSubmissionLockRef.current = false;
+        setIsSubmittingBranch(false);
+        if (finalMessage) {
+          requestErrorRef.current = finalMessage;
+          setCanvasDraftError(finalMessage);
+          setRequestError(finalMessage);
+        }
+      })();
+      return true;
     },
     [clearResolveCompletedRunTimer, runtime.threads.main, setRequestError],
   );
@@ -325,14 +683,51 @@ export function useCanvasBranchSubmission({
           return;
         }
 
+        // Flush the last committed branch before provisional changes are hidden
+        // from persistence. This protects a preceding response still inside the
+        // normal debounce window if the page closes during the new run.
+        await forceSessionPersist();
+        if (
+          !branchSubmissionLockRef.current ||
+          submissionTokenRef.current !== submissionToken
+        ) {
+          return;
+        }
+
         const persistSuspensionToken = suspendSessionPersist();
         let preSubmitSnapshot: ThreadExport;
+        let preSubmitExternalState: ThreadExternalState;
         try {
           const exportedSnapshot = runtime.threads.main.export();
-          preSubmitSnapshot =
+          const exportedExternalState =
+            runtime.threads.main.exportExternalState() as ThreadExternalState;
+          const visibleMessages = runtime.threads.main
+            .getState()
+            .messages.filter((message) => !message.id.startsWith("__error__"));
+          const visibleExternalMessages = collectVisibleExternalMessageChain(
+            visibleMessages,
+            exportedExternalState,
+          );
+          const clonedSnapshot =
             typeof structuredClone === "function"
               ? structuredClone(exportedSnapshot)
               : exportedSnapshot;
+          const clonedVisibleMessages =
+            typeof structuredClone === "function"
+              ? structuredClone(visibleMessages)
+              : visibleMessages;
+          preSubmitSnapshot = repairThreadSnapshotFromVisibleBranch(
+            clonedSnapshot,
+            clonedVisibleMessages,
+          );
+          preSubmitExternalState = repairExternalStateFromVisibleBranch(
+            typeof structuredClone === "function"
+              ? structuredClone(exportedExternalState)
+              : exportedExternalState,
+            typeof structuredClone === "function"
+              ? structuredClone(visibleExternalMessages)
+              : visibleExternalMessages,
+          );
         } catch {
           resumeSessionPersist(persistSuspensionToken);
           branchSubmissionLockRef.current = false;
@@ -344,10 +739,13 @@ export function useCanvasBranchSubmission({
         }
         pendingDraftSubmissionRef.current = true;
         pendingOutputRunRef.current = {
-          beforeNodeIds: new Set(canvasConversationNodesRef.current.map((node) => node.id)),
+          beforeMessageIds: new Set(
+            preSubmitSnapshot.messages.map((entry) => entry.message.id),
+          ),
           sourcePromptId: CANVAS_PROMPT_DRAFT_NODE_ID,
           artifactIds: [...activeDraft.outputArtifactIds],
           preSubmitSnapshot,
+          preSubmitExternalState,
           persistSuspensionToken,
           submissionToken,
         };
@@ -437,31 +835,31 @@ export function useCanvasBranchSubmission({
         ) {
           return;
         }
-        const currentNodes = canvasConversationNodesRef.current;
-        const { promptNode, responseNode } = pendingOutput
-          ? findCompletedCanvasRunNodes(currentNodes, pendingOutput.beforeNodeIds)
-          : { promptNode: null, responseNode: null };
-
-        let responseIsComplete = false;
-        if (responseNode) {
-          try {
-            responseIsComplete = isCompletedRuntimeResponse(
-              runtime.threads.main.export(),
-              responseNode.id,
-            );
-          } catch {
-            // Repository export can lag the rendered graph by a render frame.
-          }
+        let completedRun: ReturnType<typeof findCompletedRuntimeRun> | null = null;
+        try {
+          const visibleMessages = runtime.threads.main
+            .getState()
+            .messages.filter((message) => !message.id.startsWith("__error__"));
+          const reconciledSnapshot = repairThreadSnapshotFromVisibleBranch(
+            runtime.threads.main.export(),
+            visibleMessages,
+          );
+          completedRun = findCompletedRuntimeRun(
+            reconciledSnapshot,
+            pendingOutput.beforeMessageIds,
+          );
+        } catch {
+          // The repository may still be reconciling a streamed server ID.
         }
 
-        if (pendingOutput && responseNode && promptNode && responseIsComplete) {
+        if (completedRun?.responseEntry && completedRun.promptEntry) {
           try {
             applyCompletedResponse({
-              promptId: promptNode.id,
-              responseId: responseNode.id,
+              promptId: completedRun.promptEntry.message.id,
+              responseId: completedRun.responseEntry.message.id,
               sourcePromptId: pendingOutput.sourcePromptId,
               artifactIds: pendingOutput.artifactIds,
-              text: responseNode.text,
+              text: completedRun.responseText,
             });
           } catch {
             rollbackPendingTransaction(
@@ -478,10 +876,10 @@ export function useCanvasBranchSubmission({
           setCanvasDraftError(null);
           cancelDraft();
           setIsSubmittingBranch(false);
-        } else if (pendingOutput && attempt < 12) {
+        } else if (pendingOutput && attempt < COMPLETED_RUN_MAX_ATTEMPTS) {
           resolveCompletedRunTimerRef.current = window.setTimeout(
             () => resolveCompletedRun(attempt + 1),
-            75,
+            COMPLETED_RUN_RETRY_DELAY_MS,
           );
           return;
         } else {
@@ -514,18 +912,24 @@ export function useCanvasBranchSubmission({
       pendingOutputRunRef.current = null;
       pendingDraftSubmissionRef.current = false;
       submissionTokenRef.current += 1;
-      try {
-        runtime.threads.main.cancelRun();
-      } catch {
-        // The run may already have ended while the Canvas was unmounting.
+      if (runtime.threads.main.getState().isRunning) {
+        try {
+          runtime.threads.main.cancelRun();
+        } catch {
+          // The run may already have ended while the Canvas was unmounting.
+        }
       }
-      try {
-        runtime.threads.main.import(pending.preSubmitSnapshot);
-      } catch {
-        // Cleanup must still release the module-level persistence suspension.
-      } finally {
-        resumeSessionPersist(pending.persistSuspensionToken);
-      }
+      void restoreThreadSnapshot(
+        runtime.threads.main,
+        pending.preSubmitSnapshot,
+        pending.preSubmitExternalState,
+      )
+        .catch(() => {
+          // Unmount cleanup is best-effort; persistence still remains isolated.
+        })
+        .finally(() => {
+          resumeSessionPersist(pending.persistSuspensionToken);
+        });
     },
     [clearResolveCompletedRunTimer, runtime.threads.main],
   );
