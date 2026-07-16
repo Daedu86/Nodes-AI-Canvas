@@ -110,7 +110,7 @@ export const buildBranchSpec = (
         anchorId: anchor.id,
         anchorRole: anchor.role,
         parentId: normalizeRuntimeParentId(anchor.parentId),
-        sourceId: null,
+        sourceId: anchor.id,
         targetRole: "user",
         startRun: true,
         placeholder: detail.placeholder,
