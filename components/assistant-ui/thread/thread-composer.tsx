@@ -9,22 +9,133 @@ import type { FC } from "react";
 import React from "react";
 import { ImagePlus, SendHorizontalIcon, X } from "lucide-react";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
-import { useHistoryMode } from "@/components/context/history-mode";
 import { useLlmEnabled } from "@/components/context/llm-enabled";
 import { useModelConfig } from "@/components/context/model-config";
 import { useRequestError } from "@/components/context/request-error";
 import { Button } from "@/components/ui/button";
 import { isVisionCapableModel } from "@/lib/llm/provider-catalog";
 
+type ChatContextScope = "parent" | "branch" | "tree";
+
+type ScopedContextMessage = {
+  id?: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+
+type ExportedThreadEntry = {
+  parentId: string | null;
+  message: {
+    id: string;
+    role: string;
+    content: unknown;
+  };
+};
+
+type ExportedThreadSnapshot = {
+  headId?: string | null;
+  messages: ExportedThreadEntry[];
+};
+
+const ASSISTANT_FIRST_PARENT_CONTEXT =
+  "Continue from the saved assistant response below; treat it as conversation context.";
+
+const getExportedMessageText = (message: ExportedThreadEntry["message"]) => {
+  if (typeof message.content === "string") return message.content.trim();
+  if (!Array.isArray(message.content)) return "";
+  return message.content
+    .flatMap((part) => {
+      if (!part || typeof part !== "object") return [];
+      const record = part as { type?: unknown; text?: unknown };
+      return record.type === "text" && typeof record.text === "string"
+        ? [record.text]
+        : [];
+    })
+    .join("\n")
+    .trim();
+};
+
+const buildChatContextMessages = (
+  snapshot: ExportedThreadSnapshot,
+  scope: ChatContextScope,
+  promptText: string,
+): ScopedContextMessage[] => {
+  const entries = snapshot.messages.filter(
+    (entry) =>
+      !entry.message.id.startsWith("__error__") &&
+      (entry.message.role === "user" || entry.message.role === "assistant"),
+  );
+  const byId = new Map(entries.map((entry) => [entry.message.id, entry] as const));
+  const toMessage = (entry: ExportedThreadEntry | undefined): ScopedContextMessage | null => {
+    if (!entry) return null;
+    const content = getExportedMessageText(entry.message);
+    if (!content) return null;
+    return {
+      id: entry.message.id,
+      role: entry.message.role as "user" | "assistant",
+      content,
+    };
+  };
+  const headEntry = snapshot.headId
+    ? byId.get(snapshot.headId)
+    : entries.at(-1);
+  let history: ScopedContextMessage[] = [];
+
+  if (scope === "parent") {
+    const parentMessage = toMessage(headEntry);
+    history = parentMessage
+      ? parentMessage.role === "assistant"
+        ? [
+            { role: "user", content: ASSISTANT_FIRST_PARENT_CONTEXT },
+            parentMessage,
+          ]
+        : [parentMessage]
+      : [];
+  } else if (scope === "branch") {
+    const lineage: ExportedThreadEntry[] = [];
+    const visited = new Set<string>();
+    let current = headEntry;
+    while (current && !visited.has(current.message.id)) {
+      visited.add(current.message.id);
+      lineage.push(current);
+      current = current.parentId ? byId.get(current.parentId) : undefined;
+    }
+    history = lineage.reverse().flatMap((entry) => {
+      const message = toMessage(entry);
+      return message ? [message] : [];
+    });
+  } else {
+    history = entries.flatMap((entry) => {
+      const message = toMessage(entry);
+      return message ? [message] : [];
+    });
+  }
+
+  return [
+    ...history,
+    { role: "user" as const, content: promptText.trim() },
+  ].filter((message) => message.content.length > 0);
+};
+
 const applyComposerRunConfig = (
   composer: ReturnType<typeof useComposerRuntime>,
-  historyMode: "last" | "full",
+  contextScope: ChatContextScope,
   modelId: string,
   provider: string,
+  contextMessages?: ScopedContextMessage[],
 ) => {
   if (!composer) return;
+  const historyMode = contextScope === "parent" ? "last" : "full";
   try {
-    composer.setRunConfig({ custom: { historyMode, model: modelId, provider } });
+    composer.setRunConfig({
+      custom: {
+        contextScope,
+        ...(contextMessages ? { contextMessages } : {}),
+        historyMode,
+        model: modelId,
+        provider,
+      },
+    });
   } catch {
     // Runtime may be unavailable during initialization.
   }
@@ -33,31 +144,24 @@ const applyComposerRunConfig = (
 const ACTIVE_RUN_ERROR_MESSAGE =
   "The assistant is still responding. Wait for it to finish or cancel the current run.";
 
-const HistoryModeControls: FC<{
-  historyMode: "last" | "full";
-  setHistoryMode: (value: "last" | "full") => void;
+const ContextScopeControls: FC<{
+  contextScope: ChatContextScope;
+  setContextScope: (value: ChatContextScope) => void;
   className?: string;
-}> = ({ historyMode, setHistoryMode, className }) => {
+}> = ({ contextScope, setContextScope, className }) => {
   return (
-    <div className={className ?? "flex items-center gap-1 text-xs"}>
-      <span className="text-muted-foreground">History:</span>
-      <Button
-        type="button"
-        variant={historyMode === "last" ? "default" : "outline"}
-        size="sm"
-        onClick={() => setHistoryMode("last")}
+    <label className={className ?? "flex items-center gap-2 text-xs"}>
+      <span className="text-muted-foreground">Context:</span>
+      <select
+        value={contextScope}
+        onChange={(event) => setContextScope(event.target.value as ChatContextScope)}
+        className="h-8 rounded-lg border border-border bg-background px-2 text-xs text-foreground"
       >
-        Last
-      </Button>
-      <Button
-        type="button"
-        variant={historyMode === "full" ? "default" : "outline"}
-        size="sm"
-        onClick={() => setHistoryMode("full")}
-      >
-        Full
-      </Button>
-    </div>
+        <option value="parent">Parent message</option>
+        <option value="branch">Branch lineage</option>
+        <option value="tree">Full tree</option>
+      </select>
+    </label>
   );
 };
 
@@ -101,7 +205,7 @@ export const Composer: FC = () => {
   const runtime = useAssistantRuntime();
   const composer = useComposerRuntime();
   const isRunning = useThread((state) => state.isRunning);
-  const { historyMode, setHistoryMode } = useHistoryMode();
+  const [contextScope, setContextScope] = React.useState<ChatContextScope>("parent");
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
   const { clearRequestError, requestError, setRequestError } = useRequestError();
@@ -116,10 +220,6 @@ export const Composer: FC = () => {
     }>
   >([]);
   const [isPreparingImages, setIsPreparingImages] = React.useState(false);
-
-  React.useEffect(() => {
-    applyComposerRunConfig(composer, historyMode, modelId, provider);
-  }, [composer, historyMode, modelId, provider]);
 
   const addImagesFromFiles = React.useCallback(
     async (files: File[]) => {
@@ -202,7 +302,21 @@ export const Composer: FC = () => {
         // Use assistant-ui's attachment pipeline so the AI SDK runtime can serialize the request
         // as UIMessage FileUIParts (which our backend converts into model image parts).
         const derivedText = text || (pendingImages.length > 0 ? "Describe the attached image." : "");
-        applyComposerRunConfig(composer, historyMode, modelId, provider);
+        const contextMessages =
+          pendingImages.length === 0
+            ? buildChatContextMessages(
+                runtime.threads.main.export() as unknown as ExportedThreadSnapshot,
+                contextScope,
+                derivedText,
+              )
+            : undefined;
+        applyComposerRunConfig(
+          composer,
+          contextScope,
+          modelId,
+          provider,
+          contextMessages,
+        );
 
         // Ensure the draft includes something when users send "image-only".
         if (!text && derivedText) {
@@ -261,7 +375,7 @@ export const Composer: FC = () => {
   }, [
     clearRequestError,
     composer,
-    historyMode,
+    contextScope,
     isRunning,
     isPreparingImages,
     llmEnabled,
@@ -361,10 +475,10 @@ export const Composer: FC = () => {
         />
         <ComposerAction onSend={handleSend} onCancel={handleCancel} disableSend={isPreparingImages} />
       </div>
-      <HistoryModeControls
-        historyMode={historyMode}
-        setHistoryMode={setHistoryMode}
-        className="mt-1 flex items-center gap-1 text-xs"
+      <ContextScopeControls
+        contextScope={contextScope}
+        setContextScope={setContextScope}
+        className="mt-1 flex items-center gap-2 text-xs"
       />
       {!llmEnabled ? (
         <div className="px-2 pb-2 text-xs text-amber-700 dark:text-amber-300">
@@ -386,15 +500,16 @@ export const Composer: FC = () => {
 };
 
 export const EditComposer: FC = () => {
+  const runtime = useAssistantRuntime();
   const composer = useComposerRuntime();
   const isRunning = useThread((state) => state.isRunning);
-  const { historyMode, setHistoryMode } = useHistoryMode();
+  const [contextScope, setContextScope] = React.useState<ChatContextScope>("parent");
   const { llmEnabled } = useLlmEnabled();
   const { modelId, provider } = useModelConfig();
   const { clearRequestError, requestError, setRequestError } = useRequestError();
 
   const handleSend = () => {
-    if (!composer || !llmEnabled) return;
+    if (!composer || !runtime || !llmEnabled) return;
     if (isRunning) {
       setRequestError(ACTIVE_RUN_ERROR_MESSAGE);
       return;
@@ -402,7 +517,18 @@ export const EditComposer: FC = () => {
     const state = composer.getState();
     const text = state.text.trim();
     if (!text) return;
-    applyComposerRunConfig(composer, historyMode, modelId, provider);
+    const contextMessages = buildChatContextMessages(
+      runtime.threads.main.export() as unknown as ExportedThreadSnapshot,
+      contextScope,
+      text,
+    );
+    applyComposerRunConfig(
+      composer,
+      contextScope,
+      modelId,
+      provider,
+      contextMessages,
+    );
     clearRequestError();
     composer.send({ startRun: true });
   };
@@ -425,10 +551,10 @@ export const EditComposer: FC = () => {
         }}
       />
       <div className="mx-3 mb-3 flex items-center justify-end gap-2">
-        <HistoryModeControls
-          historyMode={historyMode}
-          setHistoryMode={setHistoryMode}
-          className="mr-auto flex items-center gap-1 text-xs"
+        <ContextScopeControls
+          contextScope={contextScope}
+          setContextScope={setContextScope}
+          className="mr-auto flex items-center gap-2 text-xs"
         />
         <Button type="button" variant="ghost" onClick={handleCancel} disabled={!llmEnabled}>
           Cancel
