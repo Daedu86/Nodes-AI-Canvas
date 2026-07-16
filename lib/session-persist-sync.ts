@@ -1,4 +1,5 @@
 const listeners = new Set<() => void>();
+const persistenceSuspensionTokens = new Set<symbol>();
 
 let pending = false;
 let forcePersistHandlerCount = 0;
@@ -9,6 +10,33 @@ export const SESSION_RUNTIME_CHANGED_EVENT = "assistant-ui:session-runtime-chang
 export const notifySessionRuntimeChanged = () => {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(SESSION_RUNTIME_CHANGED_EVENT));
+};
+
+export type SessionPersistSuspensionToken = symbol;
+
+/**
+ * Prevents provisional runtime changes from reaching the persisted session.
+ * The opaque token makes releasing a stale/previous transaction a no-op.
+ */
+export const suspendSessionPersist = (): SessionPersistSuspensionToken => {
+  const token = Symbol("session-persist-suspension");
+  persistenceSuspensionTokens.add(token);
+  markSessionPersistPending();
+  return token;
+};
+
+export const isSessionPersistSuspended = () => persistenceSuspensionTokens.size > 0;
+
+/**
+ * Releases one suspension. The final release schedules exactly one persistence
+ * pass from the runtime's now-committed (or restored) state.
+ */
+export const resumeSessionPersist = (token: SessionPersistSuspensionToken) => {
+  if (!persistenceSuspensionTokens.delete(token)) return false;
+  if (persistenceSuspensionTokens.size === 0) {
+    notifySessionRuntimeChanged();
+  }
+  return true;
 };
 
 const notify = () => {

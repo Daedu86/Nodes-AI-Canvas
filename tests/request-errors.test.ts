@@ -103,4 +103,34 @@ describe("request error helpers", () => {
       "This model is rate limited right now. Try again in a moment or choose another model.",
     );
   });
+
+  it("keeps provider validation errors actionable instead of reporting a backend outage", () => {
+    const streamError = {
+      error: {
+        name: "AI_APICallError",
+        message: "Provider rejected the request",
+        statusCode: 400,
+        responseBody: JSON.stringify({
+          error: { code: "invalid_prompt", message: "messages must begin with a user role" },
+        }),
+      },
+    };
+
+    expect(
+      classifyRequestError(streamError, {
+        modelId: "openrouter/free",
+        provider: "openrouter",
+      }),
+    ).toEqual({
+      code: "provider_request_invalid",
+      message: "The model rejected this conversation context. Try another context or model.",
+      status: 400,
+    });
+
+    expect(
+      getRequestErrorMessageFromThrowable(
+        new Error("The model rejected this conversation context. Try another context or model."),
+      ),
+    ).toBe("The model rejected this conversation context. Try another context or model.");
+  });
 });

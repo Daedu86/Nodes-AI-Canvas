@@ -12,6 +12,7 @@ export type RequestErrorCode =
   | "missing_ollama_key"
   | "missing_openrouter_key"
   | "model_unavailable"
+  | "provider_request_invalid"
   | "provider_rate_limited"
   | "provider_unavailable"
   | "ollama_unavailable"
@@ -163,6 +164,20 @@ export function classifyRequestError(
     };
   }
 
+  if (
+    status === 400 ||
+    status === 422 ||
+    message.includes("bad request") ||
+    message.includes("invalid_request") ||
+    message.includes("invalid prompt")
+  ) {
+    return {
+      code: "provider_request_invalid",
+      message: "The model rejected this conversation context. Try another context or model.",
+      status: 400,
+    };
+  }
+
   if (status === 429 || message.includes("too many requests") || message.includes("rate limit")) {
     return {
       code: "provider_rate_limited",
@@ -245,6 +260,9 @@ export function getRequestErrorMessageFromResponse(response: Pick<Response, "sta
   if (errorCode === "model_unavailable") {
     return "The selected model is not available anymore. Choose another model and try again.";
   }
+  if (errorCode === "provider_request_invalid") {
+    return "The model rejected this conversation context. Try another context or model.";
+  }
   if (errorCode === "ollama_unavailable") {
     return "Ollama is not reachable. Start it locally or switch to an OpenRouter model.";
   }
@@ -324,6 +342,7 @@ export function getRequestErrorMessageFromThrowable(error: unknown) {
       trimmed === ACTIVE_RUN_ERROR_MESSAGE ||
       trimmed === QUOTA_EXCEEDED_ERROR_MESSAGE ||
       lower.includes("selected model") ||
+      lower.includes("rejected this conversation context") ||
       lower.includes("rate limited") ||
       lower.includes("timed out") ||
       lower.includes("temporarily unavailable") ||

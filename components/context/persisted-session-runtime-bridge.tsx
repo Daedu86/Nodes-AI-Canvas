@@ -14,6 +14,7 @@ import {
 import {
   FORCE_PERSIST_SESSION_EVENT,
   SESSION_RUNTIME_CHANGED_EVENT,
+  isSessionPersistSuspended,
   markSessionPersistPending,
   registerSessionPersistHandler,
   markSessionPersistSettled,
@@ -418,6 +419,10 @@ export function PersistedSessionRuntimeBridge() {
         window.clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
       }
+      if (isSessionPersistSuspended()) {
+        markSessionPersistPending();
+        return;
+      }
       const persistedSnapshot = readMergedPersistedSnapshot();
       const signature = JSON.stringify(toComparableSnapshot(persistedSnapshot));
 
@@ -447,6 +452,14 @@ export function PersistedSessionRuntimeBridge() {
 
     const scheduleFlush = () => {
       markSessionPersistPending();
+
+      if (isSessionPersistSuspended()) {
+        if (saveTimeoutRef.current !== null) {
+          window.clearTimeout(saveTimeoutRef.current);
+          saveTimeoutRef.current = null;
+        }
+        return;
+      }
 
       // Cache immediately so a fast close/reopen can restore even if the server PATCH is interrupted.
       try {
@@ -485,7 +498,7 @@ export function PersistedSessionRuntimeBridge() {
     );
     const handleForcePersist = (event: Event) => {
       const detail = event instanceof CustomEvent ? (event.detail as ForcePersistEventDetail | undefined) : undefined;
-      if (runActiveRef.current) {
+      if (runActiveRef.current || isSessionPersistSuspended()) {
         if (detail?.resolve) {
           pendingForcePersistResolversRef.current.push(detail.resolve);
         }

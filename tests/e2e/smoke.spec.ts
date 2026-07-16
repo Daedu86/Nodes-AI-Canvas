@@ -1001,6 +1001,114 @@ test("creates a sibling user branch from a flow user node", async ({ page }) => 
   ).toHaveLength(1);
 });
 
+test("rolls back a failed sibling branch before retrying it", async ({ page }) => {
+  test.setTimeout(90_000);
+  await gotoChat(page);
+  await sendPrompt(page, "Failed sibling rollback root");
+  await sendPrompt(page, "Failed sibling rollback original");
+
+  const graphBeforeBranch = await copyGraphJson(page);
+  const laterUserNodeId = graphBeforeBranch.nodes.find(
+    (node) => node.role === "user" && node.parentId !== null,
+  )?.id;
+  const activeSessionId = await getActiveSessionId(page);
+  expect(laterUserNodeId).toBeTruthy();
+  expect(activeSessionId).toBeTruthy();
+  if (!laterUserNodeId || !activeSessionId) return;
+
+  const beforeNodeIds = graphBeforeBranch.nodes
+    .filter((node) => node.id !== "__ROOT__" && !node.isBridge)
+    .map((node) => node.id)
+    .sort();
+  await expect
+    .poll(async () => {
+      const persisted = await fetchSessionDocument(page, activeSessionId);
+      return persisted.session.snapshot.messages.map((entry) => entry.message.id).sort();
+    })
+    .toEqual(beforeNodeIds);
+
+  let failedRequests = 0;
+  await page.route("**/api/chat", async (route) => {
+    failedRequests += 1;
+    await route.fulfill({
+      status: 503,
+      body: "The model provider is unavailable right now. Try again in a moment.",
+      contentType: "text/plain",
+      headers: {
+        "x-nodes-error-code": "provider_unavailable",
+        "x-nodes-error-message":
+          "The model provider is unavailable right now. Try again in a moment.",
+      },
+    });
+  });
+
+  const blockLibrary = page.getByRole("complementary", { name: "Block library" });
+  const collapseBlockLibrary = blockLibrary.getByRole("button", {
+    name: "Collapse block library",
+  });
+  if (await collapseBlockLibrary.isVisible().catch(() => false)) {
+    await collapseBlockLibrary.click();
+  }
+  await page.getByRole("button", { name: "Fit View" }).click();
+
+  const targetNode = page.locator(`.react-flow__node[data-id="${laterUserNodeId}"]`);
+  await expect(targetNode).toBeVisible({ timeout: 15_000 });
+  await targetNode
+    .getByRole("button", { name: "Create sibling branch" })
+    .evaluate((button: HTMLButtonElement) => button.click());
+
+  const draftNode = page.locator('.react-flow__node[data-id="__CANVAS_PROMPT_DRAFT__"]');
+  const draftPrompt = "Failed sibling rollback alternative";
+  await expect(draftNode).toBeVisible({ timeout: 15_000 });
+  await draftNode.getByRole("textbox", { name: "Draft prompt" }).fill(draftPrompt);
+  await draftNode.getByRole("combobox", { name: "Context required" }).selectOption("parent");
+  const sendButton = draftNode.getByRole("button", { name: "Send prompt node" });
+
+  const failedResponsePromise = page.waitForResponse(
+    (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
+  );
+  await sendButton.click();
+  const failedResponse = await failedResponsePromise;
+  expect(failedResponse.status()).toBe(503);
+  await page.unroute("**/api/chat");
+
+  await expect(draftNode).toBeVisible({ timeout: 15_000 });
+  await expect(draftNode.getByRole("textbox", { name: "Draft prompt" })).toHaveValue(draftPrompt);
+  await expect(draftNode).toContainText(/unavailable|failed/i);
+  await expect(sendButton).toBeEnabled();
+  expect(failedRequests).toBe(1);
+
+  const graphAfterFailure = await copyGraphJson(page);
+  expect(
+    graphAfterFailure.nodes
+      .filter((node) => node.id !== "__ROOT__" && !node.isBridge)
+      .map((node) => node.id)
+      .sort(),
+  ).toEqual(beforeNodeIds);
+  await expect
+    .poll(async () => {
+      const persisted = await fetchSessionDocument(page, activeSessionId);
+      return persisted.session.snapshot.messages.map((entry) => entry.message.id).sort();
+    })
+    .toEqual(beforeNodeIds);
+
+  const retryResponsePromise = page.waitForResponse(
+    (response) => response.url().includes("/api/chat") && response.request().method() === "POST",
+  );
+  await sendButton.click();
+  const retryResponse = await retryResponsePromise;
+  expect(retryResponse.ok()).toBe(true);
+  await expect(draftNode).toHaveCount(0, { timeout: 15_000 });
+
+  const graphAfterRetry = await copyGraphJson(page);
+  const retryNodes = graphAfterRetry.nodes.filter(
+    (node) => !beforeNodeIds.includes(node.id) && node.id !== "__ROOT__" && !node.isBridge,
+  );
+  expect(retryNodes.filter((node) => node.role === "user")).toHaveLength(1);
+  expect(retryNodes.filter((node) => node.role === "assistant")).toHaveLength(1);
+  expect(retryNodes).toHaveLength(2);
+});
+
 test("creates a sibling user branch from a chat user node", async ({ page }) => {
   await gotoChat(page);
   await sendPrompt(page, "Chat user sibling root");
