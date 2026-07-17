@@ -57,12 +57,16 @@ jobs:
             'Analyze JavaScript and TypeScript',
           ];
 
-          const sleep = (milliseconds) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
-          const ghJson = (endpoint) => JSON.parse(execFileSync(
-            'gh',
-            ['api', '-H', 'Accept: application/vnd.github+json', endpoint],
-            { encoding: 'utf8' },
-          ));
+          const sleep = (milliseconds) =>
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+          const ghJson = (endpoint) =>
+            JSON.parse(
+              execFileSync(
+                'gh',
+                ['api', '-H', 'Accept: application/vnd.github+json', endpoint],
+                { encoding: 'utf8' },
+              ),
+            );
 
           let selectedChecks = [];
           for (let attempt = 1; attempt <= 120; attempt += 1) {
@@ -76,19 +80,25 @@ jobs:
             }
             selectedChecks = requiredChecks.flatMap((name) => {
               const check = latestByName.get(name);
-              return check ? [{
-                name,
-                status: check.status,
-                conclusion: check.conclusion,
-                detailsUrl: check.details_url,
-                startedAt: check.started_at,
-                completedAt: check.completed_at,
-              }] : [];
+              return check
+                ? [
+                    {
+                      name,
+                      status: check.status,
+                      conclusion: check.conclusion,
+                      detailsUrl: check.details_url,
+                      startedAt: check.started_at,
+                      completedAt: check.completed_at,
+                    },
+                  ]
+                : [];
             });
             const missing = requiredChecks.filter((name) => !latestByName.has(name));
             const pending = selectedChecks.filter((check) => check.status !== 'completed');
             if (missing.length === 0 && pending.length === 0) break;
-            console.log(`Attempt ${attempt}: waiting; missing=${missing.join(', ') || 'none'}; pending=${pending.map((check) => check.name).join(', ') || 'none'}`);
+            console.log(
+              `Attempt ${attempt}: waiting; missing=${missing.join(', ') || 'none'}; pending=${pending.map((check) => check.name).join(', ') || 'none'}`,
+            );
             sleep(15_000);
           }
 
@@ -98,24 +108,25 @@ jobs:
           const unsuccessfulChecks = selectedChecks.filter((check) => check.conclusion !== 'success');
 
           let matchingAnalyses = [];
-          let analysisError = null;
+          let openAlerts = [];
+          let codeqlApiError = null;
           for (let attempt = 1; attempt <= 12; attempt += 1) {
             try {
-              const analyses = ghJson(`repos/${repository}/code-scanning/analyses?ref=refs/heads/main&per_page=100`);
-              matchingAnalyses = (analyses ?? []).filter((analysis) =>
-                analysis.commit_sha === sha && analysis.tool?.name === 'CodeQL',
+              const analyses = ghJson(
+                `repos/${repository}/code-scanning/analyses?ref=refs/heads/main&per_page=100`,
               );
+              matchingAnalyses = (analyses ?? []).filter(
+                (analysis) => analysis.commit_sha === sha && analysis.tool?.name === 'CodeQL',
+              );
+              const alerts = ghJson(`repos/${repository}/code-scanning/alerts?state=open&per_page=100`);
+              openAlerts = (alerts ?? []).filter((alert) => alert.tool?.name === 'CodeQL');
               if (matchingAnalyses.length > 0) break;
             } catch (error) {
-              analysisError = error instanceof Error ? error.message : String(error);
+              codeqlApiError = error instanceof Error ? error.message : String(error);
             }
             sleep(10_000);
           }
 
-          const codeqlResults = matchingAnalyses.reduce(
-            (total, analysis) => total + Number(analysis.results_count ?? 0),
-            0,
-          );
           const codeqlErrors = matchingAnalyses
             .map((analysis) => analysis.error)
             .filter((error) => typeof error === 'string' && error.length > 0);
@@ -124,9 +135,9 @@ jobs:
             incompleteChecks.length === 0 &&
             unsuccessfulChecks.length === 0 &&
             matchingAnalyses.length > 0 &&
-            !analysisError &&
+            !codeqlApiError &&
             codeqlErrors.length === 0 &&
-            codeqlResults === 0;
+            openAlerts.length === 0;
 
           const report = {
             completedAt: new Date().toISOString(),
@@ -135,7 +146,10 @@ jobs:
             requiredChecks: selectedChecks,
             missingChecks,
             incompleteChecks: incompleteChecks.map((check) => check.name),
-            unsuccessfulChecks: unsuccessfulChecks.map(({ name, conclusion }) => ({ name, conclusion })),
+            unsuccessfulChecks: unsuccessfulChecks.map(({ name, conclusion }) => ({
+              name,
+              conclusion,
+            })),
             codeql: {
               analyses: matchingAnalyses.map((analysis) => ({
                 id: analysis.id,
@@ -145,9 +159,17 @@ jobs:
                 rulesCount: analysis.rules_count,
                 error: analysis.error,
               })),
-              resultsCount: codeqlResults,
+              openAlerts: openAlerts.map((alert) => ({
+                number: alert.number,
+                ruleId: alert.rule?.id,
+                severity: alert.rule?.severity,
+                securitySeverityLevel: alert.rule?.security_severity_level,
+                path: alert.most_recent_instance?.location?.path,
+                startLine: alert.most_recent_instance?.location?.start_line,
+                url: alert.html_url,
+              })),
               errors: codeqlErrors,
-              apiError: analysisError,
+              apiError: codeqlApiError,
             },
             passed,
           };
@@ -176,7 +198,9 @@ jobs:
         run: |
           node <<'NODE'
           const fs = require('node:fs');
-          const report = JSON.parse(fs.readFileSync('.github/validation/issue-97-result.json', 'utf8'));
+          const report = JSON.parse(
+            fs.readFileSync('.github/validation/issue-97-result.json', 'utf8'),
+          );
           if (!report.passed) {
             console.error('Final hardening validation failed.');
             console.error(JSON.stringify(report, null, 2));
