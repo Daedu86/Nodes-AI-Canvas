@@ -1,6 +1,7 @@
 import type { ThreadRepoItem } from "@/components/assistant-ui/use-thread-repo-items";
 import { ASSISTANT_EDIT_METADATA_KEY } from "@/lib/assistant-edit-branching";
 import { getModelEntry } from "@/lib/message-model-registry";
+import { getDetachedFromMessageId } from "@/lib/thread-node-deletion";
 import { extractText } from "./graph-geometry";
 import type { Node } from "./graph-types";
 import { ROOT_NODE_ID, ROOT_NODE_LABEL } from "./graph-types";
@@ -37,6 +38,16 @@ export const buildThreadGraphNodes = ({
     depthCache.set(id, depth);
     return depth;
   };
+
+  const detachedRootIds = new Set(
+    repoItems.flatMap((item) =>
+      item.parentId === null &&
+      item.message?.id &&
+      getDetachedFromMessageId(item.message)
+        ? [item.message.id]
+        : [],
+    ),
+  );
 
   const baseNodes = repoItems.map((item, index) => {
     const id = String(item.message?.id ?? index);
@@ -84,7 +95,9 @@ export const buildThreadGraphNodes = ({
 
   if (baseNodes.length === 0) return baseNodes;
 
-  const rootChildren = baseNodes.filter((node) => node.parentId === null);
+  const rootChildren = baseNodes.filter(
+    (node) => node.parentId === null && !detachedRootIds.has(node.id),
+  );
   if (rootChildren.length === 0) return baseNodes;
 
   rootChildren.forEach((node) => {
