@@ -92,7 +92,7 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
             </div>
             <p className="text-[11px] leading-5 text-slate-300/88">
               {persistent
-                ? "Runs independently from chat and other prompt nodes. Shared outputs are serialized."
+                ? "Runs independently from chat. Each completed run creates a separate Assistant node."
                 : detail?.description ?? "Write a prompt directly on the canvas."}
             </p>
           </div>
@@ -157,11 +157,6 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
           {disabled ? (
             <div className="rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">
               AI requests are disabled. Enable AI in the header to run this prompt.
-            </div>
-          ) : null}
-          {persistent && data.promptResult ? (
-            <div className="nowheel max-h-36 overflow-y-auto rounded-xl border border-emerald-300/20 bg-emerald-400/8 px-3 py-2 text-xs leading-5 text-slate-100">
-              {data.promptResult}
             </div>
           ) : null}
         </div>
