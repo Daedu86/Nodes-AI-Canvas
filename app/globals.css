@@ -204,18 +204,6 @@
     display: none;
   }
 
-  .react-flow:has(.react-flow__viewport[style*="scale(0.3"]) .react-flow__node button,
-  .react-flow:has(.react-flow__viewport[style*="scale(0.4"]) .react-flow__node button,
-  .react-flow:has(.react-flow__viewport[style*="scale(0.5"]) .react-flow__node button,
-  .react-flow:has(.react-flow__viewport[style*="scale(0.6"]) .react-flow__node button,
-  .react-flow:has(.react-flow__viewport[style*="scale(0.3"]) .react-flow__node select,
-  .react-flow:has(.react-flow__viewport[style*="scale(0.4"]) .react-flow__node select,
-  .react-flow:has(.react-flow__viewport[style*="scale(0.5"]) .react-flow__node select,
-  .react-flow:has(.react-flow__viewport[style*="scale(0.6"]) .react-flow__node select {
-    visibility: hidden;
-    pointer-events: none;
-  }
-
   .react-flow:has(.react-flow__viewport[style*="scale(0.3"]) .react-flow__node > div,
   .react-flow:has(.react-flow__viewport[style*="scale(0.4"]) .react-flow__node > div,
   .react-flow:has(.react-flow__viewport[style*="scale(0.5"]) .react-flow__node > div,
