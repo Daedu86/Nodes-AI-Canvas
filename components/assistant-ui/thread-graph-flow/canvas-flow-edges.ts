@@ -66,6 +66,43 @@ export function buildConversationFlowEdges({
   return edges;
 }
 
+export function buildCanvasPromptResponseEdges({
+  canvasPrompts,
+}: Pick<CanvasFlowElementsParams, "canvasPrompts">): ThreadGraphFlowEdge[] {
+  return canvasPrompts.flatMap((prompt) => {
+    const responseId = prompt.promptRunId;
+    if (
+      !responseId ||
+      !prompt.promptResult?.trim() ||
+      prompt.promptStatus !== "completed"
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        id: `prompt-response:${prompt.id}->${responseId}`,
+        source: prompt.id,
+        target: responseId,
+        type: "threadEdge",
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: "#2563eb",
+          width: 18,
+          height: 18,
+        },
+        selectable: false,
+        data: {
+          accent: "#2563eb",
+          emphasis: "normal",
+          label: "response",
+          tone: "default",
+        },
+      } satisfies ThreadGraphFlowEdge,
+    ];
+  });
+}
+
 export function buildContextFlowEdges({
   artifactIndex,
   contextLinks,
@@ -120,13 +157,11 @@ export function buildOutputFlowEdges({
     if (link.relation !== "output") continue;
 
     const artifact = artifactIndex.get(link.artifactId);
-    const sourceId =
-      link.promptId && promptIndex.has(link.promptId)
-        ? link.promptId
-        : link.responseId ?? link.promptId;
+    const sourceId = link.responseId ?? link.promptId;
     if (!artifact || !sourceId) continue;
 
     const sourceExists =
+      Boolean(link.responseId) ||
       sourceId === CANVAS_PROMPT_DRAFT_NODE_ID ||
       nodeIndex.has(sourceId) ||
       promptIndex.has(sourceId);
