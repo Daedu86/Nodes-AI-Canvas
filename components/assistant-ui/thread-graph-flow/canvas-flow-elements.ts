@@ -25,6 +25,67 @@ export type {
   CanvasFlowElementsParams,
 } from "@/components/assistant-ui/thread-graph-flow/canvas-flow-elements-types";
 
+type FlowNode = CanvasFlowElements["nodes"][number];
+type FlowEdge = CanvasFlowElements["edges"][number];
+type NodePosition = { x: number; y: number };
+type LayoutCacheEntry = {
+  positions: Map<string, NodePosition>;
+};
+
+const MAX_LAYOUT_CACHE_ENTRIES = 8;
+const layoutCache = new Map<string, LayoutCacheEntry>();
+
+const buildTopologySignature = (nodes: FlowNode[], edges: FlowEdge[]) => {
+  const nodeSignature = nodes
+    .map((node) => `${node.id}:${node.type ?? ""}`)
+    .join("|");
+  const edgeSignature = edges
+    .map(
+      (edge) =>
+        `${edge.id}:${edge.source}>${edge.target}:${edge.sourceHandle ?? ""}:${edge.targetHandle ?? ""}:${edge.type ?? ""}`,
+    )
+    .join("|");
+  return `${nodeSignature}::${edgeSignature}`;
+};
+
+const readCachedLayout = (signature: string) => {
+  const cached = layoutCache.get(signature);
+  if (!cached) return null;
+
+  // Refresh insertion order so frequently used graph shapes stay in the small LRU cache.
+  layoutCache.delete(signature);
+  layoutCache.set(signature, cached);
+  return cached;
+};
+
+const storeLayout = (signature: string, nodes: FlowNode[]) => {
+  layoutCache.set(signature, {
+    positions: new Map(
+      nodes.map((node) => [
+        node.id,
+        { x: node.position.x, y: node.position.y },
+      ]),
+    ),
+  });
+
+  while (layoutCache.size > MAX_LAYOUT_CACHE_ENTRIES) {
+    const oldestKey = layoutCache.keys().next().value;
+    if (typeof oldestKey !== "string") break;
+    layoutCache.delete(oldestKey);
+  }
+};
+
+const applyCachedPositions = (
+  nodes: FlowNode[],
+  cached: LayoutCacheEntry,
+): FlowNode[] =>
+  nodes.map((node) => {
+    const position = cached.positions.get(node.id);
+    if (!position) return node;
+    if (node.position.x === position.x && node.position.y === position.y) return node;
+    return { ...node, position };
+  });
+
 export function buildCanvasFlowElements(
   params: CanvasFlowElementsParams,
 ): CanvasFlowElements {
@@ -87,22 +148,33 @@ export function buildCanvasFlowElements(
     promptIndex: params.promptIndex,
   });
 
-  const laidOut = layoutThreadGraphFlow(
-    [
-      ...conversationNodes,
-      ...draftNodes,
-      ...canvasPromptNodes,
-      ...canvasResponseNodes,
-      ...artifactNodes,
-    ],
-    [
-      ...conversationEdges,
-      ...draftEdges,
-      ...promptResponseEdges,
-      ...contextEdges,
-      ...outputEdges,
-    ],
-  );
+  const nodes = [
+    ...conversationNodes,
+    ...draftNodes,
+    ...canvasPromptNodes,
+    ...canvasResponseNodes,
+    ...artifactNodes,
+  ];
+  const edges = [
+    ...conversationEdges,
+    ...draftEdges,
+    ...promptResponseEdges,
+    ...contextEdges,
+    ...outputEdges,
+  ];
+  const topologySignature = buildTopologySignature(nodes, edges);
+  const cachedLayout = readCachedLayout(topologySignature);
+
+  if (cachedLayout) {
+    return {
+      conversationEdges,
+      edges,
+      nodes: applyCachedPositions(nodes, cachedLayout),
+    };
+  }
+
+  const laidOut = layoutThreadGraphFlow(nodes, edges);
+  storeLayout(topologySignature, laidOut.nodes);
 
   return {
     conversationEdges,
