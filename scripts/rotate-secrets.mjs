@@ -403,7 +403,8 @@ async function main() {
 
   if (!dryRun) {
     const serializedEnv = `${state.lines.join("\n").replace(/\n+$/u, "")}\n`;
-    await writeFile(envFilePath, serializedEnv, { encoding: "utf8", mode: 0o600 }); // lgtm[js/http-to-file-access] Validated provider secrets are intentionally persisted only to the fixed local .env.local file.
+    // lgtm [js/http-to-file-access] Provider responses are restricted to allowlisted HTTPS hosts, validated, and intentionally persisted only to the fixed local .env.local file.
+    await writeFile(envFilePath, serializedEnv, { encoding: "utf8", mode: 0o600 });
     if (process.platform !== "win32") {
       await chmod(envFilePath, 0o600);
     }
