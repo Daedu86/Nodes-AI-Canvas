@@ -131,21 +131,15 @@ export function useCanvasSessionState({
     (nodeId: string | null) => {
       setSelectedNodeId(nodeId);
       setCanvasSelectionId(nodeId);
-      const nextFocusedMessageId = resolveCanvasFocusedMessageId({
-        nodeId,
-        hasArtifact: !!nodeId && artifactIndex.has(nodeId),
-        hasConversationNode: !!nodeId && nodeIndex.has(nodeId),
-        hasPrompt: !!nodeId && promptIndex.has(nodeId),
-      });
-      if (nextFocusedMessageId !== undefined) {
-        setFocusedMessageId(nextFocusedMessageId);
+      if (nodeId == null) {
+        setFocusedMessageId(null);
       }
     },
-    [artifactIndex, nodeIndex, promptIndex, setCanvasSelectionId, setFocusedMessageId],
+    [setCanvasSelectionId, setFocusedMessageId],
   );
 
   React.useEffect(() => {
-    if (!focusedMessageId || focusedMessageId === selectedNodeId) return;
+    if (!focusedMessageId || selectedNodeId) return;
     if (!nodeIndex.has(focusedMessageId)) return;
     setSelectedNodeId(focusedMessageId);
   }, [focusedMessageId, nodeIndex, selectedNodeId]);
