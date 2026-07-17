@@ -1,4 +1,5 @@
 import {
+  buildCanvasPromptResponseEdges,
   buildContextFlowEdges,
   buildConversationFlowEdges,
   buildDraftFlowEdges,
@@ -8,6 +9,7 @@ import { buildCanvasFlowIndexes } from "@/components/assistant-ui/thread-graph-f
 import {
   buildArtifactFlowNodes,
   buildCanvasPromptFlowNodes,
+  buildCanvasResponseFlowNodes,
   buildConversationFlowNodes,
   buildDraftFlowNodes,
   createCanvasModelVisualResolver,
@@ -50,6 +52,9 @@ export function buildCanvasFlowElements(
     runCanvasPrompt: params.runCanvasPrompt,
     updateArtifact: params.updateArtifact,
   });
+  const canvasResponseNodes = buildCanvasResponseFlowNodes({
+    canvasPrompts: params.canvasPrompts,
+  });
   const artifactNodes = buildArtifactFlowNodes({
     artifacts: params.artifacts,
     linkedTargetCountByArtifact: params.linkedTargetCountByArtifact,
@@ -65,6 +70,9 @@ export function buildCanvasFlowElements(
   const draftEdges = buildDraftFlowEdges({
     draftBranchSpec: params.draftBranchSpec,
     nodeIndex: params.nodeIndex,
+  });
+  const promptResponseEdges = buildCanvasPromptResponseEdges({
+    canvasPrompts: params.canvasPrompts,
   });
   const contextEdges = buildContextFlowEdges({
     artifactIndex: params.artifactIndex,
@@ -84,11 +92,13 @@ export function buildCanvasFlowElements(
       ...conversationNodes,
       ...draftNodes,
       ...canvasPromptNodes,
+      ...canvasResponseNodes,
       ...artifactNodes,
     ],
     [
       ...conversationEdges,
       ...draftEdges,
+      ...promptResponseEdges,
       ...contextEdges,
       ...outputEdges,
     ],
