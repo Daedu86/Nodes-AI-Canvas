@@ -8,27 +8,12 @@ const PLAYWRIGHT_BASE_URL =
   process.env.PLAYWRIGHT_BASE_URL ??
   `http://localhost:${process.env.PLAYWRIGHT_PORT ?? "3100"}`;
 
-type ReplyOptions = {
-  history?: "last" | "full";
-  provider?: string;
-  model?: string;
-  count?: number;
-};
-
-function expectedReply(
-  prompt: string,
-  {
-    history = "last",
-    provider = "openrouter",
-    model = "openrouter/free",
-    count = 1,
-  }: ReplyOptions = {},
-) {
-  return `E2E reply: ${prompt} [provider=${provider} model=${model} history=${history} count=${count}]`;
-}
-
 function threadMessage(page: Page, text: string) {
   return page.locator("[data-message-id]").filter({ hasText: text }).first();
+}
+
+function replyPrefix(prompt: string) {
+  return `E2E reply: ${prompt} [provider=openrouter model=openrouter/free history=last count=`;
 }
 
 async function fetchAppJson<T>(page: Page, input: string, init?: RequestInit) {
@@ -46,7 +31,7 @@ async function fetchAppJson<T>(page: Page, input: string, init?: RequestInit) {
     ...(body === undefined ? {} : { data: body }),
   });
   if (!response.ok()) {
-    throw new Error(`Request failed for ${input}: ${response.status}`);
+    throw new Error(`Request failed for ${input}: ${response.status()}`);
   }
   return (await response.json()) as T;
 }
@@ -144,7 +129,7 @@ async function sendPrompt(page: Page, prompt: string) {
     throw new Error(`Chat request failed with ${response.status()}: ${await response.text()}`);
   }
   await expect(threadMessage(page, prompt)).toBeVisible({ timeout: 15_000 });
-  await expect(threadMessage(page, expectedReply(prompt))).toBeVisible({ timeout: 15_000 });
+  await expect(threadMessage(page, replyPrefix(prompt))).toBeVisible({ timeout: 15_000 });
 }
 
 test.beforeEach(async ({ page }) => {
