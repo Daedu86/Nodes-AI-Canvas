@@ -7,6 +7,7 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  useNodesState,
   type Connection,
   type EdgeTypes,
   type NodeTypes,
@@ -51,6 +52,42 @@ const nodeTypes: NodeTypes = {
 const edgeTypes: EdgeTypes = {
   threadEdge: ThreadGraphEdge,
 };
+
+type StoredNodePosition = { x: number; y: number };
+type StoredNodePositions = Record<string, StoredNodePosition>;
+
+const isStoredNodePosition = (value: unknown): value is StoredNodePosition => {
+  if (!value || typeof value !== "object") return false;
+  const position = value as { x?: unknown; y?: unknown };
+  return (
+    typeof position.x === "number" &&
+    Number.isFinite(position.x) &&
+    typeof position.y === "number" &&
+    Number.isFinite(position.y)
+  );
+};
+
+const readStoredNodePositions = (storageKey: string): StoredNodePositions => {
+  if (typeof window === "undefined") return {};
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "{}") as Record<
+      string,
+      unknown
+    >;
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, StoredNodePosition] =>
+        isStoredNodePosition(entry[1]),
+      ),
+    );
+  } catch {
+    return {};
+  }
+};
+
+const isConversationNode = (node: ThreadGraphFlowNode) =>
+  node.data?.kind !== "artifact" &&
+  node.data?.kind !== "canvas-prompt" &&
+  node.data?.kind !== "prompt-draft";
 
 type CanvasStageProps = {
   activeSessionId: string | null;
@@ -98,6 +135,30 @@ export function CanvasStage({
   storedViewport,
   viewportRef,
 }: CanvasStageProps) {
+  const positionStorageKey = `nodes.canvas-message-positions.v1:${activeSessionId ?? "default"}`;
+  const [storedMessagePositions, setStoredMessagePositions] =
+    React.useState<StoredNodePositions>({});
+  const [renderedNodes, setRenderedNodes, onNodesChange] =
+    useNodesState<ThreadGraphFlowNode>(nodes);
+
+  React.useLayoutEffect(() => {
+    setStoredMessagePositions(readStoredNodePositions(positionStorageKey));
+  }, [positionStorageKey]);
+
+  React.useEffect(() => {
+    setRenderedNodes((currentNodes) => {
+      const currentPositionById = new Map(
+        currentNodes.map((node) => [node.id, node.position] as const),
+      );
+      return nodes.map((node) => {
+        if (!isConversationNode(node)) return node;
+        const position =
+          storedMessagePositions[node.id] ?? currentPositionById.get(node.id);
+        return position ? { ...node, position } : node;
+      });
+    });
+  }, [nodes, setRenderedNodes, storedMessagePositions]);
+
   return (
     <div
       ref={viewportRef}
@@ -116,7 +177,7 @@ export function CanvasStage({
         ))}
       </div>
       <p id="canvas-stage-instructions" className="sr-only">
-        Use Tab to reach canvas controls and graph elements. Select a node to inspect it. Double-click a conversation node to open it in Chat.
+        Use Tab to reach canvas controls and graph elements. Select or drag a node to reorganize the canvas. Double-click a conversation node to open it in Chat.
       </p>
       {flowRenderMode === "3d" ? (
         <ThreadGraph3D
@@ -131,7 +192,7 @@ export function CanvasStage({
             key={`flow:${activeSessionId}`}
             aria-label="Conversation graph"
             data-graph-structure={graphStructureSignature}
-            nodes={nodes}
+            nodes={renderedNodes}
             edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -140,11 +201,12 @@ export function CanvasStage({
             fitViewOptions={{ padding: 0.18 }}
             minZoom={0.3}
             maxZoom={1.6}
-            onlyRenderVisibleElements={nodes.length > 200}
+            onlyRenderVisibleElements={renderedNodes.length > 200}
             nodesDraggable
             elementsSelectable
             proOptions={{ hideAttribution: true }}
             onInit={onInit}
+            onNodesChange={onNodesChange}
             onConnect={onCanvasConnect}
             onMoveEnd={(_, viewport) => onViewportChange(viewport)}
             onNodeDragStop={(_, node) => {
@@ -159,6 +221,19 @@ export function CanvasStage({
                 onArtifactPositionChange(node.id, position);
               } else if (node.data?.kind === "prompt-draft") {
                 onDraftPositionChange(position);
+              } else {
+                setStoredMessagePositions((current) => {
+                  const next = { ...current, [node.id]: position };
+                  try {
+                    window.localStorage.setItem(
+                      positionStorageKey,
+                      JSON.stringify(next),
+                    );
+                  } catch {
+                    // The node remains movable even when browser storage is unavailable.
+                  }
+                  return next;
+                });
               }
             }}
             onSelectionChange={({ nodes: selectedNodes }) => {
@@ -206,7 +281,7 @@ export function CanvasStage({
           </ReactFlow>
           <div className="pointer-events-none absolute bottom-5 left-20 z-10 hidden items-center gap-2 md:flex">
             <div className="pointer-events-none rounded-full border border-white/70 bg-white/82 px-3 py-1 text-[11px] text-muted-foreground shadow-[0_18px_48px_-36px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
-              Drag nodes directly on the stage. The canvas is the main workspace.
+              Drag nodes directly on the stage. Their positions are saved for this session.
             </div>
           </div>
         </>
