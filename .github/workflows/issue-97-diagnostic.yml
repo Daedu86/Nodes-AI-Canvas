@@ -25,7 +25,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-      - name: Capture failed test log and CodeQL alerts
+      - name: Summarize failed test log and CodeQL alerts
         run: |
           mkdir -p .github/validation
           gh run view "${TARGET_RUN_ID}" --repo "${GITHUB_REPOSITORY}" --job "${TARGET_JOB_ID}" --log-failed > /tmp/unit-failure.log 2>&1 || true
@@ -37,42 +37,55 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const target = process.env.TARGET_SHA;
-          const log = fs.readFileSync('/tmp/unit-failure.log', 'utf8');
+          const ansi = /\u001b\[[0-9;]*m/gu;
+          const rawLines = fs.readFileSync('/tmp/unit-failure.log', 'utf8')
+            .replace(ansi, '')
+            .split(/\r?\n/u)
+            .map((line) => line.replace(/^Unit and coverage\t[^\t]+\t[^\t]+\t/u, ''));
+          const pattern = /(FAIL|AssertionError|expected|received|toHaveBeenCalled|Test Files|Tests\s|thread-composer|Error:|×|❯)/iu;
+          const selected = new Set();
+          rawLines.forEach((line, index) => {
+            if (!pattern.test(line)) return;
+            for (let cursor = Math.max(0, index - 5); cursor <= Math.min(rawLines.length - 1, index + 8); cursor += 1) {
+              selected.add(cursor);
+            }
+          });
+          const summary = [...selected]
+            .sort((a, b) => a - b)
+            .map((index) => rawLines[index])
+            .filter(Boolean)
+            .join('\n')
+            .slice(-30000);
+          fs.writeFileSync('.github/validation/issue-97-unit-summary.txt', `${summary}\n`);
+
           const alerts = JSON.parse(fs.readFileSync('/tmp/codeql-alerts.json', 'utf8'));
           const relevantAlerts = alerts
-            .filter((alert) =>
-              alert.tool?.name === 'CodeQL' &&
-              (alert.most_recent_instance?.commit_sha === target || alert.state === 'open'),
-            )
+            .filter((alert) => alert.tool?.name === 'CodeQL')
             .map((alert) => ({
               number: alert.number,
               state: alert.state,
-              rule: {
-                id: alert.rule?.id,
-                name: alert.rule?.name,
-                description: alert.rule?.description,
-                severity: alert.rule?.severity,
-                securitySeverityLevel: alert.rule?.security_severity_level,
-              },
+              ruleId: alert.rule?.id,
+              ruleName: alert.rule?.name,
+              description: alert.rule?.description,
+              severity: alert.rule?.severity,
+              securitySeverityLevel: alert.rule?.security_severity_level,
               path: alert.most_recent_instance?.location?.path,
               startLine: alert.most_recent_instance?.location?.start_line,
               endLine: alert.most_recent_instance?.location?.end_line,
               message: alert.most_recent_instance?.message?.text,
               commitSha: alert.most_recent_instance?.commit_sha,
               htmlUrl: alert.html_url,
+              relevantToTarget: alert.most_recent_instance?.commit_sha === target,
             }));
-          const report = {
-            collectedAt: new Date().toISOString(),
-            targetSha: target,
-            unitFailureLog: log.slice(-60000),
-            codeqlAlerts: relevantAlerts,
-          };
-          fs.writeFileSync('.github/validation/issue-97-failures.json', `${JSON.stringify(report, null, 2)}\n`);
+          fs.writeFileSync(
+            '.github/validation/issue-97-codeql-alerts.json',
+            `${JSON.stringify(relevantAlerts, null, 2)}\n`,
+          );
           NODE
-      - name: Commit failure details
+      - name: Commit summaries
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/validation/issue-97-failures.json
-          git commit -m "chore: record issue 97 failure details [skip ci] [skip vercel]"
+          git add .github/validation/issue-97-unit-summary.txt .github/validation/issue-97-codeql-alerts.json
+          git commit -m "chore: record issue 97 failure summaries [skip ci] [skip vercel]"
           git push origin HEAD:main
