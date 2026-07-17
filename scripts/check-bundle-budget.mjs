@@ -4,8 +4,8 @@ import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const DEFAULT_BUNDLE_BUDGET = {
-  maxSingleGzipBytes: 1_200_000,
-  maxTotalGzipBytes: 6_000_000,
+  maxSingleGzipBytes: 400_000,
+  maxTotalGzipBytes: 1_500_000,
 };
 
 export function evaluateBundleBudget(assets, budget = DEFAULT_BUNDLE_BUDGET) {

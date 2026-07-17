@@ -7,10 +7,10 @@ import {
   DEFAULT_CANVAS_BENCHMARK_WORKLOAD,
 } from "./canvas-flow-benchmark-fixture";
 
-const DEFAULT_MAX_MEDIAN_MS = 10_000;
-const DEFAULT_MAX_SCALE_RATIO = 30;
-const SAMPLE_COUNT = 3;
-const WARMUP_COUNT = 1;
+const DEFAULT_MAX_MEDIAN_MS = 150;
+const DEFAULT_MAX_SCALE_RATIO = 8;
+const SAMPLE_COUNT = 9;
+const WARMUP_COUNT = 2;
 
 const readPositiveNumber = (name, fallback) => {
   const parsed = Number(process.env[name]);
@@ -70,8 +70,9 @@ describe("canvas flow performance budget", () => {
         createCanvasBenchmarkCase(smallWorkload),
       );
       const large = measureBenchmarkCase(createCanvasBenchmarkCase());
-      // Small timings can approach the timer/JIT noise floor on fast runners.
-      const scaleRatio = large.medianMs / Math.max(small.medianMs, 25);
+      // Keep the denominator above the sub-millisecond timer noise floor while
+      // retaining a meaningful comparison on fast runners.
+      const scaleRatio = large.medianMs / Math.max(small.medianMs, 1);
 
       console.info(
         "[canvas-performance-budget]",

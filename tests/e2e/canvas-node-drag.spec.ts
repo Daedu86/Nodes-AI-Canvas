@@ -114,6 +114,61 @@ async function readGraphPosition(node: Locator) {
   });
 }
 
+async function readGraphViewport(viewport: Locator) {
+  return viewport.evaluate((element) => {
+    const transform = getComputedStyle(element).transform;
+    const matrix = new DOMMatrixReadOnly(transform === "none" ? undefined : transform);
+    return { x: matrix.m41, y: matrix.m42, zoom: matrix.a };
+  });
+}
+
+async function findEmptyPanePoint(pane: Locator) {
+  return pane.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    for (let row = 1; row < 10; row += 1) {
+      for (let column = 1; column < 10; column += 1) {
+        const x = rect.left + (rect.width * column) / 10;
+        const y = rect.top + (rect.height * row) / 10;
+        if (document.elementFromPoint(x, y) === element) return { x, y };
+      }
+    }
+    throw new Error("Could not find an uncovered Canvas pane point");
+  });
+}
+
+async function useZoomControlUntil({
+  control,
+  viewport,
+  target,
+}: {
+  control: Locator;
+  viewport: Locator;
+  target: (zoom: number) => boolean;
+}) {
+  let current = await readGraphViewport(viewport);
+  for (let attempt = 0; attempt < 8 && !target(current.zoom); attempt += 1) {
+    const previousZoom = current.zoom;
+    let latestZoom = previousZoom;
+    let stableSamples = 0;
+    await control.click();
+    await expect
+      .poll(async () => {
+        const next = await readGraphViewport(viewport);
+        const moved = Math.abs(next.zoom - previousZoom) > 0.01;
+        stableSamples =
+          moved && Math.abs(next.zoom - latestZoom) < 0.001
+            ? stableSamples + 1
+            : 0;
+        latestZoom = next.zoom;
+        return stableSamples;
+      }, { intervals: [50, 100, 100, 150], timeout: 3_000 })
+      .toBeGreaterThanOrEqual(2);
+    current = await readGraphViewport(viewport);
+  }
+  expect(target(current.zoom)).toBe(true);
+  return current.zoom;
+}
+
 test.beforeEach(async ({ page }) => {
   await resetAppData(page);
 });
@@ -204,4 +259,122 @@ test("conversation nodes can be dragged and keep their position after reload", a
       { timeout: 10_000 },
     )
     .toBe(true);
+});
+
+test("keeps core Canvas interactions usable across selection, pan, zoom, and Chat focus", async ({
+  page,
+}) => {
+  test.slow();
+  await createAndOpenSession(page);
+  await dismissWorkspaceGuide(page);
+
+  const prompt = "Exercise the complete Canvas interaction path.";
+  const composer = page.getByPlaceholder("Write a message...");
+  await composer.fill(prompt);
+  await composer.press("Enter");
+  await openCanvas(page);
+
+  const canvas = page.getByRole("region", { name: "Conversation canvas" });
+  const graph = canvas.locator('[aria-label="Conversation graph"]');
+  const pane = canvas.locator(".react-flow__pane");
+  const viewport = canvas.locator(".react-flow__viewport");
+  const minimap = canvas.locator(".react-flow__minimap");
+  const zoomOut = canvas.getByRole("button", { name: "Zoom Out" });
+  const zoomIn = canvas.getByRole("button", { name: "Zoom In" });
+  const fitView = canvas.getByRole("button", { name: "Fit View" });
+  const conversationNodes = canvas.locator(".react-flow__node-threadNode");
+
+  await expect(graph).toBeVisible();
+  await expect
+    .poll(async () => conversationNodes.count(), { timeout: 20_000 })
+    .toBeGreaterThanOrEqual(3);
+  await expect(minimap).toBeVisible({ timeout: 10_000 });
+  await expect(zoomOut).toBeEnabled();
+  await expect(zoomIn).toBeEnabled();
+  await expect(fitView).toBeEnabled();
+
+  const lastConversationNode = conversationNodes.last();
+  await expect(lastConversationNode).toBeVisible();
+  const nodeId = await lastConversationNode.getAttribute("data-id");
+  expect(nodeId).toBeTruthy();
+  if (!nodeId) throw new Error("Conversation node is missing its data-id");
+  const node = canvas.locator(`.react-flow__node-threadNode[data-id="${nodeId}"]`);
+
+  const focusBadge = node.getByText("Focus", { exact: true });
+  await node.click({ position: { x: 24, y: 24 } });
+  await expect(focusBadge).toBeVisible();
+
+  const panePoint = await findEmptyPanePoint(pane);
+  await page.mouse.click(panePoint.x, panePoint.y);
+  await expect(focusBadge).toBeHidden();
+
+  const viewportBeforePan = await readGraphViewport(viewport);
+  await page.mouse.move(panePoint.x, panePoint.y);
+  await page.mouse.down();
+  await page.mouse.move(panePoint.x + 140, panePoint.y + 80, { steps: 10 });
+  await expect(canvas).toHaveAttribute("data-canvas-interacting", "true");
+  await expect(minimap).toHaveCount(0);
+  await page.mouse.up();
+
+  await expect
+    .poll(async () => {
+      const current = await readGraphViewport(viewport);
+      return Math.hypot(
+        current.x - viewportBeforePan.x,
+        current.y - viewportBeforePan.y,
+      );
+    })
+    .toBeGreaterThan(40);
+  await expect(canvas).toHaveAttribute("data-canvas-interacting", "false");
+  await expect(minimap).toBeVisible();
+
+  const nodeDetailControl = node.getByRole("button", {
+    name: "Delete message node",
+  });
+  const nodeSurface = node.locator(":scope > div").first();
+  await expect(nodeDetailControl).toBeVisible();
+  await expect
+    .poll(async () =>
+      nodeSurface.evaluate((element) => getComputedStyle(element).boxShadow),
+    )
+    .not.toBe("none");
+  await useZoomControlUntil({
+    control: zoomOut,
+    viewport,
+    target: (zoom) => zoom < 0.65,
+  });
+  const lowZoomDetailState = await nodeSurface.evaluate((element) => ({
+    boxShadow: getComputedStyle(element).boxShadow,
+    viewportStyle:
+      element
+        .closest(".react-flow")
+        ?.querySelector(".react-flow__viewport")
+        ?.getAttribute("style") ?? "",
+  }));
+  expect(lowZoomDetailState.viewportStyle).toMatch(/scale\(0\.[3-6]/u);
+  expect(lowZoomDetailState.boxShadow).toBe("none");
+  await expect(nodeDetailControl).toBeVisible();
+
+  await useZoomControlUntil({
+    control: zoomIn,
+    viewport,
+    target: (zoom) => zoom > 0.75,
+  });
+  await expect
+    .poll(async () =>
+      nodeSurface.evaluate((element) => getComputedStyle(element).boxShadow),
+    )
+    .not.toBe("none");
+  await expect(nodeDetailControl).toBeVisible();
+
+  await page.getByRole("button", { name: "Show canvas panel" }).click();
+  await expect(page.getByRole("button", { name: "Open split workspace" })).toBeVisible();
+  await expect(composer).toBeHidden();
+  await fitView.click();
+  await expect(node).toBeVisible();
+  await node.dblclick({ position: { x: 24, y: 24 } });
+
+  await expect(page.getByRole("button", { name: "Exit split workspace" })).toBeVisible();
+  await expect(composer).toBeVisible();
+  await expect(page.locator(`[data-message-id="${nodeId}"]`)).toBeVisible();
 });

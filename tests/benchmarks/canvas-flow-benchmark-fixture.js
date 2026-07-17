@@ -10,6 +10,39 @@ export const DEFAULT_CANVAS_BENCHMARK_WORKLOAD = Object.freeze({
   promptCount: 50,
 });
 
+export const CANVAS_BENCHMARK_NODE_WORKLOADS = Object.freeze([
+  Object.freeze({
+    nodeCount: 100,
+    workload: Object.freeze({
+      artifactCount: 19,
+      contextLinkCount: 77,
+      messageCount: 77,
+      outputLinkCount: 77,
+      promptCount: 4,
+    }),
+  }),
+  Object.freeze({
+    nodeCount: 300,
+    workload: Object.freeze({
+      artifactCount: 58,
+      contextLinkCount: 231,
+      messageCount: 231,
+      outputLinkCount: 231,
+      promptCount: 11,
+    }),
+  }),
+  Object.freeze({
+    nodeCount: 500,
+    workload: Object.freeze({
+      artifactCount: 96,
+      contextLinkCount: 385,
+      messageCount: 385,
+      outputLinkCount: 385,
+      promptCount: 19,
+    }),
+  }),
+]);
+
 const positiveInteger = (value, fallback, minimum = 1) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= minimum
