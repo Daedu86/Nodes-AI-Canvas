@@ -74,7 +74,7 @@ export const layoutThreadGraphFlow = (
       node.data.kind === "prompt-draft" ? node.data.position ?? null : null;
     return {
       ...node,
-      draggable: node.data.kind === "prompt-draft",
+      draggable: true,
       position:
         storedDraftPosition ??
         (dagrePosition
