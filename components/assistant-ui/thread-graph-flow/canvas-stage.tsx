@@ -215,7 +215,7 @@ export function CanvasStage({
   );
 
   const handleNodeDragStop = React.useCallback(
-    (_event: React.MouseEvent, node: ThreadGraphFlowNode) => {
+    (_event: MouseEvent | TouchEvent, node: ThreadGraphFlowNode) => {
       setIsInteracting(false);
       const position = { x: node.position.x, y: node.position.y };
 
