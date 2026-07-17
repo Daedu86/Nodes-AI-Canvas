@@ -1,7 +1,7 @@
 {
-  "completedAt": "2026-07-17T15:26:29.804Z",
-  "validatedSha": "f528236b0ede0c885df0c011d06f1304a9defc85",
-  "workflowRunId": "29584162688",
+  "completedAt": "2026-07-17T16:36:14.843Z",
+  "validatedSha": "3a41db3941302f111461d3b271d622940e639361",
+  "workflowRunId": "29595860215",
   "outcomes": {
     "install": "success",
     "repositoryChecks": "success",
@@ -14,7 +14,7 @@
   "sarifFiles": [
     "sarif-results/javascript.sarif"
   ],
-  "codeqlFindings": 1,
+  "codeqlFindings": 0,
   "sarifErrors": [],
   "passed": false
 }
