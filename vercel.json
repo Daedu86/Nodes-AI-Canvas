@@ -1,4 +1,5 @@
 {
   "framework": "nextjs",
+  "regions": ["fra1"],
   "ignoreCommand": "git log -1 --pretty=%B | grep -Fq '[skip vercel]'"
 }
