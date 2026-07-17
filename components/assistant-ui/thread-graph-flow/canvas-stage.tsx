@@ -16,6 +16,7 @@ import {
 } from "@xyflow/react";
 import { ArtifactGraphNode } from "@/components/assistant-ui/thread-graph-flow/artifact-node";
 import { CanvasPromptNode } from "@/components/assistant-ui/thread-graph-flow/canvas-prompt-node";
+import { CanvasResponseNode } from "@/components/assistant-ui/thread-graph-flow/canvas-response-node";
 import { ThreadGraphEdge } from "@/components/assistant-ui/thread-graph-flow/thread-graph-edge";
 import { ThreadGraphNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-node";
 import type {
@@ -45,6 +46,7 @@ const ThreadGraph3D = dynamic(
 
 const nodeTypes: NodeTypes = {
   artifactNode: ArtifactGraphNode,
+  canvasResponseNode: CanvasResponseNode,
   promptNode: CanvasPromptNode,
   threadNode: ThreadGraphNode,
 };
@@ -87,6 +89,7 @@ const readStoredNodePositions = (storageKey: string): StoredNodePositions => {
 const isConversationNode = (node: ThreadGraphFlowNode) =>
   node.data?.kind !== "artifact" &&
   node.data?.kind !== "canvas-prompt" &&
+  node.data?.kind !== "canvas-response" &&
   node.data?.kind !== "prompt-draft";
 
 type CanvasStageProps = {
@@ -246,6 +249,7 @@ export function CanvasStage({
               if (
                 node.data.kind === "artifact" ||
                 node.data.kind === "canvas-prompt" ||
+                node.data.kind === "canvas-response" ||
                 node.id === ROOT_NODE_ID
               ) {
                 return;
