@@ -21,22 +21,52 @@ This file defines the default operating rules for AI coding agents working in th
 
 - Read the relevant implementation, tests, configuration, and nearby documentation.
 - Confirm the current behavior before changing it.
-- Distinguish between a product defect, an obsolete test, a CI configuration problem, and an environment problem.
+- Distinguish between a product defect, an obsolete test, a flaky test, a CI configuration problem, and an environment problem.
 - Do not remove a test merely to obtain a green result. Remove or replace it only when it verifies behavior that has intentionally been removed or superseded.
 
-## Validation order
+## Validation workflow
 
 Run the cheapest and most targeted checks first. Stop and fix failures before starting expensive validation.
 
 1. Format and lint checks for the affected files.
 2. TypeScript checks for the affected scope.
-3. Targeted unit tests.
+3. Targeted unit or integration tests.
 4. Relevant coverage checks.
 5. Production build and bundle budget when application code or build configuration changed.
-6. Relevant end-to-end tests.
-7. Full end-to-end, performance, audit, and security validation only when justified by the scope or required for release hardening.
+6. Relevant smoke or domain end-to-end tests.
+7. Full end-to-end, performance, audit, and security validation only when justified by the scope or required for final hardening.
 
-Do not repeatedly run the entire validation suite while known fast checks are failing.
+Do not continue to broader validation while a known fast or targeted check is failing.
+
+When a test fails:
+
+1. Classify the failure as a product defect, obsolete test, flaky test, environment problem, or CI/test-infrastructure problem.
+2. Fix the underlying cause instead of bypassing the assertion.
+3. Re-run only the failed test first.
+4. After it passes, run the related file, feature group, or domain suite.
+5. Continue to broader checks only after the affected scope is green.
+
+A flaky test may be repeated once to confirm instability. Repeated success is not a substitute for fixing nondeterminism.
+
+Do not repeatedly run the entire validation suite while known fast checks are failing. Do not repeat an already-passing expensive suite after an unrelated change unless the new change affects shared infrastructure, global configuration, navigation, persistence, providers, or another dependency of that suite.
+
+Before closing an issue or completing a substantial task, run one clean final validation against the final repository state.
+
+## End-to-end testing policy
+
+Organize E2E coverage into three layers:
+
+- **Smoke:** essential user journeys such as loading the application, opening a project, creating or running a node, sending a prompt, and verifying basic persistence.
+- **Domain:** focused suites for areas such as Canvas, sessions, navigation, branching, persistence, providers, and accessibility.
+- **Full regression:** the complete suite, cross-browser checks when applicable, performance, audits, and release hardening.
+
+During development, run the smoke suite and only the domain suites affected by the change. Run full regression once at the end, manually, nightly, or as part of release hardening.
+
+E2E tests must verify stable user contracts rather than fragile implementation details. Prefer accessible roles, names, and explicit stable test identifiers over CSS structure, incidental text, arbitrary delays, or timing assumptions.
+
+Mocks and fixtures must reproduce the real application contract closely enough that a passing test represents real behavior. Keep test data isolated and deterministic. A new or modified E2E test is not complete until it is reliable under repeated execution.
+
+On E2E failure, preserve enough diagnostic evidence to identify the cause: trace, screenshot, current URL, browser console errors, relevant network failures, and video only when useful.
 
 ## CI design principles
 
