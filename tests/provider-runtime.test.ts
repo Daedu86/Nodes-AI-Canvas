@@ -44,12 +44,12 @@ describe("provider runtime", () => {
   beforeEach(() => {
     createOpenAIMock.mockReset();
     getLlmSettingsMock.mockReset();
-    createOpenAIMock.mockImplementation(
-      (settings: Record<string, unknown>) => (modelId: string) => ({
+    createOpenAIMock.mockImplementation((settings: Record<string, unknown>) => ({
+      chat: (modelId: string) => ({
         modelId,
         settings,
       }),
-    );
+    }));
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.OPENROUTER_ALLOW_DEPLOYMENT_KEY;
     delete process.env.OPENROUTER_REQUIRE_USER_KEY;
