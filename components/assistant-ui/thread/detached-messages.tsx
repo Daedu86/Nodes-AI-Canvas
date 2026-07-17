@@ -101,39 +101,39 @@ export function DetachedMessages() {
   if (detachedItems.length === 0) return null;
 
   return (
-    <section
+    <aside
       aria-label="Detached messages"
-      className="mx-auto mt-6 w-full max-w-[var(--thread-max-width)] rounded-3xl border border-orange-500/25 bg-orange-500/[0.04] px-4 py-4 shadow-sm"
+      data-testid="detached-messages-panel"
+      className="flex h-full w-[19rem] max-w-[42%] shrink-0 flex-col overflow-hidden border-l border-orange-500/20 bg-background/92 shadow-[-18px_0_36px_-30px_rgba(15,23,42,0.45)] backdrop-blur-sm"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Unplug className="h-4 w-4 text-orange-600 dark:text-orange-300" />
-            <h2 className="text-sm font-semibold text-foreground">Detached messages</h2>
-            <span className="rounded-full border border-orange-500/25 bg-background px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:text-orange-300">
-              {detachedItems.length}
-            </span>
-          </div>
-          <p className="text-xs leading-5 text-muted-foreground">
-            These messages were preserved after their parent node was deleted. They remain available for reuse in the canvas.
-          </p>
+      <div className="shrink-0 border-b border-orange-500/15 px-4 py-4">
+        <div className="flex items-center gap-2">
+          <Unplug className="h-4 w-4 text-orange-600 dark:text-orange-300" />
+          <h2 className="text-sm font-semibold text-foreground">Detached messages</h2>
+          <span className="rounded-full border border-orange-500/25 bg-background px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:text-orange-300">
+            {detachedItems.length}
+          </span>
         </div>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          Preserved message branches that are no longer part of the active chat flow.
+        </p>
       </div>
 
-      <div className="mt-3 space-y-2">
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden px-3 py-3">
         {detachedItems.map(({ depth, detachedFromId, item }) => {
           const id = item.message?.id;
           if (!id) return null;
           const role = item.message?.role === "assistant" ? "Assistant" : "User";
           const text = extractMessageText(item.message) || "No text content";
+          const indent = Math.min(depth, 4) * 10;
           return (
             <button
               key={id}
               type="button"
-              className="group flex w-full items-start justify-between gap-3 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 text-left transition hover:border-orange-500/35 hover:bg-background"
+              className="group flex w-full items-start justify-between gap-2 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 text-left transition hover:border-orange-500/35 hover:bg-background"
               style={{
-                marginLeft: `${Math.min(depth, 4) * 14}px`,
-                width: `calc(100% - ${Math.min(depth, 4) * 14}px)`,
+                marginLeft: `${indent}px`,
+                width: `calc(100% - ${indent}px)`,
               }}
               onClick={() => {
                 setFocusedMessageId(id);
@@ -141,18 +141,18 @@ export function DetachedMessages() {
                 setViewMode("split");
               }}
             >
-              <span className="min-w-0">
-                <span className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   <span>{role}</span>
                   {depth === 0 && detachedFromId ? (
-                    <span className="rounded-full border border-orange-500/25 px-2 py-0.5 normal-case tracking-normal text-orange-700 dark:text-orange-300">
-                      detached from {detachedFromId.slice(0, 8)}
+                    <span className="rounded-full border border-orange-500/25 px-1.5 py-0.5 normal-case tracking-normal text-orange-700 dark:text-orange-300">
+                      from {detachedFromId.slice(0, 8)}
                     </span>
                   ) : (
                     <span>detached branch</span>
                   )}
                 </span>
-                <span className="mt-1 line-clamp-4 block whitespace-pre-wrap break-words text-sm leading-5 text-foreground/90">
+                <span className="mt-1 line-clamp-5 block whitespace-pre-wrap break-words text-sm leading-5 text-foreground/90">
                   {text}
                 </span>
               </span>
@@ -163,6 +163,6 @@ export function DetachedMessages() {
           );
         })}
       </div>
-    </section>
+    </aside>
   );
 }
