@@ -37,7 +37,11 @@ const ThreadGraph3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div role="status" aria-live="polite" className="flex h-full min-h-[28rem] items-center justify-center rounded-[32px] border border-white/70 bg-background/80 text-sm text-muted-foreground dark:border-white/10">
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex h-full min-h-[28rem] items-center justify-center rounded-[32px] border border-white/70 bg-background/80 text-sm text-muted-foreground dark:border-white/10"
+      >
         Loading 3D canvas…
       </div>
     ),
@@ -79,13 +83,13 @@ const isStoredNodePosition = (value: unknown): value is StoredNodePosition => {
 const readStoredNodePositions = (storageKey: string): StoredNodePositions => {
   if (typeof window === "undefined") return {};
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "{}") as Record<
-      string,
-      unknown
-    >;
+    const parsed = JSON.parse(
+      window.localStorage.getItem(storageKey) ?? "{}",
+    ) as Record<string, unknown>;
     return Object.fromEntries(
-      Object.entries(parsed).filter((entry): entry is [string, StoredNodePosition] =>
-        isStoredNodePosition(entry[1]),
+      Object.entries(parsed).filter(
+        (entry): entry is [string, StoredNodePosition] =>
+          isStoredNodePosition(entry[1]),
       ),
     );
   } catch {
@@ -93,29 +97,30 @@ const readStoredNodePositions = (storageKey: string): StoredNodePositions => {
   }
 };
 
-const isConversationNode = (node: ThreadGraphFlowNode) =>
-  node.data?.kind !== "artifact" &&
-  node.data?.kind !== "canvas-prompt" &&
-  node.data?.kind !== "canvas-response" &&
-  node.data?.kind !== "prompt-draft";
-
 const positionsEqual = (
   left: StoredNodePosition | undefined,
   right: StoredNodePosition | undefined,
 ) => left?.x === right?.x && left?.y === right?.y;
+
+const shouldUseStoredPosition = (node: ThreadGraphFlowNode) =>
+  node.data?.kind !== "prompt-draft";
 
 const mergeRenderedNodes = (
   currentNodes: ThreadGraphFlowNode[],
   incomingNodes: ThreadGraphFlowNode[],
   storedPositions: StoredNodePositions,
 ) => {
-  const currentById = new Map(currentNodes.map((node) => [node.id, node] as const));
+  const currentById = new Map(
+    currentNodes.map((node) => [node.id, node] as const),
+  );
   let changed = currentNodes.length !== incomingNodes.length;
 
   const nextNodes = incomingNodes.map((incomingNode, index) => {
     const currentNode = currentById.get(incomingNode.id);
-    const desiredPosition = isConversationNode(incomingNode)
-      ? storedPositions[incomingNode.id] ?? currentNode?.position ?? incomingNode.position
+    const desiredPosition = shouldUseStoredPosition(incomingNode)
+      ? storedPositions[incomingNode.id] ??
+        currentNode?.position ??
+        incomingNode.position
       : incomingNode.position;
 
     if (
@@ -186,21 +191,40 @@ export function CanvasStage({
   viewportRef,
 }: CanvasStageProps) {
   const positionStorageKey = `nodes.canvas-message-positions.v1:${activeSessionId ?? "default"}`;
-  const [storedMessagePositions, setStoredMessagePositions] =
+  const [storedNodePositions, setStoredNodePositions] =
     React.useState<StoredNodePositions>({});
   const [isInteracting, setIsInteracting] = React.useState(false);
   const [renderedNodes, setRenderedNodes, onNodesChange] =
     useNodesState<ThreadGraphFlowNode>(nodes);
 
   React.useLayoutEffect(() => {
-    setStoredMessagePositions(readStoredNodePositions(positionStorageKey));
+    setStoredNodePositions(readStoredNodePositions(positionStorageKey));
   }, [positionStorageKey]);
 
   React.useEffect(() => {
     setRenderedNodes((currentNodes) =>
-      mergeRenderedNodes(currentNodes, nodes, storedMessagePositions),
+      mergeRenderedNodes(currentNodes, nodes, storedNodePositions),
     );
-  }, [nodes, setRenderedNodes, storedMessagePositions]);
+  }, [nodes, setRenderedNodes, storedNodePositions]);
+
+  const persistNodePosition = React.useCallback(
+    (nodeId: string, position: StoredNodePosition) => {
+      setStoredNodePositions((current) => {
+        if (positionsEqual(current[nodeId], position)) return current;
+        const next = { ...current, [nodeId]: position };
+        try {
+          window.localStorage.setItem(
+            positionStorageKey,
+            JSON.stringify(next),
+          );
+        } catch {
+          // The node remains movable even when browser storage is unavailable.
+        }
+        return next;
+      });
+    },
+    [positionStorageKey],
+  );
 
   const handleInteractionStart = React.useCallback(() => {
     setIsInteracting(true);
@@ -219,32 +243,24 @@ export function CanvasStage({
       setIsInteracting(false);
       const position = { x: node.position.x, y: node.position.y };
 
-      if (
-        node.data?.kind === "artifact" ||
-        node.data?.kind === "canvas-prompt" ||
-        node.data?.kind === "canvas-response"
-      ) {
-        onArtifactPositionChange(node.id, position);
-        return;
-      }
-
       if (node.data?.kind === "prompt-draft") {
         onDraftPositionChange(position);
         return;
       }
 
-      setStoredMessagePositions((current) => {
-        if (positionsEqual(current[node.id], position)) return current;
-        const next = { ...current, [node.id]: position };
-        try {
-          window.localStorage.setItem(positionStorageKey, JSON.stringify(next));
-        } catch {
-          // The node remains movable even when browser storage is unavailable.
-        }
-        return next;
-      });
+      // Every draggable node gets an immediate session-local position. This
+      // prevents synthetic canvas responses and prompts from snapping back
+      // while their backing state is being recomputed by the graph layout.
+      persistNodePosition(node.id, position);
+
+      if (
+        node.data?.kind === "artifact" ||
+        node.data?.kind === "canvas-prompt"
+      ) {
+        onArtifactPositionChange(node.id, position);
+      }
     },
-    [onArtifactPositionChange, onDraftPositionChange, positionStorageKey],
+    [onArtifactPositionChange, onDraftPositionChange, persistNodePosition],
   );
 
   const handleSelectionChange = React.useCallback(
@@ -255,7 +271,8 @@ export function CanvasStage({
   );
 
   const handleNodeClick = React.useCallback(
-    (_event: React.MouseEvent, node: ThreadGraphFlowNode) => onNodeSelect(node.id),
+    (_event: React.MouseEvent, node: ThreadGraphFlowNode) =>
+      onNodeSelect(node.id),
     [onNodeSelect],
   );
 
@@ -275,7 +292,11 @@ export function CanvasStage({
     [onMessageOpen, onNodeSelect],
   );
 
-  const handlePaneClick = React.useCallback(() => onNodeSelect(null), [onNodeSelect]);
+  const handlePaneClick = React.useCallback(
+    () => onNodeSelect(null),
+    [onNodeSelect],
+  );
+
   const shouldCull =
     renderedNodes.length > VISIBLE_ELEMENT_NODE_THRESHOLD ||
     edges.length > VISIBLE_ELEMENT_EDGE_THRESHOLD;
@@ -291,16 +312,34 @@ export function CanvasStage({
       onDragOver={onCanvasDragOver}
       onDrop={onCanvasDrop}
     >
-      <div role="group" aria-label="Canvas render mode" className="absolute right-5 top-5 z-20 flex items-center rounded-full border border-white/70 bg-white/92 p-1 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/92">
+      <div
+        role="group"
+        aria-label="Canvas render mode"
+        className="absolute right-5 top-5 z-20 flex items-center rounded-full border border-white/70 bg-white/92 p-1 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/92"
+      >
         {(["2d", "3d"] as FlowRenderMode[]).map((mode) => (
-          <button key={mode} type="button" aria-pressed={flowRenderMode === mode} onClick={() => onFlowRenderModeChange(mode)} className={`rounded-full px-3 py-2 transition-colors ${flowRenderMode === mode ? "bg-foreground text-background" : "hover:text-foreground"}`}>
+          <button
+            key={mode}
+            type="button"
+            aria-pressed={flowRenderMode === mode}
+            onClick={() => onFlowRenderModeChange(mode)}
+            className={`rounded-full px-3 py-2 transition-colors ${
+              flowRenderMode === mode
+                ? "bg-foreground text-background"
+                : "hover:text-foreground"
+            }`}
+          >
             {mode.toUpperCase()}
           </button>
         ))}
       </div>
+
       <p id="canvas-stage-instructions" className="sr-only">
-        Use Tab to reach canvas controls and graph elements. Select or drag a node to reorganize the canvas. Double-click a conversation node to open it in Chat.
+        Use Tab to reach canvas controls and graph elements. Select or drag a
+        node to reorganize the canvas. Double-click a conversation node to open
+        it in Chat.
       </p>
+
       {flowRenderMode === "3d" ? (
         <ThreadGraph3D
           nodes={nodes}
@@ -341,7 +380,11 @@ export function CanvasStage({
             className="overflow-hidden rounded-[32px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.06),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.88),rgba(248,250,252,0.92))] shadow-[0_30px_110px_-60px_rgba(15,23,42,0.5)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.1),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.08),transparent_18%),linear-gradient(180deg,rgba(15,23,42,0.9),rgba(2,6,23,0.92))]"
             defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
           >
-            <Background color="rgba(148,163,184,0.18)" gap={24} size={1.15} />
+            <Background
+              color="rgba(148,163,184,0.18)"
+              gap={24}
+              size={1.15}
+            />
             {!isInteracting && renderedNodes.length <= 160 ? (
               <MiniMap
                 pannable
@@ -361,9 +404,11 @@ export function CanvasStage({
               showInteractive={false}
             />
           </ReactFlow>
+
           <div className="pointer-events-none absolute bottom-5 left-20 z-10 hidden items-center gap-2 md:flex">
             <div className="pointer-events-none rounded-full border border-white/70 bg-white/82 px-3 py-1 text-[11px] text-muted-foreground shadow-[0_18px_48px_-36px_rgba(15,23,42,0.45)] backdrop-blur dark:border-white/10 dark:bg-slate-950/72">
-              Drag nodes directly on the stage. Their positions are saved for this session.
+              Drag nodes directly on the stage. Their positions are saved for
+              this session.
             </div>
           </div>
         </>
