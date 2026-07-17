@@ -66,7 +66,7 @@ export function buildConversationFlowNodes({
       type: "threadNode",
       position: { x: 0, y: 0 },
       selectable: true,
-      draggable: false,
+      draggable: true,
       data: {
         accent: visual.accent,
         branchId:
