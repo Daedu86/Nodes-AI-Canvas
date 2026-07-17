@@ -144,13 +144,18 @@ test("conversation nodes can be dragged and keep their position after reload", a
   await page.mouse.move(startX + 180, startY + 110, { steps: 12 });
   await page.mouse.up();
 
-  const after = await expect
-    .poll(async () => readGraphPosition(node), { timeout: 10_000 })
-    .toSatisfy(
-      (position) =>
-        Math.abs(position.x - before.x) > 50 &&
-        Math.abs(position.y - before.y) > 30,
-    );
+  await expect
+    .poll(
+      async () => {
+        const position = await readGraphPosition(node);
+        return (
+          Math.abs(position.x - before.x) > 50 &&
+          Math.abs(position.y - before.y) > 30
+        );
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
 
   const moved = await readGraphPosition(node);
   const storageKey = `nodes.canvas-message-positions.v1:${sessionId}`;
@@ -178,9 +183,15 @@ test("conversation nodes can be dragged and keep their position after reload", a
   await expect(reloadedNode).toBeVisible({ timeout: 15_000 });
 
   await expect
-    .poll(async () => readGraphPosition(reloadedNode), { timeout: 10_000 })
-    .toEqual({
-      x: expect.closeTo(moved.x, 3),
-      y: expect.closeTo(moved.y, 3),
-    });
+    .poll(
+      async () => {
+        const position = await readGraphPosition(reloadedNode);
+        return (
+          Math.abs(position.x - moved.x) < 0.01 &&
+          Math.abs(position.y - moved.y) < 0.01
+        );
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
 });
