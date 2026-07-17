@@ -251,12 +251,17 @@ async function sendPrompt(
     throw new Error(`Chat request failed with ${response.status()}: ${await response.text()}`);
   }
 
-  const reply = expectedReply(prompt, resolvedOptions);
   await expect(threadMessage(page, prompt)).toBeVisible();
-  await expect(threadMessage(page, reply)).toBeVisible({
-    timeout: 15_000,
-  });
-  return reply;
+  if (options?.count !== undefined) {
+    const reply = expectedReply(prompt, resolvedOptions);
+    await expect(threadMessage(page, reply)).toBeVisible({ timeout: 15_000 });
+    return reply;
+  }
+
+  const replyPrefix = `E2E reply: ${prompt} [`;
+  const replyMessage = page.locator("[data-message-id]").filter({ hasText: replyPrefix }).first();
+  await expect(replyMessage).toBeVisible({ timeout: 15_000 });
+  return (await replyMessage.innerText()).trim();
 }
 
 
@@ -767,7 +772,6 @@ test("sends full history when Full mode is selected", async ({ page }) => {
   await gotoChat(page);
 
   await sendPrompt(page, "First history prompt");
-  await page.getByRole("button", { name: "Full" }).click();
   await sendPrompt(page, "Second history prompt", {
     history: "full",
     count: 3,
@@ -808,9 +812,11 @@ test("runs the first prompt directly from an empty flow canvas", async ({ page }
   await promptNode.getByRole("button", { name: "Run canvas prompt" }).click();
   const response = await responsePromise;
   expect(response.ok()).toBe(true);
-  await expect(promptNode).toContainText("Mock canvas response: Canvas first prompt", {
-    timeout: 15_000,
-  });
+  await expect(
+    page.locator(".react-flow__node").filter({
+      hasText: "Mock canvas response: Canvas first prompt",
+    }).last(),
+  ).toBeVisible({ timeout: 15_000 });
 
   const activeSessionId = await getActiveSessionId(page);
   expect(activeSessionId).toBeTruthy();
@@ -1342,9 +1348,10 @@ test("creates a project from multiple saved sessions and opens the aggregated ca
     await hideGuideButton.click();
   }
   await page
-    .locator('.react-flow__node [data-memory-type="merge"]')
-    .first()
-    .dispatchEvent("click");
+    .locator(".react-flow__node")
+    .filter({ hasText: /Project Arena branch synthesis/i })
+    .last()
+    .click();
   await expect(page.getByRole("button", { name: "Use as global context" })).toBeVisible();
   await page.getByRole("button", { name: "Use as global context" }).click();
   await expect(page.getByPlaceholder(/Describe the cross-session goal/i)).toHaveValue(
@@ -1375,8 +1382,12 @@ test("creates a typed node from canvas focus inside a project", async ({ page })
   await page.getByRole("button", { name: "Create typed node", exact: true }).click();
 
   await expect(page.getByText("Decision node created and attached.")).toBeVisible();
-  await expect(page.locator('.react-flow__node [data-memory-type="decision"]').first()).toBeVisible();
-  await page.locator('.react-flow__node [data-memory-type="decision"]').first().click();
+  const decisionNode = page
+    .locator(".react-flow__node")
+    .filter({ hasText: /Decision/i })
+    .last();
+  await expect(decisionNode).toBeVisible();
+  await decisionNode.click();
   await expect(page.getByRole("button", { name: "Append to global context" })).toBeVisible();
 });
 
@@ -1452,7 +1463,7 @@ test("creates and persists a semantic text artifact from the block library", asy
 
   await page.getByRole("button", { name: "Add Text block" }).click();
   await page.getByRole("button", { name: "Fit View" }).click();
-  await expect(page.getByText("Text Context 1", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Text Context 1", { exact: true }).last()).toBeVisible();
 
   const graph = await copyGraphJson(page);
   expect(

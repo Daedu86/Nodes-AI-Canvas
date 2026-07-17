@@ -202,11 +202,11 @@ test("conversation nodes can be dragged and keep their position after reload", a
   expect(box).not.toBeNull();
   if (!box) throw new Error("Conversation node has no bounding box");
 
-  const startX = box.x + Math.min(80, box.width / 3);
-  const startY = box.y + 22;
+  const startX = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
   await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(startX + 180, startY + 110, { steps: 12 });
+  await page.mouse.move(startX + 220, startY + 140, { steps: 20 });
   await page.mouse.up();
 
   await expect

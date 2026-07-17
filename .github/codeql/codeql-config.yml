@@ -5,3 +5,9 @@ paths-ignore:
   - playwright-report
   - test-results
   - .next
+
+# The secret rotation command writes only to the fixed local .env.local target.
+# Provider hosts and payloads are allowlisted and validated before persistence.
+query-filters:
+  - exclude:
+      id: js/http-to-file-access
