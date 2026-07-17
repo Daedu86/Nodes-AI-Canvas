@@ -70,7 +70,7 @@ export const buildThreadGraphNodes = ({
       id,
       parentId: effectiveParent,
       role: String(item.message?.role ?? ""),
-      text: extractText(item.message).slice(0, 100),
+      text: extractText(item.message),
       depth: effectiveParent === null ? 0 : getDepth(item.message),
       idx: index,
       branchId,
