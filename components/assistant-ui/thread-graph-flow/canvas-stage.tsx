@@ -55,6 +55,13 @@ const edgeTypes: EdgeTypes = {
   threadEdge: ThreadGraphEdge,
 };
 
+const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
+const FIT_VIEW_OPTIONS = { padding: 0.18 } as const;
+const PRO_OPTIONS = { hideAttribution: true } as const;
+const DEFAULT_EDGE_OPTIONS = { animated: false } as const;
+const VISIBLE_ELEMENT_NODE_THRESHOLD = 80;
+const VISIBLE_ELEMENT_EDGE_THRESHOLD = 150;
+
 type StoredNodePosition = { x: number; y: number };
 type StoredNodePositions = Record<string, StoredNodePosition>;
 
@@ -91,6 +98,46 @@ const isConversationNode = (node: ThreadGraphFlowNode) =>
   node.data?.kind !== "canvas-prompt" &&
   node.data?.kind !== "canvas-response" &&
   node.data?.kind !== "prompt-draft";
+
+const positionsEqual = (
+  left: StoredNodePosition | undefined,
+  right: StoredNodePosition | undefined,
+) => left?.x === right?.x && left?.y === right?.y;
+
+const mergeRenderedNodes = (
+  currentNodes: ThreadGraphFlowNode[],
+  incomingNodes: ThreadGraphFlowNode[],
+  storedPositions: StoredNodePositions,
+) => {
+  const currentById = new Map(currentNodes.map((node) => [node.id, node] as const));
+  let changed = currentNodes.length !== incomingNodes.length;
+
+  const nextNodes = incomingNodes.map((incomingNode, index) => {
+    const currentNode = currentById.get(incomingNode.id);
+    const desiredPosition = isConversationNode(incomingNode)
+      ? storedPositions[incomingNode.id] ?? currentNode?.position ?? incomingNode.position
+      : incomingNode.position;
+
+    if (
+      currentNode &&
+      currentNode.type === incomingNode.type &&
+      currentNode.data === incomingNode.data &&
+      currentNode.selected === incomingNode.selected &&
+      currentNode.hidden === incomingNode.hidden &&
+      positionsEqual(currentNode.position, desiredPosition)
+    ) {
+      if (currentNodes[index] !== currentNode) changed = true;
+      return currentNode;
+    }
+
+    changed = true;
+    return positionsEqual(incomingNode.position, desiredPosition)
+      ? incomingNode
+      : { ...incomingNode, position: desiredPosition };
+  });
+
+  return changed ? nextNodes : currentNodes;
+};
 
 type CanvasStageProps = {
   activeSessionId: string | null;
@@ -141,6 +188,7 @@ export function CanvasStage({
   const positionStorageKey = `nodes.canvas-message-positions.v1:${activeSessionId ?? "default"}`;
   const [storedMessagePositions, setStoredMessagePositions] =
     React.useState<StoredNodePositions>({});
+  const [isInteracting, setIsInteracting] = React.useState(false);
   const [renderedNodes, setRenderedNodes, onNodesChange] =
     useNodesState<ThreadGraphFlowNode>(nodes);
 
@@ -149,18 +197,88 @@ export function CanvasStage({
   }, [positionStorageKey]);
 
   React.useEffect(() => {
-    setRenderedNodes((currentNodes) => {
-      const currentPositionById = new Map(
-        currentNodes.map((node) => [node.id, node.position] as const),
-      );
-      return nodes.map((node) => {
-        if (!isConversationNode(node)) return node;
-        const position =
-          storedMessagePositions[node.id] ?? currentPositionById.get(node.id);
-        return position ? { ...node, position } : node;
-      });
-    });
+    setRenderedNodes((currentNodes) =>
+      mergeRenderedNodes(currentNodes, nodes, storedMessagePositions),
+    );
   }, [nodes, setRenderedNodes, storedMessagePositions]);
+
+  const handleInteractionStart = React.useCallback(() => {
+    setIsInteracting(true);
+  }, []);
+
+  const handleMoveEnd = React.useCallback(
+    (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+      setIsInteracting(false);
+      onViewportChange(viewport);
+    },
+    [onViewportChange],
+  );
+
+  const handleNodeDragStop = React.useCallback(
+    (_event: React.MouseEvent, node: ThreadGraphFlowNode) => {
+      setIsInteracting(false);
+      const position = { x: node.position.x, y: node.position.y };
+
+      if (
+        node.data?.kind === "artifact" ||
+        node.data?.kind === "canvas-prompt" ||
+        node.data?.kind === "canvas-response"
+      ) {
+        onArtifactPositionChange(node.id, position);
+        return;
+      }
+
+      if (node.data?.kind === "prompt-draft") {
+        onDraftPositionChange(position);
+        return;
+      }
+
+      setStoredMessagePositions((current) => {
+        if (positionsEqual(current[node.id], position)) return current;
+        const next = { ...current, [node.id]: position };
+        try {
+          window.localStorage.setItem(positionStorageKey, JSON.stringify(next));
+        } catch {
+          // The node remains movable even when browser storage is unavailable.
+        }
+        return next;
+      });
+    },
+    [onArtifactPositionChange, onDraftPositionChange, positionStorageKey],
+  );
+
+  const handleSelectionChange = React.useCallback(
+    ({ nodes: selectedNodes }: { nodes: ThreadGraphFlowNode[] }) => {
+      if (selectedNodes[0]?.id) onNodeSelect(selectedNodes[0].id);
+    },
+    [onNodeSelect],
+  );
+
+  const handleNodeClick = React.useCallback(
+    (_event: React.MouseEvent, node: ThreadGraphFlowNode) => onNodeSelect(node.id),
+    [onNodeSelect],
+  );
+
+  const handleNodeDoubleClick = React.useCallback(
+    (_event: React.MouseEvent, node: ThreadGraphFlowNode) => {
+      if (
+        node.data.kind === "artifact" ||
+        node.data.kind === "canvas-prompt" ||
+        node.data.kind === "canvas-response" ||
+        node.id === ROOT_NODE_ID
+      ) {
+        return;
+      }
+      onNodeSelect(node.id);
+      onMessageOpen(node.id);
+    },
+    [onMessageOpen, onNodeSelect],
+  );
+
+  const handlePaneClick = React.useCallback(() => onNodeSelect(null), [onNodeSelect]);
+  const shouldCull =
+    renderedNodes.length > VISIBLE_ELEMENT_NODE_THRESHOLD ||
+    edges.length > VISIBLE_ELEMENT_EDGE_THRESHOLD;
 
   return (
     <div
@@ -168,6 +286,7 @@ export function CanvasStage({
       role="region"
       aria-label="Conversation canvas"
       aria-describedby="canvas-stage-instructions"
+      data-canvas-interacting={isInteracting ? "true" : "false"}
       className="relative min-h-[28rem] flex-1 lg:min-h-0"
       onDragOver={onCanvasDragOver}
       onDrop={onCanvasDrop}
@@ -200,84 +319,43 @@ export function CanvasStage({
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView={!isFlowViewport(storedViewport)}
-            defaultViewport={storedViewport ?? { x: 0, y: 0, zoom: 1 }}
-            fitViewOptions={{ padding: 0.18 }}
+            defaultViewport={storedViewport ?? DEFAULT_VIEWPORT}
+            fitViewOptions={FIT_VIEW_OPTIONS}
             minZoom={0.3}
             maxZoom={1.6}
-            onlyRenderVisibleElements={renderedNodes.length > 200}
+            onlyRenderVisibleElements={shouldCull}
             nodesDraggable
             elementsSelectable
-            proOptions={{ hideAttribution: true }}
+            proOptions={PRO_OPTIONS}
             onInit={onInit}
             onNodesChange={onNodesChange}
             onConnect={onCanvasConnect}
-            onMoveEnd={(_, viewport) => onViewportChange(viewport)}
-            onNodeDragStop={(_, node) => {
-              const position = {
-                x: node.position.x,
-                y: node.position.y,
-              };
-              if (
-                node.data?.kind === "artifact" ||
-                node.data?.kind === "canvas-prompt"
-              ) {
-                onArtifactPositionChange(node.id, position);
-              } else if (node.data?.kind === "prompt-draft") {
-                onDraftPositionChange(position);
-              } else {
-                setStoredMessagePositions((current) => {
-                  const next = { ...current, [node.id]: position };
-                  try {
-                    window.localStorage.setItem(
-                      positionStorageKey,
-                      JSON.stringify(next),
-                    );
-                  } catch {
-                    // The node remains movable even when browser storage is unavailable.
-                  }
-                  return next;
-                });
-              }
-            }}
-            onSelectionChange={({ nodes: selectedNodes }) => {
-              if (selectedNodes[0]?.id) {
-                onNodeSelect(selectedNodes[0].id);
-              }
-            }}
-            onNodeClick={(_, node) => onNodeSelect(node.id)}
-            onNodeDoubleClick={(_, node) => {
-              if (
-                node.data.kind === "artifact" ||
-                node.data.kind === "canvas-prompt" ||
-                node.data.kind === "canvas-response" ||
-                node.id === ROOT_NODE_ID
-              ) {
-                return;
-              }
-              onNodeSelect(node.id);
-              onMessageOpen(node.id);
-            }}
-            onPaneClick={() => onNodeSelect(null)}
+            onMoveStart={handleInteractionStart}
+            onMoveEnd={handleMoveEnd}
+            onNodeDragStart={handleInteractionStart}
+            onNodeDragStop={handleNodeDragStop}
+            onSelectionChange={handleSelectionChange}
+            onNodeClick={handleNodeClick}
+            onNodeDoubleClick={handleNodeDoubleClick}
+            onPaneClick={handlePaneClick}
             className="overflow-hidden rounded-[32px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.12),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.06),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.88),rgba(248,250,252,0.92))] shadow-[0_30px_110px_-60px_rgba(15,23,42,0.5)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.1),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.08),transparent_18%),linear-gradient(180deg,rgba(15,23,42,0.9),rgba(2,6,23,0.92))]"
-            defaultEdgeOptions={{ animated: false }}
+            defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
           >
-            <Background
-              color="rgba(148,163,184,0.18)"
-              gap={24}
-              size={1.15}
-            />
-            <MiniMap
-              pannable
-              zoomable
-              className="!pointer-events-none !bottom-5 !right-5 !rounded-[20px] !border !border-white/70 !bg-white/85 !shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] dark:!border-white/10 dark:!bg-slate-950/85"
-              nodeColor={(node) =>
-                String(
-                  (node.data as { accent?: string } | undefined)?.accent ??
-                    "rgba(100,116,139,0.85)",
-                )
-              }
-              maskColor="rgba(15,23,42,0.05)"
-            />
+            <Background color="rgba(148,163,184,0.18)" gap={24} size={1.15} />
+            {!isInteracting && renderedNodes.length <= 160 ? (
+              <MiniMap
+                pannable
+                zoomable
+                className="!pointer-events-none !bottom-5 !right-5 !rounded-[20px] !border !border-white/70 !bg-white/85 !shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] dark:!border-white/10 dark:!bg-slate-950/85"
+                nodeColor={(node) =>
+                  String(
+                    (node.data as { accent?: string } | undefined)?.accent ??
+                      "rgba(100,116,139,0.85)",
+                  )
+                }
+                maskColor="rgba(15,23,42,0.05)"
+              />
+            ) : null}
             <Controls
               className="!bottom-5 !left-5 !right-auto !top-auto [&>button]:!border-white/70 [&>button]:!bg-white/92 [&>button]:!text-foreground [&>button]:!shadow-sm dark:[&>button]:!border-white/10 dark:[&>button]:!bg-slate-950/92"
               showInteractive={false}
