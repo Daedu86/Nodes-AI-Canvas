@@ -12,8 +12,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
 const extractMessageText = (message: ThreadRepoItem["message"]) => {
-  if (!message || !isRecord(message)) return "";
-  const content = Array.isArray(message.content) ? message.content : [];
+  if (!message) return "";
+  const messageRecord = message as unknown as Record<string, unknown>;
+  const content = Array.isArray(messageRecord.content) ? messageRecord.content : [];
   const contentText = content
     .flatMap((part) =>
       isRecord(part) && part.type === "text" && typeof part.text === "string"
@@ -24,7 +25,7 @@ const extractMessageText = (message: ThreadRepoItem["message"]) => {
     .trim();
   if (contentText) return contentText;
 
-  const parts = Array.isArray(message.parts) ? message.parts : [];
+  const parts = Array.isArray(messageRecord.parts) ? messageRecord.parts : [];
   return parts
     .flatMap((part) =>
       isRecord(part) && part.type === "text" && typeof part.text === "string"
@@ -130,7 +131,10 @@ export function DetachedMessages() {
               key={id}
               type="button"
               className="group flex w-full items-start justify-between gap-3 rounded-2xl border border-border/60 bg-background/90 px-3 py-3 text-left transition hover:border-orange-500/35 hover:bg-background"
-              style={{ marginLeft: `${Math.min(depth, 4) * 14}px`, width: `calc(100% - ${Math.min(depth, 4) * 14}px)` }}
+              style={{
+                marginLeft: `${Math.min(depth, 4) * 14}px`,
+                width: `calc(100% - ${Math.min(depth, 4) * 14}px)`,
+              }}
               onClick={() => {
                 setFocusedMessageId(id);
                 setCanvasSelectionId(id);
