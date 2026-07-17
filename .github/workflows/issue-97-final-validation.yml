@@ -8,18 +8,20 @@ on:
       - .github/workflows/issue-97-final-validation.yml
 
 permissions:
+  actions: read
+  checks: read
   contents: write
+  security-events: read
 
 concurrency:
   group: issue-97-final-validation
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   validate:
+    name: Collect required main checks
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      CI: "true"
+    timeout-minutes: 45
     steps:
       - name: Check out main
         uses: actions/checkout@v4
@@ -27,116 +29,133 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Initialize CodeQL
-        id: codeql_init
-        continue-on-error: true
-        uses: github/codeql-action/init@v3
-        with:
-          languages: javascript-typescript
-          queries: security-extended
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        id: install
-        continue-on-error: true
-        run: npm ci
-
-      - name: Run repository checks
-        id: checks
-        continue-on-error: true
-        run: npm run check
-
-      - name: Run production build and bundle budget
-        id: build_budget
-        continue-on-error: true
-        run: npm run build:budget
-
-      - name: Install Chromium
-        id: playwright_install
-        continue-on-error: true
-        run: npx playwright install --with-deps chromium
-
-      - name: Run full Chromium E2E suite
-        id: e2e
-        continue-on-error: true
+      - name: Wait for CI and CodeQL, then record the result
         env:
-          PLAYWRIGHT_BROWSER_NAME: chromium
-        run: npm run test:e2e -- --workers=1
-
-      - name: Analyze with CodeQL
-        id: codeql_analyze
-        continue-on-error: true
-        uses: github/codeql-action/analyze@v3
-        with:
-          output: sarif-results
-          upload: false
-          category: issue-97/security-extended
-
-      - name: Record validation result
-        if: always()
-        env:
-          VALIDATED_SHA: ${{ github.sha }}
-          RUN_ID: ${{ github.run_id }}
-          INSTALL_OUTCOME: ${{ steps.install.outcome }}
-          CHECKS_OUTCOME: ${{ steps.checks.outcome }}
-          BUILD_BUDGET_OUTCOME: ${{ steps.build_budget.outcome }}
-          PLAYWRIGHT_INSTALL_OUTCOME: ${{ steps.playwright_install.outcome }}
-          E2E_OUTCOME: ${{ steps.e2e.outcome }}
-          CODEQL_INIT_OUTCOME: ${{ steps.codeql_init.outcome }}
-          CODEQL_ANALYZE_OUTCOME: ${{ steps.codeql_analyze.outcome }}
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+          TARGET_REPOSITORY: ${{ github.repository }}
+          TARGET_RUN_ID: ${{ github.run_id }}
         run: |
           mkdir -p .github/validation
           node <<'NODE'
+          const { execFileSync } = require('node:child_process');
           const fs = require('node:fs');
-          const path = require('node:path');
 
-          function walk(directory) {
-            if (!fs.existsSync(directory)) return [];
-            return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-              const fullPath = path.join(directory, entry.name);
-              return entry.isDirectory() ? walk(fullPath) : [fullPath];
-            });
-          }
+          const repository = process.env.TARGET_REPOSITORY;
+          const sha = process.env.TARGET_SHA;
+          const requiredChecks = [
+            'Quality',
+            'Unit and coverage',
+            'Production build and bundle budget',
+            'Canvas performance budget',
+            'Dependency audit',
+            'Accessibility E2E (chromium)',
+            'End-to-end (shard 1/4)',
+            'End-to-end (shard 2/4)',
+            'End-to-end (shard 3/4)',
+            'End-to-end (shard 4/4)',
+            'Analyze JavaScript and TypeScript',
+          ];
 
-          const sarifFiles = walk('sarif-results').filter((file) => file.endsWith('.sarif'));
-          let codeqlFindings = 0;
-          const sarifErrors = [];
-          for (const file of sarifFiles) {
-            try {
-              const payload = JSON.parse(fs.readFileSync(file, 'utf8'));
-              for (const run of payload.runs ?? []) codeqlFindings += (run.results ?? []).length;
-            } catch (error) {
-              sarifErrors.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+          const sleep = (milliseconds) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+          const ghJson = (endpoint) => JSON.parse(execFileSync(
+            'gh',
+            ['api', '-H', 'Accept: application/vnd.github+json', endpoint],
+            { encoding: 'utf8' },
+          ));
+
+          let selectedChecks = [];
+          for (let attempt = 1; attempt <= 120; attempt += 1) {
+            const payload = ghJson(`repos/${repository}/commits/${sha}/check-runs?per_page=100`);
+            const latestByName = new Map();
+            for (const check of payload.check_runs ?? []) {
+              const existing = latestByName.get(check.name);
+              if (!existing || String(check.started_at ?? '') > String(existing.started_at ?? '')) {
+                latestByName.set(check.name, check);
+              }
             }
+            selectedChecks = requiredChecks.flatMap((name) => {
+              const check = latestByName.get(name);
+              return check ? [{
+                name,
+                status: check.status,
+                conclusion: check.conclusion,
+                detailsUrl: check.details_url,
+                startedAt: check.started_at,
+                completedAt: check.completed_at,
+              }] : [];
+            });
+            const missing = requiredChecks.filter((name) => !latestByName.has(name));
+            const pending = selectedChecks.filter((check) => check.status !== 'completed');
+            if (missing.length === 0 && pending.length === 0) break;
+            console.log(`Attempt ${attempt}: waiting; missing=${missing.join(', ') || 'none'}; pending=${pending.map((check) => check.name).join(', ') || 'none'}`);
+            sleep(15_000);
           }
 
-          const outcomes = {
-            install: process.env.INSTALL_OUTCOME,
-            repositoryChecks: process.env.CHECKS_OUTCOME,
-            buildBudget: process.env.BUILD_BUDGET_OUTCOME,
-            playwrightInstall: process.env.PLAYWRIGHT_INSTALL_OUTCOME,
-            chromiumE2E: process.env.E2E_OUTCOME,
-            codeqlInit: process.env.CODEQL_INIT_OUTCOME,
-            codeqlAnalyze: process.env.CODEQL_ANALYZE_OUTCOME,
-          };
-          const allStepsPassed = Object.values(outcomes).every((outcome) => outcome === 'success');
-          const passed = allStepsPassed && sarifFiles.length > 0 && sarifErrors.length === 0 && codeqlFindings === 0;
+          const observedNames = new Set(selectedChecks.map((check) => check.name));
+          const missingChecks = requiredChecks.filter((name) => !observedNames.has(name));
+          const incompleteChecks = selectedChecks.filter((check) => check.status !== 'completed');
+          const unsuccessfulChecks = selectedChecks.filter((check) => check.conclusion !== 'success');
+
+          let matchingAnalyses = [];
+          let analysisError = null;
+          for (let attempt = 1; attempt <= 12; attempt += 1) {
+            try {
+              const analyses = ghJson(`repos/${repository}/code-scanning/analyses?ref=refs/heads/main&per_page=100`);
+              matchingAnalyses = (analyses ?? []).filter((analysis) =>
+                analysis.commit_sha === sha && analysis.tool?.name === 'CodeQL',
+              );
+              if (matchingAnalyses.length > 0) break;
+            } catch (error) {
+              analysisError = error instanceof Error ? error.message : String(error);
+            }
+            sleep(10_000);
+          }
+
+          const codeqlResults = matchingAnalyses.reduce(
+            (total, analysis) => total + Number(analysis.results_count ?? 0),
+            0,
+          );
+          const codeqlErrors = matchingAnalyses
+            .map((analysis) => analysis.error)
+            .filter((error) => typeof error === 'string' && error.length > 0);
+          const passed =
+            missingChecks.length === 0 &&
+            incompleteChecks.length === 0 &&
+            unsuccessfulChecks.length === 0 &&
+            matchingAnalyses.length > 0 &&
+            !analysisError &&
+            codeqlErrors.length === 0 &&
+            codeqlResults === 0;
+
           const report = {
             completedAt: new Date().toISOString(),
-            validatedSha: process.env.VALIDATED_SHA,
-            workflowRunId: process.env.RUN_ID,
-            outcomes,
-            sarifFiles: sarifFiles.map((file) => file.replaceAll('\\', '/')),
-            codeqlFindings,
-            sarifErrors,
+            validatedSha: sha,
+            workflowRunId: process.env.TARGET_RUN_ID,
+            requiredChecks: selectedChecks,
+            missingChecks,
+            incompleteChecks: incompleteChecks.map((check) => check.name),
+            unsuccessfulChecks: unsuccessfulChecks.map(({ name, conclusion }) => ({ name, conclusion })),
+            codeql: {
+              analyses: matchingAnalyses.map((analysis) => ({
+                id: analysis.id,
+                category: analysis.category,
+                createdAt: analysis.created_at,
+                resultsCount: analysis.results_count,
+                rulesCount: analysis.rules_count,
+                error: analysis.error,
+              })),
+              resultsCount: codeqlResults,
+              errors: codeqlErrors,
+              apiError: analysisError,
+            },
             passed,
           };
-          fs.writeFileSync('.github/validation/issue-97-result.json', `${JSON.stringify(report, null, 2)}\n`);
+
+          fs.writeFileSync(
+            '.github/validation/issue-97-result.json',
+            `${JSON.stringify(report, null, 2)}\n`,
+          );
           console.log(JSON.stringify(report, null, 2));
           NODE
 
@@ -149,7 +168,7 @@ jobs:
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "chore: record issue 97 validation result [skip vercel]"
+          git commit -m "chore: record issue 97 validation result [skip ci] [skip vercel]"
           git push origin HEAD:main
 
       - name: Enforce successful validation
