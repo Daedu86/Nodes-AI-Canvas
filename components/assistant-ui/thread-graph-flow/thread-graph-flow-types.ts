@@ -37,7 +37,14 @@ export type ThreadGraphFlowNodeData = {
   isBridge?: boolean;
   isCut?: boolean;
   isRoot?: boolean;
-  kind?: "root" | "bridge" | "message" | "artifact" | "prompt-draft" | "canvas-prompt";
+  kind?:
+    | "root"
+    | "bridge"
+    | "message"
+    | "artifact"
+    | "prompt-draft"
+    | "canvas-prompt"
+    | "canvas-response";
   language?: string | null;
   linkedArtifactCount?: number;
   memoryId?: string | null;
