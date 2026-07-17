@@ -7,12 +7,14 @@ import {
   useUpdateNodeInternals,
   type NodeProps,
 } from "@xyflow/react";
+import { Trash2 } from "lucide-react";
 import type { BranchOperation } from "@/lib/thread-branching";
 import {
   getGraphModelLabel,
   getGraphModelPalette,
 } from "@/components/assistant-ui/thread-graph/graph-models";
 import type { ThreadGraphFlowNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-flow-types";
+import { useCanvasMessageDeletion } from "@/components/assistant-ui/thread-graph-flow/use-canvas-message-deletion";
 
 const pillClass =
   "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em]";
@@ -79,6 +81,8 @@ export const ThreadGraphNode = memo(
     const isRoot = Boolean(data.isRoot || data.kind === "root");
     const isBridge = Boolean(data.isBridge || data.kind === "bridge");
     const isCut = Boolean(data.isCut);
+    const { deleteMessageNode, isDeleting, isDetached } =
+      useCanvasMessageDeletion(isRoot ? null : id);
     const fullText = data.preview.trim() || "No content";
     const usesWideLayout = fullText.length > 180 || fullText.includes("\n");
     const modelLabel = data.modelLabel ?? getGraphModelLabel(data.model, data.provider);
@@ -162,7 +166,23 @@ export const ThreadGraphNode = memo(
             style={{ right: -7 }}
           />
 
-          <div className="relative flex items-start justify-between gap-3">
+          {!isRoot ? (
+            <button
+              type="button"
+              className="nodrag nopan absolute right-3 top-3 z-20 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-300/30 bg-rose-400/10 text-rose-100 opacity-75 transition hover:bg-rose-400/20 hover:opacity-100 disabled:cursor-wait disabled:opacity-40"
+              aria-label="Delete message node"
+              title="Delete this message and its edges. Child messages stay available under Detached messages."
+              disabled={isDeleting}
+              onClick={(event) => {
+                event.stopPropagation();
+                deleteMessageNode();
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          ) : null}
+
+          <div className="relative flex items-start justify-between gap-3 pr-10">
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span
@@ -178,6 +198,11 @@ export const ThreadGraphNode = memo(
                 {isBridge ? (
                   <span className="inline-flex items-center rounded-full border border-amber-400/35 bg-amber-400/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-200">
                     Bridge
+                  </span>
+                ) : null}
+                {isDetached ? (
+                  <span className="inline-flex items-center rounded-full border border-orange-400/35 bg-orange-400/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-orange-200">
+                    Detached
                   </span>
                 ) : null}
                 {data.editedFromId ? (

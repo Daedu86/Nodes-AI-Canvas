@@ -4,6 +4,7 @@ import {
   Composer,
   EditComposer,
 } from "@/components/assistant-ui/thread/thread-composer";
+import { DetachedMessages } from "@/components/assistant-ui/thread/detached-messages";
 import {
   AssistantMessage,
   UserMessage,
@@ -37,6 +38,8 @@ export const Thread: FC = () => {
               AssistantMessage,
             }}
           />
+
+          <DetachedMessages />
 
           <ThreadPrimitive.If empty>
             <div className="mt-6 flex w-full max-w-[var(--thread-max-width)] flex-col items-center gap-3 pb-6">

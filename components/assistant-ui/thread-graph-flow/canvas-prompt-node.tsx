@@ -1,4 +1,3 @@
-
 "use client";
 
 import { memo } from "react";
@@ -19,6 +18,15 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
   const contextCount = data.draftContextCount ?? 0;
   const outputCount = data.draftOutputCount ?? 0;
 
+  const handleDelete = () => {
+    const confirmed = window.confirm(
+      persistent
+        ? "Delete this prompt node and all of its canvas connections?"
+        : "Delete this draft prompt node?",
+    );
+    if (confirmed) data.onDraftCancel?.();
+  };
+
   return (
     <div
       className={[
@@ -29,10 +37,34 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
       <div className="relative overflow-hidden rounded-[15px] border border-white/8 bg-slate-950/95 px-4 py-3">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.18),transparent_36%),linear-gradient(180deg,rgba(10,25,24,0.98),rgba(8,18,22,0.98))]" />
         <div className="pointer-events-none absolute left-0 top-0 h-full w-1 bg-emerald-500" />
-        <Handle type="target" position={Position.Left} className="!h-3 !w-3 !border-2 !border-slate-950 !bg-emerald-300/90" style={{ left: -7 }} />
-        <Handle type="source" position={Position.Right} className="!h-3 !w-3 !border-2 !border-slate-950 !bg-emerald-300/90" style={{ right: -7 }} />
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="!h-3 !w-3 !border-2 !border-slate-950 !bg-emerald-300/90"
+          style={{ left: -7 }}
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!h-3 !w-3 !border-2 !border-slate-950 !bg-emerald-300/90"
+          style={{ right: -7 }}
+        />
 
-        <div className="relative flex items-start justify-between gap-3">
+        <button
+          type="button"
+          className="nodrag nopan absolute right-3 top-3 z-20 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-300/30 bg-rose-400/10 text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label={persistent ? "Delete prompt node" : "Delete draft prompt node"}
+          title={busy ? "Cancel the active run before deleting this prompt." : "Delete this prompt node."}
+          disabled={busy}
+          onClick={(event) => {
+            event.stopPropagation();
+            handleDelete();
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+
+        <div className="relative flex items-start justify-between gap-3 pr-10">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-emerald-300/35 bg-emerald-400/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-100">
@@ -73,9 +105,21 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
           {!persistent ? (
             <label className="block text-xs text-slate-200">
               <span className="mb-1 block font-medium">Context required</span>
-              <select value={contextScope ?? ""} onChange={(event) => data.onDraftContextScopeChange?.(event.target.value as "parent" | "branch" | "tree")} className="nodrag nowheel h-9 w-full rounded-lg border border-white/15 bg-white/[0.06] px-2 text-xs text-slate-100">
-                <option value="" disabled>Select context before running</option>
-                <option value="parent">Parent message</option><option value="branch">Branch lineage</option><option value="tree">Full tree</option>
+              <select
+                value={contextScope ?? ""}
+                onChange={(event) =>
+                  data.onDraftContextScopeChange?.(
+                    event.target.value as "parent" | "branch" | "tree",
+                  )
+                }
+                className="nodrag nowheel h-9 w-full rounded-lg border border-white/15 bg-white/[0.06] px-2 text-xs text-slate-100"
+              >
+                <option value="" disabled>
+                  Select context before running
+                </option>
+                <option value="parent">Parent message</option>
+                <option value="branch">Branch lineage</option>
+                <option value="tree">Full tree</option>
               </select>
             </label>
           ) : null}
@@ -95,14 +139,21 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
           />
           <div className="flex justify-between gap-2 text-[11px] text-slate-300/88">
             <span>Enter sends, Shift+Enter adds newline</span>
-            {data.draftRunInterruptionNote ? <span className="text-amber-200">{data.draftRunInterruptionNote}</span> : null}
+            {data.draftRunInterruptionNote ? (
+              <span className="text-amber-200">{data.draftRunInterruptionNote}</span>
+            ) : null}
           </div>
           {data.draftError ? (
-            <div role="alert" className="rounded-xl border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-100">
+            <div
+              role="alert"
+              className="rounded-xl border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-100"
+            >
               {data.draftError}
             </div>
           ) : null}
-          {!persistent && !contextScope ? <p className="text-xs text-amber-200">Choose context to enable Run.</p> : null}
+          {!persistent && !contextScope ? (
+            <p className="text-xs text-amber-200">Choose context to enable Run.</p>
+          ) : null}
           {disabled ? (
             <div className="rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-xs leading-5 text-amber-100">
               AI requests are disabled. Enable AI in the header to run this prompt.
@@ -116,17 +167,31 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
         </div>
 
         <div className="relative mt-3 flex justify-end gap-2">
-          <Button type="button" variant="ghost" className="nodrag border border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.08]" onClick={data.onDraftCancel} disabled={busy}>
-            <Trash2 className="mr-1.5 h-4 w-4" /> {persistent ? "Delete prompt" : "Delete draft"}
-          </Button>
           {data.onDraftCancelRun ? (
-            <Button type="button" variant="outline" className="nodrag border-amber-300/35 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15" onClick={data.onDraftCancelRun}>
+            <Button
+              type="button"
+              variant="outline"
+              className="nodrag border-amber-300/35 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15"
+              onClick={data.onDraftCancelRun}
+            >
               <XCircle className="mr-1.5 h-4 w-4" /> Cancel run
             </Button>
           ) : null}
-          <Button type="button" className="nodrag bg-emerald-400 text-slate-950 hover:bg-emerald-300" onClick={data.onDraftSubmit} disabled={!canSubmit} aria-label={persistent ? "Run canvas prompt" : "Send prompt node"}>
+          <Button
+            type="button"
+            className="nodrag bg-emerald-400 text-slate-950 hover:bg-emerald-300"
+            onClick={data.onDraftSubmit}
+            disabled={!canSubmit}
+            aria-label={persistent ? "Run canvas prompt" : "Send prompt node"}
+          >
             <SendHorizontal className="mr-1.5 h-4 w-4" />
-            {status === "queued" ? "Queued" : status === "running" ? "Running..." : outputCount > 0 ? `Run → ${outputCount}` : "Run"}
+            {status === "queued"
+              ? "Queued"
+              : status === "running"
+                ? "Running..."
+                : outputCount > 0
+                  ? `Run → ${outputCount}`
+                  : "Run"}
           </Button>
         </div>
       </div>
