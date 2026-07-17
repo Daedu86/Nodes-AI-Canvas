@@ -8,7 +8,6 @@ on:
 
 permissions:
   actions: read
-  checks: read
   contents: write
   security-events: read
 
@@ -19,67 +18,61 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       TARGET_SHA: c73348d954e8fa78a203358ed08a942191b02f93
+      TARGET_RUN_ID: "29577849639"
+      TARGET_JOB_ID: "87876367676"
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-      - name: Record check and workflow state
+      - name: Capture failed test log and CodeQL alerts
         run: |
           mkdir -p .github/validation
-          gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/commits/${TARGET_SHA}/check-runs?per_page=100" > /tmp/check-runs.json
-          gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${TARGET_SHA}&per_page=100" > /tmp/workflow-runs.json
-          if gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/code-scanning/analyses?ref=refs/heads/main&per_page=100" > /tmp/analyses.json; then
+          gh run view "${TARGET_RUN_ID}" --repo "${GITHUB_REPOSITORY}" --job "${TARGET_JOB_ID}" --log-failed > /tmp/unit-failure.log 2>&1 || true
+          if gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" > /tmp/codeql-alerts.json; then
             true
           else
-            printf '[]\n' > /tmp/analyses.json
+            printf '[]\n' > /tmp/codeql-alerts.json
           fi
           node <<'NODE'
           const fs = require('node:fs');
           const target = process.env.TARGET_SHA;
-          const checks = JSON.parse(fs.readFileSync('/tmp/check-runs.json', 'utf8')).check_runs ?? [];
-          const workflows = JSON.parse(fs.readFileSync('/tmp/workflow-runs.json', 'utf8')).workflow_runs ?? [];
-          const analyses = JSON.parse(fs.readFileSync('/tmp/analyses.json', 'utf8'));
+          const log = fs.readFileSync('/tmp/unit-failure.log', 'utf8');
+          const alerts = JSON.parse(fs.readFileSync('/tmp/codeql-alerts.json', 'utf8'));
+          const relevantAlerts = alerts
+            .filter((alert) =>
+              alert.tool?.name === 'CodeQL' &&
+              (alert.most_recent_instance?.commit_sha === target || alert.state === 'open'),
+            )
+            .map((alert) => ({
+              number: alert.number,
+              state: alert.state,
+              rule: {
+                id: alert.rule?.id,
+                name: alert.rule?.name,
+                description: alert.rule?.description,
+                severity: alert.rule?.severity,
+                securitySeverityLevel: alert.rule?.security_severity_level,
+              },
+              path: alert.most_recent_instance?.location?.path,
+              startLine: alert.most_recent_instance?.location?.start_line,
+              endLine: alert.most_recent_instance?.location?.end_line,
+              message: alert.most_recent_instance?.message?.text,
+              commitSha: alert.most_recent_instance?.commit_sha,
+              htmlUrl: alert.html_url,
+            }));
           const report = {
             collectedAt: new Date().toISOString(),
             targetSha: target,
-            checkRuns: checks.map((check) => ({
-              id: check.id,
-              name: check.name,
-              status: check.status,
-              conclusion: check.conclusion,
-              detailsUrl: check.details_url,
-              startedAt: check.started_at,
-              completedAt: check.completed_at,
-            })),
-            workflowRuns: workflows.map((run) => ({
-              id: run.id,
-              name: run.name,
-              status: run.status,
-              conclusion: run.conclusion,
-              event: run.event,
-              htmlUrl: run.html_url,
-              createdAt: run.created_at,
-              updatedAt: run.updated_at,
-            })),
-            codeqlAnalyses: analyses
-              .filter((analysis) => analysis.commit_sha === target)
-              .map((analysis) => ({
-                id: analysis.id,
-                tool: analysis.tool?.name,
-                category: analysis.category,
-                resultsCount: analysis.results_count,
-                rulesCount: analysis.rules_count,
-                error: analysis.error,
-                createdAt: analysis.created_at,
-              })),
+            unitFailureLog: log.slice(-60000),
+            codeqlAlerts: relevantAlerts,
           };
-          fs.writeFileSync('.github/validation/issue-97-diagnostic.json', `${JSON.stringify(report, null, 2)}\n`);
+          fs.writeFileSync('.github/validation/issue-97-failures.json', `${JSON.stringify(report, null, 2)}\n`);
           NODE
-      - name: Commit diagnostic
+      - name: Commit failure details
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/validation/issue-97-diagnostic.json
-          git commit -m "chore: record issue 97 diagnostic [skip ci] [skip vercel]"
+          git add .github/validation/issue-97-failures.json
+          git commit -m "chore: record issue 97 failure details [skip ci] [skip vercel]"
           git push origin HEAD:main
