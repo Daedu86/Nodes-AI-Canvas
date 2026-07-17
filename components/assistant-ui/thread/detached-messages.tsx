@@ -104,7 +104,7 @@ export function DetachedMessages() {
     <aside
       aria-label="Detached messages"
       data-testid="detached-messages-panel"
-      className="flex h-full w-[19rem] max-w-[42%] shrink-0 flex-col overflow-hidden border-l border-orange-500/20 bg-background/92 shadow-[-18px_0_36px_-30px_rgba(15,23,42,0.45)] backdrop-blur-sm"
+      className="flex h-full w-[19rem] max-w-[42%] shrink-0 flex-col overflow-hidden border-l border-orange-500/20 bg-background/95 shadow-[-18px_0_36px_-30px_rgba(15,23,42,0.45)] backdrop-blur-sm"
     >
       <div className="shrink-0 border-b border-orange-500/15 px-4 py-4">
         <div className="flex items-center gap-2">
