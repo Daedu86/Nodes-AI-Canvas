@@ -179,7 +179,6 @@ export function buildCanvasPromptFlowNodes({
         kind: "canvas-prompt",
         position: prompt.position ?? null,
         preview: prompt.content || "Independent canvas prompt",
-        promptResult: prompt.promptResult ?? null,
         promptStatus: status,
         role: "prompt",
         title: prompt.title,
@@ -194,6 +193,42 @@ export function buildCanvasPromptFlowNodes({
           ),
       },
     } satisfies ThreadGraphFlowNode;
+  });
+}
+
+export function buildCanvasResponseFlowNodes({
+  canvasPrompts,
+}: Pick<CanvasFlowElementsParams, "canvasPrompts">): ThreadGraphFlowNode[] {
+  return canvasPrompts.flatMap((prompt) => {
+    const responseId = prompt.promptRunId;
+    const responseText = prompt.promptResult?.trim();
+    if (!responseId || !responseText || prompt.promptStatus !== "completed") return [];
+
+    return [
+      {
+        id: responseId,
+        type: "canvasResponseNode",
+        position: { x: 0, y: 0 },
+        selectable: true,
+        draggable: true,
+        data: {
+          accent: "#2563eb",
+          emphasis: "normal",
+          filterMatched: true,
+          kind: "canvas-response",
+          model: prompt.promptModel ?? null,
+          modelLabel: getGraphModelLabel(
+            prompt.promptModel ?? null,
+            prompt.promptProvider ?? null,
+          ),
+          preview: responseText,
+          provider: prompt.promptProvider ?? null,
+          providerLabel: providerDisplay(prompt.promptProvider ?? null),
+          role: "assistant",
+          title: "Assistant response",
+        },
+      } satisfies ThreadGraphFlowNode,
+    ];
   });
 }
 
