@@ -18,6 +18,7 @@ const assistantRuntimeMock = vi.hoisted(() => ({
   threads: {
     main: {
       append: vi.fn(),
+      export: vi.fn(),
     },
   },
 }));
@@ -169,6 +170,28 @@ vi.mock("@/components/ui/button", async () => {
 
 import { Composer } from "../components/assistant-ui/thread";
 
+const exportedThreadSnapshot = {
+  headId: "assistant-1",
+  messages: [
+    {
+      parentId: null,
+      message: {
+        id: "user-1",
+        role: "user",
+        content: [{ type: "text", text: "Earlier question" }],
+      },
+    },
+    {
+      parentId: "user-1",
+      message: {
+        id: "assistant-1",
+        role: "assistant",
+        content: [{ type: "text", text: "Previous answer" }],
+      },
+    },
+  ],
+};
+
 describe("Composer", () => {
   beforeEach(() => {
     historyModeState.historyMode = "last";
@@ -182,6 +205,8 @@ describe("Composer", () => {
     composerRuntimeMock.setRunConfig.mockReset();
     composerRuntimeMock.setText.mockReset();
     assistantRuntimeMock.threads.main.append.mockReset();
+    assistantRuntimeMock.threads.main.export.mockReset();
+    assistantRuntimeMock.threads.main.export.mockReturnValue(exportedThreadSnapshot);
     requestErrorState.clearRequestError.mockReset();
     requestErrorState.requestError = null;
     requestErrorState.setRequestError.mockReset();
@@ -192,20 +217,36 @@ describe("Composer", () => {
     cleanup();
   });
 
-  it("sets run config and sends when the send button is clicked", async () => {
+  it("builds parent context, sets run config, and sends when clicked", async () => {
     render(<Composer />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(requestErrorState.clearRequestError).toHaveBeenCalledTimes(1));
+    expect(assistantRuntimeMock.threads.main.export).toHaveBeenCalledTimes(1);
     expect(composerRuntimeMock.setRunConfig).toHaveBeenCalledWith({
       custom: {
+        contextScope: "parent",
+        contextMessages: [
+          {
+            role: "user",
+            content: "Continue from the saved assistant response below; treat it as conversation context.",
+          },
+          {
+            id: "assistant-1",
+            role: "assistant",
+            content: "Previous answer",
+          },
+          {
+            role: "user",
+            content: "Hola",
+          },
+        ],
         historyMode: "last",
         model: "nvidia/nemotron-3-super-120b-a12b:free",
         provider: "openrouter",
       },
     });
-
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
-
-    await waitFor(() => expect(requestErrorState.clearRequestError).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(composerRuntimeMock.send).toHaveBeenCalledWith({ startRun: true }),
     );
