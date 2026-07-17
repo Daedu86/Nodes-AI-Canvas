@@ -154,4 +154,38 @@
   .react-flow__node select.nowheel option:disabled {
     color: #64748b;
   }
+
+  [data-canvas-interacting="true"] .react-flow {
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+
+  [data-canvas-interacting="true"] .react-flow__node,
+  [data-canvas-interacting="true"] .react-flow__node * {
+    animation: none !important;
+    backdrop-filter: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+
+  [data-canvas-interacting="true"] .react-flow__node > * {
+    box-shadow: none !important;
+  }
+
+  [data-canvas-interacting="true"] .react-flow__edge-path,
+  [data-canvas-interacting="true"] .react-flow__connection-path {
+    filter: none !important;
+    transition: none !important;
+  }
+
+  [data-canvas-interacting="true"] .react-flow__edge-text,
+  [data-canvas-interacting="true"] .react-flow__edge-textbg {
+    opacity: 0 !important;
+  }
+
+  [data-canvas-interacting="true"] .react-flow__controls button {
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    transition: none !important;
+  }
 }
