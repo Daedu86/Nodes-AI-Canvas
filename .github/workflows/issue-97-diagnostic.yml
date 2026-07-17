@@ -1,0 +1,85 @@
+name: Issue 97 diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/issue-97-diagnostic.yml
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  security-events: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_SHA: c73348d954e8fa78a203358ed08a942191b02f93
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Record check and workflow state
+        run: |
+          mkdir -p .github/validation
+          gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/commits/${TARGET_SHA}/check-runs?per_page=100" > /tmp/check-runs.json
+          gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${TARGET_SHA}&per_page=100" > /tmp/workflow-runs.json
+          if gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/code-scanning/analyses?ref=refs/heads/main&per_page=100" > /tmp/analyses.json; then
+            true
+          else
+            printf '[]\n' > /tmp/analyses.json
+          fi
+          node <<'NODE'
+          const fs = require('node:fs');
+          const target = process.env.TARGET_SHA;
+          const checks = JSON.parse(fs.readFileSync('/tmp/check-runs.json', 'utf8')).check_runs ?? [];
+          const workflows = JSON.parse(fs.readFileSync('/tmp/workflow-runs.json', 'utf8')).workflow_runs ?? [];
+          const analyses = JSON.parse(fs.readFileSync('/tmp/analyses.json', 'utf8'));
+          const report = {
+            collectedAt: new Date().toISOString(),
+            targetSha: target,
+            checkRuns: checks.map((check) => ({
+              id: check.id,
+              name: check.name,
+              status: check.status,
+              conclusion: check.conclusion,
+              detailsUrl: check.details_url,
+              startedAt: check.started_at,
+              completedAt: check.completed_at,
+            })),
+            workflowRuns: workflows.map((run) => ({
+              id: run.id,
+              name: run.name,
+              status: run.status,
+              conclusion: run.conclusion,
+              event: run.event,
+              htmlUrl: run.html_url,
+              createdAt: run.created_at,
+              updatedAt: run.updated_at,
+            })),
+            codeqlAnalyses: analyses
+              .filter((analysis) => analysis.commit_sha === target)
+              .map((analysis) => ({
+                id: analysis.id,
+                tool: analysis.tool?.name,
+                category: analysis.category,
+                resultsCount: analysis.results_count,
+                rulesCount: analysis.rules_count,
+                error: analysis.error,
+                createdAt: analysis.created_at,
+              })),
+          };
+          fs.writeFileSync('.github/validation/issue-97-diagnostic.json', `${JSON.stringify(report, null, 2)}\n`);
+          NODE
+      - name: Commit diagnostic
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/validation/issue-97-diagnostic.json
+          git commit -m "chore: record issue 97 diagnostic [skip ci] [skip vercel]"
+          git push origin HEAD:main
