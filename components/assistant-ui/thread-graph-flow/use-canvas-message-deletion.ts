@@ -13,7 +13,7 @@ import {
 import { usePersistedSessions } from "@/components/context/persisted-sessions";
 import { useRequestError } from "@/components/context/request-error";
 import { useSessionArtifacts } from "@/components/context/session-artifacts";
-import { useSessionUiState } from "@/components/context/session-ui-state";
+import { useSessionUiActions } from "@/components/context/session-ui-state";
 import type { SessionThreadExport } from "@/lib/session-documents";
 import {
   forceSessionPersist,
@@ -31,6 +31,30 @@ type AssistantRuntime = NonNullable<ReturnType<typeof useAssistantRuntime>>;
 type MainThreadRuntime = AssistantRuntime["threads"]["main"];
 type ThreadExport = ReturnType<MainThreadRuntime["export"]>;
 type ThreadExternalState = MessageFormatRepository<UIMessage>;
+type SnapshotMessages = SessionThreadExport["messages"];
+
+const detachedMessageIdsBySnapshot = new WeakMap<
+  SnapshotMessages,
+  ReadonlySet<string>
+>();
+
+const getDetachedMessageIds = (messages: SnapshotMessages) => {
+  const cached = detachedMessageIdsBySnapshot.get(messages);
+  if (cached) return cached;
+
+  const detachedIds = new Set<string>();
+  messages.forEach((entry) => {
+    const messageId = entry.message.id;
+    if (
+      typeof messageId === "string" &&
+      getDetachedFromMessageId(entry.message)
+    ) {
+      detachedIds.add(messageId);
+    }
+  });
+  detachedMessageIdsBySnapshot.set(messages, detachedIds);
+  return detachedIds;
+};
 
 type InternalThreadControl = MainThreadRuntime & {
   __internal_threadBinding?: {
@@ -168,20 +192,14 @@ export function useCanvasMessageDeletion(messageId: string | null) {
   const { activeSession, saveActiveSessionDocumentPatch } = usePersistedSessions();
   const { canvasLinks, removeCanvasLink } = useSessionArtifacts();
   const { clearRequestError, setRequestError } = useRequestError();
-  const {
-    canvasSelectionId,
-    focusedMessageId,
-    setCanvasSelectionId,
-    setFocusedMessageId,
-  } = useSessionUiState();
+  const { setCanvasSelectionId, setFocusedMessageId } = useSessionUiActions();
   const [isDeleting, setIsDeleting] = React.useState(false);
 
   const isDetached = React.useMemo(() => {
-    if (!messageId) return false;
-    const entry = activeSession?.snapshot.messages.find(
-      (candidate) => candidate.message.id === messageId,
+    const messages = activeSession?.snapshot.messages;
+    return Boolean(
+      messageId && messages && getDetachedMessageIds(messages).has(messageId),
     );
-    return Boolean(entry && getDetachedFromMessageId(entry.message));
   }, [activeSession?.snapshot.messages, messageId]);
 
   const deleteMessageNode = React.useCallback(() => {
@@ -258,8 +276,12 @@ export function useCanvasMessageDeletion(messageId: string | null) {
           contextLinks: nextCanvasLinks,
         });
 
-        if (focusedMessageId === messageId) setFocusedMessageId(null);
-        if (canvasSelectionId === messageId) setCanvasSelectionId(null);
+        setFocusedMessageId((current) =>
+          current === messageId ? null : current,
+        );
+        setCanvasSelectionId((current) =>
+          current === messageId ? null : current,
+        );
       } catch (error) {
         setRequestError(
           error instanceof Error
@@ -273,9 +295,7 @@ export function useCanvasMessageDeletion(messageId: string | null) {
     })();
   }, [
     canvasLinks,
-    canvasSelectionId,
     clearRequestError,
-    focusedMessageId,
     isDeleting,
     messageId,
     removeCanvasLink,

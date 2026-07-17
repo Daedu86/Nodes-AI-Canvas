@@ -114,8 +114,7 @@ export const ThreadGraphNode = memo(
             : null;
 
     useEffect(() => {
-      const frame = window.requestAnimationFrame(() => updateNodeInternals(id));
-      return () => window.cancelAnimationFrame(frame);
+      updateNodeInternals(id);
     }, [fullText, id, updateNodeInternals]);
 
     return (

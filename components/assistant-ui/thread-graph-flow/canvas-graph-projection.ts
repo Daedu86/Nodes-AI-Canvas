@@ -15,6 +15,15 @@ type CanvasGraphProjection = {
   edges: ThreadGraphFlowEdge[];
 };
 
+const decoratedNodeVariants = new WeakMap<
+  ThreadGraphFlowNode,
+  Map<string, ThreadGraphFlowNode>
+>();
+const decoratedEdgeVariants = new WeakMap<
+  ThreadGraphFlowEdge,
+  Map<string, ThreadGraphFlowEdge>
+>();
+
 export function buildCanvasFilterCounts(
   canvasConversationNodes: ThreadGraphNodeModel[],
   artifactCount: number,
@@ -201,7 +210,8 @@ export function decorateCanvasNodes({
   spotlight: FlowSpotlightMode;
   visibleFlowNodes: ThreadGraphFlowNode[];
 }) {
-  return visibleFlowNodes.map((node) => {
+  let changed = false;
+  const decoratedNodes = visibleFlowNodes.map((node) => {
     const originalNode = nodeIndex.get(node.id);
     const filterMatched = originalNode
       ? matchesCanvasSpotlight(originalNode, spotlight)
@@ -216,16 +226,40 @@ export function decorateCanvasNodes({
           : selectedLineage.has(node.id) || relatedContextIds.has(node.id)
             ? "lineage"
             : "muted";
+    const selected = emphasis === "selected" ? true : undefined;
+    const dataMatches =
+      (node.data.emphasis ?? "normal") === emphasis &&
+      (node.data.filterMatched ?? true) === filterMatched;
+    const selectionMatches = node.selected === selected;
 
-    return {
+    if (dataMatches && selectionMatches) return node;
+
+    changed = true;
+    const variantKey = `${emphasis}:${filterMatched ? 1 : 0}:${selected ? 1 : 0}`;
+    let variants = decoratedNodeVariants.get(node);
+    if (!variants) {
+      variants = new Map();
+      decoratedNodeVariants.set(node, variants);
+    }
+    const cached = variants.get(variantKey);
+    if (cached) return cached;
+
+    const decoratedNode = {
       ...node,
-      data: {
-        ...node.data,
-        emphasis,
-        filterMatched,
-      },
+      selected,
+      data: dataMatches
+        ? node.data
+        : {
+            ...node.data,
+            emphasis,
+            filterMatched,
+          },
     };
+    variants.set(variantKey, decoratedNode);
+    return decoratedNode;
   });
+
+  return changed ? decoratedNodes : visibleFlowNodes;
 }
 
 export function decorateCanvasEdges({
@@ -247,7 +281,8 @@ export function decorateCanvasEdges({
     decoratedFlowNodes.map((node) => [node.id, node.data.filterMatched ?? true]),
   );
 
-  return visibleFlowEdges.map((edge) => {
+  let changed = false;
+  const decoratedEdges = visibleFlowEdges.map((edge) => {
     const sourceInLineage =
       selectedLineage.has(edge.source) || relatedContextIds.has(edge.source);
     const targetInLineage =
@@ -268,14 +303,29 @@ export function decorateCanvasEdges({
             : "lineage"
           : "muted";
 
-    return {
+    if ((edge.data?.emphasis ?? "normal") === emphasis) return edge;
+
+    changed = true;
+    let variants = decoratedEdgeVariants.get(edge);
+    if (!variants) {
+      variants = new Map();
+      decoratedEdgeVariants.set(edge, variants);
+    }
+    const cached = variants.get(emphasis);
+    if (cached) return cached;
+
+    const decoratedEdge = {
       ...edge,
       data: {
         ...edge.data,
         emphasis,
       },
     };
+    variants.set(emphasis, decoratedEdge);
+    return decoratedEdge;
   });
+
+  return changed ? decoratedEdges : visibleFlowEdges;
 }
 
 export function buildGraphStructureSignature(

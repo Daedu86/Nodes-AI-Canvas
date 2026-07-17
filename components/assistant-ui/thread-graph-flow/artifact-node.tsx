@@ -21,7 +21,7 @@ import {
 } from "@/components/assistant-ui/thread-graph-flow/artifact-presentation";
 import type { ThreadGraphFlowNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-flow-types";
 import { useSessionArtifacts } from "@/components/context/session-artifacts";
-import { useSessionUiState } from "@/components/context/session-ui-state";
+import { useSessionUiActions } from "@/components/context/session-ui-state";
 
 const previewText = (value: string) => {
   const compact = value.replace(/\s+/g, " ").trim();
@@ -32,7 +32,7 @@ const previewText = (value: string) => {
 export const ArtifactGraphNode = memo(
   ({ id, data, selected, dragging }: NodeProps<ThreadGraphFlowNode>) => {
     const { deleteArtifact } = useSessionArtifacts();
-    const { canvasSelectionId, setCanvasSelectionId } = useSessionUiState();
+    const { setCanvasSelectionId } = useSessionUiActions();
     const artifactType = data.artifactType ?? "text";
     const semanticType = data.semanticType ?? null;
     const isTable = artifactType === "text" && semanticType === "table";
@@ -79,7 +79,7 @@ export const ArtifactGraphNode = memo(
       );
       if (!confirmed) return;
       deleteArtifact(id);
-      if (canvasSelectionId === id) setCanvasSelectionId(null);
+      setCanvasSelectionId((current) => (current === id ? null : current));
     };
 
     return (

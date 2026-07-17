@@ -423,6 +423,22 @@ export function ThreadGraphFlow() {
     updateArtifact,
   });
 
+  const handleArtifactPositionChange = React.useCallback(
+    (artifactId: string, position: { x: number; y: number }) => {
+      updateArtifact(artifactId, { position });
+    },
+    [updateArtifact],
+  );
+
+  const handleMessageOpen = React.useCallback(
+    (messageId: string) => {
+      applyCanvasSelection(messageId);
+      setViewMode("split");
+      scrollMessageIntoView(messageId);
+    },
+    [applyCanvasSelection, setViewMode],
+  );
+
   const {
     handleFocusSelected,
     handleResetView,
@@ -762,18 +778,13 @@ export function ThreadGraphFlow() {
         flowRenderMode,
         graphStructureSignature,
         nodes: interactiveFlowNodes,
-        onArtifactPositionChange: (artifactId, position) =>
-          updateArtifact(artifactId, { position }),
+        onArtifactPositionChange: handleArtifactPositionChange,
         onCanvasConnect: handleCanvasConnect,
         onCanvasDragOver: handleCanvasDragOver,
         onCanvasDrop: handleCanvasDrop,
         onDraftPositionChange: setDraftPosition,
         onInit: setReactFlowInstance,
-        onMessageOpen: (messageId) => {
-          applyCanvasSelection(messageId);
-          setViewMode("split");
-          scrollMessageIntoView(messageId);
-        },
+        onMessageOpen: handleMessageOpen,
         onFlowRenderModeChange: setFlowRenderMode,
         onNodeSelect: applyCanvasSelection,
         onViewportChange: setStoredViewport,

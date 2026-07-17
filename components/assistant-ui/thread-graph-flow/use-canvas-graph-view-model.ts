@@ -302,8 +302,8 @@ export function useCanvasGraphViewModel({
     ],
   );
   const graphStructureSignature = React.useMemo(
-    () => buildGraphStructureSignature(decoratedFlowNodes, decoratedFlowEdges),
-    [decoratedFlowEdges, decoratedFlowNodes],
+    () => buildGraphStructureSignature(visibleFlowNodes, visibleFlowEdges),
+    [visibleFlowEdges, visibleFlowNodes],
   );
   const treeStructureSignature = React.useMemo(
     () => buildTreeStructureSignature(canvasConversationNodes, conversationEdges),

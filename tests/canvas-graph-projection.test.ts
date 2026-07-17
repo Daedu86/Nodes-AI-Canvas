@@ -162,13 +162,15 @@ describe("canvas graph projection", () => {
       visibleFlowNodes: flowNodes,
     });
     expect(
-      decoratedNodes.find((node) => node.id === "assistant-1")?.data.emphasis,
+      decoratedNodes.find((node) => node.id === "assistant-1")?.data.emphasis ??
+        "normal",
     ).toBe("normal");
     expect(decoratedNodes.find((node) => node.id === "user-1")?.data.emphasis).toBe(
       "muted",
     );
     expect(
-      decoratedNodes.find((node) => node.id === "artifact-1")?.data.emphasis,
+      decoratedNodes.find((node) => node.id === "artifact-1")?.data.emphasis ??
+        "normal",
     ).toBe("normal");
 
     const decoratedEdges = decorateCanvasEdges({
@@ -180,7 +182,8 @@ describe("canvas graph projection", () => {
       visibleFlowEdges: flowEdges,
     });
     expect(
-      decoratedEdges.find((edge) => edge.id === "context-assistant")?.data?.emphasis,
+      decoratedEdges.find((edge) => edge.id === "context-assistant")?.data
+        ?.emphasis ?? "normal",
     ).toBe("normal");
     expect(
       decoratedEdges.find((edge) => edge.id === "root-user")?.data?.emphasis,
@@ -194,5 +197,156 @@ describe("canvas graph projection", () => {
     expect(buildTreeStructureSignature(conversationNodes, flowEdges)).toContain(
       "assistant-1:main",
     );
+  });
+
+  it("preserves references across adjacent selections in a 500-node graph", () => {
+    const largeNodes: ThreadGraphFlowNode[] = Array.from(
+      { length: 500 },
+      (_, index) => ({
+        id: `node-${index}`,
+        position: { x: index, y: 0 },
+        data: {
+          emphasis: "normal",
+          filterMatched: true,
+          preview: `Node ${index}`,
+          role: index % 2 === 0 ? "user" : "assistant",
+        },
+      }),
+    );
+    const largeEdges: ThreadGraphFlowEdge[] = Array.from(
+      { length: 499 },
+      (_, index) => ({
+        id: `edge-${index}`,
+        source: `node-${index}`,
+        target: `node-${index + 1}`,
+        data: { emphasis: "normal", tone: "default" },
+      }),
+    );
+
+    const decoratedNodes = decorateCanvasNodes({
+      nodeIndex: new Map(),
+      relatedContextIds: new Set(),
+      selectedLineage: new Set(),
+      selectedNodeId: null,
+      spotlight: "all",
+      visibleFlowNodes: largeNodes,
+    });
+    expect(decoratedNodes).toBe(largeNodes);
+    decoratedNodes.forEach((node, index) => {
+      expect(node).toBe(largeNodes[index]);
+      expect(node.data).toBe(largeNodes[index]?.data);
+    });
+
+    const decoratedEdges = decorateCanvasEdges({
+      decoratedFlowNodes: decoratedNodes,
+      relatedContextIds: new Set(),
+      selectedLineage: new Set(),
+      selectedNodeId: null,
+      spotlight: "all",
+      visibleFlowEdges: largeEdges,
+    });
+    expect(decoratedEdges).toBe(largeEdges);
+    decoratedEdges.forEach((edge, index) => {
+      expect(edge).toBe(largeEdges[index]);
+      expect(edge.data).toBe(largeEdges[index]?.data);
+    });
+
+    const allNodeIds = new Set(largeNodes.map((node) => node.id));
+    const selected250 = decorateCanvasNodes({
+      nodeIndex: new Map(),
+      relatedContextIds: new Set(),
+      selectedLineage: allNodeIds,
+      selectedNodeId: "node-250",
+      spotlight: "all",
+      visibleFlowNodes: largeNodes,
+    });
+    const edges250 = decorateCanvasEdges({
+      decoratedFlowNodes: selected250,
+      relatedContextIds: new Set(),
+      selectedLineage: allNodeIds,
+      selectedNodeId: "node-250",
+      spotlight: "all",
+      visibleFlowEdges: largeEdges,
+    });
+    const selected251 = decorateCanvasNodes({
+      nodeIndex: new Map(),
+      relatedContextIds: new Set(),
+      selectedLineage: allNodeIds,
+      selectedNodeId: "node-251",
+      spotlight: "all",
+      visibleFlowNodes: largeNodes,
+    });
+    const edges251 = decorateCanvasEdges({
+      decoratedFlowNodes: selected251,
+      relatedContextIds: new Set(),
+      selectedLineage: allNodeIds,
+      selectedNodeId: "node-251",
+      spotlight: "all",
+      visibleFlowEdges: largeEdges,
+    });
+
+    expect(
+      selected251.filter((node, index) => node !== selected250[index]),
+    ).toHaveLength(2);
+    expect(
+      selected251.filter(
+        (node, index) => node.data !== selected250[index]?.data,
+      ),
+    ).toHaveLength(2);
+    expect(edges251.filter((edge, index) => edge !== edges250[index])).toHaveLength(2);
+    expect(
+      edges251.filter((edge, index) => edge.data !== edges250[index]?.data),
+    ).toHaveLength(2);
+    expect(selected250[250]?.selected).toBe(true);
+    expect(selected251[251]?.selected).toBe(true);
+  });
+
+  it("sets selected explicitly and reuses nodes whose derived state is unchanged", () => {
+    const selectedCandidate: ThreadGraphFlowNode = {
+      id: "selected",
+      position: { x: 0, y: 0 },
+      data: {
+        emphasis: "normal",
+        filterMatched: true,
+        preview: "Selected",
+        role: "artifact",
+      },
+    };
+    const alreadyMuted: ThreadGraphFlowNode = {
+      id: "muted",
+      position: { x: 1, y: 0 },
+      data: {
+        emphasis: "muted",
+        filterMatched: true,
+        preview: "Muted",
+        role: "artifact",
+      },
+    };
+
+    const decorated = decorateCanvasNodes({
+      nodeIndex: new Map(),
+      relatedContextIds: new Set(),
+      selectedLineage: new Set(),
+      selectedNodeId: selectedCandidate.id,
+      spotlight: "all",
+      visibleFlowNodes: [selectedCandidate, alreadyMuted],
+    });
+
+    expect(decorated[0]).not.toBe(selectedCandidate);
+    expect(decorated[0]?.selected).toBe(true);
+    expect(decorated[0]?.data.emphasis).toBe("selected");
+    expect(decorated[1]).toBe(alreadyMuted);
+    expect(decorated[1]?.data).toBe(alreadyMuted.data);
+
+    const redecorated = decorateCanvasNodes({
+      nodeIndex: new Map(),
+      relatedContextIds: new Set(),
+      selectedLineage: new Set(),
+      selectedNodeId: selectedCandidate.id,
+      spotlight: "all",
+      visibleFlowNodes: [selectedCandidate, alreadyMuted],
+    });
+    expect(redecorated[0]).toBe(decorated[0]);
+    expect(redecorated[1]).toBe(decorated[1]);
   });
 });

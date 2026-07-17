@@ -32,9 +32,9 @@ type SessionUiStateContextValue = {
   historyMode: HistoryMode;
   setHistoryMode: (value: HistoryMode) => void;
   focusedMessageId: string | null;
-  setFocusedMessageId: (value: string | null) => void;
+  setFocusedMessageId: React.Dispatch<React.SetStateAction<string | null>>;
   canvasSelectionId: string | null;
-  setCanvasSelectionId: (value: string | null) => void;
+  setCanvasSelectionId: React.Dispatch<React.SetStateAction<string | null>>;
   llmEnabled: boolean;
   setLlmEnabled: (value: boolean) => void;
   modelConfig: ModelConfig;
@@ -53,6 +53,11 @@ type SessionUiStateContextValue = {
   setLinkOverrides: React.Dispatch<React.SetStateAction<Map<string, LinkOverrideEntry>>>;
   sessionId: string;
 };
+
+type SessionUiActionsContextValue = Pick<
+  SessionUiStateContextValue,
+  "setCanvasSelectionId" | "setFocusedMessageId"
+>;
 
 const LEGACY_HISTORY_MODE_KEY = "historyMode";
 const LEGACY_LLM_ENABLED_KEY = "llmEnabled";
@@ -76,6 +81,7 @@ const DEFAULT_MODEL_CONFIG: ModelConfig = getSupportedModelConfig({
 });
 
 const SessionUiStateContext = React.createContext<SessionUiStateContextValue | null>(null);
+const SessionUiActionsContext = React.createContext<SessionUiActionsContextValue | null>(null);
 
 const getScopedStorageKey = (sessionId: string, suffix: string) =>
   `session-ui.${suffix}.v1:${sessionId}`;
@@ -476,10 +482,17 @@ export function SessionUiStateProvider({
     ],
   );
 
+  const actions = React.useMemo<SessionUiActionsContextValue>(
+    () => ({ setCanvasSelectionId, setFocusedMessageId }),
+    [setCanvasSelectionId, setFocusedMessageId],
+  );
+
   return (
-    <SessionUiStateContext.Provider value={value}>
-      {children}
-    </SessionUiStateContext.Provider>
+    <SessionUiActionsContext.Provider value={actions}>
+      <SessionUiStateContext.Provider value={value}>
+        {children}
+      </SessionUiStateContext.Provider>
+    </SessionUiActionsContext.Provider>
   );
 }
 
@@ -487,6 +500,14 @@ export function useSessionUiState() {
   const context = React.useContext(SessionUiStateContext);
   if (!context) {
     throw new Error("useSessionUiState must be used within SessionUiStateProvider");
+  }
+  return context;
+}
+
+export function useSessionUiActions() {
+  const context = React.useContext(SessionUiActionsContext);
+  if (!context) {
+    throw new Error("useSessionUiActions must be used within SessionUiStateProvider");
   }
   return context;
 }
