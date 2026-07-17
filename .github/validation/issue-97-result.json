@@ -1,11 +1,11 @@
 {
-  "completedAt": "2026-07-17T13:15:57.395Z",
-  "validatedSha": "e44cd17214d4a2490429daae1daf04620455b0bf",
-  "workflowRunId": "29581840116",
+  "completedAt": "2026-07-17T13:42:03.810Z",
+  "validatedSha": "f528236b0ede0c885df0c011d06f1304a9defc85",
+  "workflowRunId": "29584162688",
   "outcomes": {
     "install": "success",
-    "repositoryChecks": "success",
-    "buildBudget": "failure",
+    "repositoryChecks": "failure",
+    "buildBudget": "success",
     "playwrightInstall": "success",
     "chromiumE2E": "failure",
     "codeqlInit": "success",
@@ -14,7 +14,7 @@
   "sarifFiles": [
     "sarif-results/javascript.sarif"
   ],
-  "codeqlFindings": 3,
+  "codeqlFindings": 1,
   "sarifErrors": [],
   "passed": false
 }
