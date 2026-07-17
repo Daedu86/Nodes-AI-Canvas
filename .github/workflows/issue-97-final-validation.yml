@@ -1,0 +1,166 @@
+name: Issue 97 final validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/issue-97-final-validation.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: issue-97-final-validation
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CI: "true"
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Initialize CodeQL
+        id: codeql_init
+        continue-on-error: true
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        id: install
+        continue-on-error: true
+        run: npm ci
+
+      - name: Run repository checks
+        id: checks
+        continue-on-error: true
+        run: npm run check
+
+      - name: Run production build and bundle budget
+        id: build_budget
+        continue-on-error: true
+        run: npm run build:budget
+
+      - name: Install Chromium
+        id: playwright_install
+        continue-on-error: true
+        run: npx playwright install --with-deps chromium
+
+      - name: Run full Chromium E2E suite
+        id: e2e
+        continue-on-error: true
+        env:
+          PLAYWRIGHT_BROWSER_NAME: chromium
+        run: npm run test:e2e -- --workers=1
+
+      - name: Analyze with CodeQL
+        id: codeql_analyze
+        continue-on-error: true
+        uses: github/codeql-action/analyze@v3
+        with:
+          output: sarif-results
+          upload: false
+          category: issue-97/security-extended
+
+      - name: Record validation result
+        if: always()
+        env:
+          VALIDATED_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          CHECKS_OUTCOME: ${{ steps.checks.outcome }}
+          BUILD_BUDGET_OUTCOME: ${{ steps.build_budget.outcome }}
+          PLAYWRIGHT_INSTALL_OUTCOME: ${{ steps.playwright_install.outcome }}
+          E2E_OUTCOME: ${{ steps.e2e.outcome }}
+          CODEQL_INIT_OUTCOME: ${{ steps.codeql_init.outcome }}
+          CODEQL_ANALYZE_OUTCOME: ${{ steps.codeql_analyze.outcome }}
+        run: |
+          mkdir -p .github/validation
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          function walk(directory) {
+            if (!fs.existsSync(directory)) return [];
+            return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+              const fullPath = path.join(directory, entry.name);
+              return entry.isDirectory() ? walk(fullPath) : [fullPath];
+            });
+          }
+
+          const sarifFiles = walk('sarif-results').filter((file) => file.endsWith('.sarif'));
+          let codeqlFindings = 0;
+          const sarifErrors = [];
+          for (const file of sarifFiles) {
+            try {
+              const payload = JSON.parse(fs.readFileSync(file, 'utf8'));
+              for (const run of payload.runs ?? []) codeqlFindings += (run.results ?? []).length;
+            } catch (error) {
+              sarifErrors.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+            }
+          }
+
+          const outcomes = {
+            install: process.env.INSTALL_OUTCOME,
+            repositoryChecks: process.env.CHECKS_OUTCOME,
+            buildBudget: process.env.BUILD_BUDGET_OUTCOME,
+            playwrightInstall: process.env.PLAYWRIGHT_INSTALL_OUTCOME,
+            chromiumE2E: process.env.E2E_OUTCOME,
+            codeqlInit: process.env.CODEQL_INIT_OUTCOME,
+            codeqlAnalyze: process.env.CODEQL_ANALYZE_OUTCOME,
+          };
+          const allStepsPassed = Object.values(outcomes).every((outcome) => outcome === 'success');
+          const passed = allStepsPassed && sarifFiles.length > 0 && sarifErrors.length === 0 && codeqlFindings === 0;
+          const report = {
+            completedAt: new Date().toISOString(),
+            validatedSha: process.env.VALIDATED_SHA,
+            workflowRunId: process.env.RUN_ID,
+            outcomes,
+            sarifFiles: sarifFiles.map((file) => file.replaceAll('\\', '/')),
+            codeqlFindings,
+            sarifErrors,
+            passed,
+          };
+          fs.writeFileSync('.github/validation/issue-97-result.json', `${JSON.stringify(report, null, 2)}\n`);
+          console.log(JSON.stringify(report, null, 2));
+          NODE
+
+      - name: Commit validation report to main
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/validation/issue-97-result.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore: record issue 97 validation result [skip vercel]"
+          git push origin HEAD:main
+
+      - name: Enforce successful validation
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('.github/validation/issue-97-result.json', 'utf8'));
+          if (!report.passed) {
+            console.error('Final hardening validation failed.');
+            console.error(JSON.stringify(report, null, 2));
+            process.exit(1);
+          }
+          NODE
