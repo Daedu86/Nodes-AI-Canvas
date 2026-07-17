@@ -23,6 +23,11 @@ jobs:
     env:
       CI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
+      VERCEL_ENV: preview
+      NODES_PERSISTENCE_BACKEND: file
+      AUTH_ENABLE_DEV_CREDENTIALS: "0"
+      OPENROUTER_ALLOW_DEPLOYMENT_KEY: "0"
+      OPENROUTER_REQUIRE_USER_KEY: "1"
     steps:
       - name: Check out main
         uses: actions/checkout@v4
@@ -35,6 +40,7 @@ jobs:
         continue-on-error: true
         uses: github/codeql-action/init@v3
         with:
+          config-file: ./.github/codeql/codeql-config.yml
           languages: javascript-typescript
           queries: security-extended
 
