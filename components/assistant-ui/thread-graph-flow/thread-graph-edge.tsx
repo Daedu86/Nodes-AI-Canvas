@@ -78,8 +78,8 @@ export const ThreadGraphEdge = memo(
     const isLineage = emphasis === "lineage";
     const isSelected = emphasis === "selected" || selected;
     const isEditMode = Boolean(data?.linkEditMode && data?.editable);
-    const outerWidth = isSelected ? 3.8 : isLineage ? 3.1 : 2.7;
-    const innerWidth = isSelected ? 1.9 : isLineage ? 1.4 : 1.2;
+    const renderHighlight = isSelected || isLineage || isEditMode;
+    const outerWidth = isSelected ? 3.4 : isLineage ? 2.8 : 2.2;
 
     return (
       <>
@@ -87,7 +87,7 @@ export const ThreadGraphEdge = memo(
           d={path}
           fill="none"
           stroke="transparent"
-          strokeWidth={24}
+          strokeWidth={20}
           className="thread-graph-edge-hitbox"
           data-edge-id={id}
           data-edge-source={source}
@@ -102,41 +102,30 @@ export const ThreadGraphEdge = memo(
           markerEnd={markerEnd}
           style={{
             stroke: accent,
-            strokeOpacity: isMuted ? 0.08 : isSelected ? 0.98 : isLineage ? 0.85 : 0.72,
+            strokeOpacity: isMuted ? 0.07 : isSelected ? 0.98 : isLineage ? 0.86 : 0.72,
             strokeWidth: outerWidth,
             strokeDasharray: isDashed(data) ? "10 8" : undefined,
-            filter: isMuted ? "none" : `drop-shadow(0 0 8px ${accent}33)`,
+            filter: isSelected ? `drop-shadow(0 0 5px ${accent}44)` : "none",
           }}
         />
-        <BaseEdge
-          id={`${id}-inner`}
-          path={path}
-          markerEnd={markerEnd}
-          style={{
-            stroke: "rgba(255,255,255,0.78)",
-            strokeOpacity: isMuted ? 0.04 : isSelected ? 0.92 : isLineage ? 0.7 : 0.55,
-            strokeWidth: innerWidth,
-            strokeDasharray:
-              isEditMode
-                ? "4 8"
-                : data?.tone === "context"
-                  ? "7 7"
-                  : data?.tone === "pending-output"
-                    ? "5 7"
-                    : data?.tone === "draft"
-                      ? "6 7"
-                      : data?.isEdited
-                        ? "8 6"
-                        : data?.isBridge
-                          ? "3 6"
-                          : undefined,
-          }}
-        />
+        {renderHighlight ? (
+          <BaseEdge
+            id={`${id}-highlight`}
+            path={path}
+            markerEnd={markerEnd}
+            style={{
+              stroke: "rgba(255,255,255,0.74)",
+              strokeOpacity: isMuted ? 0.04 : isSelected ? 0.88 : 0.62,
+              strokeWidth: isSelected ? 1.5 : 1,
+              strokeDasharray: isEditMode ? "4 8" : undefined,
+            }}
+          />
+        ) : null}
         {badge ? (
           <EdgeLabelRenderer>
             <div
               className={[
-                "pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] shadow-sm backdrop-blur",
+                "pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] shadow-sm",
                 badge.border,
                 badge.bg,
                 badge.text,
@@ -152,7 +141,7 @@ export const ThreadGraphEdge = memo(
           <EdgeLabelRenderer>
             <button
               type="button"
-              className="pointer-events-auto absolute z-[60] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border border-rose-500/35 bg-background/95 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-700 shadow-sm backdrop-blur hover:bg-rose-500/10"
+              className="pointer-events-auto absolute z-[60] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full border border-rose-500/35 bg-background/95 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-700 shadow-sm hover:bg-rose-500/10"
               style={{ transform: `translate(${labelX}px, ${labelY + (badge ? 22 : 0)}px) translate(-50%, -50%)` }}
               onClick={(event) => {
                 event.preventDefault();
