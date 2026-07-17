@@ -9,83 +9,140 @@ on:
 permissions:
   actions: read
   contents: write
-  security-events: read
 
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
-      TARGET_SHA: c73348d954e8fa78a203358ed08a942191b02f93
-      TARGET_RUN_ID: "29577849639"
-      TARGET_JOB_ID: "87876367676"
+      TARGET_RUN_ID: "29581840116"
+      TARGET_JOB_ID: "87889210531"
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-      - name: Summarize failed test log and CodeQL alerts
+
+      - name: Extract build, E2E, and SARIF failures
         run: |
-          mkdir -p .github/validation
-          gh run view "${TARGET_RUN_ID}" --repo "${GITHUB_REPOSITORY}" --job "${TARGET_JOB_ID}" --log-failed > /tmp/unit-failure.log 2>&1 || true
-          if gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" > /tmp/codeql-alerts.json; then
-            true
-          else
-            printf '[]\n' > /tmp/codeql-alerts.json
-          fi
+          mkdir -p .github/validation /tmp/issue97-artifacts
+          gh run view "${TARGET_RUN_ID}" --repo "${GITHUB_REPOSITORY}" --job "${TARGET_JOB_ID}" --log > /tmp/issue97.log 2>&1 || true
+          gh run download "${TARGET_RUN_ID}" --repo "${GITHUB_REPOSITORY}" --name issue-97-validation-artifacts --dir /tmp/issue97-artifacts || true
+
           node <<'NODE'
           const fs = require('node:fs');
-          const target = process.env.TARGET_SHA;
-          const ansi = /\u001b\[[0-9;]*m/gu;
-          const rawLines = fs.readFileSync('/tmp/unit-failure.log', 'utf8')
-            .replace(ansi, '')
-            .split(/\r?\n/u)
-            .map((line) => line.replace(/^Unit and coverage\t[^\t]+\t[^\t]+\t/u, ''));
-          const pattern = /(FAIL|AssertionError|expected|received|toHaveBeenCalled|Test Files|Tests\s|thread-composer|Error:|×|❯)/iu;
-          const selected = new Set();
-          rawLines.forEach((line, index) => {
-            if (!pattern.test(line)) return;
-            for (let cursor = Math.max(0, index - 5); cursor <= Math.min(rawLines.length - 1, index + 8); cursor += 1) {
-              selected.add(cursor);
-            }
-          });
-          const summary = [...selected]
-            .sort((a, b) => a - b)
-            .map((index) => rawLines[index])
-            .filter(Boolean)
-            .join('\n')
-            .slice(-30000);
-          fs.writeFileSync('.github/validation/issue-97-unit-summary.txt', `${summary}\n`);
+          const path = require('node:path');
 
-          const alerts = JSON.parse(fs.readFileSync('/tmp/codeql-alerts.json', 'utf8'));
-          const relevantAlerts = alerts
-            .filter((alert) => alert.tool?.name === 'CodeQL')
-            .map((alert) => ({
-              number: alert.number,
-              state: alert.state,
-              ruleId: alert.rule?.id,
-              ruleName: alert.rule?.name,
-              description: alert.rule?.description,
-              severity: alert.rule?.severity,
-              securitySeverityLevel: alert.rule?.security_severity_level,
-              path: alert.most_recent_instance?.location?.path,
-              startLine: alert.most_recent_instance?.location?.start_line,
-              endLine: alert.most_recent_instance?.location?.end_line,
-              message: alert.most_recent_instance?.message?.text,
-              commitSha: alert.most_recent_instance?.commit_sha,
-              htmlUrl: alert.html_url,
-              relevantToTarget: alert.most_recent_instance?.commit_sha === target,
-            }));
+          const ansi = /\u001b\[[0-9;]*m/gu;
+          const rawLines = fs.existsSync('/tmp/issue97.log')
+            ? fs.readFileSync('/tmp/issue97.log', 'utf8').replace(ansi, '').split(/\r?\n/u)
+            : [];
+
+          const normalize = (line) => {
+            const fields = line.split('\t');
+            return fields.length >= 4 ? fields.slice(3).join('\t') : line;
+          };
+          const linesForStep = (stepName) =>
+            rawLines
+              .filter((line) => line.includes(`\t${stepName}\t`))
+              .map(normalize)
+              .filter(Boolean);
+          const selectRelevant = (lines, patterns, tail = 180) => {
+            const selected = new Set();
+            lines.forEach((line, index) => {
+              if (!patterns.some((pattern) => pattern.test(line))) return;
+              for (let cursor = Math.max(0, index - 5); cursor <= Math.min(lines.length - 1, index + 12); cursor += 1) {
+                selected.add(cursor);
+              }
+            });
+            const contextual = [...selected]
+              .sort((a, b) => a - b)
+              .map((index) => lines[index]);
+            const fallback = lines.slice(-tail);
+            return (contextual.length > 0 ? contextual : fallback).slice(-400).join('\n');
+          };
+
+          const buildLines = linesForStep('Run production build and bundle budget');
+          const e2eLines = linesForStep('Run full Chromium end-to-end suite');
+          const buildExcerpt = selectRelevant(buildLines, [
+            /Largest JavaScript/iu,
+            /Total JavaScript/iu,
+            /budget/iu,
+            /error/iu,
+            /exit code/iu,
+          ]);
+          const e2eExcerpt = selectRelevant(e2eLines, [
+            /failed/iu,
+            /error/iu,
+            /timeout/iu,
+            /expect/iu,
+            /test(s)?\s/iu,
+            /×/u,
+            /❯/u,
+          ]);
+
+          function walk(directory) {
+            if (!fs.existsSync(directory)) return [];
+            return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+              const fullPath = path.join(directory, entry.name);
+              return entry.isDirectory() ? walk(fullPath) : [fullPath];
+            });
+          }
+
+          const sarifFiles = walk('/tmp/issue97-artifacts').filter((file) => file.endsWith('.sarif'));
+          const findings = [];
+          const sarifErrors = [];
+          for (const file of sarifFiles) {
+            try {
+              const payload = JSON.parse(fs.readFileSync(file, 'utf8'));
+              for (const run of payload.runs ?? []) {
+                const ruleById = new Map(
+                  (run.tool?.driver?.rules ?? []).map((rule) => [rule.id, rule]),
+                );
+                for (const result of run.results ?? []) {
+                  const location = result.locations?.[0]?.physicalLocation;
+                  const rule = ruleById.get(result.ruleId);
+                  findings.push({
+                    ruleId: result.ruleId,
+                    ruleName: rule?.name,
+                    level: result.level,
+                    message: result.message?.text,
+                    path: location?.artifactLocation?.uri,
+                    startLine: location?.region?.startLine,
+                    endLine: location?.region?.endLine,
+                  });
+                }
+              }
+            } catch (error) {
+              sarifErrors.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
+            }
+          }
+
+          const report = {
+            collectedAt: new Date().toISOString(),
+            targetRunId: process.env.TARGET_RUN_ID,
+            targetJobId: process.env.TARGET_JOB_ID,
+            buildExcerpt,
+            e2eExcerpt,
+            sarifFiles: sarifFiles.map((file) => file.replace('/tmp/issue97-artifacts/', '')),
+            findings,
+            sarifErrors,
+          };
           fs.writeFileSync(
-            '.github/validation/issue-97-codeql-alerts.json',
-            `${JSON.stringify(relevantAlerts, null, 2)}\n`,
+            '.github/validation/issue-97-failure-summary.json',
+            `${JSON.stringify(report, null, 2)}\n`,
           );
+          console.log(JSON.stringify(report, null, 2));
           NODE
-      - name: Commit summaries
+
+      - name: Commit diagnostic summary
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/validation/issue-97-unit-summary.txt .github/validation/issue-97-codeql-alerts.json
-          git commit -m "chore: record issue 97 failure summaries [skip ci] [skip vercel]"
+          git add .github/validation/issue-97-failure-summary.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore: record issue 97 failure summary [skip ci] [skip vercel]"
           git push origin HEAD:main
