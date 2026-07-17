@@ -61,7 +61,7 @@ async function ensureSignedIn(page: Page) {
   await page.locator("#dev-email").fill(DEV_AUTH_EMAIL);
   await page.locator("#dev-password").fill(DEV_AUTH_PASSWORD);
   await loginButton.click();
-  await expect(newSessionButton).toBeVisible({ timeout: 15_000 });
+  await expect(composer).toBeVisible({ timeout: 15_000 });
 }
 
 async function createAndOpenSession(page: Page) {
@@ -123,10 +123,20 @@ test("conversation nodes can be dragged and keep their position after reload", a
 }) => {
   const sessionId = await createAndOpenSession(page);
   await dismissWorkspaceGuide(page);
+
+  const composer = page.getByPlaceholder("Write a message...");
+  await composer.fill("Reply briefly so the Canvas contains a real assistant node.");
+  await composer.press("Enter");
+
   await openCanvas(page);
 
   const canvas = page.getByRole("region", { name: "Conversation canvas" });
-  const node = canvas.locator(".react-flow__node-threadNode").first();
+  const conversationNodes = canvas.locator(".react-flow__node-threadNode");
+  await expect
+    .poll(async () => conversationNodes.count(), { timeout: 20_000 })
+    .toBeGreaterThanOrEqual(2);
+
+  const node = conversationNodes.last();
   await expect(node).toBeVisible({ timeout: 15_000 });
 
   const nodeId = await node.getAttribute("data-id");
