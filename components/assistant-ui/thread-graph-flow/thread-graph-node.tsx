@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useState, type CSSProperties } from "react";
+import { memo, useEffect, type CSSProperties } from "react";
 import {
   Handle,
   Position,
@@ -21,11 +21,6 @@ const formatBranchLabel = (branchId?: string | number | null) => {
   if (branchId == null || branchId === "") return null;
   const text = String(branchId);
   return text.length > 18 ? `${text.slice(0, 8)}…${text.slice(-4)}` : text;
-};
-
-const getCompactPreview = (value: string) => {
-  const compact = value.replace(/\s+/g, " ").trim();
-  return compact || "No content";
 };
 
 const getNodeTone = (data: ThreadGraphFlowNode["data"]) => {
@@ -80,11 +75,12 @@ const getNodeTone = (data: ThreadGraphFlowNode["data"]) => {
 
 export const ThreadGraphNode = memo(
   ({ id, data, selected, dragging }: NodeProps<ThreadGraphFlowNode>) => {
-    const [expanded, setExpanded] = useState(false);
     const updateNodeInternals = useUpdateNodeInternals();
     const isRoot = Boolean(data.isRoot || data.kind === "root");
     const isBridge = Boolean(data.isBridge || data.kind === "bridge");
     const isCut = Boolean(data.isCut);
+    const fullText = data.preview.trim() || "No content";
+    const usesWideLayout = fullText.length > 180 || fullText.includes("\n");
     const modelLabel = data.modelLabel ?? getGraphModelLabel(data.model, data.provider);
     const providerLabel =
       data.providerLabel ?? (data.provider ? data.provider.replace(/^@?/, "") : null);
@@ -97,12 +93,6 @@ export const ThreadGraphNode = memo(
     });
     const accent = data.accent ?? palette.swatch;
     const branchLabel = formatBranchLabel(data.branchId);
-    const fullText = data.preview.trim() || "No content";
-    const compactPreview = getCompactPreview(fullText);
-    const canExpand =
-      !isRoot &&
-      !isBridge &&
-      (fullText.length > 180 || fullText.includes("\n"));
     const tone = getNodeTone(data);
     const selectedRing = selected ? "ring-2 ring-sky-400/70" : "ring-1 ring-white/10";
     const draggingLift = dragging ? "scale-[1.015]" : "scale-100";
@@ -122,13 +112,13 @@ export const ThreadGraphNode = memo(
     useEffect(() => {
       const frame = window.requestAnimationFrame(() => updateNodeInternals(id));
       return () => window.cancelAnimationFrame(frame);
-    }, [expanded, id, updateNodeInternals]);
+    }, [fullText, id, updateNodeInternals]);
 
     return (
       <div
         className={[
-          "group relative min-w-[280px] rounded-[28px] border bg-background/95 p-[1px] transition-[width,transform,opacity,box-shadow] duration-200",
-          expanded
+          "group relative min-w-[280px] rounded-[28px] border bg-background/95 p-[1px] transition-[transform,opacity,box-shadow] duration-200",
+          usesWideLayout
             ? "w-[min(560px,calc(100vw-3rem))] max-w-none"
             : "w-[340px] max-w-[340px]",
           "border-white/10 bg-slate-950/95",
@@ -148,9 +138,7 @@ export const ThreadGraphNode = memo(
         <div className="relative overflow-hidden rounded-[27px] border border-white/8 bg-slate-950/95 px-4 py-3">
           <div
             className="pointer-events-none absolute inset-0 opacity-90"
-            style={{
-              backgroundImage: tone.background,
-            }}
+            style={{ backgroundImage: tone.background }}
           />
           <div
             className="pointer-events-none absolute left-0 top-0 h-full w-1.5"
@@ -256,31 +244,10 @@ export const ThreadGraphNode = memo(
             </div>
           </div>
 
-          <div className="relative mt-3">
-            {expanded ? (
-              <div className="nodrag nopan nowheel max-h-[min(60vh,520px)] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-black/15 px-3 py-3 shadow-inner">
-                <div className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
-                  {fullText}
-                </div>
-              </div>
-            ) : (
-              <p className="line-clamp-5 text-sm leading-5 text-slate-100">
-                {compactPreview}
-              </p>
-            )}
-            {canExpand ? (
-              <button
-                type="button"
-                aria-expanded={expanded}
-                className="nodrag nopan mt-2 inline-flex items-center rounded-full border border-white/15 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-slate-100 transition-colors hover:bg-white/[0.1]"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setExpanded((current) => !current);
-                }}
-              >
-                {expanded ? "Collapse response" : "Show full response"}
-              </button>
-            ) : null}
+          <div className="relative mt-3 rounded-xl border border-white/10 bg-black/15 px-3 py-3 shadow-inner">
+            <div className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-100">
+              {fullText}
+            </div>
           </div>
 
           <div className="relative mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-200/88">
@@ -310,6 +277,7 @@ export const ThreadGraphNode = memo(
               </span>
             ) : null}
           </div>
+
           {!isBridge && data.onContextScopeChange ? (
             <label className="nodrag nopan relative mt-3 block text-[11px] text-slate-300">
               <span className="mb-1 block font-medium uppercase tracking-[0.14em]">
@@ -335,6 +303,7 @@ export const ThreadGraphNode = memo(
               </select>
             </label>
           ) : null}
+
           {branchAction && data.onBranchOperation ? (
             <button
               type="button"
@@ -347,6 +316,7 @@ export const ThreadGraphNode = memo(
               {branchAction.label}
             </button>
           ) : null}
+
           {isRoot && (data.onToggleLinkEdit || data.onCopyGraphJson) ? (
             <div className="nodrag nopan relative mt-3 flex flex-wrap gap-2">
               {data.onToggleLinkEdit ? (
