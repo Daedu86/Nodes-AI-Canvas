@@ -56,6 +56,7 @@ const renderPromptNode = (overrides: Partial<ThreadGraphFlowNodeData> = {}) => {
 describe("CanvasPromptNode", () => {
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it("renders a canvas draft composer with controls and hint", () => {
@@ -89,14 +90,26 @@ describe("CanvasPromptNode", () => {
     expect(onDraftSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("submits from the Send button and cancels from Delete draft", () => {
+  it("submits from the Send button and cancels from Delete draft after confirmation", () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { onDraftCancel, onDraftSubmit } = renderPromptNode();
 
     fireEvent.click(screen.getByRole("button", { name: "Send prompt node" }));
     fireEvent.click(screen.getByRole("button", { name: /Delete draft/i }));
 
+    expect(window.confirm).toHaveBeenCalledTimes(1);
     expect(onDraftSubmit).toHaveBeenCalledTimes(1);
     expect(onDraftCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the prompt when deletion is not confirmed", () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { onDraftCancel } = renderPromptNode();
+
+    fireEvent.click(screen.getByRole("button", { name: /Delete draft/i }));
+
+    expect(window.confirm).toHaveBeenCalledTimes(1);
+    expect(onDraftCancel).not.toHaveBeenCalled();
   });
 
   it("requires a context scope before Run", () => {
