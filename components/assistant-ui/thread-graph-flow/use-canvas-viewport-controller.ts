@@ -41,15 +41,11 @@ export const shouldRefitCanvasTree = (
 
 export function useCanvasViewportController({
   decoratedNodeCount,
-  densityMode,
   draftActive,
   flowRenderMode,
-  focusedMessageId,
-  nodeIndex,
   selectedNodeId,
   setStoredViewport,
   treeStructureSignature,
-  visibleNodeCount,
 }: UseCanvasViewportControllerOptions) {
   const [reactFlowInstance, setReactFlowInstance] =
     React.useState<CanvasFlowInstance | null>(null);
@@ -82,49 +78,6 @@ export function useCanvasViewportController({
     reactFlowInstance,
     setStoredViewport,
     treeStructureSignature,
-  ]);
-
-  React.useEffect(() => {
-    if (!reactFlowInstance || !focusedMessageId || !nodeIndex.has(focusedMessageId)) {
-      return;
-    }
-    const animationFrame = window.requestAnimationFrame(() => {
-      void reactFlowInstance
-        .fitView({
-          duration: 260,
-          padding: 0.34,
-          nodes: [{ id: focusedMessageId }],
-        })
-        .then(() => {
-          setStoredViewport(reactFlowInstance.getViewport());
-        });
-    });
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-    };
-  }, [focusedMessageId, nodeIndex, reactFlowInstance, setStoredViewport]);
-
-  React.useEffect(() => {
-    if (!reactFlowInstance || densityMode !== "focus" || !selectedNodeId) return;
-    const animationFrame = window.requestAnimationFrame(() => {
-      void reactFlowInstance
-        .fitView({
-          duration: 280,
-          padding: 0.28,
-        })
-        .then(() => {
-          setStoredViewport(reactFlowInstance.getViewport());
-        });
-    });
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-    };
-  }, [
-    densityMode,
-    reactFlowInstance,
-    selectedNodeId,
-    setStoredViewport,
-    visibleNodeCount,
   ]);
 
   React.useEffect(() => {
