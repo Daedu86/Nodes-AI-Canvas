@@ -1,0 +1,20 @@
+{
+  "completedAt": "2026-07-17T13:15:57.395Z",
+  "validatedSha": "e44cd17214d4a2490429daae1daf04620455b0bf",
+  "workflowRunId": "29581840116",
+  "outcomes": {
+    "install": "success",
+    "repositoryChecks": "success",
+    "buildBudget": "failure",
+    "playwrightInstall": "success",
+    "chromiumE2E": "failure",
+    "codeqlInit": "success",
+    "codeqlAnalyze": "success"
+  },
+  "sarifFiles": [
+    "sarif-results/javascript.sarif"
+  ],
+  "codeqlFindings": 3,
+  "sarifErrors": [],
+  "passed": false
+}
