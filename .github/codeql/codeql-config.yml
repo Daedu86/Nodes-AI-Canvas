@@ -1,0 +1,7 @@
+name: CodeQL configuration
+
+paths-ignore:
+  - coverage
+  - playwright-report
+  - test-results
+  - .next
