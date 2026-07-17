@@ -18,7 +18,7 @@ import { ThreadBranchDraftProvider } from "@/components/context/thread-branch-dr
 export const Thread: FC = () => {
   return (
     <ThreadBranchDraftProvider>
-      <div className="box-border flex h-full min-w-0 overflow-hidden bg-transparent">
+      <div className="relative box-border flex h-full min-w-0 overflow-hidden bg-transparent">
         <ThreadPrimitive.Root
           className="box-border flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-transparent"
           style={{
