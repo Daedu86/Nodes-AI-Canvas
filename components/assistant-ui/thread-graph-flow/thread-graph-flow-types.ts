@@ -4,6 +4,7 @@ import type { Edge, Node } from "@xyflow/react";
 import type {
   CodexAgentRole,
   CodexApprovalDecision,
+  CodexCanvasEventType,
   CodexRunStatus,
 } from "@/lib/agents/codex/types";
 import type { ProjectMemoryType } from "@/lib/memory-documents";
@@ -50,7 +51,8 @@ export type ThreadGraphFlowNodeData = {
     | "prompt-draft"
     | "canvas-prompt"
     | "canvas-response"
-    | "agent-run";
+    | "agent-run"
+    | "agent-activity";
   language?: string | null;
   linkedArtifactCount?: number;
   memoryId?: string | null;
@@ -86,6 +88,8 @@ export type ThreadGraphFlowNodeData = {
   agentEventCount?: number;
   agentError?: string | null;
   agentPendingApprovalId?: string | null;
+  agentActivityType?: CodexCanvasEventType | null;
+  agentActivityCreatedAt?: string | null;
   onAgentPromptChange?: (value: string) => void;
   onAgentRoleChange?: (role: CodexAgentRole) => void;
   onAgentStart?: () => void;
