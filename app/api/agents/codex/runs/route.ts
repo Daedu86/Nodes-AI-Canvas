@@ -36,6 +36,7 @@ export async function POST(req: Request) {
   const role = body?.role && ROLES.has(body.role) ? body.role : "coder";
   const projectId = asOptionalString(body?.projectId);
   const workspaceId = asOptionalString(body?.workspaceId);
+  const cwd = asOptionalString(body?.cwd);
   const parentRunId = asOptionalString(body?.parentRunId);
   const label = asOptionalString(body?.label);
   const metadata =
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
     route: "/api/agents/codex/runs",
     sessionId,
     projectId,
-    payload: { label, parentRunId, role, workspaceId },
+    payload: { cwd, label, parentRunId, role, workspaceId },
   });
 
   try {
@@ -71,6 +72,7 @@ export async function POST(req: Request) {
       projectId,
       prompt,
       workspaceId,
+      cwd,
       parentRunId,
       role,
       label,
