@@ -1,4 +1,5 @@
 import type {
+  CodexApprovalDecision,
   CodexRunnerStartRequest,
   CodexRunnerStartResponse,
 } from "@/lib/agents/codex/types";
@@ -95,6 +96,27 @@ export async function cancelCodexRun(ownerId: string, runId: string) {
   const response = await runnerFetch(ownerId, `/v1/runs/${encodeURIComponent(runId)}/cancel`, {
     method: "POST",
   });
+  if (!response.ok) {
+    throw new Error(await readRunnerError(response));
+  }
+  return response;
+}
+
+export async function resolveCodexApproval(
+  ownerId: string,
+  runId: string,
+  approvalId: string,
+  decision: CodexApprovalDecision,
+) {
+  const response = await runnerFetch(
+    ownerId,
+    `/v1/runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ decision }),
+    },
+  );
   if (!response.ok) {
     throw new Error(await readRunnerError(response));
   }
