@@ -165,10 +165,14 @@ export const fileAgentWorkRepository: AgentWorkRepository = {
       const event = await safeReadJson<StoredAgentEvent>(filePath);
       if (!event || event.ownerId !== ownerId) continue;
       if (options.tokenId && event.tokenId !== options.tokenId) continue;
+      if (options.sessionId && event.sessionId !== options.sessionId) continue;
+      if (options.projectId && event.projectId !== options.projectId) continue;
+      if (options.eventType && event.eventType !== options.eventType) continue;
+      if (options.eventTypePrefix && !event.eventType.startsWith(options.eventTypePrefix)) continue;
       events.push(event);
     }
     const sorted = sortByDateDesc(events);
-    const limit = typeof options.limit === "number" ? Math.max(1, Math.min(200, options.limit)) : 80;
+    const limit = typeof options.limit === "number" ? Math.max(1, Math.min(1000, options.limit)) : 80;
     return sorted.slice(0, limit);
   },
 };
