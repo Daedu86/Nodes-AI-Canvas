@@ -7,14 +7,14 @@ import {
   CheckCircle2,
   FilePenLine,
   ShieldQuestion,
-  TerminalSquare,
+  SquareTerminal,
   Wrench,
   XCircle,
 } from "lucide-react";
 import type { ThreadGraphFlowNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-flow-types";
 
 const iconFor = (type: string | null | undefined) => {
-  if (type?.startsWith("shell.")) return TerminalSquare;
+  if (type?.startsWith("shell.")) return SquareTerminal;
   if (type === "file.changed") return FilePenLine;
   if (type?.startsWith("tool.")) return Wrench;
   if (type?.startsWith("approval.")) return ShieldQuestion;
