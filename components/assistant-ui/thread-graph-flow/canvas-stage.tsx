@@ -18,6 +18,7 @@ import { Bot, Plus } from "lucide-react";
 import { ArtifactGraphNode } from "@/components/assistant-ui/thread-graph-flow/artifact-node";
 import { CanvasPromptNode } from "@/components/assistant-ui/thread-graph-flow/canvas-prompt-node";
 import { CanvasResponseNode } from "@/components/assistant-ui/thread-graph-flow/canvas-response-node";
+import { CodexAgentActivityNode } from "@/components/assistant-ui/thread-graph-flow/codex-agent-activity-node";
 import { CodexAgentRunNode } from "@/components/assistant-ui/thread-graph-flow/codex-agent-run-node";
 import { ThreadGraphEdge } from "@/components/assistant-ui/thread-graph-flow/thread-graph-edge";
 import { ThreadGraphNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-node";
@@ -52,6 +53,7 @@ const ThreadGraph3D = dynamic(
 );
 
 const nodeTypes: NodeTypes = {
+  agentActivityNode: CodexAgentActivityNode,
   agentRunNode: CodexAgentRunNode,
   artifactNode: ArtifactGraphNode,
   canvasResponseNode: CanvasResponseNode,
@@ -107,7 +109,7 @@ const positionsEqual = (
 ) => left?.x === right?.x && left?.y === right?.y;
 
 const shouldUseStoredPosition = (node: ThreadGraphFlowNode) =>
-  node.data?.kind !== "prompt-draft";
+  node.data?.kind !== "prompt-draft" && node.data?.kind !== "agent-activity";
 
 const mergeRenderedNodes = (
   currentNodes: ThreadGraphFlowNode[],
@@ -194,7 +196,7 @@ export function CanvasStage({
   storedViewport,
   viewportRef,
 }: CanvasStageProps) {
-  const { addAgent, agentEdges, agentNodes } = useCodexAgentRuns({
+  const { addAgent, agentEdges, agentNodes, updateAgentPosition } = useCodexAgentRuns({
     sessionId: activeSessionId,
   });
   const combinedNodes = React.useMemo(
@@ -266,12 +268,14 @@ export function CanvasStage({
         onDraftPositionChange(position);
         return;
       }
+      if (node.data?.kind === "agent-activity") return;
 
-      // Every draggable node gets an immediate session-local position. This
-      // prevents synthetic canvas responses and prompts from snapping back
-      // while their backing state is being recomputed by the graph layout.
       persistNodePosition(node.id, position);
 
+      if (node.data?.kind === "agent-run") {
+        updateAgentPosition(node.id, position);
+        return;
+      }
       if (
         node.data?.kind === "artifact" ||
         node.data?.kind === "canvas-prompt"
@@ -279,7 +283,12 @@ export function CanvasStage({
         onArtifactPositionChange(node.id, position);
       }
     },
-    [onArtifactPositionChange, onDraftPositionChange, persistNodePosition],
+    [
+      onArtifactPositionChange,
+      onDraftPositionChange,
+      persistNodePosition,
+      updateAgentPosition,
+    ],
   );
 
   const handleSelectionChange = React.useCallback(
@@ -302,6 +311,7 @@ export function CanvasStage({
         node.data.kind === "canvas-prompt" ||
         node.data.kind === "canvas-response" ||
         node.data.kind === "agent-run" ||
+        node.data.kind === "agent-activity" ||
         node.id === ROOT_NODE_ID
       ) {
         return;
@@ -374,8 +384,8 @@ export function CanvasStage({
 
       {flowRenderMode === "3d" ? (
         <ThreadGraph3D
-          nodes={nodes}
-          edges={edges}
+          nodes={combinedNodes}
+          edges={combinedEdges}
           selectedNodeId={selectedNodeId}
           onSelectNode={onNodeSelect}
         />
