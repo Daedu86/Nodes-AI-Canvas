@@ -7,6 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "check": "node --check server.mjs",
     "start": "node server.mjs",
     "start:env": "node --env-file=.env server.mjs",
     "dev": "node --watch server.mjs",
