@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import type {
   CodexAgentRole,
@@ -14,9 +15,9 @@ import { getSession } from "@/lib/session-store";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_RUNS = 100;
+const MAX_RUNS = 50;
 const MAX_EVENTS_PER_RUN = 40;
-const MAX_TEXT = 200_000;
+const MAX_TEXT = 50_000;
 
 const ROLES = new Set<CodexAgentRole>(["coder", "reviewer", "researcher", "tester", "custom"]);
 const STATUSES = new Set<CodexRunStatus>([
@@ -39,6 +40,14 @@ const asString = (value: unknown, max = MAX_TEXT) =>
 const asNullableString = (value: unknown, max = 500) => {
   if (typeof value !== "string" || !value.trim()) return null;
   return value.trim().slice(0, max);
+};
+
+const snapshotEventId = (ownerId: string, sessionId: string) => {
+  const hex = createHash("sha256")
+    .update(`codex-canvas-snapshot:${ownerId}:${sessionId}`)
+    .digest("hex")
+    .slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 };
 
 const sanitizePosition = (value: unknown) => {
@@ -156,6 +165,7 @@ export async function POST(req: Request) {
 
   const snapshot = sanitizeSnapshot(rawSnapshot, sessionId);
   await recordAgentEvent({
+    id: snapshotEventId(guarded.user.id, sessionId),
     actor: {
       tokenId: guarded.user.agentTokenId ?? null,
       label: guarded.user.agentLabel ?? "codex",
