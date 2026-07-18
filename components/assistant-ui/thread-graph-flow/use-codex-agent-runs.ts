@@ -6,6 +6,9 @@ import type {
   CodexAgentRole,
   CodexApprovalDecision,
   CodexCanvasEvent,
+  CodexCanvasEventType,
+  CodexCanvasSnapshot,
+  CodexPersistedRun,
   CodexRunStatus,
   CodexRunnerEventEnvelope,
   CodexRunnerStartResponse,
@@ -17,24 +20,23 @@ import type {
 
 const TERMINAL_STATUSES = new Set<CodexRunStatus>(["completed", "failed", "cancelled"]);
 const MAX_VISIBLE_EVENTS = 100;
+const MAX_PERSISTED_EVENTS = 40;
+const ACTIVITY_EVENT_TYPES = new Set<CodexCanvasEventType>([
+  "agent.child.spawned",
+  "tool.started",
+  "tool.completed",
+  "shell.started",
+  "shell.completed",
+  "file.changed",
+  "approval.requested",
+  "approval.resolved",
+  "run.completed",
+  "run.failed",
+  "run.cancelled",
+]);
+const MAX_ACTIVITY_NODES_PER_RUN = 8;
 
-type LocalCodexRun = {
-  localId: string;
-  runId: string | null;
-  threadId: string | null;
-  agentId: string | null;
-  parentLocalId: string | null;
-  parentRunId: string | null;
-  role: CodexAgentRole;
-  label: string;
-  prompt: string;
-  output: string;
-  status: CodexRunStatus;
-  events: CodexCanvasEvent[];
-  pendingApprovalId: string | null;
-  error: string | null;
-  position: { x: number; y: number };
-};
+export type LocalCodexRun = CodexPersistedRun;
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -43,6 +45,14 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 
 const readString = (value: unknown) =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+const readNestedString = (value: unknown, keys: string[]) => {
+  let current = value;
+  for (const key of keys) {
+    current = asRecord(current)[key];
+  }
+  return readString(current);
+};
 
 const eventParams = (event: CodexCanvasEvent) => asRecord(event.payload.params);
 
@@ -88,6 +98,88 @@ const makeLocalId = () =>
     ? `codex-agent-${crypto.randomUUID()}`
     : `codex-agent-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
+const childLocalId = (runId: string) => `codex-agent-${runId}`;
+
+const activityTitle = (type: CodexCanvasEventType) => {
+  switch (type) {
+    case "shell.started":
+      return "Shell command started";
+    case "shell.completed":
+      return "Shell command completed";
+    case "file.changed":
+      return "File changed";
+    case "tool.started":
+      return "Tool started";
+    case "tool.completed":
+      return "Tool completed";
+    case "approval.requested":
+      return "Approval required";
+    case "approval.resolved":
+      return "Approval resolved";
+    case "agent.child.spawned":
+      return "Subagent spawned";
+    case "run.completed":
+      return "Agent completed";
+    case "run.failed":
+      return "Agent failed";
+    case "run.cancelled":
+      return "Agent cancelled";
+    default:
+      return "Agent activity";
+  }
+};
+
+const activityPreview = (event: CodexCanvasEvent) => {
+  const params = eventParams(event);
+  const item = asRecord(params.item);
+  const command =
+    readString(params.command) ??
+    readString(params.cmd) ??
+    readString(item.command) ??
+    readString(item.cmd);
+  const file =
+    readString(params.path) ??
+    readString(params.filePath) ??
+    readString(item.path) ??
+    readString(item.filePath);
+  const tool =
+    readString(params.toolName) ??
+    readString(params.name) ??
+    readString(item.toolName) ??
+    readString(item.name);
+  const childLabel = readString(params.label);
+  const decision = readString(params.decision);
+  const message = readString(params.message) ?? readNestedString(params, ["turn", "error", "message"]);
+
+  if (command) return command.slice(0, 260);
+  if (file) return file.slice(0, 260);
+  if (tool) return tool.slice(0, 260);
+  if (childLabel) return childLabel.slice(0, 260);
+  if (decision) return `Decision: ${decision}`;
+  if (message) return message.slice(0, 260);
+  return event.type.replaceAll(".", " ");
+};
+
+const readSpawnedChild = (event: CodexCanvasEvent) => {
+  if (event.type !== "agent.child.spawned") return null;
+  const params = eventParams(event);
+  const runId = readString(params.childRunId) ?? readString(params.runId);
+  if (!runId) return null;
+  return {
+    runId,
+    threadId: readString(params.childThreadId) ?? readString(params.threadId),
+    agentId: readString(params.childAgentId) ?? readString(params.agentId),
+    label: readString(params.label) ?? "Codex Subagent",
+    role: (readString(params.role) as CodexAgentRole | null) ?? "custom",
+  };
+};
+
+const snapshotRuns = (runs: LocalCodexRun[]): CodexPersistedRun[] =>
+  runs.map((run) => ({
+    ...run,
+    events: run.events.slice(-MAX_PERSISTED_EVENTS),
+  }));
+
 export function useCodexAgentRuns({
   sessionId,
   projectId = null,
@@ -96,23 +188,41 @@ export function useCodexAgentRuns({
   projectId?: string | null;
 }) {
   const [runs, setRuns] = React.useState<LocalCodexRun[]>([]);
+  const [hydratedSessionId, setHydratedSessionId] = React.useState<string | null>(null);
   const runsRef = React.useRef(runs);
   const streamsRef = React.useRef(new Map<string, EventSource>());
+  const persistTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openStreamRef = React.useRef<
+    (localId: string, runResponse: CodexRunnerStartResponse, afterEventId?: string | null) => void
+  >(() => {});
 
   React.useEffect(() => {
     runsRef.current = runs;
   }, [runs]);
 
+  const closeStream = React.useCallback((localId: string) => {
+    streamsRef.current.get(localId)?.close();
+    streamsRef.current.delete(localId);
+  }, []);
+
+  const closeAllStreams = React.useCallback(() => {
+    streamsRef.current.forEach((stream) => stream.close());
+    streamsRef.current.clear();
+  }, []);
+
   React.useEffect(
     () => () => {
-      streamsRef.current.forEach((stream) => stream.close());
-      streamsRef.current.clear();
+      closeAllStreams();
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     },
-    [],
+    [closeAllStreams],
   );
 
   const patchRun = React.useCallback(
-    (localId: string, patch: Partial<LocalCodexRun> | ((run: LocalCodexRun) => Partial<LocalCodexRun>)) => {
+    (
+      localId: string,
+      patch: Partial<LocalCodexRun> | ((run: LocalCodexRun) => Partial<LocalCodexRun>),
+    ) => {
       setRuns((current) =>
         current.map((run) => {
           if (run.localId !== localId) return run;
@@ -122,6 +232,13 @@ export function useCodexAgentRuns({
       );
     },
     [],
+  );
+
+  const updateAgentPosition = React.useCallback(
+    (localId: string, position: { x: number; y: number }) => {
+      patchRun(localId, { position });
+    },
+    [patchRun],
   );
 
   const addAgent = React.useCallback((parentLocalId?: string | null) => {
@@ -134,12 +251,12 @@ export function useCodexAgentRuns({
         : current.filter((entry) => !entry.parentLocalId).length;
       const position = parent
         ? {
-            x: parent.position.x + 420,
-            y: parent.position.y + siblingCount * 260,
+            x: parent.position.x + 430,
+            y: parent.position.y + siblingCount * 300,
           }
         : {
-            x: 220 + (siblingCount % 3) * 400,
-            y: 180 + Math.floor(siblingCount / 3) * 300,
+            x: 220 + (siblingCount % 3) * 420,
+            y: 180 + Math.floor(siblingCount / 3) * 320,
           };
       return [
         ...current,
@@ -164,16 +281,69 @@ export function useCodexAgentRuns({
     });
   }, []);
 
-  const closeStream = React.useCallback((localId: string) => {
-    streamsRef.current.get(localId)?.close();
-    streamsRef.current.delete(localId);
-  }, []);
+  const ensureSpawnedChild = React.useCallback(
+    (parentLocalId: string, event: CodexCanvasEvent) => {
+      const spawned = readSpawnedChild(event);
+      if (!spawned) return;
+      let shouldOpen = false;
+      let localId = childLocalId(spawned.runId);
+      setRuns((current) => {
+        const existing = current.find((run) => run.runId === spawned.runId);
+        if (existing) {
+          localId = existing.localId;
+          return current;
+        }
+        const parent = current.find((run) => run.localId === parentLocalId);
+        if (!parent) return current;
+        const siblingCount = current.filter((run) => run.parentLocalId === parentLocalId).length;
+        shouldOpen = true;
+        return [
+          ...current,
+          {
+            localId,
+            runId: spawned.runId,
+            threadId: spawned.threadId,
+            agentId: spawned.agentId,
+            parentLocalId,
+            parentRunId: parent.runId,
+            role: spawned.role,
+            label: spawned.label,
+            prompt: "Spawned automatically by Codex.",
+            output: "",
+            status: "running",
+            events: [],
+            pendingApprovalId: null,
+            error: null,
+            position: {
+              x: parent.position.x + 430,
+              y: parent.position.y + siblingCount * 300,
+            },
+          },
+        ];
+      });
+      if (shouldOpen) {
+        queueMicrotask(() =>
+          openStreamRef.current(localId, {
+            runId: spawned.runId,
+            threadId: spawned.threadId,
+            status: "running",
+            agentId: spawned.agentId,
+            parentRunId: event.runId,
+          }),
+        );
+      }
+    },
+    [],
+  );
 
   const openStream = React.useCallback(
-    (localId: string, runResponse: CodexRunnerStartResponse) => {
-      closeStream(localId);
+    (localId: string, runResponse: CodexRunnerStartResponse, afterEventId?: string | null) => {
+      if (streamsRef.current.has(localId)) return;
+      const currentRun = runsRef.current.find((run) => run.localId === localId);
+      const cursor = afterEventId ?? currentRun?.events.at(-1)?.id ?? null;
+      const query = cursor ? `?after=${encodeURIComponent(cursor)}` : "";
       const stream = new EventSource(
-        `/api/agents/codex/runs/${encodeURIComponent(runResponse.runId)}/events`,
+        `/api/agents/codex/runs/${encodeURIComponent(runResponse.runId)}/events${query}`,
       );
       streamsRef.current.set(localId, stream);
 
@@ -191,7 +361,12 @@ export function useCodexAgentRuns({
             agentId: envelope.agentId ?? runResponse.agentId ?? null,
           });
 
+          if (normalized.type === "agent.child.spawned") {
+            ensureSpawnedChild(localId, normalized);
+          }
+
           patchRun(localId, (current) => {
+            if (current.events.some((event) => event.id === normalized.id)) return {};
             const delta = readAgentDelta(normalized);
             const approvalId = readApprovalId(normalized);
             const status = statusFromEvent(current.status, normalized);
@@ -227,8 +402,84 @@ export function useCodexAgentRuns({
         }
       };
     },
-    [closeStream, patchRun],
+    [closeStream, ensureSpawnedChild, patchRun],
   );
+
+  React.useEffect(() => {
+    openStreamRef.current = openStream;
+  }, [openStream]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    closeAllStreams();
+    setRuns([]);
+    setHydratedSessionId(null);
+    if (!sessionId) return () => {
+      cancelled = true;
+    };
+
+    void fetch(`/api/agents/codex/state?sessionId=${encodeURIComponent(sessionId)}`, {
+      method: "GET",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Unable to restore Codex agents (${response.status}).`);
+        return (await response.json()) as { snapshot?: CodexCanvasSnapshot };
+      })
+      .then((body) => {
+        if (cancelled) return;
+        const restored = body.snapshot?.sessionId === sessionId ? body.snapshot.runs : [];
+        setRuns(restored ?? []);
+        setHydratedSessionId(sessionId);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.warn("[codex-agents] failed to restore canvas state", error);
+        setHydratedSessionId(sessionId);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [closeAllStreams, sessionId]);
+
+  React.useEffect(() => {
+    if (!sessionId || hydratedSessionId !== sessionId) return;
+    runs.forEach((run) => {
+      if (!run.runId || TERMINAL_STATUSES.has(run.status) || streamsRef.current.has(run.localId)) return;
+      openStream(run.localId, {
+        runId: run.runId,
+        threadId: run.threadId,
+        status: run.status,
+        agentId: run.agentId,
+        parentRunId: run.parentRunId,
+      });
+    });
+  }, [hydratedSessionId, openStream, runs, sessionId]);
+
+  React.useEffect(() => {
+    if (!sessionId || hydratedSessionId !== sessionId) return;
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    const snapshot: CodexCanvasSnapshot = {
+      version: 1,
+      sessionId,
+      projectId,
+      runs: snapshotRuns(runs),
+      updatedAt: new Date().toISOString(),
+    };
+    persistTimerRef.current = setTimeout(() => {
+      void fetch("/api/agents/codex/state", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ snapshot }),
+      }).catch((error) => {
+        console.warn("[codex-agents] failed to persist canvas state", error);
+      });
+    }, 600);
+    return () => {
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    };
+  }, [hydratedSessionId, projectId, runs, sessionId]);
 
   const startAgent = React.useCallback(
     async (localId: string) => {
@@ -242,6 +493,7 @@ export function useCodexAgentRuns({
           body: JSON.stringify({
             sessionId,
             projectId,
+            workspaceId: projectId,
             prompt: current.prompt.trim(),
             role: current.role,
             label: current.label,
@@ -336,15 +588,29 @@ export function useCodexAgentRuns({
 
   const removeAgent = React.useCallback(
     (localId: string) => {
-      const current = runsRef.current.find((entry) => entry.localId === localId);
-      if (current && !TERMINAL_STATUSES.has(current.status) && current.runId) return;
-      closeStream(localId);
-      setRuns((entries) => entries.filter((entry) => entry.localId !== localId));
+      const all = runsRef.current;
+      const ids = new Set<string>([localId]);
+      let expanded = true;
+      while (expanded) {
+        expanded = false;
+        for (const run of all) {
+          if (run.parentLocalId && ids.has(run.parentLocalId) && !ids.has(run.localId)) {
+            ids.add(run.localId);
+            expanded = true;
+          }
+        }
+      }
+      const blocked = all.some(
+        (run) => ids.has(run.localId) && run.runId && !TERMINAL_STATUSES.has(run.status),
+      );
+      if (blocked) return;
+      ids.forEach((id) => closeStream(id));
+      setRuns((entries) => entries.filter((entry) => !ids.has(entry.localId)));
     },
     [closeStream],
   );
 
-  const nodes = React.useMemo<ThreadGraphFlowNode[]>(
+  const runNodes = React.useMemo<ThreadGraphFlowNode[]>(
     () =>
       runs.map((run) => ({
         id: run.localId,
@@ -380,28 +646,74 @@ export function useCodexAgentRuns({
     [addAgent, cancelAgent, patchRun, removeAgent, resolveApproval, runs, startAgent],
   );
 
-  const edges = React.useMemo<ThreadGraphFlowEdge[]>(
+  const activityNodes = React.useMemo<ThreadGraphFlowNode[]>(
     () =>
       runs.flatMap((run) =>
-        run.parentLocalId
-          ? [
-              {
-                id: `codex-agent-edge-${run.parentLocalId}-${run.localId}`,
-                source: run.parentLocalId,
-                target: run.localId,
-                type: "threadEdge",
-                data: { label: "subagent", tone: "default" },
-              } satisfies ThreadGraphFlowEdge,
-            ]
-          : [],
+        run.events
+          .filter((event) => ACTIVITY_EVENT_TYPES.has(event.type))
+          .slice(-MAX_ACTIVITY_NODES_PER_RUN)
+          .map((event, index) => ({
+            id: `codex-activity-${event.id}`,
+            type: "agentActivityNode",
+            position: {
+              x: run.position.x,
+              y: run.position.y + 300 + index * 120,
+            },
+            draggable: false,
+            data: {
+              kind: "agent-activity",
+              role: "agent-activity",
+              title: activityTitle(event.type),
+              preview: activityPreview(event),
+              provider: "codex",
+              providerLabel: "Codex",
+              agentRunId: run.runId,
+              agentThreadId: run.threadId,
+              agentParentRunId: run.parentRunId,
+              agentActivityType: event.type,
+              agentActivityCreatedAt: event.createdAt,
+            },
+          })),
       ),
     [runs],
   );
 
+  const agentEdges = React.useMemo<ThreadGraphFlowEdge[]>(() => {
+    const edges: ThreadGraphFlowEdge[] = [];
+    runs.forEach((run) => {
+      if (run.parentLocalId) {
+        edges.push({
+          id: `codex-agent-edge-${run.parentLocalId}-${run.localId}`,
+          source: run.parentLocalId,
+          target: run.localId,
+          type: "threadEdge",
+          data: { label: "subagent", tone: "default" },
+        });
+      }
+      const activities = run.events
+        .filter((event) => ACTIVITY_EVENT_TYPES.has(event.type))
+        .slice(-MAX_ACTIVITY_NODES_PER_RUN);
+      let source = run.localId;
+      activities.forEach((event) => {
+        const target = `codex-activity-${event.id}`;
+        edges.push({
+          id: `codex-activity-edge-${source}-${target}`,
+          source,
+          target,
+          type: "threadEdge",
+          data: { tone: "default" },
+        });
+        source = target;
+      });
+    });
+    return edges;
+  }, [runs]);
+
   return {
     addAgent,
-    agentEdges: edges,
-    agentNodes: nodes,
+    agentEdges,
+    agentNodes: [...runNodes, ...activityNodes],
     runCount: runs.length,
+    updateAgentPosition,
   };
 }
