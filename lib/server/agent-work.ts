@@ -57,6 +57,8 @@ export async function recordAgentEvent(params: {
   sessionId?: string | null;
   projectId?: string | null;
   payload?: Record<string, unknown>;
+  id?: string;
+  createdAt?: string;
 }) {
   const repo = getAgentWorkRepository();
   try {
@@ -65,6 +67,8 @@ export async function recordAgentEvent(params: {
     }
 
     await repo.recordAgentEvent(params.actor.ownerId, {
+      id: params.id,
+      createdAt: params.createdAt,
       tokenId: params.actor.tokenId ?? null,
       eventType: params.eventType,
       method: params.method,
