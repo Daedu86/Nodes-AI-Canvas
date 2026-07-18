@@ -38,6 +38,10 @@ export type AgentTokenUpsertInput = {
 export type AgentWorkListOptions = {
   limit?: number;
   tokenId?: string | null;
+  sessionId?: string | null;
+  projectId?: string | null;
+  eventType?: string | null;
+  eventTypePrefix?: string | null;
 };
 
 export type AgentWorkRepository = {
