@@ -162,9 +162,12 @@ export const supabaseAgentWorkRepository: AgentWorkRepository = {
       created_at: now,
     };
 
-    const { error } = await client.from("agent_events").insert(row);
+    const request = input.id
+      ? client.from("agent_events").upsert(row, { onConflict: "id" })
+      : client.from("agent_events").insert(row);
+    const { error } = await request;
     if (error) {
-      throw new Error(error.message || "Failed to insert agent event");
+      throw new Error(error.message || "Failed to persist agent event");
     }
   },
 
