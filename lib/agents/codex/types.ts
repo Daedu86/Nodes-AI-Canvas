@@ -71,12 +71,40 @@ export type CodexCanvasEvent = {
   payload: Record<string, unknown>;
 };
 
+export type CodexPersistedRun = {
+  localId: string;
+  runId: string | null;
+  threadId: string | null;
+  agentId: string | null;
+  parentLocalId: string | null;
+  parentRunId: string | null;
+  role: CodexAgentRole;
+  label: string;
+  prompt: string;
+  output: string;
+  status: CodexRunStatus;
+  events: CodexCanvasEvent[];
+  pendingApprovalId: string | null;
+  error: string | null;
+  position: { x: number; y: number };
+};
+
+export type CodexCanvasSnapshot = {
+  version: 1;
+  sessionId: string;
+  projectId: string | null;
+  runs: CodexPersistedRun[];
+  updatedAt: string;
+};
+
 export type CodexRunnerEventEnvelope = {
   id?: string;
   runId: string;
   threadId?: string | null;
   parentRunId?: string | null;
   agentId?: string | null;
+  sessionId?: string | null;
+  projectId?: string | null;
   createdAt?: string;
   notification: CodexAppServerNotification;
 };
