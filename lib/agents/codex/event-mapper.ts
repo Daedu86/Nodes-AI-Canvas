@@ -42,6 +42,9 @@ function mapItemEvent(method: string, params: Record<string, unknown>): CodexCan
 
 function mapMethod(method: string, params: Record<string, unknown>): CodexCanvasEventType {
   const normalized = method.toLowerCase();
+  if (normalized === "agent/child/spawned" || normalized === "thread/child/spawned") {
+    return "agent.child.spawned";
+  }
   if (normalized === "turn/started" || normalized === "thread/started") return "agent.started";
   if (normalized === "item/agentmessage/delta") return "agent.message.delta";
   if (normalized.includes("approval") && normalized.endsWith("requested")) return "approval.requested";
