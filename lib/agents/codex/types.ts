@@ -13,11 +13,18 @@ export type CodexRunStatus =
   | "failed"
   | "cancelled";
 
+export type CodexApprovalDecision =
+  | "accept"
+  | "acceptForSession"
+  | "decline"
+  | "cancel";
+
 export type StartCodexRunInput = {
   sessionId: string;
   prompt: string;
   projectId?: string | null;
   workspaceId?: string | null;
+  cwd?: string | null;
   parentRunId?: string | null;
   role?: CodexAgentRole;
   label?: string | null;
@@ -62,6 +69,16 @@ export type CodexCanvasEvent = {
   type: CodexCanvasEventType;
   createdAt: string;
   payload: Record<string, unknown>;
+};
+
+export type CodexRunnerEventEnvelope = {
+  id?: string;
+  runId: string;
+  threadId?: string | null;
+  parentRunId?: string | null;
+  agentId?: string | null;
+  createdAt?: string;
+  notification: CodexAppServerNotification;
 };
 
 export type CodexAppServerNotification = {
