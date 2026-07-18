@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { existsSync, statSync } from "node:fs";
 import http from "node:http";
+import path from "node:path";
 import readline from "node:readline";
 
 const PORT = Number(process.env.CODEX_RUNNER_PORT || 8787);
@@ -20,6 +22,50 @@ const approvals = new Map();
 
 const isRecord = (value) => value && typeof value === "object" && !Array.isArray(value);
 const asString = (value) => (typeof value === "string" && value.trim() ? value.trim() : null);
+
+function parseWorkspaceMap() {
+  const raw = process.env.CODEX_WORKSPACES_JSON?.trim();
+  if (!raw) return new Map();
+  try {
+    const parsed = JSON.parse(raw);
+    if (!isRecord(parsed)) throw new Error("expected an object");
+    return new Map(
+      Object.entries(parsed).flatMap(([workspaceId, value]) => {
+        const cwd = asString(value);
+        return cwd ? [[workspaceId, path.resolve(cwd)]] : [];
+      }),
+    );
+  } catch (error) {
+    throw new Error(
+      `Invalid CODEX_WORKSPACES_JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+const WORKSPACES = parseWorkspaceMap();
+
+function assertWorkspacePath(cwd) {
+  const resolved = path.resolve(cwd);
+  if (!existsSync(resolved) || !statSync(resolved).isDirectory()) {
+    throw new Error(`Configured Codex workspace does not exist or is not a directory: ${resolved}`);
+  }
+  return resolved;
+}
+
+function resolveWorkspace(body) {
+  const workspaceId = asString(body.workspaceId);
+  if (workspaceId) {
+    const configured = WORKSPACES.get(workspaceId);
+    if (!configured) throw new Error(`Unknown Codex workspace id: ${workspaceId}`);
+    return { workspaceId, cwd: assertWorkspacePath(configured) };
+  }
+  if (DEFAULT_CWD) {
+    return { workspaceId: null, cwd: assertWorkspacePath(DEFAULT_CWD) };
+  }
+  throw new Error(
+    "No Codex workspace configured. Set CODEX_DEFAULT_CWD or CODEX_WORKSPACES_JSON on the runner.",
+  );
+}
 
 function json(res, status, body) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
@@ -111,18 +157,23 @@ function makeEnvelope(run, notification) {
     threadId: run.threadId,
     parentRunId: run.parentRunId,
     agentId: run.agentId,
+    sessionId: run.sessionId,
+    projectId: run.projectId,
     createdAt: new Date().toISOString(),
     notification,
   };
+}
+
+function writeSse(res, envelope) {
+  res.write(`id: ${envelope.id}\n`);
+  res.write(`data: ${JSON.stringify(envelope)}\n\n`);
 }
 
 function publish(run, notification) {
   const envelope = makeEnvelope(run, notification);
   run.events.push(envelope);
   if (run.events.length > MAX_EVENT_BACKLOG) run.events.splice(0, run.events.length - MAX_EVENT_BACKLOG);
-  for (const subscriber of run.subscribers) {
-    subscriber.write(`data: ${JSON.stringify(envelope)}\n\n`);
-  }
+  for (const subscriber of run.subscribers) writeSse(subscriber, envelope);
   return envelope;
 }
 
@@ -139,6 +190,72 @@ function updateRunStatus(run, method, params) {
     }
   }
   if (method === "turn/failed") run.status = "failed";
+}
+
+function makeRunRecord(input) {
+  return {
+    runId: input.runId || randomUUID(),
+    agentId: input.agentId || `codex-${randomUUID().slice(0, 8)}`,
+    ownerId: input.ownerId,
+    parentRunId: input.parentRunId || null,
+    sessionId: input.sessionId || null,
+    projectId: input.projectId || null,
+    workspaceId: input.workspaceId || null,
+    cwd: input.cwd || null,
+    role: input.role || "coder",
+    label: input.label || "Codex Agent",
+    status: input.status || "queued",
+    threadId: input.threadId || null,
+    turnId: input.turnId || null,
+    events: [],
+    subscribers: new Set(),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function registerRun(run) {
+  runs.set(run.runId, run);
+  if (run.threadId) runByThreadId.set(run.threadId, run.runId);
+  if (run.turnId) runByTurnId.set(run.turnId, run.runId);
+  return run;
+}
+
+function spawnChildRun(parentRun, params) {
+  const childThreadId = inferThreadId(params);
+  if (!childThreadId || childThreadId === parentRun.threadId) return null;
+  const existingRunId = runByThreadId.get(childThreadId);
+  if (existingRunId) return runs.get(existingRunId) || null;
+
+  const thread = isRecord(params?.thread) ? params.thread : {};
+  const child = registerRun(
+    makeRunRecord({
+      ownerId: parentRun.ownerId,
+      parentRunId: parentRun.runId,
+      sessionId: parentRun.sessionId,
+      projectId: parentRun.projectId,
+      workspaceId: parentRun.workspaceId,
+      cwd: parentRun.cwd,
+      role: "custom",
+      label: asString(thread.name) || "Codex Subagent",
+      status: "running",
+      threadId: childThreadId,
+    }),
+  );
+
+  publish(parentRun, {
+    method: "agent/child/spawned",
+    params: {
+      childRunId: child.runId,
+      childThreadId,
+      childAgentId: child.agentId,
+      parentRunId: parentRun.runId,
+      parentThreadId: parentRun.threadId,
+      label: child.label,
+      role: child.role,
+    },
+  });
+  publish(child, { method: "thread/started", params });
+  return child;
 }
 
 class CodexAppServer {
@@ -179,7 +296,7 @@ class CodexAppServer {
       clientInfo: {
         name: "nodes_ai_canvas",
         title: "Nodes AI Canvas Codex Runner",
-        version: "0.1.0",
+        version: "0.2.0",
       },
       capabilities: { experimentalApi: true },
     });
@@ -292,9 +409,20 @@ class CodexAppServer {
   }
 
   handleNotification(method, params) {
+    const threadId = inferThreadId(params);
+    const parentThreadId = inferParentThreadId(params);
+
+    if (method === "thread/started" && threadId && parentThreadId && threadId !== parentThreadId) {
+      const parentRunId = runByThreadId.get(parentThreadId);
+      const parentRun = parentRunId ? runs.get(parentRunId) : null;
+      if (parentRun) {
+        const child = spawnChildRun(parentRun, params);
+        if (child) return;
+      }
+    }
+
     const run = findRunForParams(params);
     if (!run) return;
-    const threadId = inferThreadId(params);
     const turnId = inferTurnId(params);
     if (threadId && !run.threadId) {
       run.threadId = threadId;
@@ -333,31 +461,34 @@ const codex = new CodexAppServer();
 
 async function startRun(body, ownerId) {
   await codex.ensureStarted();
-  const runId = randomUUID();
-  const agentId = asString(body.agentId) || `codex-${runId.slice(0, 8)}`;
   const parentRunId = asString(body.parentRunId);
-  const cwd = asString(body.cwd) || asString(body.metadata?.cwd) || DEFAULT_CWD;
-  const run = {
-    runId,
-    agentId,
-    ownerId,
-    parentRunId,
-    sessionId: asString(body.sessionId),
-    projectId: asString(body.projectId),
-    role: asString(body.role) || "coder",
-    label: asString(body.label) || "Codex Agent",
-    status: "queued",
-    threadId: null,
-    turnId: null,
-    events: [],
-    subscribers: new Set(),
-    createdAt: new Date().toISOString(),
-  };
-  runs.set(runId, run);
+  const parentRun = parentRunId ? runs.get(parentRunId) : null;
+  if (parentRunId && (!parentRun || parentRun.ownerId !== ownerId)) {
+    throw new Error("Parent Codex run was not found for this owner.");
+  }
+
+  const workspace = parentRun
+    ? { workspaceId: parentRun.workspaceId, cwd: parentRun.cwd }
+    : resolveWorkspace(body);
+  const runId = randomUUID();
+  const run = registerRun(
+    makeRunRecord({
+      runId,
+      agentId: asString(body.agentId) || `codex-${runId.slice(0, 8)}`,
+      ownerId,
+      parentRunId,
+      sessionId: asString(body.sessionId),
+      projectId: asString(body.projectId),
+      workspaceId: workspace.workspaceId,
+      cwd: workspace.cwd,
+      role: asString(body.role) || "coder",
+      label: asString(body.label) || (parentRun ? "Codex Subagent" : "Codex Agent"),
+    }),
+  );
 
   try {
     const threadResult = await codex.request("thread/start", {
-      ...(cwd ? { cwd } : {}),
+      cwd: workspace.cwd,
     });
     const threadId = getNestedString(threadResult, ["thread", "id"]);
     if (!threadId) throw new Error("Codex did not return a thread id.");
@@ -404,11 +535,29 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
   if (url.pathname === "/healthz") {
-    return json(res, 200, { ok: true, codexRunning: Boolean(codex.proc), runs: runs.size });
+    return json(res, 200, {
+      ok: true,
+      codexRunning: Boolean(codex.proc),
+      runs: runs.size,
+      workspaceCount: WORKSPACES.size,
+      hasDefaultWorkspace: Boolean(DEFAULT_CWD),
+    });
   }
   if (!authorize(req)) return json(res, 401, { error: "Unauthorized." });
 
   try {
+    if (url.pathname === "/readyz" && req.method === "GET") {
+      await codex.ensureStarted();
+      const account = await codex.request("account/read", {});
+      return json(res, 200, {
+        ok: true,
+        codexRunning: true,
+        authenticated: Boolean(account),
+        workspaceCount: WORKSPACES.size,
+        hasDefaultWorkspace: Boolean(DEFAULT_CWD),
+      });
+    }
+
     if (req.method === "POST" && url.pathname === "/v1/runs") {
       const body = await readJson(req);
       const ownerId = ownerFrom(req, body);
@@ -436,7 +585,13 @@ const server = http.createServer(async (req, res) => {
         "cache-control": "no-cache, no-transform",
         connection: "keep-alive",
       });
-      for (const event of run.events) res.write(`data: ${JSON.stringify(event)}\n\n`);
+      const afterEventId = asString(url.searchParams.get("after")) || asString(req.headers["last-event-id"]);
+      let backlog = run.events;
+      if (afterEventId) {
+        const cursor = run.events.findIndex((event) => event.id === afterEventId);
+        backlog = cursor >= 0 ? run.events.slice(cursor + 1) : [];
+      }
+      for (const event of backlog) writeSse(res, event);
       run.subscribers.add(res);
       const keepAlive = setInterval(() => res.write(": keepalive\n\n"), 15_000);
       req.on("close", () => {
