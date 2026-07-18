@@ -40,6 +40,22 @@ describe("normalizeCodexNotification", () => {
     expect(event.type).toBe("approval.requested");
   });
 
+  it("maps runner child spawn notifications", () => {
+    const event = normalizeCodexNotification({
+      runId: "run-parent",
+      notification: {
+        method: "agent/child/spawned",
+        params: {
+          childRunId: "run-child",
+          childThreadId: "thread-child",
+          parentRunId: "run-parent",
+        },
+      },
+    });
+
+    expect(event.type).toBe("agent.child.spawned");
+  });
+
   it("maps completed turns", () => {
     const event = normalizeCodexNotification({
       runId: "run-1",
