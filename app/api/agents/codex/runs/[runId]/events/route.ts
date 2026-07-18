@@ -18,9 +18,11 @@ export async function GET(
   if (!runId) {
     return NextResponse.json({ error: "Missing run id." }, { status: 400 });
   }
+  const url = new URL(req.url);
+  const afterEventId = url.searchParams.get("after")?.trim() || null;
 
   try {
-    const upstream = await streamCodexRunEvents(guarded.user.id, runId);
+    const upstream = await streamCodexRunEvents(guarded.user.id, runId, afterEventId);
     if (!upstream.ok || !upstream.body) {
       const message = await upstream.text().catch(() => "Codex event stream unavailable.");
       return NextResponse.json(
@@ -38,7 +40,7 @@ export async function GET(
       eventType: "codex.run.stream.opened",
       method: "GET",
       route: "/api/agents/codex/runs/[runId]/events",
-      payload: { runId },
+      payload: { runId, afterEventId },
     });
 
     const headers = new Headers(upstream.headers);
