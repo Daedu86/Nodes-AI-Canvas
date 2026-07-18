@@ -85,8 +85,13 @@ export async function startCodexRun(
   };
 }
 
-export async function streamCodexRunEvents(ownerId: string, runId: string) {
-  return runnerFetch(ownerId, `/v1/runs/${encodeURIComponent(runId)}/events`, {
+export async function streamCodexRunEvents(
+  ownerId: string,
+  runId: string,
+  afterEventId?: string | null,
+) {
+  const query = afterEventId ? `?after=${encodeURIComponent(afterEventId)}` : "";
+  return runnerFetch(ownerId, `/v1/runs/${encodeURIComponent(runId)}/events${query}`, {
     method: "GET",
     headers: { accept: "text/event-stream" },
   });
