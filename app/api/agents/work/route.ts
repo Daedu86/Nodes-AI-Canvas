@@ -4,8 +4,37 @@ import { requireLocalApiUser } from "@/lib/server/request-guards";
 import { getAgentWorkRepository } from "@/lib/persistence/repositories";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const CODEX_RUNTIME_AGENT_ID = "codex-runtime";
+const CODEX_MODEL = process.env.CODEX_MODEL?.trim() || "gpt-5.6-sol";
+
+const getCodexConnectionState = async () => {
+  const rawUrl = process.env.CODEX_RUNNER_URL?.trim();
+  if (!rawUrl) return false;
+
+  try {
+    const baseUrl = new URL(rawUrl).toString().replace(/\/+$/, "");
+    const headers = new Headers();
+    const token = process.env.CODEX_RUNNER_TOKEN?.trim();
+    if (token) headers.set("authorization", `Bearer ${token}`);
+
+    const response = await fetch(`${baseUrl}/readyz`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (!response.ok) return false;
+
+    const body = (await response.json().catch(() => null)) as
+      | { ok?: unknown; codexRunning?: unknown; authenticated?: unknown }
+      | null;
+    return Boolean(body?.ok && body?.codexRunning && body?.authenticated);
+  } catch {
+    return false;
+  }
+};
 
 type AgentWorkResponse = {
   agents: Array<{
@@ -76,9 +105,10 @@ export async function GET(req: Request) {
     );
   }
 
-  const [sessions, projects] = await Promise.all([
+  const [sessions, projects, codexConnected] = await Promise.all([
     listSessions({ includeArchived: true, ownerId: guarded.user.id }),
     listProjectsForUser(guarded.user),
+    getCodexConnectionState(),
   ]);
 
   const sessionsById = new Map(sessions.map((s) => [s.id, s]));
@@ -115,7 +145,7 @@ export async function GET(req: Request) {
     .filter(Boolean) as AgentWorkResponse["agents"];
 
   const codexEvents = events.filter((event) => event.eventType.startsWith("codex."));
-  if (codexEvents.length > 0) {
+  if (codexEvents.length > 0 || codexConnected) {
     const chronological = [...codexEvents].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
@@ -127,7 +157,7 @@ export async function GET(req: Request) {
     ];
     agents.unshift({
       tokenId: CODEX_RUNTIME_AGENT_ID,
-      label: "Codex Runtime",
+      label: `Codex · ${codexConnected ? "Connected" : "Offline"} · ${CODEX_MODEL}`,
       createdAt: chronological[0]?.createdAt ?? new Date().toISOString(),
       expiresAt: null,
       lastUsedAt: chronological.at(-1)?.createdAt ?? null,
