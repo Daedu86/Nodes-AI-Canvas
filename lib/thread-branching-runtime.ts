@@ -31,8 +31,91 @@ export type ExecuteBranchSpecOptions = {
   text: string;
 };
 
+type ScopedContextMessage = NonNullable<ExecuteBranchSpecOptions["contextMessages"]>[number];
+
+const MAX_DURABLE_TREE_CONTEXT_CHARS = 32 * 1024;
+const MAX_DURABLE_TREE_CONTEXT_MESSAGES = 48;
+const MAX_DURABLE_TREE_MESSAGE_CHARS = 4 * 1024;
+const MAX_DURABLE_TREE_PROMPT_CHARS = 8 * 1024;
+const DURABLE_TREE_TRUNCATION_MESSAGE: ScopedContextMessage = {
+  role: "system",
+  content:
+    "[Full tree context truncated in durable metadata. The live request still uses the complete tree when runConfig is available.]",
+};
+
 const uniqueIds = (value: string[] | undefined) =>
   value ? Array.from(new Set(value.filter(Boolean))) : [];
+
+const truncateDurableTreeMessage = (
+  message: ScopedContextMessage,
+  maxChars = MAX_DURABLE_TREE_MESSAGE_CHARS,
+): ScopedContextMessage => {
+  if (message.content.length <= maxChars) return message;
+  return {
+    ...message,
+    content: `${message.content.slice(0, Math.max(0, maxChars - 24))}\n[... truncated ...]`,
+  };
+};
+
+const getSerializedMessageSize = (message: ScopedContextMessage) =>
+  JSON.stringify(message).length;
+
+const boundDurableTreeContextMessages = (
+  contextMessages: ScopedContextMessage[],
+): ScopedContextMessage[] => {
+  if (contextMessages.length === 0) return [];
+
+  const currentPrompt = truncateDurableTreeMessage(
+    contextMessages.at(-1)!,
+    MAX_DURABLE_TREE_PROMPT_CHARS,
+  );
+  const history = contextMessages
+    .slice(0, -1)
+    .map((message) => truncateDurableTreeMessage(message));
+  const normalized = [...history, currentPrompt];
+
+  if (
+    normalized.length <= MAX_DURABLE_TREE_CONTEXT_MESSAGES &&
+    JSON.stringify(normalized).length <= MAX_DURABLE_TREE_CONTEXT_CHARS
+  ) {
+    return normalized;
+  }
+
+  const markerSize = getSerializedMessageSize(DURABLE_TREE_TRUNCATION_MESSAGE);
+  const promptSize = getSerializedMessageSize(currentPrompt);
+  const headBudget = Math.floor(MAX_DURABLE_TREE_CONTEXT_CHARS / 3);
+  let totalSize = markerSize + promptSize + 4;
+  const head: ScopedContextMessage[] = [];
+  const tail: ScopedContextMessage[] = [];
+  const headIndexes = new Set<number>();
+
+  for (let index = 0; index < history.length; index += 1) {
+    if (head.length >= 6) break;
+    const candidate = history[index]!;
+    const candidateSize = getSerializedMessageSize(candidate) + 1;
+    if (totalSize + candidateSize > headBudget) break;
+    head.push(candidate);
+    headIndexes.add(index);
+    totalSize += candidateSize;
+  }
+
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    if (headIndexes.has(index)) continue;
+    if (head.length + tail.length + 2 >= MAX_DURABLE_TREE_CONTEXT_MESSAGES) break;
+    const candidate = history[index]!;
+    const candidateSize = getSerializedMessageSize(candidate) + 1;
+    if (totalSize + candidateSize > MAX_DURABLE_TREE_CONTEXT_CHARS) break;
+    tail.push(candidate);
+    totalSize += candidateSize;
+  }
+
+  return [
+    ...head,
+    DURABLE_TREE_TRUNCATION_MESSAGE,
+    ...tail.reverse(),
+    currentPrompt,
+  ];
+};
 
 export const buildBranchAppendMessage = (
   spec: BranchSpec,
@@ -59,21 +142,31 @@ export const buildBranchAppendMessage = (
     options.outputArtifactTypes ?? [],
   );
   const promptText = `${trimmedText}${formattingInstruction}`;
+  const durableContextMessages =
+    contextScope === "tree" && contextMessages
+      ? boundDurableTreeContextMessages(contextMessages)
+      : contextMessages;
 
-  const durableScopedConfig = {
-    ...(contextMessages && contextMessages.length > 0
-      ? { contextMessages }
-      : {}),
+  const baseScopedConfig = {
     ...(contextScope ? { contextScope } : {}),
     historyMode,
     model: modelId,
     provider,
   };
+  const durableScopedConfig = {
+    ...(durableContextMessages && durableContextMessages.length > 0
+      ? { contextMessages: durableContextMessages }
+      : {}),
+    ...baseScopedConfig,
+  };
   const scopedRequestConfig = {
     ...(contextArtifacts && contextArtifacts.length > 0
       ? { contextArtifacts }
       : {}),
-    ...durableScopedConfig,
+    ...(contextMessages && contextMessages.length > 0
+      ? { contextMessages }
+      : {}),
+    ...baseScopedConfig,
   };
 
   return {
