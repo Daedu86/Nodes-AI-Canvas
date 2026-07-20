@@ -269,22 +269,44 @@ export async function parseChatRequest(req: Request): Promise<ChatRequestParseRe
   return { ok: true, body: result.data };
 }
 
+const getDurableMessageCustomConfig = (messages: ChatRequestBody["messages"]) => {
+  for (const message of [...messages].reverse()) {
+    const metadata = message.metadata;
+    if (!metadata || typeof metadata !== "object") continue;
+    const custom = (metadata as Record<string, unknown>).custom;
+    if (!custom || typeof custom !== "object") continue;
+    const record = custom as Record<string, unknown>;
+    const candidate = Object.fromEntries(
+      ["contextArtifacts", "contextMessages", "contextScope", "historyMode", "model", "provider"]
+        .filter((key) => record[key] !== undefined)
+        .map((key) => [key, record[key]]),
+    );
+    const parsed = modelResolutionCustomSchema.safeParse(candidate);
+    if (parsed.success) return parsed.data;
+  }
+  return undefined;
+};
+
 export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
   const rawMessages = body.messages;
   const messages = normalizeMessages(rawMessages);
+  const durableMessageCustom = getDurableMessageCustomConfig(rawMessages);
   const contextArtifacts = normalizeLlmContextArtifacts(
     body.metadata?.custom?.contextArtifacts ??
-      body.runConfig?.custom?.contextArtifacts,
+      body.runConfig?.custom?.contextArtifacts ??
+      durableMessageCustom?.contextArtifacts,
   );
   const historyMode =
     body.metadata?.custom?.historyMode ??
     body.metadata?.historyMode ??
     body.runConfig?.custom?.historyMode ??
     body.runConfig?.historyMode ??
+    durableMessageCustom?.historyMode ??
     body.historyMode;
   const scopedMessages = normalizeMessages(
     body.metadata?.custom?.contextMessages ??
       body.runConfig?.custom?.contextMessages ??
+      durableMessageCustom?.contextMessages ??
       [],
   );
 
