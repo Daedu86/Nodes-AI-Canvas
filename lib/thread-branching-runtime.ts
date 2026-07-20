@@ -11,7 +11,7 @@ import {
 type InternalThreadRuntime = ThreadRuntime & {
   __internal_threadBinding?: {
     getState?: () => {
-      append?: (message: ReturnType<typeof buildBranchAppendMessage>) => void;
+      append?: (message: Parameters<ThreadRuntime["append"]>[0]) => void;
     };
   };
 };
