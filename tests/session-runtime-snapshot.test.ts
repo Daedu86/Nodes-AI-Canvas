@@ -66,19 +66,21 @@ describe("mergeSessionSnapshotRepositories", () => {
       { headId: "root", messages: [{ parentId: null, message: runtime }] },
     );
 
-    expect(merged.messages[0]?.message.metadata).toMatchObject({
-      custom: {
-        contextMessages: [
-          { role: "assistant", content: "A y B" },
-          { role: "user", content: "Give me one word for each" },
-        ],
-        contextScope: "parent",
-        historyMode: "last",
-        model: "openrouter/free",
-        provider: "openrouter",
+    expect(merged.messages[0]?.message).toMatchObject({
+      metadata: {
+        custom: {
+          contextMessages: [
+            { role: "assistant", content: "A y B" },
+            { role: "user", content: "Give me one word for each" },
+          ],
+          contextScope: "parent",
+          historyMode: "last",
+          model: "openrouter/free",
+          provider: "openrouter",
+        },
       },
     });
-    expect(merged.messages[0]?.message.metadata.custom).not.toHaveProperty("inputArtifactIds");
+    expect(merged.messages[0]?.message).not.toHaveProperty("metadata.custom.inputArtifactIds");
   });
 });
 
@@ -135,13 +137,17 @@ describe("mergeRuntimeBranchIntoSessionSnapshot", () => {
     };
 
     const merged = mergeRuntimeBranchIntoSessionSnapshot(repository, [runtime]);
-    expect(merged.messages[0]?.message.metadata.custom).toMatchObject({
-      contextScope: "parent",
-      historyMode: "last",
-      model: "openrouter/free",
-      provider: "openrouter",
+    expect(merged.messages[0]?.message).toMatchObject({
+      metadata: {
+        custom: {
+          contextScope: "parent",
+          historyMode: "last",
+          model: "openrouter/free",
+          provider: "openrouter",
+        },
+      },
     });
-    expect(merged.messages[0]?.message.metadata.custom).toHaveProperty("contextMessages");
+    expect(merged.messages[0]?.message).toHaveProperty("metadata.custom.contextMessages");
   });
 
   it("replaces a substantive optimistic assistant with one stable child", () => {
