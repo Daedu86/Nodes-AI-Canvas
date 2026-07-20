@@ -10,7 +10,7 @@ const message = (id: string, role: "user" | "assistant", text: string) => ({
   role,
   content: [{ type: "text", text }],
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
-  metadata: { custom: {} },
+  metadata: { custom: {} as Record<string, unknown> },
   ...(role === "assistant"
     ? { status: { type: "complete", reason: "stop" } }
     : { attachments: [] }),
@@ -47,17 +47,38 @@ describe("mergeSessionSnapshotRepositories", () => {
     expect(merged.messages).toContainEqual({ parentId: "root", message: newAssistant });
   });
 
-  it("preserves a persisted context scope when the runtime export omits it", () => {
+  it("preserves durable scoped context when the runtime export omits it", () => {
     const persisted = message("root", "user", "Question");
-    persisted.metadata.custom = { contextScope: "tree" };
+    persisted.metadata.custom = {
+      contextMessages: [
+        { role: "assistant", content: "A y B" },
+        { role: "user", content: "Give me one word for each" },
+      ],
+      contextScope: "parent",
+      historyMode: "last",
+      model: "openrouter/free",
+      provider: "openrouter",
+      inputArtifactIds: ["artifact-1"],
+    };
     const runtime = message("root", "user", "Question");
     const merged = mergeSessionSnapshotRepositories(
       { headId: "root", messages: [{ parentId: null, message: persisted }] },
       { headId: "root", messages: [{ parentId: null, message: runtime }] },
     );
+
     expect(merged.messages[0]?.message.metadata).toMatchObject({
-      custom: { contextScope: "tree" },
+      custom: {
+        contextMessages: [
+          { role: "assistant", content: "A y B" },
+          { role: "user", content: "Give me one word for each" },
+        ],
+        contextScope: "parent",
+        historyMode: "last",
+        model: "openrouter/free",
+        provider: "openrouter",
+      },
     });
+    expect(merged.messages[0]?.message.metadata.custom).not.toHaveProperty("inputArtifactIds");
   });
 });
 
@@ -93,6 +114,34 @@ describe("mergeRuntimeBranchIntoSessionSnapshot", () => {
     expect(merged.headId).toBe("new");
     expect(merged.messages).toContainEqual({ parentId: "root", message: oldAssistant });
     expect(merged.messages).toContainEqual({ parentId: "root", message: newAssistant });
+  });
+
+  it("preserves durable context when a runtime branch replaces the same prompt", () => {
+    const persisted = message("user-1", "user", "Follow-up");
+    persisted.metadata.custom = {
+      contextMessages: [
+        { role: "assistant", content: "A y B" },
+        { role: "user", content: "Follow-up" },
+      ],
+      contextScope: "parent",
+      historyMode: "last",
+      model: "openrouter/free",
+      provider: "openrouter",
+    };
+    const runtime = message("user-1", "user", "Follow-up");
+    const repository: SessionThreadExport = {
+      headId: "user-1",
+      messages: [{ parentId: null, message: persisted }],
+    };
+
+    const merged = mergeRuntimeBranchIntoSessionSnapshot(repository, [runtime]);
+    expect(merged.messages[0]?.message.metadata.custom).toMatchObject({
+      contextScope: "parent",
+      historyMode: "last",
+      model: "openrouter/free",
+      provider: "openrouter",
+    });
+    expect(merged.messages[0]?.message.metadata.custom).toHaveProperty("contextMessages");
   });
 
   it("replaces a substantive optimistic assistant with one stable child", () => {
