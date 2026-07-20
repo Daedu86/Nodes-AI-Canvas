@@ -1,7 +1,6 @@
 import type { ThreadRuntime } from "@assistant-ui/react";
 import type { HistoryMode, ModelProvider } from "@/components/context/session-ui-state";
 import type { ContextScope } from "@/components/context/graph-branch-intent";
-import { packFullTreeContextMessages } from "@/lib/full-tree-context";
 import type { BranchSpec } from "@/lib/thread-branching";
 import {
   getOutputFormatInstruction,
@@ -41,7 +40,7 @@ const MAX_DURABLE_TREE_PROMPT_CHARS = 8 * 1024;
 const DURABLE_TREE_TRUNCATION_MESSAGE: ScopedContextMessage = {
   role: "system",
   content:
-    "[Full tree context truncated in durable metadata. The live request still uses a compact provider-safe tree reference.]",
+    "[Full tree context truncated in durable metadata. The live request uses the durable tree context recovered by the server.]",
 };
 
 const uniqueIds = (value: string[] | undefined) =>
@@ -143,14 +142,15 @@ export const buildBranchAppendMessage = (
     options.outputArtifactTypes ?? [],
   );
   const promptText = `${trimmedText}${formattingInstruction}`;
-  const liveContextMessages =
-    contextScope === "tree" && contextMessages
-      ? packFullTreeContextMessages(contextMessages)
-      : contextMessages;
   const durableContextMessages =
     contextScope === "tree" && contextMessages
       ? boundDurableTreeContextMessages(contextMessages)
       : contextMessages;
+  // Full-tree context is intentionally omitted from runConfig. Assistant UI can enter a
+  // local running state before its AI SDK transport starts when a large custom tree payload
+  // is attached to the run config. The server already recovers contextMessages from the
+  // appended user message metadata, so keeping tree context durable there avoids that stall.
+  const requestContextMessages = contextScope === "tree" ? undefined : contextMessages;
 
   const baseScopedConfig = {
     ...(contextScope ? { contextScope } : {}),
@@ -168,8 +168,8 @@ export const buildBranchAppendMessage = (
     ...(contextArtifacts && contextArtifacts.length > 0
       ? { contextArtifacts }
       : {}),
-    ...(liveContextMessages && liveContextMessages.length > 0
-      ? { contextMessages: liveContextMessages }
+    ...(requestContextMessages && requestContextMessages.length > 0
+      ? { contextMessages: requestContextMessages }
       : {}),
     ...baseScopedConfig,
   };
