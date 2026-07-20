@@ -226,6 +226,40 @@ describe("chat request validation", () => {
     ]);
   });
 
+  it("does not reuse durable scoped context from an older message", () => {
+    const parsed = chatRequestBodySchema.parse({
+      messages: [
+        {
+          id: "old-branch-prompt",
+          role: "user",
+          parts: [{ type: "text", text: "old branch question" }],
+          metadata: {
+            custom: {
+              contextScope: "parent",
+              contextMessages: [
+                { role: "assistant", content: "Old parent context" },
+                { role: "user", content: "old branch question" },
+              ],
+              historyMode: "last",
+            },
+          },
+        },
+        {
+          id: "current-prompt",
+          role: "user",
+          parts: [{ type: "text", text: "brand new question" }],
+        },
+      ],
+      historyMode: "full",
+    });
+
+    const prepared = prepareChatRequest(parsed);
+    expect(prepared.messagesToSend.map((message) => message.content)).toEqual([
+      "old branch question",
+      "brand new question",
+    ]);
+  });
+
   it("returns a structured error for malformed JSON", async () => {
     const result = await parseChatRequest(
       new Request("http://nodes.test/api/chat", {
