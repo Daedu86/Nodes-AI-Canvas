@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { SendHorizontal, Trash2, XCircle } from "lucide-react";
+import { Pause, SendHorizontal, Trash2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ThreadGraphFlowNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-flow-types";
 
@@ -17,6 +17,8 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
   const canSubmit = !disabled && !busy && text.trim().length > 0 && (persistent || contextScope !== null);
   const contextCount = data.draftContextCount ?? 0;
   const outputCount = data.draftOutputCount ?? 0;
+  const canPause = status === "running" && Boolean(data.onDraftCancelRun);
+  const canCancelQueued = status === "queued" && Boolean(data.onDraftCancelRun);
 
   const handleDelete = () => {
     const confirmed = window.confirm(
@@ -54,7 +56,7 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
           type="button"
           className="nodrag nopan absolute right-3 top-3 z-20 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-300/30 bg-rose-400/10 text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label={persistent ? "Delete prompt node" : "Delete draft prompt node"}
-          title={busy ? "Cancel the active run before deleting this prompt." : "Delete this prompt node."}
+          title={busy ? "Pause or cancel the active run before deleting this prompt." : "Delete this prompt node."}
           disabled={busy}
           onClick={(event) => {
             event.stopPropagation();
@@ -162,14 +164,26 @@ export const CanvasPromptNode = memo(({ data, selected }: NodeProps<ThreadGraphF
         </div>
 
         <div className="relative mt-3 flex justify-end gap-2">
-          {data.onDraftCancelRun ? (
+          {canPause ? (
             <Button
               type="button"
               variant="outline"
               className="nodrag border-amber-300/35 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15"
               onClick={data.onDraftCancelRun}
+              aria-label="Pause active LLM run"
+              title="Pause this run by interrupting the active LLM request. Run again to restart it."
             >
-              <XCircle className="mr-1.5 h-4 w-4" /> Cancel run
+              <Pause className="mr-1.5 h-4 w-4" /> Pause
+            </Button>
+          ) : canCancelQueued ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="nodrag border-amber-300/35 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15"
+              onClick={data.onDraftCancelRun}
+              aria-label="Cancel queued LLM run"
+            >
+              <XCircle className="mr-1.5 h-4 w-4" /> Cancel queued
             </Button>
           ) : null}
           <Button
