@@ -270,21 +270,21 @@ export async function parseChatRequest(req: Request): Promise<ChatRequestParseRe
 }
 
 const getDurableMessageCustomConfig = (messages: ChatRequestBody["messages"]) => {
-  for (const message of [...messages].reverse()) {
-    const metadata = message.metadata;
-    if (!metadata || typeof metadata !== "object") continue;
-    const custom = (metadata as Record<string, unknown>).custom;
-    if (!custom || typeof custom !== "object") continue;
-    const record = custom as Record<string, unknown>;
-    const candidate = Object.fromEntries(
-      ["contextArtifacts", "contextMessages", "contextScope", "historyMode", "model", "provider"]
-        .filter((key) => record[key] !== undefined)
-        .map((key) => [key, record[key]]),
-    );
-    const parsed = modelResolutionCustomSchema.safeParse(candidate);
-    if (parsed.success) return parsed.data;
-  }
-  return undefined;
+  const message = messages.at(-1);
+  if (!message) return undefined;
+
+  const metadata = message.metadata;
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const custom = (metadata as Record<string, unknown>).custom;
+  if (!custom || typeof custom !== "object") return undefined;
+  const record = custom as Record<string, unknown>;
+  const candidate = Object.fromEntries(
+    ["contextArtifacts", "contextMessages", "contextScope", "historyMode", "model", "provider"]
+      .filter((key) => record[key] !== undefined)
+      .map((key) => [key, record[key]]),
+  );
+  const parsed = modelResolutionCustomSchema.safeParse(candidate);
+  return parsed.success ? parsed.data : undefined;
 };
 
 export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
