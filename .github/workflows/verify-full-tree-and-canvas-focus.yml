@@ -1,0 +1,85 @@
+name: Verify full tree and apply canvas chat focus
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/verify-full-tree-and-canvas-focus.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Focus chat on Canvas branch anchor
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("components/assistant-ui/thread-graph-flow/thread-graph-flow.tsx")
+          text = path.read_text()
+
+          old_body = '''      beginDraft(anchor.id, operation, initialText, {
+            contextScope: anchor.contextScope ?? null,
+          });
+          applyCanvasSelection(CANVAS_PROMPT_DRAFT_NODE_ID);
+          setFlowRenderMode("2d");'''
+          new_body = '''      beginDraft(anchor.id, operation, initialText, {
+            contextScope: anchor.contextScope ?? null,
+          });
+          applyCanvasSelection(CANVAS_PROMPT_DRAFT_NODE_ID);
+          setFocusedMessageId(anchor.id);
+          setViewMode("split");
+          scrollMessageIntoView(anchor.id);
+          setFlowRenderMode("2d");'''
+          if old_body not in text:
+              raise SystemExit("Expected Canvas branch operation block was not found")
+          text = text.replace(old_body, new_body, 1)
+
+          old_deps = '''      nodeIndex,
+      setCanvasDraftError,
+      setFlowRenderMode,
+    ],'''
+          new_deps = '''      nodeIndex,
+      setCanvasDraftError,
+      setFlowRenderMode,
+      setFocusedMessageId,
+      setViewMode,
+    ],'''
+          if old_deps not in text:
+              raise SystemExit("Expected Canvas branch dependency block was not found")
+          text = text.replace(old_deps, new_deps, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Run focused Full tree tests
+        run: npx vitest run tests/thread-branching-runtime.test.ts tests/chat-request.test.ts
+
+      - name: Commit only after tests pass
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/verify-full-tree-and-canvas-focus.yml
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(canvas): focus chat on branch anchor"
+          git push origin main
