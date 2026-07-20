@@ -173,6 +173,10 @@ describe("thread branching runtime", () => {
     const durableMessages = message.metadata.custom.contextMessages;
     const liveMessages = message.runConfig.custom.contextMessages;
 
+    expect(liveMessages).toBeDefined();
+    expect(durableMessages).toBeDefined();
+    if (!liveMessages || !durableMessages) return;
+
     expect(liveMessages).toHaveLength(contextMessages.length);
     expect(liveMessages).toEqual(contextMessages);
     expect(durableMessages.length).toBeLessThan(contextMessages.length);
