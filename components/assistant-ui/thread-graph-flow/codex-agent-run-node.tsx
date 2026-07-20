@@ -20,6 +20,7 @@ import type { CodexAgentRole } from "@/lib/agents/codex/types";
 import type { ThreadGraphFlowNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-flow-types";
 
 const RUNNING_STATUSES = new Set(["queued", "running", "waiting_for_approval"]);
+const CODEX_MODEL = process.env.NEXT_PUBLIC_CODEX_MODEL?.trim() || "gpt-5.6-sol";
 
 const roleLabels: Record<CodexAgentRole, string> = {
   coder: "Coder",
@@ -95,6 +96,9 @@ export const CodexAgentRunNode = memo(
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full border border-sky-300/35 bg-sky-400/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-100">
                     Codex Agent
+                  </span>
+                  <span className="rounded-full border border-indigo-300/30 bg-indigo-400/10 px-2.5 py-1 text-[10px] font-semibold tracking-[0.08em] text-indigo-100">
+                    LLM · {CODEX_MODEL}
                   </span>
                   <span
                     className={[
