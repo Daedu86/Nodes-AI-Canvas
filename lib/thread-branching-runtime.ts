@@ -60,10 +60,7 @@ export const buildBranchAppendMessage = (
   );
   const promptText = `${trimmedText}${formattingInstruction}`;
 
-  const scopedRequestConfig = {
-    ...(contextArtifacts && contextArtifacts.length > 0
-      ? { contextArtifacts }
-      : {}),
+  const durableScopedConfig = {
     ...(contextMessages && contextMessages.length > 0
       ? { contextMessages }
       : {}),
@@ -71,6 +68,12 @@ export const buildBranchAppendMessage = (
     historyMode,
     model: modelId,
     provider,
+  };
+  const scopedRequestConfig = {
+    ...(contextArtifacts && contextArtifacts.length > 0
+      ? { contextArtifacts }
+      : {}),
+    ...durableScopedConfig,
   };
 
   return {
@@ -83,7 +86,7 @@ export const buildBranchAppendMessage = (
         branchAnchorId: spec.anchorId,
         branchAnchorRole: spec.anchorRole,
         branchOperation: spec.operation,
-        ...scopedRequestConfig,
+        ...durableScopedConfig,
         ...(contextNodeIds && contextNodeIds.length > 0
           ? { contextNodeIds: [...contextNodeIds] }
           : {}),
