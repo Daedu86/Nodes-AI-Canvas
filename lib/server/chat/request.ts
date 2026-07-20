@@ -317,25 +317,70 @@ export async function parseChatRequest(req: Request): Promise<ChatRequestParseRe
   return { ok: true, body: result.data };
 }
 
+const getDurableMessageCustomConfig = (messages: ChatRequestBody["messages"]) => {
+  const message = messages.at(-1);
+  if (!message) return undefined;
+
+  const metadata = message.metadata;
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const custom = (metadata as Record<string, unknown>).custom;
+  if (!custom || typeof custom !== "object") return undefined;
+  const record = custom as Record<string, unknown>;
+  const candidate = Object.fromEntries(
+    ["contextArtifacts", "contextMessages", "contextScope", "historyMode", "model", "provider"]
+      .filter((key) => record[key] !== undefined)
+      .map((key) => [key, record[key]]),
+  );
+  const parsed = modelResolutionCustomSchema.safeParse(candidate);
+  if (!parsed.success) return undefined;
+  if (!parsed.data.contextScope || !parsed.data.contextMessages?.length) return undefined;
+  return parsed.data;
+};
+
+const withDurableModelFallback = (
+  body: ChatRequestBody,
+  durableMessageCustom: z.infer<typeof modelResolutionCustomSchema> | undefined,
+): ChatRequestBody => {
+  if (!durableMessageCustom?.model && !durableMessageCustom?.provider) return body;
+
+  return {
+    ...body,
+    runConfig: {
+      ...body.runConfig,
+      custom: {
+        ...(durableMessageCustom.model ? { model: durableMessageCustom.model } : {}),
+        ...(durableMessageCustom.provider ? { provider: durableMessageCustom.provider } : {}),
+        ...body.runConfig?.custom,
+      },
+    },
+  };
+};
+
 export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
   const rawMessages = body.messages;
   const messages = normalizeMessages(rawMessages);
+  const durableMessageCustom = getDurableMessageCustomConfig(rawMessages);
+  const effectiveBody = withDurableModelFallback(body, durableMessageCustom);
   const contextArtifacts = normalizeLlmContextArtifacts(
     body.metadata?.custom?.contextArtifacts ??
-      body.runConfig?.custom?.contextArtifacts,
+      body.runConfig?.custom?.contextArtifacts ??
+      durableMessageCustom?.contextArtifacts,
   );
   const contextScope =
     body.metadata?.custom?.contextScope ??
-    body.runConfig?.custom?.contextScope;
+    body.runConfig?.custom?.contextScope ??
+    durableMessageCustom?.contextScope;
   const historyMode =
     body.metadata?.custom?.historyMode ??
     body.metadata?.historyMode ??
     body.runConfig?.custom?.historyMode ??
     body.runConfig?.historyMode ??
+    durableMessageCustom?.historyMode ??
     body.historyMode;
   const scopedMessages = normalizeMessages(
     body.metadata?.custom?.contextMessages ??
       body.runConfig?.custom?.contextMessages ??
+      durableMessageCustom?.contextMessages ??
       [],
   );
   const scopedMessagesToSend =
@@ -344,7 +389,7 @@ export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
       : scopedMessages;
 
   return {
-    body,
+    body: effectiveBody,
     contextArtifacts,
     historyMode,
     messages,
@@ -353,7 +398,7 @@ export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
         ? scopedMessagesToSend
         : selectMessagesForHistoryMode(messages, historyMode ?? "full"),
     rawMessages,
-    requestedModel: getRequestedModelConfig(body),
+    requestedModel: getRequestedModelConfig(effectiveBody),
     system: body.system,
     tools: body.tools,
   };
