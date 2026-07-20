@@ -33,6 +33,7 @@ import {
   getRequestErrorMessageFromResponse,
   getRequestErrorMessageFromThrowable,
 } from "@/lib/llm/request-errors";
+import { compactFullTreeRequestBody } from "@/lib/full-tree-context";
 import { rememberMessageLatencyEntry } from "@/lib/message-latency-registry";
 import { notifySessionRuntimeChanged } from "@/lib/session-persist-sync";
 import { GraphBranchIntentProvider } from "@/components/context/graph-branch-intent";
@@ -151,7 +152,7 @@ function SessionBoundRuntime({ sessionId }: { sessionId: string }) {
         headers?: HeadersInit;
       }) => ({
         body: {
-          ...(options.body ?? {}),
+          ...compactFullTreeRequestBody(options.body ?? {}),
           ...chatRequestBody,
         },
         headers: Object.fromEntries(new Headers(options.headers ?? {}).entries()),
