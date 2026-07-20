@@ -287,6 +287,25 @@ const getDurableMessageCustomConfig = (messages: ChatRequestBody["messages"]) =>
   return parsed.success ? parsed.data : undefined;
 };
 
+const withDurableModelFallback = (
+  body: ChatRequestBody,
+  durableMessageCustom: z.infer<typeof modelResolutionCustomSchema> | undefined,
+) => {
+  if (!durableMessageCustom?.model && !durableMessageCustom?.provider) return body;
+
+  return {
+    ...body,
+    runConfig: {
+      ...body.runConfig,
+      custom: {
+        ...(durableMessageCustom.model ? { model: durableMessageCustom.model } : {}),
+        ...(durableMessageCustom.provider ? { provider: durableMessageCustom.provider } : {}),
+        ...body.runConfig?.custom,
+      },
+    },
+  };
+};
+
 export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
   const rawMessages = body.messages;
   const messages = normalizeMessages(rawMessages);
@@ -309,6 +328,7 @@ export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
       durableMessageCustom?.contextMessages ??
       [],
   );
+  const modelResolutionBody = withDurableModelFallback(body, durableMessageCustom);
 
   return {
     body,
@@ -320,7 +340,7 @@ export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
         ? scopedMessages
         : selectMessagesForHistoryMode(messages, historyMode),
     rawMessages,
-    requestedModel: getRequestedModelConfig(body),
+    requestedModel: getRequestedModelConfig(modelResolutionBody),
     system: body.system,
     tools: body.tools,
   };
