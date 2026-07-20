@@ -8,14 +8,23 @@ import {
 } from "@assistant-ui/core";
 import type { UIMessage } from "ai";
 import React from "react";
-import type { ContextScope, GraphBranchIntent } from "@/components/context/graph-branch-intent";
+import type {
+  ContextScope,
+  GraphBranchIntent,
+} from "@/components/context/graph-branch-intent";
 import type { ModelProvider } from "@/components/context/model-config";
 import {
   CANVAS_BRANCH_CANCEL_FAILURE,
   CANVAS_PROMPT_DRAFT_NODE_ID,
 } from "@/components/assistant-ui/thread-graph-flow/canvas-workspace-utils";
+import {
+  appendCompletedCanvasBranch,
+  buildCanvasBranchRunRequest,
+  createCanvasBranchRunId,
+  type CanvasBranchRunResponse,
+} from "@/lib/canvas-branch-direct-run";
 import { buildBranchSpec } from "@/lib/thread-branching";
-import { executeBranchSpec } from "@/lib/thread-branching-runtime";
+import { buildBranchAppendMessage } from "@/lib/thread-branching-runtime";
 import { ensureThreadIdle } from "@/lib/thread-run-control";
 import { toLlmContextArtifacts, type SessionArtifact } from "@/lib/session-artifacts";
 import type { SessionThreadExport } from "@/lib/session-documents";
@@ -70,19 +79,17 @@ type UseCanvasBranchSubmissionOptions = {
 };
 
 type PendingOutputRun = {
-  beforeMessageIds: Set<string>;
   sourcePromptId: string;
   artifactIds: string[];
   preSubmitSnapshot: ThreadExport;
   preSubmitExternalState: ThreadExternalState;
   persistSuspensionToken: SessionPersistSuspensionToken;
   submissionToken: number;
+  abortController: AbortController;
 };
 
 const ASSISTANT_FIRST_PARENT_CONTEXT =
   "Continue from the saved assistant response below; treat it as conversation context.";
-const COMPLETED_RUN_RETRY_DELAY_MS = 75;
-const COMPLETED_RUN_MAX_ATTEMPTS = 200;
 
 export function orderThreadSnapshotForImport(snapshot: ThreadExport): ThreadExport {
   const entryById = new Map(
@@ -196,7 +203,9 @@ export function collectVisibleExternalMessageChain(
     }
     rawMessages.forEach((rawMessage) => {
       if (seenExternalIds.has(rawMessage.id)) {
-        throw new Error(`The external conversation contains duplicate message ${rawMessage.id}.`);
+        throw new Error(
+          `The external conversation contains duplicate message ${rawMessage.id}.`,
+        );
       }
       seenExternalIds.add(rawMessage.id);
     });
@@ -323,8 +332,12 @@ export function findCompletedRuntimeRun(
 }
 
 const waitForCanvasCommit = async () => {
-  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) =>
+    window.requestAnimationFrame(() => resolve()),
+  );
+  await new Promise<void>((resolve) =>
+    window.requestAnimationFrame(() => resolve()),
+  );
 };
 
 const waitForAdapterSettle = async (delayMs = 100) => {
@@ -343,14 +356,15 @@ async function restoreThreadSnapshot(
   }
   const importableExternalState = orderExternalStateForRestore(externalState);
   const expectedHeadId = importableSnapshot.headId ?? null;
-  const expectedIds = new Set(importableSnapshot.messages.map((entry) => entry.message.id));
+  const expectedIds = new Set(
+    importableSnapshot.messages.map((entry) => entry.message.id),
+  );
   const expectedParentById = new Map(
-    importableSnapshot.messages.map((entry) => [entry.message.id, entry.parentId] as const),
+    importableSnapshot.messages.map(
+      (entry) => [entry.message.id, entry.parentId] as const,
+    ),
   );
 
-  // Remove provisional external messages from the AI SDK store itself. A
-  // repository import alone cannot prevent useChat's failed-send state from
-  // replaying that user message on the next adapter reconciliation.
   const unexpectedVisibleIds = thread
     .getState()
     .messages.map((message) => message.id)
@@ -370,19 +384,20 @@ async function restoreThreadSnapshot(
     const restoredEntries = restored.messages.filter(
       (entry) => !entry.message.id.startsWith("__error__"),
     );
-    const restoredIds = new Set(restoredEntries.map((entry) => entry.message.id));
+    const restoredIds = new Set(
+      restoredEntries.map((entry) => entry.message.id),
+    );
     return (
       (restored.headId ?? null) === expectedHeadId &&
       expectedIds.size === restoredIds.size &&
       [...expectedIds].every((id) => restoredIds.has(id)) &&
       restoredEntries.every(
-        (entry) => expectedParentById.get(entry.message.id) === entry.parentId,
+        (entry) =>
+          expectedParentById.get(entry.message.id) === entry.parentId,
       )
     );
   };
 
-  // A failed AI SDK request can enqueue one final adapter update after runEnd.
-  // Restore until the exact snapshot remains stable across a settle window.
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const internalState = (thread as InternalThreadControl).__internal_threadBinding?.getState?.();
     if (
@@ -392,8 +407,6 @@ async function restoreThreadSnapshot(
     ) {
       internalState.switchToBranch(expectedHeadId);
     } else {
-      // External-store reset updates the adapter first. This lets React unmount
-      // provisional resources before the repository is cleared.
       thread.reset();
     }
 
@@ -425,9 +438,15 @@ export function buildCanvasContextMessages(
     content: string;
   };
   const byId = new Map(nodes.map((node) => [node.id, node] as const));
-  const toMessage = (node: ThreadGraphNodeModel | undefined): ScopedContextMessage | null =>
+  const toMessage = (
+    node: ThreadGraphNodeModel | undefined,
+  ): ScopedContextMessage | null =>
     node && (node.role === "user" || node.role === "assistant")
-      ? { id: node.id, role: node.role as "user" | "assistant", content: node.text }
+      ? {
+          id: node.id,
+          role: node.role as "user" | "assistant",
+          content: node.text,
+        }
       : null;
   let history: ScopedContextMessage[] = [];
 
@@ -473,7 +492,9 @@ export function findCompletedCanvasRunNodes(
   currentNodes: ThreadGraphNodeModel[],
   beforeNodeIds: ReadonlySet<string>,
 ) {
-  const newNodes = currentNodes.filter((node) => !beforeNodeIds.has(node.id));
+  const newNodes = currentNodes.filter(
+    (node) => !beforeNodeIds.has(node.id),
+  );
   const responseNode = [...newNodes]
     .sort((a, b) => (b.idx ?? 0) - (a.idx ?? 0))
     .find((node) => node.role === "assistant");
@@ -486,7 +507,10 @@ export function findCompletedCanvasRunNodes(
   return { promptNode, responseNode: responseNode ?? null };
 }
 
-export function isCompletedRuntimeResponse(snapshot: unknown, responseId: string) {
+export function isCompletedRuntimeResponse(
+  snapshot: unknown,
+  responseId: string,
+) {
   if (!snapshot || typeof snapshot !== "object") return false;
   const messages = (snapshot as { messages?: unknown }).messages;
   if (!Array.isArray(messages)) return false;
@@ -527,30 +551,19 @@ export function useCanvasBranchSubmission({
   setRequestError,
 }: UseCanvasBranchSubmissionOptions) {
   const [isSubmittingBranch, setIsSubmittingBranch] = React.useState(false);
-  const [canvasDraftError, setCanvasDraftError] = React.useState<string | null>(null);
+  const [canvasDraftError, setCanvasDraftError] = React.useState<string | null>(
+    null,
+  );
   const branchSubmissionLockRef = React.useRef(false);
-  const pendingDraftSubmissionRef = React.useRef(false);
   const pendingOutputRunRef = React.useRef<PendingOutputRun | null>(null);
-  const resolveCompletedRunTimerRef = React.useRef<number | null>(null);
   const submissionTokenRef = React.useRef(0);
   const canvasConversationNodesRef = React.useRef<ThreadGraphNodeModel[]>(
     canvasConversationNodes,
   );
-  const requestErrorRef = React.useRef<string | null>(requestError);
 
   React.useEffect(() => {
     canvasConversationNodesRef.current = canvasConversationNodes;
   }, [canvasConversationNodes]);
-
-  React.useEffect(() => {
-    requestErrorRef.current = requestError;
-  }, [requestError]);
-
-  const clearResolveCompletedRunTimer = React.useCallback(() => {
-    if (resolveCompletedRunTimerRef.current === null) return;
-    window.clearTimeout(resolveCompletedRunTimerRef.current);
-    resolveCompletedRunTimerRef.current = null;
-  }, []);
 
   const rollbackPendingTransaction = React.useCallback(
     (expectedSubmissionToken: number, message: string | null) => {
@@ -563,11 +576,8 @@ export function useCanvasBranchSubmission({
         return false;
       }
 
-      // Detach the transaction before cancellation/restoration because either
-      // operation may synchronously emit runEnd or repository callbacks.
       pendingOutputRunRef.current = null;
-      pendingDraftSubmissionRef.current = false;
-      clearResolveCompletedRunTimer();
+      pending.abortController.abort();
       void (async () => {
         let finalMessage = message;
         try {
@@ -590,37 +600,34 @@ export function useCanvasBranchSubmission({
             ? `${finalMessage} The provisional branch could not be rolled back; reload before retrying.`
             : "The provisional branch could not be rolled back; reload before retrying.";
         } finally {
-          // Only this transaction's opaque token can resume persistence.
           resumeSessionPersist(pending.persistSuspensionToken);
         }
 
         branchSubmissionLockRef.current = false;
         setIsSubmittingBranch(false);
         if (finalMessage) {
-          requestErrorRef.current = finalMessage;
           setCanvasDraftError(finalMessage);
           setRequestError(finalMessage);
         }
       })();
       return true;
     },
-    [clearResolveCompletedRunTimer, runtime.threads.main, setRequestError],
+    [runtime.threads.main, setRequestError],
   );
 
   const handleCancelRun = React.useCallback(() => {
     const pending = pendingOutputRunRef.current;
     if (pending) {
       rollbackPendingTransaction(pending.submissionToken, null);
-      requestErrorRef.current = null;
       clearRequestError();
       setCanvasDraftError(null);
       return;
     }
+
     submissionTokenRef.current += 1;
     clearRequestError();
     setCanvasDraftError(null);
     branchSubmissionLockRef.current = false;
-    pendingDraftSubmissionRef.current = false;
     setIsSubmittingBranch(false);
     try {
       runtime.threads.main.cancelRun();
@@ -629,7 +636,12 @@ export function useCanvasBranchSubmission({
       setCanvasDraftError(message);
       setRequestError(message);
     }
-  }, [clearRequestError, rollbackPendingTransaction, runtime.threads.main, setRequestError]);
+  }, [
+    clearRequestError,
+    rollbackPendingTransaction,
+    runtime.threads.main,
+    setRequestError,
+  ]);
 
   const handleCancelPromptDraft = React.useCallback(() => {
     const pending = pendingOutputRunRef.current;
@@ -639,7 +651,6 @@ export function useCanvasBranchSubmission({
       submissionTokenRef.current += 1;
     }
     branchSubmissionLockRef.current = false;
-    pendingDraftSubmissionRef.current = false;
     setIsSubmittingBranch(false);
     setCanvasDraftError(null);
     clearRequestError();
@@ -649,12 +660,14 @@ export function useCanvasBranchSubmission({
   const handleSubmitBranchDraft = React.useCallback(() => {
     if (!draftBranchSpec || !draft || !llmEnabled) return;
     if (!draft.contextScope) {
-      const message = "Choose Parent, Branch, or Tree context before running this draft.";
+      const message =
+        "Choose Parent, Branch, or Tree context before running this draft.";
       setCanvasDraftError(message);
       setRequestError(message);
       return;
     }
     if (branchSubmissionLockRef.current) return;
+
     branchSubmissionLockRef.current = true;
     const submissionToken = submissionTokenRef.current + 1;
     submissionTokenRef.current = submissionToken;
@@ -665,13 +678,11 @@ export function useCanvasBranchSubmission({
       try {
         setIsSubmittingBranch(true);
         setCanvasDraftError(null);
-        requestErrorRef.current = null;
         clearRequestError();
 
         const threadReady = await ensureThreadIdle(runtime.threads.main);
         if (!threadReady) {
           branchSubmissionLockRef.current = false;
-          pendingDraftSubmissionRef.current = false;
           setCanvasDraftError(CANVAS_BRANCH_CANCEL_FAILURE);
           setRequestError(CANVAS_BRANCH_CANCEL_FAILURE);
           return;
@@ -683,9 +694,6 @@ export function useCanvasBranchSubmission({
           return;
         }
 
-        // Flush the last committed branch before provisional changes are hidden
-        // from persistence. This protects a preceding response still inside the
-        // normal debounce window if the page closes during the new run.
         await forceSessionPersist();
         if (
           !branchSubmissionLockRef.current ||
@@ -731,62 +739,170 @@ export function useCanvasBranchSubmission({
         } catch {
           resumeSessionPersist(persistSuspensionToken);
           branchSubmissionLockRef.current = false;
-          pendingDraftSubmissionRef.current = false;
-          const message = "Canvas branching could not capture the current conversation. Try again.";
+          const message =
+            "Canvas branching could not capture the current conversation. Try again.";
           setCanvasDraftError(message);
           setRequestError(message);
           return;
         }
-        pendingDraftSubmissionRef.current = true;
+
+        const contextMessages = buildCanvasContextMessages(
+          canvasConversationNodesRef.current,
+          draftBranchSpec.parentId,
+          activeDraft.contextScope,
+          activeDraft.text,
+        );
+        const contextArtifacts =
+          draftContextArtifacts.length > 0
+            ? toLlmContextArtifacts(draftContextArtifacts)
+            : undefined;
+        const outputArtifactTypes = activeDraft.outputArtifactIds.map(
+          (artifactId) => artifactIndex.get(artifactId)?.semanticType ?? null,
+        );
+        const appendMessage = buildBranchAppendMessage(draftBranchSpec, {
+          contextScope: activeDraft.contextScope,
+          contextMessages,
+          contextArtifacts,
+          contextNodeIds:
+            draftContextArtifacts.length > 0
+              ? draftContextArtifacts.map((artifact) => artifact.id)
+              : undefined,
+          historyMode:
+            activeDraft.contextScope === "parent" ? "last" : "full",
+          inputArtifactIds: activeDraft.inputArtifactIds,
+          modelId,
+          outputArtifactIds: activeDraft.outputArtifactIds,
+          outputArtifactTypes,
+          provider,
+          requireContextScope: true,
+          text: activeDraft.text,
+        });
+
+        if (!appendMessage) {
+          resumeSessionPersist(persistSuspensionToken);
+          branchSubmissionLockRef.current = false;
+          const message =
+            "Branch draft is empty. Add a prompt before creating the branch.";
+          setCanvasDraftError(message);
+          setRequestError(message);
+          return;
+        }
+
+        const abortController = new AbortController();
         pendingOutputRunRef.current = {
-          beforeMessageIds: new Set(
-            preSubmitSnapshot.messages.map((entry) => entry.message.id),
-          ),
           sourcePromptId: CANVAS_PROMPT_DRAFT_NODE_ID,
           artifactIds: [...activeDraft.outputArtifactIds],
           preSubmitSnapshot,
           preSubmitExternalState,
           persistSuspensionToken,
           submissionToken,
+          abortController,
         };
-        const executed = executeBranchSpec(runtime.threads.main, draftBranchSpec, {
-          contextScope: activeDraft.contextScope,
-          contextMessages: buildCanvasContextMessages(
-            canvasConversationNodesRef.current,
-            draftBranchSpec.parentId,
-            activeDraft.contextScope,
-            activeDraft.text,
+        submitted = true;
+
+        const runId = createCanvasBranchRunId();
+        const response = await fetch("/api/canvas-branch-runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            buildCanvasBranchRunRequest({
+              contextArtifacts,
+              contextMessages,
+              contextScope: activeDraft.contextScope,
+              model: modelId,
+              outputArtifactTypes,
+              prompt: activeDraft.text,
+              promptId: appendMessage.id,
+              provider,
+              runId,
+            }),
           ),
-          contextArtifacts:
-            draftContextArtifacts.length > 0
-              ? toLlmContextArtifacts(draftContextArtifacts)
-              : undefined,
-          contextNodeIds:
-            draftContextArtifacts.length > 0
-              ? draftContextArtifacts.map((artifact) => artifact.id)
-              : undefined,
-          historyMode: activeDraft.contextScope === "parent" ? "last" : "full",
-          inputArtifactIds: activeDraft.inputArtifactIds,
-          modelId,
-          outputArtifactIds: activeDraft.outputArtifactIds,
-          outputArtifactTypes: activeDraft.outputArtifactIds.map(
-            (artifactId) => artifactIndex.get(artifactId)?.semanticType ?? null,
-          ),
-          provider,
-          requireContextScope: true,
-          text: activeDraft.text,
+          signal: abortController.signal,
         });
-        if (!executed) {
-          const message = "Branch draft is empty. Add a prompt before creating the branch.";
-          rollbackPendingTransaction(submissionToken, message);
+        const payload = (await response.json().catch(() => null)) as
+          | CanvasBranchRunResponse
+          | null;
+        if (!response.ok) {
+          const structuredError =
+            payload?.error && typeof payload.error === "object"
+              ? payload.error.message
+              : payload?.error;
+          throw new Error(
+            structuredError ||
+              payload?.message ||
+              `Canvas branch run failed: ${response.status}`,
+          );
+        }
+
+        const responseText = payload?.text?.trim() ?? "";
+        if (!responseText) {
+          throw new Error("The model returned an empty branch response.");
+        }
+        const responseId =
+          typeof payload?.runId === "string" && payload.runId.trim()
+            ? payload.runId
+            : runId;
+
+        const nextExternalState = appendCompletedCanvasBranch({
+          externalState: preSubmitExternalState,
+          modelId: payload?.modelId || modelId,
+          provider: payload?.provider || provider,
+          responseId,
+          responseText,
+          userMessage: appendMessage,
+        });
+        runtime.threads.main.importExternalState(nextExternalState);
+        await waitForAdapterSettle();
+
+        const committedSnapshot = runtime.threads.main.export();
+        const promptEntry = committedSnapshot.messages.find(
+          (entry) => entry.message.id === appendMessage.id,
+        );
+        const responseEntry = committedSnapshot.messages.find(
+          (entry) => entry.message.id === responseId,
+        );
+        if (
+          !promptEntry ||
+          promptEntry.parentId !== draftBranchSpec.parentId ||
+          !responseEntry ||
+          responseEntry.parentId !== appendMessage.id
+        ) {
+          throw new Error(
+            "The completed branch could not be committed to the conversation tree.",
+          );
+        }
+
+        applyCompletedResponse({
+          promptId: appendMessage.id,
+          responseId,
+          sourcePromptId: CANVAS_PROMPT_DRAFT_NODE_ID,
+          artifactIds: [...activeDraft.outputArtifactIds],
+          text: responseText,
+        });
+
+        pendingOutputRunRef.current = null;
+        notifySessionRuntimeReplaced(
+          committedSnapshot as unknown as SessionThreadExport,
+        );
+        resumeSessionPersist(persistSuspensionToken);
+        branchSubmissionLockRef.current = false;
+        setCanvasDraftError(null);
+        cancelDraft();
+        setIsSubmittingBranch(false);
+        void forceSessionPersist();
+      } catch (error) {
+        const aborted =
+          error instanceof DOMException && error.name === "AbortError";
+        if (aborted) {
+          rollbackPendingTransaction(submissionToken, null);
           return;
         }
-        submitted = true;
-      } catch {
-        const message = "Canvas branching failed. Try again from the selected node.";
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Canvas branching failed. Try again from the selected node.";
         if (!rollbackPendingTransaction(submissionToken, message)) {
           branchSubmissionLockRef.current = false;
-          pendingDraftSubmissionRef.current = false;
           pendingOutputRunRef.current = null;
           setCanvasDraftError(message);
           setRequestError(message);
@@ -798,7 +914,9 @@ export function useCanvasBranchSubmission({
       }
     })();
   }, [
+    applyCompletedResponse,
     artifactIndex,
+    cancelDraft,
     clearRequestError,
     draft,
     draftBranchSpec,
@@ -821,97 +939,13 @@ export function useCanvasBranchSubmission({
     if (draft) setCanvasDraftError(requestError);
   }, [draft, requestError, rollbackPendingTransaction]);
 
-  React.useEffect(() => {
-    const unsubscribe = runtime.threads.main.unstable_on("runEnd", () => {
-      const pendingOutput = pendingOutputRunRef.current;
-      if (!pendingOutput) return;
-      const expectedSubmissionToken = pendingOutput.submissionToken;
-      const resolveCompletedRun = (attempt: number) => {
-        const activePending = pendingOutputRunRef.current;
-        if (
-          !activePending ||
-          activePending.submissionToken !== expectedSubmissionToken ||
-          submissionTokenRef.current !== expectedSubmissionToken
-        ) {
-          return;
-        }
-        let completedRun: ReturnType<typeof findCompletedRuntimeRun> | null = null;
-        try {
-          const visibleMessages = runtime.threads.main
-            .getState()
-            .messages.filter((message) => !message.id.startsWith("__error__"));
-          const reconciledSnapshot = repairThreadSnapshotFromVisibleBranch(
-            runtime.threads.main.export(),
-            visibleMessages,
-          );
-          completedRun = findCompletedRuntimeRun(
-            reconciledSnapshot,
-            pendingOutput.beforeMessageIds,
-          );
-        } catch {
-          // The repository may still be reconciling a streamed server ID.
-        }
-
-        if (completedRun?.responseEntry && completedRun.promptEntry) {
-          try {
-            applyCompletedResponse({
-              promptId: completedRun.promptEntry.message.id,
-              responseId: completedRun.responseEntry.message.id,
-              sourcePromptId: pendingOutput.sourcePromptId,
-              artifactIds: pendingOutput.artifactIds,
-              text: completedRun.responseText,
-            });
-          } catch {
-            rollbackPendingTransaction(
-              expectedSubmissionToken,
-              "The assistant response could not be committed. Your draft was kept so you can try again.",
-            );
-            return;
-          }
-          pendingOutputRunRef.current = null;
-          pendingDraftSubmissionRef.current = false;
-          clearResolveCompletedRunTimer();
-          resumeSessionPersist(pendingOutput.persistSuspensionToken);
-          branchSubmissionLockRef.current = false;
-          setCanvasDraftError(null);
-          cancelDraft();
-          setIsSubmittingBranch(false);
-        } else if (pendingOutput && attempt < COMPLETED_RUN_MAX_ATTEMPTS) {
-          resolveCompletedRunTimerRef.current = window.setTimeout(
-            () => resolveCompletedRun(attempt + 1),
-            COMPLETED_RUN_RETRY_DELAY_MS,
-          );
-          return;
-        } else {
-          rollbackPendingTransaction(
-            expectedSubmissionToken,
-            requestErrorRef.current ??
-              "The assistant did not return a response. Your draft was kept so you can try again.",
-          );
-        }
-      };
-      resolveCompletedRunTimerRef.current = window.setTimeout(
-        () => resolveCompletedRun(0),
-        0,
-      );
-    });
-    return unsubscribe;
-  }, [
-    applyCompletedResponse,
-    cancelDraft,
-    clearResolveCompletedRunTimer,
-    rollbackPendingTransaction,
-    runtime.threads.main,
-  ]);
-
   React.useEffect(
     () => () => {
-      clearResolveCompletedRunTimer();
       const pending = pendingOutputRunRef.current;
       if (!pending) return;
       pendingOutputRunRef.current = null;
-      pendingDraftSubmissionRef.current = false;
       submissionTokenRef.current += 1;
+      pending.abortController.abort();
       if (runtime.threads.main.getState().isRunning) {
         try {
           runtime.threads.main.cancelRun();
@@ -931,7 +965,7 @@ export function useCanvasBranchSubmission({
           resumeSessionPersist(pending.persistSuspensionToken);
         });
     },
-    [clearResolveCompletedRunTimer, runtime.threads.main],
+    [runtime.threads.main],
   );
 
   return {
