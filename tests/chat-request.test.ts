@@ -179,6 +179,53 @@ describe("chat request validation", () => {
     ]);
   });
 
+  it("recovers scoped parent context from durable message metadata when runConfig is missing", () => {
+    const parsed = chatRequestBodySchema.parse({
+      messages: [
+        {
+          id: "follow-up",
+          role: "user",
+          parts: [{ type: "text", text: "de esas letras que me diste dame 1 palabra de cada una" }],
+          metadata: {
+            custom: {
+              branchAnchorId: "assistant-1",
+              branchOperation: "create-follow-up-prompt",
+              contextScope: "parent",
+              contextMessages: [
+                {
+                  role: "user",
+                  content:
+                    "Continue from the saved assistant response below; treat it as conversation context.",
+                },
+                { id: "assistant-1", role: "assistant", content: "A y B" },
+                {
+                  role: "user",
+                  content: "de esas letras que me diste dame 1 palabra de cada una",
+                },
+              ],
+              historyMode: "last",
+              model: "openrouter/free",
+              provider: "openrouter",
+            },
+          },
+        },
+      ],
+      model: "openrouter/free",
+      provider: "openrouter",
+    });
+
+    const prepared = prepareChatRequest(parsed);
+    expect(prepared.historyMode).toBe("last");
+    expect(prepared.messagesToSend.map((message) => [message.role, message.content])).toEqual([
+      [
+        "user",
+        "Continue from the saved assistant response below; treat it as conversation context.",
+      ],
+      ["assistant", "A y B"],
+      ["user", "de esas letras que me diste dame 1 palabra de cada una"],
+    ]);
+  });
+
   it("returns a structured error for malformed JSON", async () => {
     const result = await parseChatRequest(
       new Request("http://nodes.test/api/chat", {
