@@ -141,4 +141,49 @@ describe("thread branching runtime", () => {
       },
     });
   });
+
+  it("bounds durable full tree metadata without truncating the live run config", () => {
+    const history: Array<{
+      id: string;
+      role: "user" | "assistant";
+      content: string;
+    }> = Array.from({ length: 80 }, (_, index) => ({
+      id: `tree-node-${index}`,
+      role: index % 2 === 0 ? "user" : "assistant",
+      content: `${index}: ${"x".repeat(2_048)}`,
+    }));
+    const contextMessages = [
+      ...history,
+      { id: "current-prompt", role: "user" as const, content: "Summarize the full tree" },
+    ];
+
+    const message = buildBranchAppendMessage(baseSpec, {
+      contextMessages,
+      contextScope: "tree",
+      historyMode: "full",
+      modelId: "openrouter/free",
+      provider: "openrouter",
+      requireContextScope: true,
+      text: "Summarize the full tree",
+    });
+
+    expect(message).not.toBeNull();
+    if (!message) return;
+
+    const durableMessages = message.metadata.custom.contextMessages;
+    const liveMessages = message.runConfig.custom.contextMessages;
+
+    expect(liveMessages).toHaveLength(contextMessages.length);
+    expect(liveMessages).toEqual(contextMessages);
+    expect(durableMessages.length).toBeLessThan(contextMessages.length);
+    expect(JSON.stringify(durableMessages).length).toBeLessThanOrEqual(32 * 1024);
+    expect(durableMessages[0]?.id).toBe("tree-node-0");
+    expect(durableMessages.at(-1)).toMatchObject({
+      id: "current-prompt",
+      content: "Summarize the full tree",
+    });
+    expect(
+      durableMessages.some((entry) => entry.content.includes("truncated in durable metadata")),
+    ).toBe(true);
+  });
 });
