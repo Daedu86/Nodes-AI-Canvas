@@ -15,6 +15,18 @@ const baseSpec: BranchSpec = {
   title: "Create root branch",
 };
 
+const followUpSpec: BranchSpec = {
+  operation: "create-follow-up-prompt",
+  anchorId: "assistant-node-1",
+  anchorRole: "assistant",
+  parentId: "assistant-node-1",
+  sourceId: "assistant-node-1",
+  targetRole: "user",
+  startRun: true,
+  placeholder: "Continue this branch...",
+  title: "Create follow-up message",
+};
+
 describe("thread branching runtime", () => {
   it("builds append messages without losing a null parentId", () => {
     expect(
@@ -83,6 +95,59 @@ describe("thread branching runtime", () => {
       expect.objectContaining({
         parentId: null,
         sourceId: null,
+      }),
+    );
+  });
+
+  it("uses the public append for non-root full-tree runs so transport lifecycle starts", () => {
+    const internalAppend = vi.fn();
+    const publicAppend = vi.fn();
+    const runtime = {
+      append: publicAppend,
+      __internal_threadBinding: {
+        getState: () => ({
+          append: internalAppend,
+        }),
+      },
+    } as unknown as ThreadRuntime;
+
+    const executed = executeBranchSpec(runtime, followUpSpec, {
+      contextMessages: [
+        { id: "root-user", role: "user", content: "Give me two fruits" },
+        { id: "root-assistant", role: "assistant", content: "apple and pear" },
+        { id: "color-user", role: "user", content: "Give each fruit a color" },
+        { id: "color-assistant", role: "assistant", content: "red and green" },
+        { id: "animal-user", role: "user", content: "Give each fruit an animal" },
+        { id: "animal-assistant", role: "assistant", content: "monkey and bear" },
+        { id: "current-prompt", role: "user", content: "Which colors and animals were mentioned?" },
+      ],
+      contextScope: "tree",
+      historyMode: "full",
+      modelId: "openrouter/free",
+      provider: "openrouter",
+      requireContextScope: true,
+      text: "Which colors and animals were mentioned?",
+    });
+
+    expect(executed).toBe(true);
+    expect(internalAppend).not.toHaveBeenCalled();
+    expect(publicAppend).toHaveBeenCalledTimes(1);
+    expect(publicAppend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parentId: "assistant-node-1",
+        startRun: true,
+        metadata: {
+          custom: expect.objectContaining({
+            contextScope: "tree",
+            contextMessages: expect.arrayContaining([
+              expect.objectContaining({ content: "red and green" }),
+              expect.objectContaining({ content: "monkey and bear" }),
+            ]),
+          }),
+        },
+        runConfig: {
+          custom: expect.not.objectContaining({ contextMessages: expect.anything() }),
+        },
       }),
     );
   });
