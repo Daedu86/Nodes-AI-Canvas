@@ -46,6 +46,13 @@ const DURABLE_TREE_TRUNCATION_MESSAGE: ScopedContextMessage = {
 const uniqueIds = (value: string[] | undefined) =>
   value ? Array.from(new Set(value.filter(Boolean))) : [];
 
+const createBranchMessageId = () => {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `canvas-branch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 const truncateDurableTreeMessage = (
   message: ScopedContextMessage,
   maxChars = MAX_DURABLE_TREE_MESSAGE_CHARS,
@@ -175,6 +182,7 @@ export const buildBranchAppendMessage = (
   };
 
   return {
+    id: createBranchMessageId(),
     parentId: spec.parentId,
     sourceId: spec.sourceId,
     role: spec.targetRole,
@@ -211,11 +219,20 @@ export const executeBranchSpec = (
   const message = buildBranchAppendMessage(spec, options);
   if (!message) return false;
 
+  // Branch submissions are deliberately split into two explicit runtime actions.
+  // Relying on CreateAppendMessage.startRun for an off-head branch can append the
+  // optimistic user message without starting the AI SDK transport. That leaves the
+  // Canvas transaction waiting forever for a runEnd event that will never arrive.
+  // Append first with auto-run disabled, then start the run against the known new
+  // user-message id so every branch path uses the same deterministic lifecycle.
+  const shouldStartRun = message.startRun;
+  const appendMessage = shouldStartRun ? { ...message, startRun: false } : message;
+
   // assistant-ui's public ThreadRuntime.append coerces `parentId: null` into the
   // current head message. Only root-level branching needs the internal append to
-  // preserve `null`; non-root follow-up/sibling runs must use the public append so
-  // Assistant UI starts the normal transport lifecycle.
-  if (message.parentId === null) {
+  // preserve `null`; non-root branches use the public append so the new branch is
+  // registered through the supported runtime surface.
+  if (appendMessage.parentId === null) {
     const internalState = (threadRuntime as InternalThreadRuntime).__internal_threadBinding?.getState?.();
     const internalAppend =
       internalState && typeof internalState.append === "function"
@@ -223,11 +240,21 @@ export const executeBranchSpec = (
         : null;
 
     if (internalAppend) {
-      internalAppend(message);
-      return true;
+      internalAppend(appendMessage);
+    } else {
+      threadRuntime.append(appendMessage);
     }
+  } else {
+    threadRuntime.append(appendMessage);
   }
 
-  threadRuntime.append(message);
+  if (shouldStartRun) {
+    threadRuntime.startRun({
+      parentId: message.id,
+      sourceId: message.sourceId,
+      runConfig: message.runConfig,
+    });
+  }
+
   return true;
 };
