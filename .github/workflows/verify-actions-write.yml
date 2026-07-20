@@ -1,0 +1,26 @@
+name: Verify Actions write access
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-actions-write.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.event.head_commit.message == 'chore: verify actions write access'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write marker
+        run: |
+          echo "actions-write-ok $(date -u +%FT%TZ)" > .github/actions-write-marker.txt
+          rm .github/workflows/verify-actions-write.yml
+          git config user.name "chatgpt-codex-connector[bot]"
+          git config user.email "chatgpt-codex-connector[bot]@users.noreply.github.com"
+          git add .github/actions-write-marker.txt .github/workflows/verify-actions-write.yml
+          git commit -m "chore: confirm actions write access"
+          git push origin HEAD:main
