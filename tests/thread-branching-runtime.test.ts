@@ -142,7 +142,7 @@ describe("thread branching runtime", () => {
     });
   });
 
-  it("bounds durable full tree metadata without truncating the live run config", () => {
+  it("bounds durable full tree metadata and compacts the live run config before transport", () => {
     const history: Array<{
       id: string;
       role: "user" | "assistant";
@@ -177,8 +177,16 @@ describe("thread branching runtime", () => {
     expect(durableMessages).toBeDefined();
     if (!liveMessages || !durableMessages) return;
 
-    expect(liveMessages).toHaveLength(contextMessages.length);
-    expect(liveMessages).toEqual(contextMessages);
+    expect(liveMessages).toHaveLength(2);
+    expect(liveMessages[0]?.role).toBe("system");
+    expect(liveMessages[0]?.content).toContain("full conversation tree");
+    expect(liveMessages[1]).toMatchObject({
+      id: "current-prompt",
+      role: "user",
+      content: "Summarize the full tree",
+    });
+    expect(JSON.stringify(liveMessages).length).toBeLessThanOrEqual(50 * 1024);
+
     expect(durableMessages.length).toBeLessThan(contextMessages.length);
     expect(JSON.stringify(durableMessages).length).toBeLessThanOrEqual(32 * 1024);
     expect(durableMessages[0]?.id).toBe("tree-node-0");
