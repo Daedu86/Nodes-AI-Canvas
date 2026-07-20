@@ -43,10 +43,17 @@ export const providerDisplay = (provider?: string | null) => {
   return getProviderLabel(provider);
 };
 
-export const scrollMessageIntoView = (messageId: string) => {
+export const scrollMessageIntoView = (messageId: string, attemptsRemaining = 8) => {
+  if (typeof document === "undefined") return;
   const element = document.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
-  if (!element) return;
-  element.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (element) {
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  if (attemptsRemaining <= 0 || typeof window === "undefined") return;
+  window.requestAnimationFrame(() => {
+    scrollMessageIntoView(messageId, attemptsRemaining - 1);
+  });
 };
 
 const semanticArtifactMeta: Record<
@@ -176,123 +183,5 @@ export const artifactDefaultTitle = (
       return `Prompt ${count}`;
     default:
       return `${semanticMeta?.titlePrefix ?? "Text Context"} ${count}`;
-  }
-};
-
-export const artifactContentLabel = (
-  artifact:
-    | SessionArtifact["artifactType"]
-    | Pick<SessionArtifact, "artifactType" | "semanticType">,
-) => {
-  const descriptor =
-    typeof artifact === "string"
-      ? {
-          artifactType: artifact,
-          semanticType: null as SessionArtifactSemanticType | null,
-        }
-      : artifact;
-  if (descriptor.artifactType === "text" && descriptor.semanticType) {
-    return `${getSemanticArtifactMeta(descriptor.semanticType)?.label ?? "Text"} notes`;
-  }
-  switch (descriptor.artifactType) {
-    case "image":
-      return "Notes";
-    case "file":
-      return "Extracted text / notes";
-    case "prompt":
-      return "Prompt";
-    default:
-      return "Content";
-  }
-};
-
-export const artifactContentPlaceholder = (
-  artifact:
-    | SessionArtifact["artifactType"]
-    | Pick<SessionArtifact, "artifactType" | "semanticType">,
-) => {
-  const descriptor =
-    typeof artifact === "string"
-      ? {
-          artifactType: artifact,
-          semanticType: null as SessionArtifactSemanticType | null,
-        }
-      : artifact;
-  if (descriptor.artifactType === "text" && descriptor.semanticType) {
-    return (
-      getSemanticArtifactMeta(descriptor.semanticType)?.placeholder ??
-      "Write reusable context here..."
-    );
-  }
-  switch (descriptor.artifactType) {
-    case "code":
-      return "Paste code or config here...";
-    case "image":
-      return "Describe what matters about this image...";
-    case "file":
-      return "Review or refine the extracted file text here...";
-    case "prompt":
-      return "Write an independent model instruction...";
-    default:
-      return "Write reusable context here...";
-  }
-};
-
-export const formatByteSize = (byteSize?: number | null) => {
-  if (!byteSize || byteSize <= 0) return null;
-  if (byteSize < 1024) return `${byteSize} B`;
-  if (byteSize < 1024 * 1024) {
-    return `${(byteSize / 1024).toFixed(byteSize >= 10 * 1024 ? 0 : 1)} KB`;
-  }
-  return `${(byteSize / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-export const trimArtifactPreview = (
-  artifact: Pick<SessionArtifact, "artifactType" | "content" | "fileName">,
-) => {
-  const compact = artifact.content.replace(/\s+/g, " ").trim();
-  if (compact.length > 0) return compact;
-  if (artifact.artifactType === "image") {
-    return artifact.fileName ? `Image: ${artifact.fileName}` : "Image artifact";
-  }
-  if (artifact.artifactType === "file") {
-    return artifact.fileName ? `File: ${artifact.fileName}` : "File artifact";
-  }
-  return "Empty artifact";
-};
-
-export const LegendItem = ({
-  color,
-  label,
-}: {
-  color: string;
-  label: string;
-}) => (
-  <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[11px] text-muted-foreground">
-    <span
-      className="h-2.5 w-2.5 rounded-full"
-      style={{ backgroundColor: color }}
-    />
-    <span>{label}</span>
-  </span>
-);
-
-export const isFlowViewport = (
-  value: Viewport | null,
-): value is Viewport =>
-  !!value &&
-  typeof value.x === "number" &&
-  typeof value.y === "number" &&
-  typeof value.zoom === "number";
-
-export const readFlowRenderMode = (
-  storageKey: string,
-): FlowRenderMode => {
-  try {
-    const value = localStorage.getItem(storageKey);
-    if (value === "3d") return "3d";
-    return "2d";
-  } catch {
-    return "2d";
   }
 };
