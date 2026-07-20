@@ -179,27 +179,40 @@ describe("chat request validation", () => {
     ]);
   });
 
-  it("converts full tree context into provider-safe reference context", () => {
+  it("recovers full tree sibling context from durable message metadata", () => {
     const parsed = chatRequestBodySchema.parse({
-      messages: [validMessage],
-      runConfig: {
-        custom: {
-          contextScope: "tree",
-          historyMode: "full",
-          contextMessages: [
-            { id: "u-root", role: "user", content: "Dame 2 frutas" },
-            { id: "a-root", role: "assistant", content: "manzana y pera" },
-            { id: "u-colors", role: "user", content: "Dame un color para cada fruta" },
-            { id: "a-colors", role: "assistant", content: "rojo y verde" },
-            { id: "u-animals", role: "user", content: "Dame un animal para cada fruta" },
-            { id: "a-animals", role: "assistant", content: "mono y oso" },
-            { role: "user", content: "Cuales fueron todos los colores y animales?" },
-          ],
+      messages: [
+        {
+          id: "current-prompt",
+          role: "user",
+          parts: [{ type: "text", text: "Cuales fueron todos los colores y animales?" }],
+          metadata: {
+            custom: {
+              contextScope: "tree",
+              historyMode: "full",
+              model: "openrouter/free",
+              provider: "openrouter",
+              contextMessages: [
+                { id: "u-root", role: "user", content: "Dame 2 frutas" },
+                { id: "a-root", role: "assistant", content: "manzana y pera" },
+                { id: "u-colors", role: "user", content: "Dame un color para cada fruta" },
+                { id: "a-colors", role: "assistant", content: "rojo y verde" },
+                { id: "u-animals", role: "user", content: "Dame un animal para cada fruta" },
+                { id: "a-animals", role: "assistant", content: "mono y oso" },
+                { id: "current-prompt", role: "user", content: "Cuales fueron todos los colores y animales?" },
+              ],
+            },
+          },
         },
-      },
+      ],
     });
 
     const prepared = prepareChatRequest(parsed);
+    expect(prepared.historyMode).toBe("full");
+    expect(prepared.requestedModel).toEqual({
+      modelId: "openrouter/free",
+      provider: "openrouter",
+    });
     expect(prepared.messagesToSend).toHaveLength(2);
     expect(prepared.messagesToSend[0]?.role).toBe("system");
     expect(prepared.messagesToSend[0]?.content).toContain("full conversation tree");
