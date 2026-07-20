@@ -1,6 +1,7 @@
 import type { ThreadRuntime } from "@assistant-ui/react";
 import type { HistoryMode, ModelProvider } from "@/components/context/session-ui-state";
 import type { ContextScope } from "@/components/context/graph-branch-intent";
+import { packFullTreeContextMessages } from "@/lib/full-tree-context";
 import type { BranchSpec } from "@/lib/thread-branching";
 import {
   getOutputFormatInstruction,
@@ -40,7 +41,7 @@ const MAX_DURABLE_TREE_PROMPT_CHARS = 8 * 1024;
 const DURABLE_TREE_TRUNCATION_MESSAGE: ScopedContextMessage = {
   role: "system",
   content:
-    "[Full tree context truncated in durable metadata. The live request still uses the complete tree when runConfig is available.]",
+    "[Full tree context truncated in durable metadata. The live request still uses a compact provider-safe tree reference.]",
 };
 
 const uniqueIds = (value: string[] | undefined) =>
@@ -142,6 +143,10 @@ export const buildBranchAppendMessage = (
     options.outputArtifactTypes ?? [],
   );
   const promptText = `${trimmedText}${formattingInstruction}`;
+  const liveContextMessages =
+    contextScope === "tree" && contextMessages
+      ? packFullTreeContextMessages(contextMessages)
+      : contextMessages;
   const durableContextMessages =
     contextScope === "tree" && contextMessages
       ? boundDurableTreeContextMessages(contextMessages)
@@ -163,8 +168,8 @@ export const buildBranchAppendMessage = (
     ...(contextArtifacts && contextArtifacts.length > 0
       ? { contextArtifacts }
       : {}),
-    ...(contextMessages && contextMessages.length > 0
-      ? { contextMessages }
+    ...(liveContextMessages && liveContextMessages.length > 0
+      ? { contextMessages: liveContextMessages }
       : {}),
     ...baseScopedConfig,
   };
