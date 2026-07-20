@@ -47,6 +47,7 @@ describe("thread branching runtime", () => {
         text: "New root branch",
       }),
     ).toMatchObject({
+      id: expect.any(String),
       metadata: {
         custom: {
           contextNodeIds: ["artifact-1"],
@@ -69,11 +70,13 @@ describe("thread branching runtime", () => {
     });
   });
 
-  it("uses the internal runtime append when available so null parentId is preserved", () => {
+  it("uses the internal runtime append for root branches and starts the run explicitly", () => {
     const internalAppend = vi.fn();
     const publicAppend = vi.fn();
+    const startRun = vi.fn();
     const runtime = {
       append: publicAppend,
+      startRun,
       __internal_threadBinding: {
         getState: () => ({
           append: internalAppend,
@@ -91,19 +94,30 @@ describe("thread branching runtime", () => {
     expect(executed).toBe(true);
     expect(publicAppend).not.toHaveBeenCalled();
     expect(internalAppend).toHaveBeenCalledTimes(1);
-    expect(internalAppend).toHaveBeenCalledWith(
+    const appended = internalAppend.mock.calls[0]?.[0];
+    expect(appended).toEqual(
       expect.objectContaining({
+        id: expect.any(String),
         parentId: null,
         sourceId: null,
+        startRun: false,
       }),
     );
+    expect(startRun).toHaveBeenCalledTimes(1);
+    expect(startRun).toHaveBeenCalledWith({
+      parentId: appended.id,
+      sourceId: null,
+      runConfig: appended.runConfig,
+    });
   });
 
-  it("uses the public append for non-root full-tree runs so transport lifecycle starts", () => {
+  it("uses public append then explicit startRun for non-root full-tree runs", () => {
     const internalAppend = vi.fn();
     const publicAppend = vi.fn();
+    const startRun = vi.fn();
     const runtime = {
       append: publicAppend,
+      startRun,
       __internal_threadBinding: {
         getState: () => ({
           append: internalAppend,
@@ -132,10 +146,12 @@ describe("thread branching runtime", () => {
     expect(executed).toBe(true);
     expect(internalAppend).not.toHaveBeenCalled();
     expect(publicAppend).toHaveBeenCalledTimes(1);
-    expect(publicAppend).toHaveBeenCalledWith(
+    const appended = publicAppend.mock.calls[0]?.[0];
+    expect(appended).toEqual(
       expect.objectContaining({
+        id: expect.any(String),
         parentId: "assistant-node-1",
-        startRun: true,
+        startRun: false,
         metadata: {
           custom: expect.objectContaining({
             contextScope: "tree",
@@ -150,12 +166,20 @@ describe("thread branching runtime", () => {
         },
       }),
     );
+    expect(startRun).toHaveBeenCalledTimes(1);
+    expect(startRun).toHaveBeenCalledWith({
+      parentId: appended.id,
+      sourceId: "assistant-node-1",
+      runConfig: appended.runConfig,
+    });
   });
 
-  it("falls back to the public append when no internal binding exists", () => {
+  it("falls back to public append for root branches and still explicitly starts once", () => {
     const publicAppend = vi.fn();
+    const startRun = vi.fn();
     const runtime = {
       append: publicAppend,
+      startRun,
     } as unknown as ThreadRuntime;
 
     const executed = executeBranchSpec(runtime, baseSpec, {
@@ -167,12 +191,42 @@ describe("thread branching runtime", () => {
 
     expect(executed).toBe(true);
     expect(publicAppend).toHaveBeenCalledTimes(1);
-    expect(publicAppend).toHaveBeenCalledWith(
+    const appended = publicAppend.mock.calls[0]?.[0];
+    expect(appended).toEqual(
       expect.objectContaining({
+        id: expect.any(String),
         parentId: null,
         role: "user",
+        startRun: false,
       }),
     );
+    expect(startRun).toHaveBeenCalledTimes(1);
+    expect(startRun).toHaveBeenCalledWith({
+      parentId: appended.id,
+      sourceId: null,
+      runConfig: appended.runConfig,
+    });
+  });
+
+  it("does not start a run when the branch spec is append-only", () => {
+    const publicAppend = vi.fn();
+    const startRun = vi.fn();
+    const runtime = {
+      append: publicAppend,
+      startRun,
+    } as unknown as ThreadRuntime;
+    const appendOnlySpec = { ...followUpSpec, startRun: false };
+
+    const executed = executeBranchSpec(runtime, appendOnlySpec, {
+      historyMode: "full",
+      modelId: "openrouter/free",
+      provider: "openrouter",
+      text: "Store this branch only",
+    });
+
+    expect(executed).toBe(true);
+    expect(publicAppend).toHaveBeenCalledTimes(1);
+    expect(startRun).not.toHaveBeenCalled();
   });
 
   it("rejects required canvas drafts without context and serializes scoped context", () => {
