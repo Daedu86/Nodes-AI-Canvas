@@ -106,14 +106,6 @@ async function openCanvas(page: Page) {
   });
 }
 
-async function readGraphPosition(node: Locator) {
-  return node.evaluate((element) => {
-    const transform = getComputedStyle(element).transform;
-    const matrix = new DOMMatrixReadOnly(transform === "none" ? undefined : transform);
-    return { x: matrix.m41, y: matrix.m42 };
-  });
-}
-
 async function readGraphViewport(viewport: Locator) {
   return viewport.evaluate((element) => {
     const transform = getComputedStyle(element).transform;
@@ -125,13 +117,15 @@ async function readGraphViewport(viewport: Locator) {
 async function findEmptyPanePoint(pane: Locator) {
   return pane.evaluate((element) => {
     const rect = element.getBoundingClientRect();
-    for (let row = 1; row < 10; row += 1) {
-      for (let column = 1; column < 10; column += 1) {
-        const x = rect.left + (rect.width * column) / 10;
-        const y = rect.top + (rect.height * row) / 10;
+    const inset = 8;
+    const step = 8;
+
+    for (let y = rect.top + inset; y <= rect.bottom - inset; y += step) {
+      for (let x = rect.left + inset; x <= rect.right - inset; x += step) {
         if (document.elementFromPoint(x, y) === element) return { x, y };
       }
     }
+
     throw new Error("Could not find an uncovered Canvas pane point");
   });
 }
@@ -171,94 +165,6 @@ async function useZoomControlUntil({
 
 test.beforeEach(async ({ page }) => {
   await resetAppData(page);
-});
-
-test.skip("conversation nodes can be dragged and keep their position after reload", async ({
-  page,
-}) => {
-  const sessionId = await createAndOpenSession(page);
-  await dismissWorkspaceGuide(page);
-
-  const composer = page.getByPlaceholder("Write a message...");
-  await composer.fill("Reply briefly so the Canvas contains a real assistant node.");
-  await composer.press("Enter");
-
-  await openCanvas(page);
-
-  const canvas = page.getByRole("region", { name: "Conversation canvas" });
-  const conversationNodes = canvas.locator(".react-flow__node-threadNode");
-  await expect
-    .poll(async () => conversationNodes.count(), { timeout: 20_000 })
-    .toBeGreaterThanOrEqual(2);
-
-  const node = conversationNodes.last();
-  await expect(node).toBeVisible({ timeout: 15_000 });
-
-  const nodeId = await node.getAttribute("data-id");
-  expect(nodeId).toBeTruthy();
-
-  const before = await readGraphPosition(node);
-  const box = await node.boundingBox();
-  expect(box).not.toBeNull();
-  if (!box) throw new Error("Conversation node has no bounding box");
-
-  const startX = box.x + box.width / 2;
-  const startY = box.y + box.height / 2;
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX + 220, startY + 140, { steps: 20 });
-  await page.mouse.up();
-
-  await expect
-    .poll(
-      async () => {
-        const position = await readGraphPosition(node);
-        return (
-          Math.abs(position.x - before.x) > 50 &&
-          Math.abs(position.y - before.y) > 30
-        );
-      },
-      { timeout: 10_000 },
-    )
-    .toBe(true);
-
-  const moved = await readGraphPosition(node);
-  const storageKey = `nodes.canvas-message-positions.v1:${sessionId}`;
-  const storedPosition = await page.evaluate(
-    ({ key, id }) => {
-      const raw = window.localStorage.getItem(key);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as Record<string, { x: number; y: number }>;
-      return parsed[id] ?? null;
-    },
-    { key: storageKey, id: nodeId as string },
-  );
-
-  expect(storedPosition).not.toBeNull();
-  expect(storedPosition?.x).toBeCloseTo(moved.x, 3);
-  expect(storedPosition?.y).toBeCloseTo(moved.y, 3);
-
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await dismissWorkspaceGuide(page);
-  await openCanvas(page);
-
-  const reloadedNode = page
-    .getByRole("region", { name: "Conversation canvas" })
-    .locator(`.react-flow__node-threadNode[data-id="${nodeId}"]`);
-  await expect(reloadedNode).toBeVisible({ timeout: 15_000 });
-
-  await expect
-    .poll(
-      async () => {
-        const position = await readGraphPosition(reloadedNode);
-        return (
-          Math.abs(position.x - moved.x) < 0.01 &&
-          Math.abs(position.y - moved.y) < 0.01
-        );
-      },
-      { timeout: 10_000 },
-    )
-    .toBe(true);
 });
 
 test("keeps core Canvas interactions usable across selection, pan, zoom, and Chat focus", async ({
