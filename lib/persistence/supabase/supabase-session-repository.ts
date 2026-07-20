@@ -31,6 +31,9 @@ const sessionSummarySelect =
 const isMissingSessionError = (error: unknown) =>
   error instanceof Error && error.message === "Session not found";
 
+const isStructurallyEqual = (left: unknown, right: unknown) =>
+  JSON.stringify(left) === JSON.stringify(right);
+
 const processBlobQueueBestEffort = async () => {
   try {
     await processSessionBlobDeleteQueue({ limit: 100, scanStorage: false });
@@ -126,23 +129,44 @@ export const supabaseSessionRepository: SessionRepository = {
     }
 
     const patchPayload: Record<string, unknown> = {};
-    if (patch.archived !== undefined) patchPayload.archived = patch.archived;
-    if (patch.title !== undefined) patchPayload.title = patch.title;
+    if (patch.archived !== undefined && patch.archived !== current.archived) {
+      patchPayload.archived = patch.archived;
+    }
+    if (patch.title !== undefined && patch.title !== current.title) {
+      patchPayload.title = patch.title;
+    }
     if (patch.snapshot !== undefined) {
-      patchPayload.snapshot = normalizeSessionThreadExport(patch.snapshot);
+      const normalizedSnapshot = normalizeSessionThreadExport(patch.snapshot);
+      if (!isStructurallyEqual(normalizedSnapshot, current.snapshot)) {
+        patchPayload.snapshot = normalizedSnapshot;
+      }
     }
     if (patch.artifacts !== undefined) {
-      patchPayload.artifacts = normalizeSessionArtifactsDocument(patch.artifacts);
+      const normalizedArtifacts = normalizeSessionArtifactsDocument(patch.artifacts);
+      if (!isStructurallyEqual(normalizedArtifacts, current.artifacts)) {
+        patchPayload.artifacts = normalizedArtifacts;
+      }
     }
     if (patch.contextLinks !== undefined) {
-      patchPayload.contextLinks = normalizeSessionContextLinksDocument(patch.contextLinks);
+      const normalizedContextLinks = normalizeSessionContextLinksDocument(patch.contextLinks);
+      if (!isStructurallyEqual(normalizedContextLinks, current.contextLinks)) {
+        patchPayload.contextLinks = normalizedContextLinks;
+      }
     }
-    if (
-      patch.snapshot !== undefined ||
-      patch.artifacts !== undefined ||
-      patch.contextLinks !== undefined
-    ) {
+
+    const hasDocumentPatch =
+      patchPayload.snapshot !== undefined ||
+      patchPayload.artifacts !== undefined ||
+      patchPayload.contextLinks !== undefined;
+    if (hasDocumentPatch) {
       patchPayload.schemaVersion = CURRENT_SESSION_SCHEMA_VERSION;
+    }
+
+    // A no-op patch must not call the versioned reconciliation RPC. Doing so
+    // increments the session version even though the document did not change,
+    // which can feed a client persistence acknowledgement loop indefinitely.
+    if (Object.keys(patchPayload).length === 0) {
+      return current;
     }
 
     const { data, error } = await client.rpc("patch_session_with_blob_reconciliation", {
