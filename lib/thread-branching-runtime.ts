@@ -212,16 +212,20 @@ export const executeBranchSpec = (
   if (!message) return false;
 
   // assistant-ui's public ThreadRuntime.append coerces `parentId: null` into the
-  // current head message. For root-level branching we need to preserve `null`.
-  const internalState = (threadRuntime as InternalThreadRuntime).__internal_threadBinding?.getState?.();
-  const internalAppend =
-    internalState && typeof internalState.append === "function"
-      ? internalState.append.bind(internalState)
-      : null;
+  // current head message. Only root-level branching needs the internal append to
+  // preserve `null`; non-root follow-up/sibling runs must use the public append so
+  // Assistant UI starts the normal transport lifecycle.
+  if (message.parentId === null) {
+    const internalState = (threadRuntime as InternalThreadRuntime).__internal_threadBinding?.getState?.();
+    const internalAppend =
+      internalState && typeof internalState.append === "function"
+        ? internalState.append.bind(internalState)
+        : null;
 
-  if (internalAppend) {
-    internalAppend(message);
-    return true;
+    if (internalAppend) {
+      internalAppend(message);
+      return true;
+    }
   }
 
   threadRuntime.append(message);
