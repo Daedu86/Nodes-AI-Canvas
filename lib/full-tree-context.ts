@@ -29,6 +29,12 @@ const clampFullTreeContext = (value: string) => {
   return `${value.slice(0, headChars)}${FULL_TREE_TRUNCATION_MARKER}${value.slice(-tailChars)}`;
 };
 
+const isPackedFullTreeContext = (messages: FullTreeContextMessage[]) =>
+  messages.length === 2 &&
+  messages[0]?.role === "system" &&
+  messages[0].content.startsWith(FULL_TREE_CONTEXT_INTRO) &&
+  messages[1]?.role === "user";
+
 /**
  * Packs a non-linear Full tree transcript into a provider-safe reference block
  * before it is placed in Assistant UI runConfig. This keeps the runtime and
@@ -38,7 +44,7 @@ const clampFullTreeContext = (value: string) => {
 export const packFullTreeContextMessages = (
   messages: FullTreeContextMessage[],
 ): FullTreeContextMessage[] => {
-  if (messages.length <= 1) return messages;
+  if (messages.length <= 1 || isPackedFullTreeContext(messages)) return messages;
 
   const currentPrompt = messages.at(-1);
   if (!currentPrompt) return messages;
