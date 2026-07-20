@@ -162,16 +162,19 @@ export const supabaseAgentWorkRepository: AgentWorkRepository = {
       created_at: now,
     };
 
-    const { error } = await client.from("agent_events").insert(row);
+    const request = input.id
+      ? client.from("agent_events").upsert(row, { onConflict: "id" })
+      : client.from("agent_events").insert(row);
+    const { error } = await request;
     if (error) {
-      throw new Error(error.message || "Failed to insert agent event");
+      throw new Error(error.message || "Failed to persist agent event");
     }
   },
 
   async listAgentEvents(ownerId, options: AgentWorkListOptions = {}) {
     requireOwnerId(ownerId);
     const client = getSupabasePersistenceClient();
-    const limit = typeof options.limit === "number" ? Math.max(1, Math.min(200, options.limit)) : 80;
+    const limit = typeof options.limit === "number" ? Math.max(1, Math.min(1000, options.limit)) : 80;
     let query = client
       .from("agent_events")
       .select("*")
@@ -179,9 +182,11 @@ export const supabaseAgentWorkRepository: AgentWorkRepository = {
       .order("created_at", { ascending: false })
       .limit(limit);
 
-    if (options.tokenId) {
-      query = query.eq("token_id", options.tokenId);
-    }
+    if (options.tokenId) query = query.eq("token_id", options.tokenId);
+    if (options.sessionId) query = query.eq("session_id", options.sessionId);
+    if (options.projectId) query = query.eq("project_id", options.projectId);
+    if (options.eventType) query = query.eq("event_type", options.eventType);
+    if (options.eventTypePrefix) query = query.like("event_type", `${options.eventTypePrefix}%`);
 
     const { data, error } = await query;
     const rows = ensureData(data, error, "Failed to list agent events") as AgentEventRow[];

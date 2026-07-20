@@ -5,6 +5,8 @@ import { getAgentWorkRepository } from "@/lib/persistence/repositories";
 
 export const runtime = "nodejs";
 
+const CODEX_RUNTIME_AGENT_ID = "codex-runtime";
+
 type AgentWorkResponse = {
   agents: Array<{
     tokenId: string;
@@ -50,6 +52,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const tokenId = url.searchParams.get("tokenId");
   const tokenFilter = tokenId && tokenId.length > 0 ? tokenId : null;
+  const codexOnly = tokenFilter === CODEX_RUNTIME_AGENT_ID;
 
   const repo = getAgentWorkRepository();
   let tokens = [];
@@ -57,7 +60,11 @@ export async function GET(req: Request) {
   try {
     [tokens, events] = await Promise.all([
       repo.listAgentTokens(guarded.user.id),
-      repo.listAgentEvents(guarded.user.id, { limit: 150, tokenId: tokenFilter }),
+      repo.listAgentEvents(guarded.user.id, {
+        limit: 250,
+        tokenId: codexOnly ? null : tokenFilter,
+        eventTypePrefix: codexOnly ? "codex." : null,
+      }),
     ]);
   } catch {
     return new Response(
@@ -84,24 +91,51 @@ export async function GET(req: Request) {
     if (event.projectId) projectIds.add(event.projectId);
   });
 
-  const agents = tokens.map((token) => {
-    if (token.revoked) {
-      return null;
-    }
-    const tokenEvents = events.filter((event) => event.tokenId === token.tokenId);
-    const tokenSessionIds = [...new Set(tokenEvents.flatMap((event) => (event.sessionId ? [event.sessionId] : [])))];
-    const tokenProjectIds = [...new Set(tokenEvents.flatMap((event) => (event.projectId ? [event.projectId] : [])))];
-    return {
-      tokenId: token.tokenId,
-      label: token.label,
-      createdAt: token.createdAt,
-      expiresAt: token.expiresAt,
-      lastUsedAt: token.lastUsedAt,
-      eventCount: tokenEvents.length,
-      sessionIds: tokenSessionIds,
-      projectIds: tokenProjectIds,
-    };
-  }).filter(Boolean) as AgentWorkResponse["agents"];
+  const agents = tokens
+    .map((token) => {
+      if (token.revoked) return null;
+      const tokenEvents = events.filter((event) => event.tokenId === token.tokenId);
+      const tokenSessionIds = [
+        ...new Set(tokenEvents.flatMap((event) => (event.sessionId ? [event.sessionId] : []))),
+      ];
+      const tokenProjectIds = [
+        ...new Set(tokenEvents.flatMap((event) => (event.projectId ? [event.projectId] : []))),
+      ];
+      return {
+        tokenId: token.tokenId,
+        label: token.label,
+        createdAt: token.createdAt,
+        expiresAt: token.expiresAt,
+        lastUsedAt: token.lastUsedAt,
+        eventCount: tokenEvents.length,
+        sessionIds: tokenSessionIds,
+        projectIds: tokenProjectIds,
+      };
+    })
+    .filter(Boolean) as AgentWorkResponse["agents"];
+
+  const codexEvents = events.filter((event) => event.eventType.startsWith("codex."));
+  if (codexEvents.length > 0) {
+    const chronological = [...codexEvents].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    const codexSessionIds = [
+      ...new Set(codexEvents.flatMap((event) => (event.sessionId ? [event.sessionId] : []))),
+    ];
+    const codexProjectIds = [
+      ...new Set(codexEvents.flatMap((event) => (event.projectId ? [event.projectId] : []))),
+    ];
+    agents.unshift({
+      tokenId: CODEX_RUNTIME_AGENT_ID,
+      label: "Codex Runtime",
+      createdAt: chronological[0]?.createdAt ?? new Date().toISOString(),
+      expiresAt: null,
+      lastUsedAt: chronological.at(-1)?.createdAt ?? null,
+      eventCount: codexEvents.length,
+      sessionIds: codexSessionIds,
+      projectIds: codexProjectIds,
+    });
+  }
 
   const response: AgentWorkResponse = {
     agents,

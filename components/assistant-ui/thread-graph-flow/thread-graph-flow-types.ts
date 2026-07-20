@@ -1,6 +1,12 @@
 "use client";
 
 import type { Edge, Node } from "@xyflow/react";
+import type {
+  CodexAgentRole,
+  CodexApprovalDecision,
+  CodexCanvasEventType,
+  CodexRunStatus,
+} from "@/lib/agents/codex/types";
 import type { ProjectMemoryType } from "@/lib/memory-documents";
 import type {
   SessionArtifactSemanticType,
@@ -44,7 +50,9 @@ export type ThreadGraphFlowNodeData = {
     | "artifact"
     | "prompt-draft"
     | "canvas-prompt"
-    | "canvas-response";
+    | "canvas-response"
+    | "agent-run"
+    | "agent-activity";
   language?: string | null;
   linkedArtifactCount?: number;
   memoryId?: string | null;
@@ -69,6 +77,27 @@ export type ThreadGraphFlowNodeData = {
   statusLabel?: string | null;
   syncMode?: SessionArtifactSyncMode;
   title?: string | null;
+
+  agentRunId?: string | null;
+  agentThreadId?: string | null;
+  agentParentRunId?: string | null;
+  agentStatus?: CodexRunStatus | null;
+  agentRole?: CodexAgentRole | null;
+  agentPrompt?: string;
+  agentOutput?: string;
+  agentEventCount?: number;
+  agentError?: string | null;
+  agentPendingApprovalId?: string | null;
+  agentActivityType?: CodexCanvasEventType | null;
+  agentActivityCreatedAt?: string | null;
+  onAgentPromptChange?: (value: string) => void;
+  onAgentRoleChange?: (role: CodexAgentRole) => void;
+  onAgentStart?: () => void;
+  onAgentCancel?: () => void;
+  onAgentRemove?: () => void;
+  onAgentSpawnChild?: () => void;
+  onAgentApproval?: (decision: CodexApprovalDecision) => void;
+
   onDraftCancel?: () => void;
   onDraftCancelRun?: () => void;
   onDraftSubmit?: () => void;

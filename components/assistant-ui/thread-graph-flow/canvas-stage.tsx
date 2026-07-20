@@ -14,15 +14,19 @@ import {
   type ReactFlowInstance,
   type Viewport,
 } from "@xyflow/react";
+import { Bot, Plus } from "lucide-react";
 import { ArtifactGraphNode } from "@/components/assistant-ui/thread-graph-flow/artifact-node";
 import { CanvasPromptNode } from "@/components/assistant-ui/thread-graph-flow/canvas-prompt-node";
 import { CanvasResponseNode } from "@/components/assistant-ui/thread-graph-flow/canvas-response-node";
+import { CodexAgentActivityNode } from "@/components/assistant-ui/thread-graph-flow/codex-agent-activity-node";
+import { CodexAgentRunNode } from "@/components/assistant-ui/thread-graph-flow/codex-agent-run-node";
 import { ThreadGraphEdge } from "@/components/assistant-ui/thread-graph-flow/thread-graph-edge";
 import { ThreadGraphNode } from "@/components/assistant-ui/thread-graph-flow/thread-graph-node";
 import type {
   ThreadGraphFlowEdge,
   ThreadGraphFlowNode,
 } from "@/components/assistant-ui/thread-graph-flow/thread-graph-flow-types";
+import { useCodexAgentRuns } from "@/components/assistant-ui/thread-graph-flow/use-codex-agent-runs";
 import {
   isFlowViewport,
   type FlowRenderMode,
@@ -49,6 +53,8 @@ const ThreadGraph3D = dynamic(
 );
 
 const nodeTypes: NodeTypes = {
+  agentActivityNode: CodexAgentActivityNode,
+  agentRunNode: CodexAgentRunNode,
   artifactNode: ArtifactGraphNode,
   canvasResponseNode: CanvasResponseNode,
   promptNode: CanvasPromptNode,
@@ -103,7 +109,7 @@ const positionsEqual = (
 ) => left?.x === right?.x && left?.y === right?.y;
 
 const shouldUseStoredPosition = (node: ThreadGraphFlowNode) =>
-  node.data?.kind !== "prompt-draft";
+  node.data?.kind !== "prompt-draft" && node.data?.kind !== "agent-activity";
 
 const mergeRenderedNodes = (
   currentNodes: ThreadGraphFlowNode[],
@@ -190,12 +196,27 @@ export function CanvasStage({
   storedViewport,
   viewportRef,
 }: CanvasStageProps) {
+  const { addAgent, agentEdges, agentNodes, updateAgentPosition } = useCodexAgentRuns({
+    sessionId: activeSessionId,
+  });
+  const combinedNodes = React.useMemo(
+    () => [...nodes, ...agentNodes],
+    [agentNodes, nodes],
+  );
+  const combinedEdges = React.useMemo(
+    () => [...edges, ...agentEdges],
+    [agentEdges, edges],
+  );
+  const combinedGraphStructureSignature = React.useMemo(
+    () => `${graphStructureSignature}|codex:${agentNodes.map((node) => node.id).join(",")}`,
+    [agentNodes, graphStructureSignature],
+  );
   const positionStorageKey = `nodes.canvas-message-positions.v1:${activeSessionId ?? "default"}`;
   const [storedNodePositions, setStoredNodePositions] =
     React.useState<StoredNodePositions>({});
   const [isInteracting, setIsInteracting] = React.useState(false);
   const [renderedNodes, setRenderedNodes, onNodesChange] =
-    useNodesState<ThreadGraphFlowNode>(nodes);
+    useNodesState<ThreadGraphFlowNode>(combinedNodes);
 
   React.useLayoutEffect(() => {
     setStoredNodePositions(readStoredNodePositions(positionStorageKey));
@@ -203,9 +224,9 @@ export function CanvasStage({
 
   React.useEffect(() => {
     setRenderedNodes((currentNodes) =>
-      mergeRenderedNodes(currentNodes, nodes, storedNodePositions),
+      mergeRenderedNodes(currentNodes, combinedNodes, storedNodePositions),
     );
-  }, [nodes, setRenderedNodes, storedNodePositions]);
+  }, [combinedNodes, setRenderedNodes, storedNodePositions]);
 
   const persistNodePosition = React.useCallback(
     (nodeId: string, position: StoredNodePosition) => {
@@ -247,12 +268,14 @@ export function CanvasStage({
         onDraftPositionChange(position);
         return;
       }
+      if (node.data?.kind === "agent-activity") return;
 
-      // Every draggable node gets an immediate session-local position. This
-      // prevents synthetic canvas responses and prompts from snapping back
-      // while their backing state is being recomputed by the graph layout.
       persistNodePosition(node.id, position);
 
+      if (node.data?.kind === "agent-run") {
+        updateAgentPosition(node.id, position);
+        return;
+      }
       if (
         node.data?.kind === "artifact" ||
         node.data?.kind === "canvas-prompt"
@@ -260,7 +283,12 @@ export function CanvasStage({
         onArtifactPositionChange(node.id, position);
       }
     },
-    [onArtifactPositionChange, onDraftPositionChange, persistNodePosition],
+    [
+      onArtifactPositionChange,
+      onDraftPositionChange,
+      persistNodePosition,
+      updateAgentPosition,
+    ],
   );
 
   const handleSelectionChange = React.useCallback(
@@ -282,6 +310,8 @@ export function CanvasStage({
         node.data.kind === "artifact" ||
         node.data.kind === "canvas-prompt" ||
         node.data.kind === "canvas-response" ||
+        node.data.kind === "agent-run" ||
+        node.data.kind === "agent-activity" ||
         node.id === ROOT_NODE_ID
       ) {
         return;
@@ -299,7 +329,7 @@ export function CanvasStage({
 
   const shouldCull =
     renderedNodes.length > VISIBLE_ELEMENT_NODE_THRESHOLD ||
-    edges.length > VISIBLE_ELEMENT_EDGE_THRESHOLD;
+    combinedEdges.length > VISIBLE_ELEMENT_EDGE_THRESHOLD;
 
   return (
     <div
@@ -312,6 +342,18 @@ export function CanvasStage({
       onDragOver={onCanvasDragOver}
       onDrop={onCanvasDrop}
     >
+      <button
+        type="button"
+        onClick={() => addAgent(null)}
+        className="absolute left-5 top-5 z-20 inline-flex h-10 items-center gap-2 rounded-full border border-sky-300/35 bg-slate-950/92 px-4 text-xs font-semibold text-sky-100 shadow-sm backdrop-blur transition hover:bg-slate-900"
+        aria-label="Add Codex agent to canvas"
+        title="Add an independent Codex agent node. Add several to run multiple agents in parallel."
+      >
+        <Bot className="h-4 w-4" />
+        <Plus className="h-3.5 w-3.5" />
+        Add agent
+      </button>
+
       <div
         role="group"
         aria-label="Canvas render mode"
@@ -342,8 +384,8 @@ export function CanvasStage({
 
       {flowRenderMode === "3d" ? (
         <ThreadGraph3D
-          nodes={nodes}
-          edges={edges}
+          nodes={combinedNodes}
+          edges={combinedEdges}
           selectedNodeId={selectedNodeId}
           onSelectNode={onNodeSelect}
         />
@@ -352,9 +394,9 @@ export function CanvasStage({
           <ReactFlow
             key={`flow:${activeSessionId}`}
             aria-label="Conversation graph"
-            data-graph-structure={graphStructureSignature}
+            data-graph-structure={combinedGraphStructureSignature}
             nodes={renderedNodes}
-            edges={edges}
+            edges={combinedEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView={!isFlowViewport(storedViewport)}
