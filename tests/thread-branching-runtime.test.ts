@@ -17,34 +17,29 @@ const baseSpec: BranchSpec = {
 
 describe("thread branching runtime", () => {
   it("builds append messages without losing a null parentId", () => {
-    expect(
-      buildBranchAppendMessage(baseSpec, {
-        contextArtifacts: [
-          {
-            id: "artifact-1",
-            artifactType: "text",
-            title: "Requirement note",
-            content: "Use React Flow",
-            language: null,
-          },
-        ],
-        contextNodeIds: ["artifact-1"],
-        historyMode: "last",
-        modelId: "nvidia/nemotron-3-super-120b-a12b:free",
-        provider: "openrouter",
-        text: "New root branch",
-      }),
-    ).toMatchObject({
+    const result = buildBranchAppendMessage(baseSpec, {
+      contextArtifacts: [
+        {
+          id: "artifact-1",
+          artifactType: "text",
+          title: "Requirement note",
+          content: "Use React Flow",
+          language: null,
+        },
+      ],
+      contextNodeIds: ["artifact-1"],
+      historyMode: "last",
+      modelId: "nvidia/nemotron-3-super-120b-a12b:free",
+      provider: "openrouter",
+      text: "New root branch",
+    });
+
+    expect(result).toMatchObject({
       metadata: {
         custom: {
-          contextArtifacts: [
-            {
-              id: "artifact-1",
-              title: "Requirement note",
-            },
-          ],
           contextNodeIds: ["artifact-1"],
           historyMode: "last",
+          inputArtifactIds: ["artifact-1"],
           model: "nvidia/nemotron-3-super-120b-a12b:free",
           provider: "openrouter",
         },
@@ -64,6 +59,7 @@ describe("thread branching runtime", () => {
       },
       startRun: true,
     });
+    expect(result?.metadata.custom).not.toHaveProperty("contextArtifacts");
   });
 
   it("uses the internal runtime append when available so null parentId is preserved", () => {
