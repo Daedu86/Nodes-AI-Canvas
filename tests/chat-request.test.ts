@@ -163,7 +163,7 @@ describe("chat request validation", () => {
       messages: [validMessage],
       runConfig: {
         custom: {
-          contextScope: "tree",
+          contextScope: "branch",
           contextMessages: [
             { id: "u-1", role: "user", content: "First branch" },
             { id: "a-1", role: "assistant", content: "First reply" },
@@ -177,6 +177,38 @@ describe("chat request validation", () => {
       "First reply",
       "Current prompt",
     ]);
+  });
+
+  it("converts full tree context into provider-safe reference context", () => {
+    const parsed = chatRequestBodySchema.parse({
+      messages: [validMessage],
+      runConfig: {
+        custom: {
+          contextScope: "tree",
+          historyMode: "full",
+          contextMessages: [
+            { id: "u-root", role: "user", content: "Dame 2 frutas" },
+            { id: "a-root", role: "assistant", content: "manzana y pera" },
+            { id: "u-colors", role: "user", content: "Dame un color para cada fruta" },
+            { id: "a-colors", role: "assistant", content: "rojo y verde" },
+            { id: "u-animals", role: "user", content: "Dame un animal para cada fruta" },
+            { id: "a-animals", role: "assistant", content: "mono y oso" },
+            { role: "user", content: "Cuales fueron todos los colores y animales?" },
+          ],
+        },
+      },
+    });
+
+    const prepared = prepareChatRequest(parsed);
+    expect(prepared.messagesToSend).toHaveLength(2);
+    expect(prepared.messagesToSend[0]?.role).toBe("system");
+    expect(prepared.messagesToSend[0]?.content).toContain("full conversation tree");
+    expect(prepared.messagesToSend[0]?.content).toContain("rojo y verde");
+    expect(prepared.messagesToSend[0]?.content).toContain("mono y oso");
+    expect(prepared.messagesToSend[1]?.role).toBe("user");
+    expect(prepared.messagesToSend[1]?.content).toBe(
+      "Cuales fueron todos los colores y animales?",
+    );
   });
 
   it("returns a structured error for malformed JSON", async () => {
