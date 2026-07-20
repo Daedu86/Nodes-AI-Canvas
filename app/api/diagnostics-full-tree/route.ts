@@ -1,8 +1,16 @@
+import { generateText, type ModelMessage } from "ai";
+import { createLanguageModel } from "@/lib/llm/provider-runtime";
 import { chatRequestBodySchema, prepareChatRequest } from "@/lib/server/chat/request";
 import { executeBranchSpec } from "@/lib/thread-branching-runtime";
 import type { BranchSpec } from "@/lib/thread-branching";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+const sanitizeError = (error: unknown) =>
+  (error instanceof Error ? error.message : String(error))
+    .replace(/(?:sk-or-v1-|sk-)[A-Za-z0-9_-]{12,}/g, "[redacted-token]")
+    .slice(0, 240);
 
 export async function GET() {
   const publicAppends: unknown[] = [];
@@ -26,7 +34,7 @@ export async function GET() {
     placeholder: "Continue this branch...",
     title: "Create follow-up message",
   };
-  const prompt = "Cuales fueron todos los colores y animales?";
+  const prompt = "Cuales fueron todos los colores y animales? Responde solo con los dos colores y los dos animales mencionados.";
   const executed = executeBranchSpec(runtime as never, spec, {
     contextMessages: [
       { id: "u-root", role: "user", content: "Dame 2 frutas" },
@@ -68,7 +76,7 @@ export async function GET() {
   const prepared = prepareChatRequest(parsed);
   const systemContext = prepared.messagesToSend[0]?.content ?? "";
   const currentPrompt = prepared.messagesToSend[1]?.content ?? "";
-  const checks = {
+  const pipelineChecks = {
     executed,
     usedPublicAppend: publicAppends.length === 1,
     skippedInternalAppend: internalAppends.length === 0,
@@ -81,12 +89,48 @@ export async function GET() {
       prepared.requestedModel.provider === "openrouter" &&
       prepared.requestedModel.modelId === "openrouter/free",
   };
-  const ok = Object.values(checks).every(Boolean);
+  const pipelineOk = Object.values(pipelineChecks).every(Boolean);
 
+  let providerText: string | null = null;
+  let providerError: string | null = null;
+  let providerUsedTreeFacts = false;
+  try {
+    const model = createLanguageModel(
+      { provider: "openrouter", modelId: "openrouter/free" },
+      {},
+      { userPlan: "paid" },
+    ) as Parameters<typeof generateText>[0]["model"];
+    const messages = prepared.messagesToSend.map((message) => ({
+      role: message.role,
+      content: message.modelContent as string,
+    })) as ModelMessage[];
+    const result = await generateText({
+      model,
+      messages,
+      maxOutputTokens: 80,
+      abortSignal: AbortSignal.timeout(45_000),
+    });
+    providerText = result.text.trim();
+    const normalized = providerText.toLocaleLowerCase("es");
+    providerUsedTreeFacts = ["rojo", "verde", "mono", "oso"].every((term) =>
+      normalized.includes(term),
+    );
+  } catch (error) {
+    providerError = sanitizeError(error);
+  }
+
+  const ok = pipelineOk && providerUsedTreeFacts;
   return Response.json(
     {
       ok,
-      checks,
+      pipelineChecks,
+      providerTest: {
+        attempted: true,
+        responded: Boolean(providerText),
+        usedTreeFacts: providerUsedTreeFacts,
+        text: providerText,
+        error: providerError,
+      },
       messageRoles: prepared.messagesToSend.map((message) => message.role),
       messageCount: prepared.messagesToSend.length,
     },
