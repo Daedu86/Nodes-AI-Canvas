@@ -10,6 +10,15 @@ const FULL_TREE_CONTEXT_INTRO =
 const FULL_TREE_TRUNCATION_MARKER =
   "\n\n[... middle of full tree context truncated before transport ...]\n\n";
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isFullTreeContextMessage = (value: unknown): value is FullTreeContextMessage =>
+  isRecord(value) &&
+  (value.role === "system" || value.role === "user" || value.role === "assistant") &&
+  typeof value.content === "string" &&
+  (value.id === undefined || typeof value.id === "string");
+
 const clampFullTreeContext = (value: string) => {
   if (value.length <= MAX_CLIENT_FULL_TREE_CONTEXT_CHARS) return value;
 
@@ -54,3 +63,39 @@ export const packFullTreeContextMessages = (
     currentPrompt,
   ];
 };
+
+const compactModelResolutionTreeContext = (value: unknown) => {
+  if (!isRecord(value)) return value;
+  const custom = isRecord(value.custom) ? value.custom : null;
+  if (custom?.contextScope !== "tree" || !Array.isArray(custom.contextMessages)) {
+    return value;
+  }
+
+  const contextMessages = custom.contextMessages.filter(isFullTreeContextMessage);
+  if (contextMessages.length === 0) return value;
+
+  return {
+    ...value,
+    custom: {
+      ...custom,
+      contextMessages: packFullTreeContextMessages(contextMessages),
+    },
+  };
+};
+
+/**
+ * Final transport guard used by the AI SDK request adapter. It compacts Full
+ * tree context regardless of whether Assistant UI placed it in runConfig or
+ * metadata, preventing a large tree from stalling client-side serialization.
+ */
+export const compactFullTreeRequestBody = (
+  body: Record<string, unknown>,
+): Record<string, unknown> => ({
+  ...body,
+  ...(body.runConfig !== undefined
+    ? { runConfig: compactModelResolutionTreeContext(body.runConfig) }
+    : {}),
+  ...(body.metadata !== undefined
+    ? { metadata: compactModelResolutionTreeContext(body.metadata) }
+    : {}),
+});
