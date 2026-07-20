@@ -3,28 +3,38 @@ import type { SessionThreadExport } from "@/lib/session-documents";
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
-const mergePersistedContextScope = (
+const DURABLE_CONTEXT_CUSTOM_KEYS = [
+  "contextMessages",
+  "contextScope",
+  "historyMode",
+  "model",
+  "provider",
+] as const;
+
+const mergePersistedDurableContext = (
   previous: Record<string, unknown>,
   next: Record<string, unknown>,
 ) => {
   const previousMetadata = isRecord(previous.metadata) ? previous.metadata : {};
   const previousCustom = isRecord(previousMetadata.custom) ? previousMetadata.custom : {};
-  const scope = previousCustom.contextScope;
-  if (scope !== "parent" && scope !== "branch" && scope !== "tree") return next;
   const nextMetadata = isRecord(next.metadata) ? next.metadata : {};
   const nextCustom = isRecord(nextMetadata.custom) ? nextMetadata.custom : {};
-  if (
-    nextCustom.contextScope === "parent" ||
-    nextCustom.contextScope === "branch" ||
-    nextCustom.contextScope === "tree"
-  ) {
-    return next;
-  }
+  const preservedEntries = DURABLE_CONTEXT_CUSTOM_KEYS.flatMap((key) =>
+    nextCustom[key] === undefined && previousCustom[key] !== undefined
+      ? [[key, previousCustom[key]] as const]
+      : [],
+  );
+
+  if (preservedEntries.length === 0) return next;
+
   return {
     ...next,
     metadata: {
       ...nextMetadata,
-      custom: { ...nextCustom, contextScope: scope },
+      custom: {
+        ...Object.fromEntries(preservedEntries),
+        ...nextCustom,
+      },
     },
   };
 };
@@ -101,7 +111,7 @@ export const mergeSessionSnapshotRepositories = (
         const previous = messages[existingIndex]!;
         messages[existingIndex] = {
           ...nextEntry,
-          message: mergePersistedContextScope(previous.message, nextEntry.message),
+          message: mergePersistedDurableContext(previous.message, nextEntry.message),
         };
       }
     });
@@ -166,7 +176,7 @@ export const mergeRuntimeBranchIntoSessionSnapshot = (
     const previous = mergedMessages[existingIndex]!;
     mergedMessages[existingIndex] = {
       ...nextEntry,
-      message: mergePersistedContextScope(previous.message, nextEntry.message),
+      message: mergePersistedDurableContext(previous.message, nextEntry.message),
     };
   });
 
