@@ -37,7 +37,16 @@ describe("thread branching runtime", () => {
     ).toMatchObject({
       metadata: {
         custom: {
+          contextArtifacts: [
+            {
+              id: "artifact-1",
+              title: "Requirement note",
+            },
+          ],
           contextNodeIds: ["artifact-1"],
+          historyMode: "last",
+          model: "nvidia/nemotron-3-super-120b-a12b:free",
+          provider: "openrouter",
         },
       },
       parentId: null,
@@ -132,11 +141,75 @@ describe("thread branching runtime", () => {
         text: "Canvas draft",
       }),
     ).toMatchObject({
-      metadata: { custom: { contextScope: "branch" } },
+      metadata: {
+        custom: {
+          contextMessages: [{ role: "user", content: "Earlier prompt" }],
+          contextScope: "branch",
+          historyMode: "full",
+          model: "openrouter/free",
+          provider: "openrouter",
+        },
+      },
       runConfig: {
         custom: {
           contextMessages: [{ role: "user", content: "Earlier prompt" }],
           contextScope: "branch",
+        },
+      },
+    });
+  });
+
+  it("keeps assistant parent context in durable metadata for follow-up prompts", () => {
+    const contextMessages = [
+      {
+        role: "user" as const,
+        content:
+          "Continue from the saved assistant response below; treat it as conversation context.",
+      },
+      {
+        id: "assistant-letters",
+        role: "assistant" as const,
+        content: "Claro, aquí tienes dos letras: A y B.",
+      },
+      {
+        role: "user" as const,
+        content: "de esas letras que me diste dame 1 palabra de cada una de ellas",
+      },
+    ];
+
+    const message = buildBranchAppendMessage(
+      {
+        ...baseSpec,
+        operation: "create-follow-up-prompt",
+        anchorId: "assistant-letters",
+        anchorRole: "assistant",
+        parentId: "assistant-letters",
+      },
+      {
+        contextMessages,
+        contextScope: "parent",
+        historyMode: "last",
+        modelId: "openrouter/free",
+        provider: "openrouter",
+        requireContextScope: true,
+        text: "de esas letras que me diste dame 1 palabra de cada una de ellas",
+      },
+    );
+
+    expect(message).toMatchObject({
+      metadata: {
+        custom: {
+          contextMessages,
+          contextScope: "parent",
+          historyMode: "last",
+          model: "openrouter/free",
+          provider: "openrouter",
+        },
+      },
+      runConfig: {
+        custom: {
+          contextMessages,
+          contextScope: "parent",
         },
       },
     });
