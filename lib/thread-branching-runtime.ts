@@ -60,6 +60,19 @@ export const buildBranchAppendMessage = (
   );
   const promptText = `${trimmedText}${formattingInstruction}`;
 
+  const scopedRequestConfig = {
+    ...(contextArtifacts && contextArtifacts.length > 0
+      ? { contextArtifacts }
+      : {}),
+    ...(contextMessages && contextMessages.length > 0
+      ? { contextMessages }
+      : {}),
+    ...(contextScope ? { contextScope } : {}),
+    historyMode,
+    model: modelId,
+    provider,
+  };
+
   return {
     parentId: spec.parentId,
     sourceId: spec.sourceId,
@@ -70,7 +83,7 @@ export const buildBranchAppendMessage = (
         branchAnchorId: spec.anchorId,
         branchAnchorRole: spec.anchorRole,
         branchOperation: spec.operation,
-        ...(contextScope ? { contextScope } : {}),
+        ...scopedRequestConfig,
         ...(contextNodeIds && contextNodeIds.length > 0
           ? { contextNodeIds: [...contextNodeIds] }
           : {}),
@@ -80,18 +93,9 @@ export const buildBranchAppendMessage = (
     },
     runConfig: {
       custom: {
-        ...(contextArtifacts && contextArtifacts.length > 0
-          ? { contextArtifacts }
-          : {}),
-        ...(contextMessages && contextMessages.length > 0
-          ? { contextMessages }
-          : {}),
-        ...(contextScope ? { contextScope } : {}),
+        ...scopedRequestConfig,
         ...(inputArtifactIds.length > 0 ? { inputArtifactIds } : {}),
         ...(outputArtifactIds.length > 0 ? { outputArtifactIds } : {}),
-        historyMode,
-        model: modelId,
-        provider,
       },
     },
     startRun: spec.startRun,
