@@ -26,6 +26,12 @@ const MAX_CONTEXT_ARTIFACTS = 32;
 const MAX_SYSTEM_CHARS = 64 * 1024;
 const MAX_TEXT_CONTENT_CHARS = 512 * 1024;
 const MAX_ARTIFACT_CONTENT_CHARS = 2 * 1024 * 1024;
+const MAX_FULL_TREE_CONTEXT_CHARS = 64 * 1024;
+
+const FULL_TREE_CONTEXT_INTRO =
+  "The following messages come from the full conversation tree. They may belong to sibling branches, so treat them as reference context rather than one linear dialogue.";
+const FULL_TREE_TRUNCATION_MARKER =
+  "\n\n[... middle of full tree context truncated to stay within model limits ...]\n\n";
 
 export const CHAT_REQUEST_ID_HEADER = "x-nodes-request-id";
 export const INVALID_CHAT_REQUEST_CODE = "invalid_request";
@@ -203,6 +209,48 @@ const createValidationResponse = (options: {
   );
 };
 
+const clampFullTreeContext = (value: string) => {
+  if (value.length <= MAX_FULL_TREE_CONTEXT_CHARS) return value;
+
+  const availableChars = MAX_FULL_TREE_CONTEXT_CHARS - FULL_TREE_TRUNCATION_MARKER.length;
+  const headChars = Math.floor(availableChars / 3);
+  const tailChars = availableChars - headChars;
+  return `${value.slice(0, headChars)}${FULL_TREE_TRUNCATION_MARKER}${value.slice(-tailChars)}`;
+};
+
+const normalizeFullTreeContext = (
+  scopedMessages: NormalizedLlmMessage[],
+): NormalizedLlmMessage[] => {
+  if (scopedMessages.length <= 1) return scopedMessages;
+
+  const currentPrompt = scopedMessages.at(-1);
+  if (!currentPrompt) return scopedMessages;
+
+  const treeTranscript = scopedMessages
+    .slice(0, -1)
+    .map((message, index) => {
+      const idSuffix = message.id ? ` | id=${message.id}` : "";
+      return `[Tree node ${index + 1} | role=${message.role}${idSuffix}]\n${message.content}`;
+    })
+    .join("\n\n");
+
+  if (!treeTranscript.trim()) return [currentPrompt];
+
+  const contextContent = clampFullTreeContext(
+    `${FULL_TREE_CONTEXT_INTRO}\n\n${treeTranscript}`,
+  );
+  const normalized = normalizeMessages([
+    { role: "system", content: contextContent },
+    {
+      ...(currentPrompt.id ? { id: currentPrompt.id } : {}),
+      role: currentPrompt.role,
+      content: currentPrompt.content,
+    },
+  ]);
+
+  return normalized.length > 0 ? normalized : [currentPrompt];
+};
+
 export async function parseChatRequest(req: Request): Promise<ChatRequestParseResult> {
   const declaredLength = Number(req.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_CHAT_REQUEST_BYTES) {
@@ -276,6 +324,9 @@ export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
     body.metadata?.custom?.contextArtifacts ??
       body.runConfig?.custom?.contextArtifacts,
   );
+  const contextScope =
+    body.metadata?.custom?.contextScope ??
+    body.runConfig?.custom?.contextScope;
   const historyMode =
     body.metadata?.custom?.historyMode ??
     body.metadata?.historyMode ??
@@ -287,6 +338,10 @@ export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
       body.runConfig?.custom?.contextMessages ??
       [],
   );
+  const scopedMessagesToSend =
+    contextScope === "tree"
+      ? normalizeFullTreeContext(scopedMessages)
+      : scopedMessages;
 
   return {
     body,
@@ -294,8 +349,8 @@ export function prepareChatRequest(body: ChatRequestBody): PreparedChatRequest {
     historyMode,
     messages,
     messagesToSend:
-      scopedMessages.length > 0
-        ? scopedMessages
+      scopedMessagesToSend.length > 0
+        ? scopedMessagesToSend
         : selectMessagesForHistoryMode(messages, historyMode ?? "full"),
     rawMessages,
     requestedModel: getRequestedModelConfig(body),
