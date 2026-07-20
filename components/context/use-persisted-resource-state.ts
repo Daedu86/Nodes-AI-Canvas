@@ -9,6 +9,17 @@ import {
 
 type ResourceWithId = { id: string };
 
+const getResourceVersion = (resource: ResourceWithId) => {
+  const version = (resource as ResourceWithId & { version?: unknown }).version;
+  return typeof version === "number" && Number.isFinite(version) ? version : null;
+};
+
+const hasSameVersion = (current: ResourceWithId, next: ResourceWithId) => {
+  const currentVersion = getResourceVersion(current);
+  const nextVersion = getResourceVersion(next);
+  return currentVersion !== null && nextVersion !== null && currentVersion === nextVersion;
+};
+
 export function usePersistedResourceState<
   TSummary extends ResourceWithId,
   TDocument extends TSummary,
@@ -40,8 +51,20 @@ export function usePersistedResourceState<
 
   const updateKnownResource = React.useCallback(
     (resource: TDocument) => {
+      const currentActive = activeResourceRef.current;
+
+      // Versioned persistence responses with the same version are acknowledgements
+      // of an unchanged document. Re-applying them creates needless React updates
+      // and can feed persistence bridges that subscribe to runtime/session changes.
+      if (
+        currentActive?.id === resource.id &&
+        hasSameVersion(currentActive, resource)
+      ) {
+        return;
+      }
+
       setResources((previous) => replaceResourceById(previous, resource));
-      if (activeResourceRef.current?.id === resource.id) {
+      if (currentActive?.id === resource.id) {
         setActiveResource(resource);
       }
     },
