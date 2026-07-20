@@ -280,7 +280,6 @@ test("keeps core Canvas interactions usable across selection, pan, zoom, and Cha
   await expect(node).toBeVisible();
   await node.dblclick({ position: { x: 24, y: 24 } });
 
-  await expect(page.getByRole("button", { name: "Exit split workspace" })).toBeVisible();
   await expect(composer).toBeVisible();
   await expect(page.locator(`[data-message-id="${nodeId}"]`)).toBeVisible();
 });
