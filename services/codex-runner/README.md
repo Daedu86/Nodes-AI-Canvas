@@ -43,6 +43,41 @@ CODEX_RUNNER_TOKEN=replace-with-a-long-random-secret
 
 For a remote Nodes deployment, keep the runner on a private network or authenticated tunnel and point `CODEX_RUNNER_URL` at that private endpoint. The runner is not intended to run as a normal Vercel Function.
 
+## Windows background autostart
+
+On Windows, the runner can be installed once as a per-user Scheduled Task so you do not have to run `npm run start:env` manually every time.
+
+From PowerShell:
+
+```powershell
+cd services/codex-runner
+npm run autostart:install:windows
+```
+
+This installs and immediately starts `Nodes AI Canvas Codex Runner`. After that it starts automatically when you sign in to Windows.
+
+The scheduled task launches `windows-runner.ps1`, which:
+
+- runs the runner in a hidden background process;
+- reads `services/codex-runner/.env`;
+- checks `/healthz` first to avoid a duplicate runner;
+- restarts the runner automatically after an unexpected exit;
+- writes local logs under `services/codex-runner/.logs/`.
+
+Check the runner at:
+
+```text
+http://127.0.0.1:8787/healthz
+```
+
+Remove autostart with:
+
+```powershell
+npm run autostart:remove:windows
+```
+
+The installer uses the current Windows user and `RunLevel Limited`; it does not intentionally request administrator privileges. Windows policy may still require elevation on managed machines.
+
 ## Workspace configuration
 
 The runner never accepts an arbitrary filesystem path from the browser or Nodes API. It resolves workspaces from runner-owned configuration.
