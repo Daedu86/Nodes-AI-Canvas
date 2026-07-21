@@ -6,7 +6,10 @@ import {
   ArrowLeft,
   Bot,
   CheckCircle2,
+  Clock3,
+  Coins,
   FolderKanban,
+  Gauge,
   MessageSquareText,
   RefreshCw,
   Save,
@@ -38,11 +41,21 @@ type AgentWorkAgent = {
   model?: string | null;
 };
 
+type CodexUsageSnapshot = {
+  ok?: boolean;
+  account?: unknown;
+  rateLimits?: unknown;
+  usage?: unknown;
+  updatedAt?: string;
+  error?: string;
+} | null;
+
 type AgentWorkResponse = {
   agents: AgentWorkAgent[];
   sessions: Array<{ id: string; title: string | null; updatedAt: string; createdAt: string; archived: boolean; messageCount: number }>;
   projects: Array<{ id: string; title: string | null; updatedAt: string; createdAt: string; sessionCount: number }>;
   events: Array<{ id: string; tokenId: string | null; eventType: string; method: string; route: string; sessionId: string | null; projectId: string | null; createdAt: string }>;
+  codexUsage?: CodexUsageSnapshot;
 };
 
 const workspaceBackdropClassName =
@@ -56,6 +69,69 @@ const formatDate = (value: string | null) => {
   if (!value) return "never";
   try { return new Date(value).toLocaleString(); } catch { return value; }
 };
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const numberValue = (...values: unknown[]) => {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  }
+  return null;
+};
+
+const stringValue = (...values: unknown[]) => {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+};
+
+const formatResetAt = (value: unknown) => {
+  const numeric = numberValue(value);
+  const date = numeric !== null
+    ? new Date(numeric > 10_000_000_000 ? numeric : numeric * 1000)
+    : typeof value === "string" ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "Not reported";
+  const diffMs = date.getTime() - Date.now();
+  if (diffMs <= 0) return `Reset due · ${date.toLocaleString()}`;
+  const totalMinutes = Math.max(1, Math.round(diffMs / 60_000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  const relative = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  return `Resets in ${relative} · ${date.toLocaleString()}`;
+};
+
+const formatWindow = (minutes: number | null, fallback: string) => {
+  if (!minutes) return fallback;
+  if (minutes % 1440 === 0) return `${minutes / 1440}-day window`;
+  if (minutes % 60 === 0) return `${minutes / 60}-hour window`;
+  return `${minutes}-minute window`;
+};
+
+function UsageWindow({ title, value }: { title: string; value: Record<string, unknown> }) {
+  const used = numberValue(value.usedPercent, value.used_percent, value.percentUsed, value.percent_used);
+  const windowMinutes = numberValue(value.windowDurationMins, value.window_duration_mins, value.windowMinutes);
+  const resetAt = value.resetsAt ?? value.resets_at ?? value.resetAt ?? value.reset_at;
+  const safeUsed = used === null ? null : Math.min(100, Math.max(0, used));
+  const available = safeUsed === null ? null : Math.max(0, 100 - safeUsed);
+  return (
+    <div className="rounded-[16px] border border-border/70 bg-background/70 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div><p className="text-sm font-semibold">{formatWindow(windowMinutes, title)}</p><p className="mt-1 text-xs text-muted-foreground">{formatResetAt(resetAt)}</p></div>
+        <span className="text-sm font-semibold text-sky-600">{available === null ? "—" : `${Math.round(available)}% available`}</span>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-sky-500 transition-all" style={{ width: `${available ?? 0}%` }} />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{safeUsed === null ? "Usage percentage not reported by Codex." : `${Math.round(safeUsed)}% used`}</p>
+    </div>
+  );
+}
 
 export function AgentWorkWorkspace() {
   const { showWorkspace } = useWorkspaceSurface();
@@ -75,7 +151,7 @@ export function AgentWorkWorkspace() {
       const url = new URL("/api/agents/work", window.location.origin);
       const resolvedTokenId = tokenId ?? selectedTokenId;
       if (resolvedTokenId) url.searchParams.set("tokenId", resolvedTokenId);
-      const res = await fetch(url.toString(), { method: "GET" });
+      const res = await fetch(url.toString(), { method: "GET", cache: "no-store" });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const data = (await res.json()) as AgentWorkResponse;
       setPayload(data);
@@ -106,6 +182,10 @@ export function AgentWorkWorkspace() {
   }, [refresh]);
 
   React.useEffect(() => { void refresh(null); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    const timer = window.setInterval(() => void refresh(selectedTokenId), 60_000);
+    return () => window.clearInterval(timer);
+  }, [refresh, selectedTokenId]);
 
   const toggleTool = (tool: CodexAgentTool) => {
     setDefaults((current) => ({
@@ -128,15 +208,30 @@ export function AgentWorkWorkspace() {
   const sessionsById = React.useMemo(() => new Map((payload?.sessions ?? []).map((item) => [item.id, item])), [payload?.sessions]);
   const projectsById = React.useMemo(() => new Map((payload?.projects ?? []).map((item) => [item.id, item])), [payload?.projects]);
 
+  const rateLimitsEnvelope = asRecord(payload?.codexUsage?.rateLimits);
+  const rateLimits = asRecord(rateLimitsEnvelope.rateLimits ?? rateLimitsEnvelope.rate_limits ?? rateLimitsEnvelope);
+  const primary = asRecord(rateLimits.primary ?? rateLimits.primaryLimit ?? rateLimits.primary_limit);
+  const secondary = asRecord(rateLimits.secondary ?? rateLimits.secondaryLimit ?? rateLimits.secondary_limit);
+  const credits = asRecord(rateLimits.credits ?? rateLimits.creditBalance ?? rateLimits.credit_balance);
+  const resetCredits = asRecord(rateLimits.rateLimitResetCredits ?? rateLimits.rate_limit_reset_credits ?? rateLimits.resetCredits);
+  const account = asRecord(payload?.codexUsage?.account);
+  const plan = stringValue(rateLimits.planType, rateLimits.plan_type, account.planType, account.plan_type, account.type);
+  const creditBalance = numberValue(credits.balance, credits.amount, credits.remaining);
+  const resetCount = numberValue(resetCredits.availableCount, resetCredits.available_count, resetCredits.count);
+  const usageEnvelope = asRecord(payload?.codexUsage?.usage);
+  const usage = asRecord(usageEnvelope.usage ?? usageEnvelope);
+  const tokenTotal = numberValue(usage.totalTokens, usage.total_tokens, usage.tokens, usage.tokenCount, usage.token_count);
+  const codexConnected = agents.find((agent) => agent.tokenId === "codex-runtime")?.connected ?? false;
+
   return (
     <div className={workspaceBackdropClassName}>
       <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-[12px] border border-border/80 bg-muted/60"><Activity className="size-4" /></div>
-          <div><h1 className="text-base font-semibold">Agent Work</h1><p className="mt-1 text-sm text-muted-foreground">Configure agent defaults and audit agent activity.</p></div>
+          <div><h1 className="text-base font-semibold">Agent Work</h1><p className="mt-1 text-sm text-muted-foreground">Configure agent defaults, monitor Codex capacity, and audit agent activity.</p></div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled={busy} onClick={() => void refresh(selectedTokenId)}><RefreshCw className="size-4" />Refresh</Button>
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => void refresh(selectedTokenId)}><RefreshCw className={`size-4 ${busy ? "animate-spin" : ""}`} />Refresh</Button>
           <Button variant="outline" size="sm" onClick={showWorkspace}><ArrowLeft className="size-4" />Back</Button>
         </div>
       </div>
@@ -144,6 +239,36 @@ export function AgentWorkWorkspace() {
       <div className="flex min-h-0 flex-1 flex-col p-5">
         <div className={shellClassName}><div className={shellInnerClassName}>
           {error ? <p className="mb-4 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
+
+          <section className="mb-5 rounded-[18px] border border-emerald-500/20 bg-emerald-500/[0.04] p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2"><Gauge className="size-4 text-emerald-500" /><p className="text-xs font-medium uppercase tracking-[0.14em] text-emerald-600">Codex usage & limits</p></div>
+                <h2 className="mt-1 text-lg font-semibold">Account capacity</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Live values reported by your local Codex app-server. Refreshes every 60 seconds.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${codexConnected ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-600"}`}>{codexConnected ? "● Codex connected" : "● Codex offline"}</span>
+                {plan ? <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium">{plan}</span> : null}
+              </div>
+            </div>
+
+            {payload?.codexUsage ? (
+              <div className="mt-5 grid gap-3 xl:grid-cols-2">
+                {Object.keys(primary).length ? <UsageWindow title="Primary limit" value={primary} /> : <div className="rounded-[16px] border border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">Primary usage window was not reported by this Codex build/account.</div>}
+                {Object.keys(secondary).length ? <UsageWindow title="Secondary limit" value={secondary} /> : <div className="rounded-[16px] border border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">Secondary usage window was not reported by this Codex build/account.</div>}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-[16px] border border-amber-500/25 bg-amber-500/[0.06] p-4 text-sm text-muted-foreground">Usage data is not available yet. Restart the local Codex Runner after pulling this update, then refresh Agent Work.</div>
+            )}
+
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <div className="rounded-[16px] border border-border/70 bg-background/70 p-4"><div className="flex items-center gap-2 text-sm font-semibold"><Coins className="size-4 text-amber-500" />Credits</div><p className="mt-2 text-xl font-semibold">{creditBalance === null ? "—" : creditBalance.toLocaleString()}</p><p className="mt-1 text-xs text-muted-foreground">{Object.keys(credits).length ? "Reported account balance" : "Not reported for this account"}</p></div>
+              <div className="rounded-[16px] border border-border/70 bg-background/70 p-4"><div className="flex items-center gap-2 text-sm font-semibold"><RefreshCw className="size-4 text-violet-500" />Banked resets</div><p className="mt-2 text-xl font-semibold">{resetCount === null ? "—" : Math.round(resetCount)}</p><p className="mt-1 text-xs text-muted-foreground">Available reset credits</p></div>
+              <div className="rounded-[16px] border border-border/70 bg-background/70 p-4"><div className="flex items-center gap-2 text-sm font-semibold"><Clock3 className="size-4 text-sky-500" />Token activity</div><p className="mt-2 text-xl font-semibold">{tokenTotal === null ? "—" : tokenTotal.toLocaleString()}</p><p className="mt-1 text-xs text-muted-foreground">{tokenTotal === null ? "Detailed token total not reported" : "Reported tokens"}</p></div>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">Last update: {payload?.codexUsage?.updatedAt ? formatDate(payload.codexUsage.updatedAt) : "not available"}</p>
+          </section>
 
           <section className="mb-5 rounded-[18px] border border-sky-500/25 bg-sky-500/[0.06] p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
