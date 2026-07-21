@@ -7,11 +7,20 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const CODEX_RUNTIME_AGENT_ID = "codex-runtime";
-const CODEX_MODEL = process.env.CODEX_MODEL?.trim() || "gpt-5.6-sol";
+const CODEX_MODEL = process.env.CODEX_MODEL?.trim() || "gpt-5.5";
 
-const getCodexConnectionState = async () => {
+type CodexUsageSnapshot = {
+  ok?: boolean;
+  account?: unknown;
+  rateLimits?: unknown;
+  usage?: unknown;
+  updatedAt?: string;
+  error?: string;
+} | null;
+
+const getCodexRuntimeState = async () => {
   const rawUrl = process.env.CODEX_RUNNER_URL?.trim();
-  if (!rawUrl) return false;
+  if (!rawUrl) return { connected: false, usage: null as CodexUsageSnapshot };
 
   try {
     const baseUrl = new URL(rawUrl).toString().replace(/\/+$/, "");
@@ -19,20 +28,37 @@ const getCodexConnectionState = async () => {
     const token = process.env.CODEX_RUNNER_TOKEN?.trim();
     if (token) headers.set("authorization", `Bearer ${token}`);
 
-    const response = await fetch(`${baseUrl}/readyz`, {
-      method: "GET",
-      headers,
-      cache: "no-store",
-      signal: AbortSignal.timeout(6_000),
-    });
-    if (!response.ok) return false;
+    const [readyResponse, usageResponse] = await Promise.all([
+      fetch(`${baseUrl}/readyz`, {
+        method: "GET",
+        headers,
+        cache: "no-store",
+        signal: AbortSignal.timeout(6_000),
+      }),
+      fetch(`${baseUrl}/v1/account/usage`, {
+        method: "GET",
+        headers,
+        cache: "no-store",
+        signal: AbortSignal.timeout(8_000),
+      }).catch(() => null),
+    ]);
 
-    const body = (await response.json().catch(() => null)) as
-      | { ok?: unknown; codexRunning?: unknown; authenticated?: unknown }
-      | null;
-    return Boolean(body?.ok && body?.codexRunning && body?.authenticated);
+    const readyBody = readyResponse.ok
+      ? ((await readyResponse.json().catch(() => null)) as
+          | { ok?: unknown; codexRunning?: unknown; authenticated?: unknown }
+          | null)
+      : null;
+    const connected = Boolean(
+      readyBody?.ok && readyBody?.codexRunning && readyBody?.authenticated,
+    );
+
+    const usage = usageResponse?.ok
+      ? ((await usageResponse.json().catch(() => null)) as CodexUsageSnapshot)
+      : null;
+
+    return { connected, usage };
   } catch {
-    return false;
+    return { connected: false, usage: null as CodexUsageSnapshot };
   }
 };
 
@@ -46,6 +72,8 @@ type AgentWorkResponse = {
     eventCount: number;
     sessionIds: string[];
     projectIds: string[];
+    connected?: boolean;
+    model?: string | null;
   }>;
   sessions: Array<{
     id: string;
@@ -72,6 +100,7 @@ type AgentWorkResponse = {
     projectId: string | null;
     createdAt: string;
   }>;
+  codexUsage: CodexUsageSnapshot;
 };
 
 export async function GET(req: Request) {
@@ -105,10 +134,10 @@ export async function GET(req: Request) {
     );
   }
 
-  const [sessions, projects, codexConnected] = await Promise.all([
+  const [sessions, projects, codexRuntime] = await Promise.all([
     listSessions({ includeArchived: true, ownerId: guarded.user.id }),
     listProjectsForUser(guarded.user),
-    getCodexConnectionState(),
+    getCodexRuntimeState(),
   ]);
 
   const sessionsById = new Map(sessions.map((s) => [s.id, s]));
@@ -145,7 +174,7 @@ export async function GET(req: Request) {
     .filter(Boolean) as AgentWorkResponse["agents"];
 
   const codexEvents = events.filter((event) => event.eventType.startsWith("codex."));
-  if (codexEvents.length > 0 || codexConnected) {
+  if (codexEvents.length > 0 || codexRuntime.connected) {
     const chronological = [...codexEvents].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
@@ -157,13 +186,15 @@ export async function GET(req: Request) {
     ];
     agents.unshift({
       tokenId: CODEX_RUNTIME_AGENT_ID,
-      label: `Codex · ${codexConnected ? "Connected" : "Offline"} · ${CODEX_MODEL}`,
+      label: `Codex · ${codexRuntime.connected ? "Connected" : "Offline"} · ${CODEX_MODEL}`,
       createdAt: chronological[0]?.createdAt ?? new Date().toISOString(),
       expiresAt: null,
       lastUsedAt: chronological.at(-1)?.createdAt ?? null,
       eventCount: codexEvents.length,
       sessionIds: codexSessionIds,
       projectIds: codexProjectIds,
+      connected: codexRuntime.connected,
+      model: CODEX_MODEL,
     });
   }
 
@@ -185,6 +216,7 @@ export async function GET(req: Request) {
       projectId: event.projectId,
       createdAt: event.createdAt,
     })),
+    codexUsage: codexRuntime.usage,
   };
 
   return Response.json(response);
