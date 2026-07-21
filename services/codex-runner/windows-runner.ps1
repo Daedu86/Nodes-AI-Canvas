@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 $RunnerDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $EnvFile = Join-Path $RunnerDir ".env"
-$ServerFile = Join-Path $RunnerDir "server.mjs"
+$ServerFile = Join-Path $RunnerDir "server-launcher.mjs"
 $LogDir = Join-Path $RunnerDir ".logs"
 $StdoutLog = Join-Path $LogDir "runner.stdout.log"
 $StderrLog = Join-Path $LogDir "runner.stderr.log"
