@@ -11,6 +11,8 @@
     "start": "node server.mjs",
     "start:env": "node --env-file=.env server.mjs",
     "dev": "node --watch server.mjs",
-    "dev:env": "node --env-file=.env --watch server.mjs"
+    "dev:env": "node --env-file=.env --watch server.mjs",
+    "autostart:install:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File ./install-windows-autostart.ps1",
+    "autostart:remove:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File ./uninstall-windows-autostart.ps1"
   }
 }
