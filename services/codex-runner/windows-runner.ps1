@@ -33,10 +33,23 @@ if (Test-RunnerAlive) {
 
 Set-Location $RunnerDir
 
+# Start-Process flattens ArgumentList into a command line. Explicitly quote paths so
+# installations under folders such as "SW Projects" are passed to Node intact.
+$QuotedEnvArg = '"--env-file=' + $EnvFile.Replace('"', '\"') + '"'
+$QuotedServerArg = '"' + $ServerFile.Replace('"', '\"') + '"'
+
 while ($true) {
   try {
     Add-Content -Path $StdoutLog -Value "[$(Get-Date -Format o)] Starting Codex runner..."
-    $process = Start-Process -FilePath "node" -ArgumentList @("--env-file=$EnvFile", $ServerFile) -WorkingDirectory $RunnerDir -RedirectStandardOutput $StdoutLog -RedirectStandardError $StderrLog -PassThru -WindowStyle Hidden
+    $process = Start-Process `
+      -FilePath "node" `
+      -ArgumentList @($QuotedEnvArg, $QuotedServerArg) `
+      -WorkingDirectory $RunnerDir `
+      -RedirectStandardOutput $StdoutLog `
+      -RedirectStandardError $StderrLog `
+      -PassThru `
+      -WindowStyle Hidden
+
     $process.WaitForExit()
     Add-Content -Path $StderrLog -Value "[$(Get-Date -Format o)] Runner exited with code $($process.ExitCode). Restarting in $RestartDelaySeconds seconds."
   } catch {
