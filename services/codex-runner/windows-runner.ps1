@@ -36,15 +36,7 @@ Set-Location $RunnerDir
 while ($true) {
   try {
     Add-Content -Path $StdoutLog -Value "[$(Get-Date -Format o)] Starting Codex runner..."
-    $process = Start-Process \
-      -FilePath "node" \
-      -ArgumentList @("--env-file=$EnvFile", $ServerFile) \
-      -WorkingDirectory $RunnerDir \
-      -RedirectStandardOutput $StdoutLog \
-      -RedirectStandardError $StderrLog \
-      -PassThru \
-      -WindowStyle Hidden
-
+    $process = Start-Process -FilePath "node" -ArgumentList @("--env-file=$EnvFile", $ServerFile) -WorkingDirectory $RunnerDir -RedirectStandardOutput $StdoutLog -RedirectStandardError $StderrLog -PassThru -WindowStyle Hidden
     $process.WaitForExit()
     Add-Content -Path $StderrLog -Value "[$(Get-Date -Format o)] Runner exited with code $($process.ExitCode). Restarting in $RestartDelaySeconds seconds."
   } catch {
