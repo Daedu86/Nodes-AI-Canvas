@@ -14,6 +14,7 @@ export const CODEX_MODEL_OPTIONS = [
 export const CODEX_TOOL_OPTIONS = ["web", "files", "shell"] as const;
 
 export type CodexAgentTool = (typeof CODEX_TOOL_OPTIONS)[number];
+export type CodexAgentModel = (typeof CODEX_MODEL_OPTIONS)[number];
 
 export type CodexAgentDefaults = {
   model: string;
@@ -22,8 +23,14 @@ export type CodexAgentDefaults = {
   approvalMode: "ask" | "auto";
 };
 
+const configuredDefaultModel = process.env.NEXT_PUBLIC_CODEX_MODEL?.trim();
+const fallbackModel =
+  configuredDefaultModel && CODEX_MODEL_OPTIONS.includes(configuredDefaultModel as CodexAgentModel)
+    ? configuredDefaultModel
+    : "gpt-5.5";
+
 export const FALLBACK_CODEX_AGENT_DEFAULTS: CodexAgentDefaults = {
-  model: process.env.NEXT_PUBLIC_CODEX_MODEL?.trim() || "gpt-5.5",
+  model: fallbackModel,
   tools: ["web", "files"],
   workspace: "temporary",
   approvalMode: "ask",
@@ -32,16 +39,17 @@ export const FALLBACK_CODEX_AGENT_DEFAULTS: CodexAgentDefaults = {
 const isTool = (value: unknown): value is CodexAgentTool =>
   typeof value === "string" && CODEX_TOOL_OPTIONS.includes(value as CodexAgentTool);
 
+const isModel = (value: unknown): value is CodexAgentModel =>
+  typeof value === "string" && CODEX_MODEL_OPTIONS.includes(value as CodexAgentModel);
+
 export const normalizeCodexAgentDefaults = (value: unknown): CodexAgentDefaults => {
   const record = value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
   const tools = Array.isArray(record.tools) ? record.tools.filter(isTool) : [];
   return {
-    model:
-      typeof record.model === "string" && record.model.trim()
-        ? record.model.trim().slice(0, 120)
-        : FALLBACK_CODEX_AGENT_DEFAULTS.model,
+    // This also migrates stale selections such as the old gpt-5.6-sol placeholder.
+    model: isModel(record.model) ? record.model : FALLBACK_CODEX_AGENT_DEFAULTS.model,
     tools: tools.length ? tools : FALLBACK_CODEX_AGENT_DEFAULTS.tools,
     workspace: record.workspace === "project" ? "project" : "temporary",
     approvalMode: record.approvalMode === "auto" ? "auto" : "ask",
