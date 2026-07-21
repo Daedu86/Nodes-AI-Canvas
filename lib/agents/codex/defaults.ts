@@ -1,9 +1,14 @@
 export const CODEX_AGENT_DEFAULTS_STORAGE_KEY = "nodes.codex-agent-defaults.v1";
 
+// Current general-purpose / coding models listed for Codex usage.
+// Access can still vary by account, plan, workspace policy, or research-preview eligibility.
 export const CODEX_MODEL_OPTIONS = [
-  "gpt-5.6-sol",
-  "gpt-5.6",
-  "o4-mini",
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.3-codex",
+  "gpt-5.3-codex-spark",
+  "gpt-5.2",
 ] as const;
 
 export const CODEX_TOOL_OPTIONS = ["web", "files", "shell"] as const;
@@ -18,7 +23,7 @@ export type CodexAgentDefaults = {
 };
 
 export const FALLBACK_CODEX_AGENT_DEFAULTS: CodexAgentDefaults = {
-  model: process.env.NEXT_PUBLIC_CODEX_MODEL?.trim() || "gpt-5.6-sol",
+  model: process.env.NEXT_PUBLIC_CODEX_MODEL?.trim() || "gpt-5.5",
   tools: ["web", "files"],
   workspace: "temporary",
   approvalMode: "ask",
